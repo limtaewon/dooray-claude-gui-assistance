@@ -7,3 +7,6 @@ out
 .env
 .env.local
 .idea
+release
+.omc
+.playwright-mcp
