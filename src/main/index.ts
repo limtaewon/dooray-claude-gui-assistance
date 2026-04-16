@@ -13,6 +13,7 @@ import { AIService } from './ai/AIService'
 import Store from 'electron-store'
 import { TerminalManager } from './terminal/TerminalManager'
 import { SkillStore } from './skills/SkillStore'
+import { GitService } from './git/GitService'
 import { IPC_CHANNELS } from '../shared/types/ipc'
 import type { McpServerConfig } from '../shared/types/mcp'
 import type { SkillSaveRequest } from '../shared/types/skills'
@@ -20,6 +21,7 @@ import type { UsageQueryParams } from '../shared/types/usage'
 import type { DoorayTaskUpdateParams, DoorayWikiUpdateParams, DoorayCalendarQueryParams, DoorayTask } from '../shared/types/dooray'
 import type { AIChatRequest } from '../shared/types/ai'
 import type { TerminalCreateOptions, TerminalResizeOptions } from '../shared/types/terminal'
+import type { GitWorktreeCreateParams, GitWorktreeRemoveParams } from '../shared/types/git'
 
 // Managers
 const mcpConfigManager = new McpConfigManager()
@@ -34,6 +36,7 @@ const aiService = new AIService()
 const store = new Store({ name: 'clauday-data' })
 const terminalManager = new TerminalManager()
 const skillStore = new SkillStore()
+const gitService = new GitService()
 
 // AI에 Dooray 컨텍스트를 제공하기 위한 캐시
 let cachedTasks: DoorayTask[] = []
@@ -525,6 +528,53 @@ ${data}`
       mainHelp: mainKo, mcpHelp: mcpKo, authHelp: authKo, agentsHelp: agentsKo, pluginHelp: pluginKo
     }
   })
+
+  // Git Worktree (에러 시 메시지 정규화)
+  const gitHandle = <T,>(channel: string, handler: (...args: unknown[]) => Promise<T>): void => {
+    ipcMain.handle(channel, async (_, ...args: unknown[]) => {
+      try {
+        return await handler(...args)
+      } catch (err) {
+        throw new Error(err instanceof Error ? err.message : String(err))
+      }
+    })
+  }
+
+  gitHandle(IPC_CHANNELS.GIT_IS_REPO, (path) =>
+    gitService.isGitRepo(path as string)
+  )
+  gitHandle(IPC_CHANNELS.GIT_REPO_ROOT, (path) =>
+    gitService.getRepoRoot(path as string)
+  )
+  gitHandle(IPC_CHANNELS.GIT_BRANCHES, (repoPath) =>
+    gitService.listBranches(repoPath as string)
+  )
+  gitHandle(IPC_CHANNELS.GIT_WORKTREES, (repoPath) =>
+    gitService.listWorktrees(repoPath as string)
+  )
+  gitHandle(IPC_CHANNELS.GIT_WORKTREE_CREATE, (params) =>
+    gitService.createWorktree(params as GitWorktreeCreateParams)
+  )
+  gitHandle(IPC_CHANNELS.GIT_WORKTREE_REMOVE, (params) =>
+    gitService.removeWorktree(params as GitWorktreeRemoveParams)
+  )
+  gitHandle(IPC_CHANNELS.GIT_WORKTREE_STATUS, (worktreePath) =>
+    gitService.getWorktreeStatus(worktreePath as string)
+  )
+  gitHandle(IPC_CHANNELS.GIT_DIFF, (worktreePath) =>
+    gitService.getDiff(worktreePath as string)
+  )
+  gitHandle(IPC_CHANNELS.GIT_COMPARE_BRANCHES, (args) => {
+    const { repoPath, branch1, branch2 } = args as { repoPath: string; branch1: string; branch2: string }
+    return gitService.compareBranches(repoPath, branch1, branch2)
+  })
+  gitHandle(IPC_CHANNELS.GIT_COMPARE_FILE, (args) => {
+    const { repoPath, filePath, branch1, branch2 } = args as { repoPath: string; filePath: string; branch1: string; branch2: string }
+    return gitService.compareFile(repoPath, filePath, branch1, branch2)
+  })
+  gitHandle(IPC_CHANNELS.GIT_PRUNE, (repoPath) =>
+    gitService.pruneWorktrees(repoPath as string)
+  )
 
   // Dialog
   ipcMain.handle(IPC_CHANNELS.DIALOG_SELECT_FOLDER, async () => {

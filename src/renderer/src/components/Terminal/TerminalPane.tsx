@@ -85,14 +85,23 @@ function TerminalPane({ sessionId, isActive, initialOutput }: TerminalPaneProps)
 
   useEffect(() => {
     if (isActive && fitAddonRef.current) {
-      try { fitAddonRef.current.fit() } catch {}
-      terminalRef.current?.focus()
+      // hidden → block 전환 후 레이아웃 완료를 기다린 뒤 fit
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          try {
+            fitAddonRef.current?.fit()
+            const dims = fitAddonRef.current?.proposeDimensions()
+            if (dims) window.api.terminal.resize({ id: sessionId, cols: dims.cols, rows: dims.rows })
+          } catch {}
+          terminalRef.current?.focus()
+        })
+      })
     }
-  }, [isActive])
+  }, [isActive, sessionId])
 
   return (
     <div ref={containerRef}
-      className={`h-full w-full ${isActive ? 'block' : 'hidden'}`}
+      className={`absolute inset-0 ${isActive ? 'z-10' : 'z-0 pointer-events-none invisible'}`}
       style={{ padding: '4px 8px' }} />
   )
 }

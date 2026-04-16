@@ -15,6 +15,15 @@ import type {
 } from '../shared/types/dooray'
 import type { AIChatRequest, AIChatResponse, AIBriefing, AIReport, AIReportRequest } from '../shared/types/ai'
 import type { TerminalSession, TerminalCreateOptions, TerminalResizeOptions } from '../shared/types/terminal'
+import type {
+  GitWorktree,
+  GitWorktreeStatus,
+  GitBranch,
+  GitDiffResult,
+  GitWorktreeCreateParams,
+  GitWorktreeRemoveParams,
+  GitFileCompare
+} from '../shared/types/git'
 
 const api = {
   // MCP
@@ -212,6 +221,32 @@ const api = {
   claudeCli: {
     info: (): Promise<{ version: string; mainHelp: string; mcpHelp: string; authHelp: string; agentsHelp: string; pluginHelp: string }> =>
       ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_CLI_INFO)
+  },
+
+  // Git Worktree
+  git: {
+    isRepo: (path: string): Promise<boolean> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_IS_REPO, path),
+    repoRoot: (path: string): Promise<string> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_REPO_ROOT, path),
+    branches: (repoPath: string): Promise<GitBranch[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_BRANCHES, repoPath),
+    worktrees: (repoPath: string): Promise<GitWorktree[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_WORKTREES, repoPath),
+    createWorktree: (params: GitWorktreeCreateParams): Promise<GitWorktree> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_WORKTREE_CREATE, params),
+    removeWorktree: (params: GitWorktreeRemoveParams): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_WORKTREE_REMOVE, params),
+    worktreeStatus: (worktreePath: string): Promise<Omit<GitWorktreeStatus, 'worktree'>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_WORKTREE_STATUS, worktreePath),
+    diff: (worktreePath: string): Promise<GitDiffResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_DIFF, worktreePath),
+    compareBranches: (repoPath: string, branch1: string, branch2: string): Promise<GitDiffResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_COMPARE_BRANCHES, { repoPath, branch1, branch2 }),
+    compareFile: (repoPath: string, filePath: string, branch1: string, branch2: string): Promise<GitFileCompare> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_COMPARE_FILE, { repoPath, filePath, branch1, branch2 }),
+    prune: (repoPath: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_PRUNE, repoPath)
   },
 
   // Dialog

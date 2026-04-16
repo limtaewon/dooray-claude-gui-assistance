@@ -99,6 +99,19 @@ export const IPC_CHANNELS = {
   // Claude CLI Info
   CLAUDE_CLI_INFO: 'claude:cli-info',
 
+  // Git Worktree
+  GIT_IS_REPO: 'git:is-repo',
+  GIT_REPO_ROOT: 'git:repo-root',
+  GIT_BRANCHES: 'git:branches',
+  GIT_WORKTREES: 'git:worktrees',
+  GIT_WORKTREE_CREATE: 'git:worktree-create',
+  GIT_WORKTREE_REMOVE: 'git:worktree-remove',
+  GIT_WORKTREE_STATUS: 'git:worktree-status',
+  GIT_DIFF: 'git:diff',
+  GIT_COMPARE_BRANCHES: 'git:compare-branches',
+  GIT_COMPARE_FILE: 'git:compare-file',
+  GIT_PRUNE: 'git:prune',
+
   // Dialog
   DIALOG_SELECT_FOLDER: 'dialog:select-folder',
 

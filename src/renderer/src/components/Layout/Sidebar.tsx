@@ -1,6 +1,6 @@
-import { Server, Sparkles, BarChart3, Calendar, Terminal, BookOpen, MessageSquare } from 'lucide-react'
+import { Server, Sparkles, BarChart3, Calendar, Terminal, BookOpen, MessageSquare, GitBranch } from 'lucide-react'
 
-type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions'
+type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git'
 
 interface SidebarProps {
   activeView: View
@@ -12,6 +12,7 @@ const NAV_ITEMS: { view: View; icon: typeof Server; label: string }[] = [
   { view: 'terminal', icon: Terminal, label: '터미널' },
   { view: 'mcp', icon: Server, label: 'MCP 서버' },
   { view: 'skills', icon: Sparkles, label: '스킬' },
+  { view: 'git', icon: GitBranch, label: '브랜치 작업' },
   { view: 'sessions', icon: MessageSquare, label: '세션' },
   { view: 'usage', icon: BarChart3, label: '사용량' },
   { view: 'manual', icon: BookOpen, label: '매뉴얼' }

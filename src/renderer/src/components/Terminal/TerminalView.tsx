@@ -57,6 +57,16 @@ function TerminalView(): JSX.Element {
     [activeId]
   )
 
+  // 외부에서 터미널 생성 요청 수신 (BranchWorkspace 등)
+  useEffect(() => {
+    const handler = (e: Event): void => {
+      const { cwd } = (e as CustomEvent).detail || {}
+      createSession(cwd)
+    }
+    window.addEventListener('create-terminal', handler)
+    return () => window.removeEventListener('create-terminal', handler)
+  }, [createSession])
+
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
       if (e.metaKey && e.key === 't') { e.preventDefault(); createSession() }

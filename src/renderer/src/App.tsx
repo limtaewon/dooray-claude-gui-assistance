@@ -9,8 +9,9 @@ import DoorayAssistant from './components/Dooray/DoorayAssistant'
 import TerminalView from './components/Terminal/TerminalView'
 import ClaudeManual from './components/ClaudeManual/ClaudeManual'
 import SessionExplorer from './components/Sessions/SessionExplorer'
+import BranchWorkspace from './components/Git/BranchWorkspace'
 
-type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions'
+type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git'
 
 function App(): JSX.Element {
   const [activeView, setActiveView] = useState<View>('dooray')
@@ -25,6 +26,11 @@ function App(): JSX.Element {
           {/* 터미널은 항상 마운트 (탭 전환 시 세션 유지) */}
           <div className={`absolute inset-0 ${activeView === 'terminal' ? 'z-10' : 'z-0 pointer-events-none invisible'}`}>
             <TerminalView />
+          </div>
+
+          {/* 브랜치 작업도 항상 마운트 (워크트리 상태 유지) */}
+          <div className={`absolute inset-0 ${activeView === 'git' ? 'z-10' : 'z-0 pointer-events-none invisible'}`}>
+            <BranchWorkspace onOpenTerminal={() => setActiveView('terminal')} />
           </div>
 
           {/* 나머지 뷰는 조건부 렌더링 */}
