@@ -68,7 +68,9 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TOKEN_VALIDATE),
     projects: {
       list: (): Promise<DoorayProject[]> =>
-        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_PROJECTS_LIST)
+        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_PROJECTS_LIST),
+      info: (projectId: string): Promise<DoorayProject> =>
+        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_PROJECT_INFO, projectId)
     },
     tasks: {
       list: (projectIds?: string[]): Promise<DoorayTask[]> =>

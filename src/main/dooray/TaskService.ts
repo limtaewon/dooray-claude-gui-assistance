@@ -40,14 +40,35 @@ export class TaskService {
   }
 
   async listMyProjects(): Promise<DoorayProject[]> {
-    const res = await this.client.request<DoorayListResponse<DoorayProject>>(
-      '/project/v1/projects?member=me&size=100'
-    )
-    const projects = res.result || []
-    for (const p of projects) {
-      this.projectCache.set(p.id, p)
+    // 비공개 프로젝트 + 내가 멤버인 공개 프로젝트를 병렬 조회
+    const [privateRes, publicRes] = await Promise.all([
+      this.client.request<DoorayListResponse<DoorayProject>>(
+        '/project/v1/projects?member=me&size=100'
+      ),
+      this.client.request<DoorayListResponse<DoorayProject>>(
+        '/project/v1/projects?type=public&scope=private&size=100'
+      ).catch(() => ({ result: [] as DoorayProject[] }))
+    ])
+
+    const seen = new Set<string>()
+    const projects: DoorayProject[] = []
+    for (const p of [...(privateRes.result || []), ...(publicRes.result || [])]) {
+      if (!seen.has(p.id)) {
+        seen.add(p.id)
+        projects.push(p)
+        this.projectCache.set(p.id, p)
+      }
     }
     return projects
+  }
+
+  async getProjectInfo(projectId: string): Promise<DoorayProject> {
+    const res = await this.client.request<DoorayItemResponse<DoorayProject>>(
+      `/project/v1/projects/${projectId}`
+    )
+    const project = res.result
+    this.projectCache.set(project.id, project)
+    return project
   }
 
   // 단일 프로젝트의 내 담당 태스크 전체 로드 (페이지네이션)

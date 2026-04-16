@@ -30,6 +30,8 @@ export const IPC_CHANNELS = {
   DOORAY_CALENDAR_LIST: 'dooray:calendar:list',
   DOORAY_CALENDAR_EVENTS: 'dooray:calendar:events',
 
+  DOORAY_PROJECT_INFO: 'dooray:project:info',
+
   // Dooray Task Detail
   DOORAY_TASK_DETAIL: 'dooray:task:detail',
   DOORAY_TASK_COMMENTS: 'dooray:task:comments',
