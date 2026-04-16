@@ -119,6 +119,9 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.DOORAY_PROJECTS_LIST, () =>
     taskService.listMyProjects()
   )
+  ipcMain.handle(IPC_CHANNELS.DOORAY_PROJECT_INFO, (_, projectId: string) =>
+    taskService.getProjectInfo(projectId)
+  )
   ipcMain.handle(IPC_CHANNELS.DOORAY_TASKS_LIST, (_, projectIds?: string[]) =>
     taskService.listMyTasks(projectIds)
   )

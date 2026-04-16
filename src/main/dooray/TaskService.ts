@@ -62,6 +62,15 @@ export class TaskService {
     return projects
   }
 
+  async getProjectInfo(projectId: string): Promise<DoorayProject> {
+    const res = await this.client.request<DoorayItemResponse<DoorayProject>>(
+      `/project/v1/projects/${projectId}`
+    )
+    const project = res.result
+    this.projectCache.set(project.id, project)
+    return project
+  }
+
   // 단일 프로젝트의 내 담당 태스크 전체 로드 (페이지네이션)
   // 프로젝트 태그 이름 캐시 로드
   private async loadTagInfo(projectId: string): Promise<Map<string, { name: string; color: string }>> {

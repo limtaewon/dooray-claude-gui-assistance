@@ -66,17 +66,25 @@ function ProjectTaskView(): JSX.Element {
   const loadProjects = useCallback(async () => {
     setLoadingProjects(true)
     try {
-      const [allProjects, pinnedIds] = await Promise.all([
+      const [allProjects, pinnedIds, customProjects] = await Promise.all([
         window.api.dooray.projects.list(),
-        window.api.settings.getProjects()
+        window.api.settings.getProjects(),
+        window.api.settings.get('customProjects') as Promise<DoorayProject[] | null>
       ])
+      // API 프로젝트 + 수동 프로젝트 병합
+      const merged = [...allProjects]
+      for (const cp of customProjects || []) {
+        if (!allProjects.some(p => p.id === cp.id)) {
+          merged.push(cp)
+        }
+      }
       let filtered: DoorayProject[]
       if (pinnedIds.length > 0) {
         filtered = pinnedIds
-          .map((id) => allProjects.find((p) => p.id === id))
+          .map((id) => merged.find((p) => p.id === id))
           .filter(Boolean) as DoorayProject[]
       } else {
-        filtered = allProjects
+        filtered = merged
       }
       setProjects(filtered)
       if (filtered.length > 0 && !selectedProject) {
