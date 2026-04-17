@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import type { DoorayCalendarEvent } from '../../../../shared/types/dooray'
 import SkillQuickToggle from './SkillQuickToggle'
+import { LoadingView, ErrorView, EmptyView } from '../common/StateViews'
 
 // API 캘린더 목록 + 이벤트에서 추출한 캘린더 합산
 function CalendarFilter({ events, filterIds, onFilter }: {
@@ -50,23 +51,23 @@ function CalendarFilter({ events, filterIds, onFilter }: {
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 w-64 bg-[#151c2c] border border-[#2d3a52] rounded-xl shadow-2xl z-40 overflow-hidden">
-            <div className="px-3 py-2 border-b border-[#2d3a52] bg-[#1a2238]">
+          <div className="absolute right-0 top-full mt-1 w-64 bg-bg-surface border border-bg-border rounded-xl shadow-2xl z-40 overflow-hidden">
+            <div className="px-3 py-2 border-b border-bg-border bg-bg-surface-hover">
               <span className="text-[11px] font-semibold text-gray-100">표시할 캘린더 선택</span>
-              <span className="text-[9px] text-gray-500 ml-2">{filterIds.length > 0 ? `${filterIds.length}개` : '전체'}</span>
+              <span className="text-[9px] text-text-tertiary ml-2">{filterIds.length > 0 ? `${filterIds.length}개` : '전체'}</span>
             </div>
             <div className="max-h-60 overflow-y-auto py-1">
               {calendars.map((c) => (
-                <button key={c.id} onClick={() => toggle(c.id)} className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#1e2840] text-left">
+                <button key={c.id} onClick={() => toggle(c.id)} className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-bg-surface-hover text-left">
                   <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 ${filterIds.includes(c.id) ? 'bg-blue-500 border-blue-500' : 'border-gray-600'}`}>
                     {filterIds.includes(c.id) && <Check size={9} className="text-white" />}
                   </div>
                   <span className={`text-[11px] truncate flex-1 ${filterIds.includes(c.id) ? 'text-gray-100' : 'text-gray-400'}`}>{c.name}</span>
-                  {c.count > 0 && <span className="text-[9px] text-gray-500 flex-shrink-0">{c.count}</span>}
+                  {c.count > 0 && <span className="text-[9px] text-text-tertiary flex-shrink-0">{c.count}</span>}
                 </button>
               ))}
             </div>
-            <div className="px-3 py-1.5 border-t border-[#2d3a52] text-[9px] text-gray-500">선택 없으면 전체 표시</div>
+            <div className="px-3 py-1.5 border-t border-bg-border text-[9px] text-text-tertiary">선택 없으면 전체 표시</div>
           </div>
         </>
       )}
@@ -180,8 +181,9 @@ function CalendarAssistant(): JSX.Element {
   // 오늘 기준
   const todayKey = useMemo(() => localDateKey(new Date()), [])
 
-  // 날짜 그룹 + 정렬된 엔트리 (메모화)
-  const { groupedByDate, sortedDateEntries } = useMemo(() => {
+  // 장기 이벤트(2일+)와 단일 이벤트 분리 + 날짜 그룹 (메모화)
+  const { longEvents, groupedByDate, sortedDateEntries } = useMemo(() => {
+    const long: DoorayCalendarEvent[] = []
     const grouped: Record<string, DoorayCalendarEvent[]> = {}
     for (const event of displayEvents) {
       const startStr = getStart(event)
@@ -192,14 +194,24 @@ function CalendarAssistant(): JSX.Element {
         if (isNaN(evStart.getTime())) continue
         const duration = !isNaN(evEnd.getTime()) ? evEnd.getTime() - evStart.getTime() : 0
         const isLong = duration > 2 * 24 * 60 * 60 * 1000
-        const dateKey = isLong ? todayKey : localDateKey(evStart)
-        if (!grouped[dateKey]) grouped[dateKey] = []
-        if (!grouped[dateKey].some((e) => e.id === event.id)) grouped[dateKey].push(event)
+        if (isLong) {
+          if (!long.some((e) => e.id === event.id)) long.push(event)
+        } else {
+          const dateKey = localDateKey(evStart)
+          if (!grouped[dateKey]) grouped[dateKey] = []
+          if (!grouped[dateKey].some((e) => e.id === event.id)) grouped[dateKey].push(event)
+        }
       } catch {}
     }
+    // 장기 이벤트는 시작일 순 정렬
+    long.sort((a, b) => {
+      const as = fixDate(getStart(a)).getTime() || 0
+      const bs = fixDate(getStart(b)).getTime() || 0
+      return as - bs
+    })
     const sorted = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b))
-    return { groupedByDate: grouped, sortedDateEntries: sorted }
-  }, [displayEvents, todayKey])
+    return { longEvents: long, groupedByDate: grouped, sortedDateEntries: sorted }
+  }, [displayEvents])
 
   return (
     <div className="h-full flex flex-col">
@@ -241,20 +253,69 @@ function CalendarAssistant(): JSX.Element {
       {/* 일정 목록 */}
       <div className="flex-1 overflow-y-auto px-6 py-4">
         {loading ? (
-          <div className="text-text-secondary text-sm text-center py-8">일정 불러오는 중...</div>
+          <LoadingView message="일정 불러오는 중..." />
         ) : error ? (
-          <div className="flex flex-col items-center justify-center py-8 gap-2">
-            <AlertCircle size={20} className="text-red-400" />
-            <p className="text-xs text-red-400 text-center max-w-sm">{error}</p>
-            <button onClick={loadEvents} className="text-xs text-clover-blue hover:underline mt-1">다시 시도</button>
-          </div>
-        ) : Object.keys(groupedByDate).length === 0 ? (
-          <div className="text-text-secondary text-sm text-center py-8">이번 주 일정이 없습니다.</div>
+          <ErrorView message={error} onRetry={loadEvents} />
+        ) : (longEvents.length === 0 && Object.keys(groupedByDate).length === 0) ? (
+          <EmptyView
+            icon={CalendarDays}
+            title="이번 주 일정이 없습니다"
+            description="캘린더 필터가 걸려있으면 해제해보세요"
+            actionLabel="새로고침"
+            onAction={loadEvents}
+          />
         ) : (
           <div className="space-y-5">
+            {/* 장기 이벤트 섹션 (2일+) */}
+            {longEvents.length > 0 && (
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wide mb-2 text-emerald-400 flex items-center gap-1.5">
+                  <CalendarDays size={11} /> 장기 일정
+                  <span className="text-text-tertiary font-normal">{longEvents.length}개</span>
+                </h3>
+                <div className="space-y-1.5">
+                  {longEvents.map((event, i) => {
+                    const evStart = fixDate(getStart(event))
+                    const evEnd = fixDate(getEnd(event))
+                    const now = new Date()
+                    const isOngoing = !isNaN(evStart.getTime()) && !isNaN(evEnd.getTime()) &&
+                      evStart.getTime() <= now.getTime() && now.getTime() <= evEnd.getTime()
+                    const isUpcoming = !isNaN(evStart.getTime()) && evStart.getTime() > now.getTime()
+                    const periodStr = `${safeDate(getStart(event))} ~ ${safeDate(getEnd(event))}`
+                    return (
+                      <div key={`long-${event.id || i}`} className="flex items-start gap-3 p-2.5 bg-bg-surface border border-bg-border rounded-lg hover:border-bg-border-light transition-colors">
+                        <div className="w-1 min-h-[32px] rounded-full flex-shrink-0 bg-emerald-400" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="text-xs text-text-primary">{event.subject || '(제목 없음)'}</p>
+                            {isOngoing && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-400/15 text-emerald-400 font-medium">진행 중</span>
+                            )}
+                            {isUpcoming && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-clover-blue/15 text-clover-blue font-medium">예정</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 mt-0.5">
+                            <div className="flex items-center gap-1 text-[10px] text-text-secondary">
+                              <Clock size={9} /> {periodStr}
+                            </div>
+                            {event.location && (
+                              <div className="flex items-center gap-1 text-[10px] text-text-secondary">
+                                <MapPin size={9} /> {event.location}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 날짜별 단일 일정 */}
             {sortedDateEntries.map(([dateKey, dayEvents]) => {
-              const todayLocal = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
-              const isToday = dateKey === todayLocal
+              const isToday = dateKey === todayKey
               return (
                 <div key={dateKey}>
                   <h3 className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isToday ? 'text-clover-blue' : 'text-text-secondary'}`}>
@@ -263,18 +324,15 @@ function CalendarAssistant(): JSX.Element {
                   <div className="space-y-1.5">
                     {dayEvents.map((event, i) => {
                       const isAllDay = event.wholeDayFlag || (!safeTime(getStart(event)) && !safeTime(getEnd(event)))
-                      const evStart = fixDate(getStart(event)), evEnd = fixDate(getEnd(event))
-                      const isLong = !isNaN(evEnd.getTime()) && (evEnd.getTime() - evStart.getTime() > 2 * 24 * 60 * 60 * 1000)
-                      const periodStr = isLong ? `${safeDate(getStart(event))} ~ ${safeDate(getEnd(event))}` : ''
                       return (
                         <div key={`${event.id || i}-${dateKey}`} className="flex items-start gap-3 p-2.5 bg-bg-surface border border-bg-border rounded-lg hover:border-bg-border-light transition-colors">
-                          <div className={`w-1 min-h-[32px] rounded-full flex-shrink-0 ${isLong ? 'bg-emerald-400' : isAllDay ? 'bg-clover-orange' : 'bg-clover-blue'}`} />
+                          <div className={`w-1 min-h-[32px] rounded-full flex-shrink-0 ${isAllDay ? 'bg-clover-orange' : 'bg-clover-blue'}`} />
                           <div className="flex-1 min-w-0">
                             <p className="text-xs text-text-primary">{event.subject || '(제목 없음)'}</p>
                             <div className="flex items-center gap-3 mt-0.5">
                               <div className="flex items-center gap-1 text-[10px] text-text-secondary">
                                 <Clock size={9} />
-                                {isLong ? periodStr : isAllDay ? '종일' : `${safeTime(getStart(event))} - ${safeTime(getEnd(event))}`}
+                                {isAllDay ? '종일' : `${safeTime(getStart(event))} - ${safeTime(getEnd(event))}`}
                               </div>
                               {event.location && (
                                 <div className="flex items-center gap-1 text-[10px] text-text-secondary">

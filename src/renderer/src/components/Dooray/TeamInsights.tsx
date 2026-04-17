@@ -5,9 +5,9 @@ import type { DoorayTask } from '../../../../shared/types/dooray'
 interface ProjectStats {
   code: string
   total: number
+  backlog: number
   registered: number
   working: number
-  done: number
   closed: number
   overdueCount: number
 }
@@ -37,13 +37,13 @@ function TeamInsights(): JSX.Element {
   for (const task of tasks) {
     const code = task.projectCode || 'UNKNOWN'
     if (!projectMap.has(code)) {
-      projectMap.set(code, { code, total: 0, registered: 0, working: 0, done: 0, closed: 0, overdueCount: 0 })
+      projectMap.set(code, { code, total: 0, backlog: 0, registered: 0, working: 0, closed: 0, overdueCount: 0 })
     }
     const stats = projectMap.get(code)!
     stats.total++
     const wf = task.workflowClass || 'registered'
-    if (wf in stats) (stats as Record<string, number>)[wf]++
-    if (task.dueDateAt && new Date(task.dueDateAt) < new Date() && wf !== 'done' && wf !== 'closed') {
+    if (wf in stats) (stats as unknown as Record<string, number>)[wf]++
+    if (task.dueDateAt && new Date(task.dueDateAt) < new Date() && wf !== 'closed') {
       stats.overdueCount++
     }
   }
@@ -53,18 +53,18 @@ function TeamInsights(): JSX.Element {
   // 전체 통계
   const totalStats = {
     total: tasks.length,
+    backlog: tasks.filter((t) => t.workflowClass === 'backlog').length,
     registered: tasks.filter((t) => t.workflowClass === 'registered').length,
     working: tasks.filter((t) => t.workflowClass === 'working').length,
-    done: tasks.filter((t) => t.workflowClass === 'done').length,
     closed: tasks.filter((t) => t.workflowClass === 'closed').length,
     overdue: tasks.filter((t) =>
       t.dueDateAt && new Date(t.dueDateAt) < new Date() &&
-      t.workflowClass !== 'done' && t.workflowClass !== 'closed'
+      t.workflowClass !== 'closed'
     ).length
   }
 
   const completionRate = totalStats.total > 0
-    ? Math.round(((totalStats.done + totalStats.closed) / totalStats.total) * 100)
+    ? Math.round((totalStats.closed / totalStats.total) * 100)
     : 0
 
   if (loading) {
@@ -105,6 +105,11 @@ function TeamInsights(): JSX.Element {
           {totalStats.total > 0 && (
             <>
               <div
+                className="bg-gray-400 h-full transition-all"
+                style={{ width: `${(totalStats.backlog / totalStats.total) * 100}%` }}
+                title={`백로그 ${totalStats.backlog}`}
+              />
+              <div
                 className="bg-clover-orange h-full transition-all"
                 style={{ width: `${(totalStats.registered / totalStats.total) * 100}%` }}
                 title={`등록 ${totalStats.registered}`}
@@ -116,22 +121,17 @@ function TeamInsights(): JSX.Element {
               />
               <div
                 className="bg-emerald-400 h-full transition-all"
-                style={{ width: `${(totalStats.done / totalStats.total) * 100}%` }}
-                title={`완료 ${totalStats.done}`}
-              />
-              <div
-                className="bg-gray-500 h-full transition-all"
                 style={{ width: `${(totalStats.closed / totalStats.total) * 100}%` }}
-                title={`닫힘 ${totalStats.closed}`}
+                title={`완료 ${totalStats.closed}`}
               />
             </>
           )}
         </div>
         <div className="flex gap-4 mt-1.5">
+          <Legend color="bg-gray-400" label="백로그" count={totalStats.backlog} />
           <Legend color="bg-clover-orange" label="등록" count={totalStats.registered} />
           <Legend color="bg-clover-blue" label="진행중" count={totalStats.working} />
-          <Legend color="bg-emerald-400" label="완료" count={totalStats.done} />
-          <Legend color="bg-gray-500" label="닫힘" count={totalStats.closed} />
+          <Legend color="bg-emerald-400" label="완료" count={totalStats.closed} />
         </div>
       </div>
 
@@ -140,7 +140,7 @@ function TeamInsights(): JSX.Element {
         <h3 className="text-xs font-semibold text-text-secondary mb-3">프로젝트별 현황</h3>
         <div className="space-y-2">
           {projectStats.map((p) => {
-            const activeTotal = p.registered + p.working + p.done + p.closed
+            const activeTotal = p.backlog + p.registered + p.working + p.closed
             return (
               <div key={p.code} className="bg-bg-surface border border-bg-border rounded-lg p-3">
                 <div className="flex items-center justify-between mb-2">
@@ -158,17 +158,17 @@ function TeamInsights(): JSX.Element {
                 <div className="h-2 rounded-full overflow-hidden flex bg-bg-primary">
                   {activeTotal > 0 && (
                     <>
+                      <div className="bg-gray-400 h-full" style={{ width: `${(p.backlog / activeTotal) * 100}%` }} />
                       <div className="bg-clover-orange h-full" style={{ width: `${(p.registered / activeTotal) * 100}%` }} />
                       <div className="bg-clover-blue h-full" style={{ width: `${(p.working / activeTotal) * 100}%` }} />
-                      <div className="bg-emerald-400 h-full" style={{ width: `${(p.done / activeTotal) * 100}%` }} />
-                      <div className="bg-gray-500 h-full" style={{ width: `${(p.closed / activeTotal) * 100}%` }} />
+                      <div className="bg-emerald-400 h-full" style={{ width: `${(p.closed / activeTotal) * 100}%` }} />
                     </>
                   )}
                 </div>
                 <div className="flex gap-3 mt-1.5 text-[10px] text-text-tertiary">
                   <span>등록 {p.registered}</span>
                   <span>진행 {p.working}</span>
-                  <span>완료 {p.done}</span>
+                  <span>완료 {p.closed}</span>
                 </div>
               </div>
             )

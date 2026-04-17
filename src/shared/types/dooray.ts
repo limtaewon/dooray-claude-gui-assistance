@@ -2,6 +2,8 @@ export interface DoorayProject {
   id: string
   code: string
   description?: string
+  /** 사용자가 수동으로 추가한 프로젝트 (API로 자동 조회되지 않는 것) */
+  isCustom?: boolean
 }
 
 export interface DoorayTask {
@@ -28,8 +30,8 @@ export interface DoorayTaskDetail extends DoorayTask {
     content: string
   }
   users?: {
-    to?: Array<{ member: { id: string; name: string } }>
-    cc?: Array<{ member: { id: string; name: string } }>
+    to?: Array<{ member?: { id: string; name: string }; emailUser?: { emailAddress: string } }>
+    cc?: Array<{ member?: { id: string; name: string }; emailUser?: { emailAddress: string } }>
   }
   priority?: string
   milestoneId?: string

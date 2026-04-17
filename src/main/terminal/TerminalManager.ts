@@ -72,7 +72,11 @@ export class TerminalManager {
 
   resize(options: TerminalResizeOptions): void {
     const session = this.sessions.get(options.id)
-    if (session) session.pty.resize(options.cols, options.rows)
+    if (!session) return
+    // cols/rows가 양수일 때만 resize (node-pty가 0 이하에서 throw)
+    if (options.cols > 0 && options.rows > 0) {
+      try { session.pty.resize(options.cols, options.rows) } catch { /* ignore */ }
+    }
   }
 
   kill(id: string): void {

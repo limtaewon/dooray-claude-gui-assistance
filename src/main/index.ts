@@ -9,11 +9,14 @@ import { DoorayClient } from './dooray/DoorayClient'
 import { TaskService } from './dooray/TaskService'
 import { WikiService } from './dooray/WikiService'
 import { CalendarService } from './dooray/CalendarService'
+import { MessengerService } from './dooray/MessengerService'
+import { WatcherService } from './watcher/WatcherService'
 import { AIService } from './ai/AIService'
 import Store from 'electron-store'
 import { TerminalManager } from './terminal/TerminalManager'
 import { SkillStore } from './skills/SkillStore'
 import { GitService } from './git/GitService'
+import { AnalyticsService } from './analytics/AnalyticsService'
 import { IPC_CHANNELS } from '../shared/types/ipc'
 import type { McpServerConfig } from '../shared/types/mcp'
 import type { SkillSaveRequest } from '../shared/types/skills'
@@ -31,11 +34,14 @@ const doorayClient = new DoorayClient()
 const taskService = new TaskService(doorayClient)
 const wikiService = new WikiService(doorayClient)
 const calendarService = new CalendarService(doorayClient)
+const messengerService = new MessengerService(doorayClient)
+const watcherService = new WatcherService(messengerService)
 const aiService = new AIService()
 const store = new Store({ name: 'clauday-data' })
 const terminalManager = new TerminalManager()
 const skillStore = new SkillStore()
 const gitService = new GitService()
+const analyticsService = new AnalyticsService()
 
 // AI에 Dooray 컨텍스트를 제공하기 위한 캐시
 let cachedTasks: DoorayTask[] = []
@@ -48,7 +54,7 @@ function createWindow(): BrowserWindow {
     minHeight: 680,
     title: 'Clauday',
     titleBarStyle: 'hiddenInset',
-    backgroundColor: '#111827',
+    backgroundColor: '#F4F6FA',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -60,6 +66,20 @@ function createWindow(): BrowserWindow {
   configWatcher.setMainWindow(mainWindow)
   terminalManager.setMainWindow(mainWindow)
   aiService.setMainWindow(mainWindow)
+  taskService.setMainWindow(mainWindow)
+  // customProjects는 과거 객체 배열 / 신규 문자열 배열 둘 다 지원
+  const rawCustom = store.get('customProjects', []) as unknown[]
+  const customIds = rawCustom.map((x) =>
+    typeof x === 'string' ? x : (x && typeof x === 'object' && 'id' in x ? String((x as { id: unknown }).id) : '')
+  ).filter(Boolean)
+  taskService.setCustomProjectIds(customIds)
+  watcherService.setMainWindow(mainWindow)
+  watcherService.start()
+  // AI가 스킬을 system prompt에 자동으로 합치도록 연결 (enabled && autoApply 스킬만)
+  aiService.setSkillLoader((target) => {
+    const skills = skillStore.forTarget(target)
+    return skills.map((s) => ({ name: s.name, content: s.content }))
+  })
   // 저장된 모델 설정 로드
   aiService.setModelConfig((store.get('aiModelConfig', {}) as import('../shared/types/ai').AIModelConfig) || {})
 
@@ -124,6 +144,117 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.DOORAY_PROJECT_INFO, (_, projectId: string) =>
     taskService.getProjectInfo(projectId)
   )
+  // 커뮤니티: 게시글(=태스크) 생성
+  ipcMain.handle(
+    IPC_CHANNELS.DOORAY_TASK_CREATE,
+    (_, params: { projectId: string; subject: string; body: string; assigneeIds?: string[] }) =>
+      taskService.createTask(params)
+  )
+  // 커뮤니티: 댓글 생성
+  ipcMain.handle(
+    IPC_CHANNELS.DOORAY_TASK_COMMENT_CREATE,
+    (_, params: { projectId: string; postId: string; content: string }) =>
+      taskService.createTaskComment(params)
+  )
+  // 파일 업로드 (ArrayBuffer로 받음)
+  ipcMain.handle(
+    IPC_CHANNELS.DOORAY_TASK_UPLOAD_FILE,
+    (_, params: { projectId: string; postId: string; filename: string; mime: string; data: ArrayBuffer }) =>
+      taskService.uploadFileToTask(params)
+  )
+  // 본문 업데이트 (이미지 업로드 후 링크 치환에 사용)
+  ipcMain.handle(
+    IPC_CHANNELS.DOORAY_TASK_UPDATE_BODY,
+    (_, params: { projectId: string; postId: string; subject: string; body: string }) =>
+      taskService.updateTaskBody(params)
+  )
+  // 댓글 본문 수정
+  ipcMain.handle(
+    IPC_CHANNELS.DOORAY_TASK_COMMENT_UPDATE,
+    (_, params: { projectId: string; postId: string; logId: string; content: string }) =>
+      taskService.updateTaskComment(params)
+  )
+  // 커뮤니티: 게시글 목록
+  ipcMain.handle(
+    IPC_CHANNELS.DOORAY_COMMUNITY_POSTS,
+    (_, { projectId, page, size }: { projectId: string; page?: number; size?: number }) =>
+      taskService.listCommunityPosts(projectId, page, size)
+  )
+  // 메신저: 채널 목록
+  ipcMain.handle(
+    IPC_CHANNELS.DOORAY_MESSENGER_CHANNELS,
+    (_, { force }: { force?: boolean } = {}) => messengerService.listChannels(!!force)
+  )
+  // 메신저: 메시지 전송
+  ipcMain.handle(
+    IPC_CHANNELS.DOORAY_MESSENGER_SEND,
+    (_, { channelId, text, organizationId }: { channelId: string; text: string; organizationId?: string }) =>
+      messengerService.sendMessage(channelId, text, organizationId)
+  )
+  // AI: 메신저 메시지 정리/생성
+  ipcMain.handle(
+    IPC_CHANNELS.AI_COMPOSE_MESSAGE,
+    (_, { instruction, channelName, requestId }: { instruction: string; channelName?: string; requestId?: string }) =>
+      aiService.composeMessengerMessage(instruction, channelName, requestId)
+  )
+  // AI: 자연어 → 필터 규칙 JSON
+  ipcMain.handle(
+    IPC_CHANNELS.AI_GENERATE_FILTER,
+    (_, { instruction, requestId }: { instruction: string; requestId?: string }) =>
+      aiService.generateFilterRule(instruction, requestId)
+  )
+
+  // ===== Watcher (모니터링) =====
+  ipcMain.handle(IPC_CHANNELS.WATCHER_LIST, () => watcherService.listWatchers())
+  ipcMain.handle(
+    IPC_CHANNELS.WATCHER_CREATE,
+    (_, req: import('../shared/types/watcher').WatcherCreateRequest) => watcherService.createWatcher(req)
+  )
+  ipcMain.handle(
+    IPC_CHANNELS.WATCHER_UPDATE,
+    (_, { id, patch }: { id: string; patch: import('../shared/types/watcher').WatcherUpdateRequest }) =>
+      watcherService.updateWatcher(id, patch)
+  )
+  ipcMain.handle(IPC_CHANNELS.WATCHER_DELETE, (_, id: string) => watcherService.deleteWatcher(id))
+  ipcMain.handle(IPC_CHANNELS.WATCHER_MESSAGES, (_, watcherId: string) =>
+    watcherService.messagesForWatcher(watcherId)
+  )
+  ipcMain.handle(IPC_CHANNELS.WATCHER_MARK_READ, (_, ids: string[]) => watcherService.markRead(ids))
+  ipcMain.handle(IPC_CHANNELS.WATCHER_MARK_ALL_READ, (_, watcherId: string) => watcherService.markAllRead(watcherId))
+  ipcMain.handle(IPC_CHANNELS.WATCHER_REFRESH, (_, watcherId?: string) => watcherService.refresh(watcherId))
+  ipcMain.handle(IPC_CHANNELS.WATCHER_UNREAD_COUNT, () => watcherService.unreadCounts())
+  // 파일/이미지 fetch (인증 토큰 필요한 리소스를 data URL로 반환, 10분 캐시)
+  const fileCache = new Map<string, { dataUrl: string; at: number }>()
+  ipcMain.handle(IPC_CHANNELS.DOORAY_FILE_FETCH, async (_, args: unknown) => {
+    // 여러 형태 지원 (호환성)
+    let path: string | undefined
+    let context: { projectId?: string; postId?: string; wikiId?: string; pageId?: string } | undefined
+
+    if (typeof args === 'string') {
+      path = args
+    } else if (args && typeof args === 'object') {
+      const o = args as { path?: unknown; context?: unknown }
+      if (typeof o.path === 'string') {
+        path = o.path
+        context = o.context as typeof context
+      }
+    }
+    if (!path) throw new Error(`잘못된 파라미터 (${typeof args})`)
+
+    const cacheKey = context
+      ? `${path}|${context.projectId || ''}|${context.postId || ''}|${context.wikiId || ''}|${context.pageId || ''}`
+      : path
+    const now = Date.now()
+    const cached = fileCache.get(cacheKey)
+    if (cached && now - cached.at < 10 * 60 * 1000) return cached.dataUrl
+    const dataUrl = await doorayClient.fetchBinary(path, context)
+    fileCache.set(cacheKey, { dataUrl, at: now })
+    if (fileCache.size > 50) {
+      const oldest = Array.from(fileCache.entries()).sort((a, b) => a[1].at - b[1].at)[0]
+      if (oldest) fileCache.delete(oldest[0])
+    }
+    return dataUrl
+  })
   ipcMain.handle(IPC_CHANNELS.DOORAY_TASKS_LIST, (_, projectIds?: string[]) =>
     taskService.listMyTasks(projectIds)
   )
@@ -268,14 +399,14 @@ function registerIpcHandlers(): void {
       const [tasks, ccTasks, dueTodayTasks, events] = await Promise.all([tasksP, ccP, dueP, eventsP])
       cachedTasks = tasks
 
-      emit('🔍 브리핑 스킬 로드 중...')
+      // 스킬은 AIService.skillLoader에서 자동 적용됨 (system prompt에 merge)
       const briefingSkills = skillStore.forTarget('briefing')
-      if (briefingSkills.length > 0) emit(`✓ 스킬 ${briefingSkills.length}개 적용`)
+      if (briefingSkills.length > 0) emit(`🔍 스킬 ${briefingSkills.length}개 자동 적용`)
 
       return aiService.generateBriefing(
         tasks,
         events,
-        briefingSkills.map((s) => ({ name: s.name, content: s.content })),
+        undefined,
         ccTasks,
         dueTodayTasks,
         requestId
@@ -337,12 +468,21 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.SETTINGS_SET_PROJECTS, (_, projectIds: string[]) => {
     store.set('pinnedProjects', projectIds)
   })
+  // 수동 추가 프로젝트 (API로 조회 안 되는 공개 프로젝트)
+  ipcMain.handle(IPC_CHANNELS.SETTINGS_GET_CUSTOM_PROJECTS, () =>
+    store.get('customProjects', []) as string[]
+  )
+  ipcMain.handle(IPC_CHANNELS.SETTINGS_SET_CUSTOM_PROJECTS, (_, projectIds: string[]) => {
+    const dedup = Array.from(new Set(projectIds))
+    store.set('customProjects', dedup)
+    taskService.setCustomProjectIds(dedup)
+  })
 
   // Clover Skills (파일시스템 기반 - ~/Library/Application Support/clover/skills/)
   ipcMain.handle(IPC_CHANNELS.CLOVER_SKILLS_LIST, () => skillStore.list())
   ipcMain.handle(IPC_CHANNELS.CLOVER_SKILLS_GET, (_, id: string) => skillStore.get(id))
   ipcMain.handle(IPC_CHANNELS.CLOVER_SKILLS_SAVE, (_, skill: Record<string, unknown>) =>
-    skillStore.save(skill as import('../shared/types/skill').CloverSkill)
+    skillStore.save(skill as unknown as import('../shared/types/skill').CloverSkill)
   )
   ipcMain.handle(IPC_CHANNELS.CLOVER_SKILLS_DELETE, (_, id: string) => skillStore.delete(id))
   ipcMain.handle(IPC_CHANNELS.CLOVER_SKILLS_FOR_TARGET, (_, target: string) => skillStore.forTarget(target))
@@ -560,7 +700,7 @@ function registerIpcHandlers(): void {
     if (!data) return '인사이트 데이터가 없습니다. 먼저 터미널에서 `/insights`를 실행해주세요.'
 
     try {
-      const result = await aiService.chat(
+      return await aiService.ask(
         `다음은 Claude Code 최근 세션 데이터입니다. 한국어 인사이트 리포트를 작성해주세요.
 
 포함:
@@ -572,9 +712,9 @@ function registerIpcHandlers(): void {
 
 마크다운으로 보기 좋게.
 
-${data}`
+${data}`,
+        { feature: 'sessionSummary', maxBudget: '0.3' }
       )
-      return result.content
     } catch (err) {
       return `인사이트 생성 오류: ${err instanceof Error ? err.message : '알 수 없는 오류'}`
     }
@@ -587,7 +727,7 @@ ${data}`
     const { join } = require('path')
     const home = homedir()
     const extraPaths = [join(home, '.claude', 'local'), join(home, '.claude', 'bin'), '/usr/local/bin', '/opt/homebrew/bin', join(home, '.local', 'bin')]
-    const richEnv = { ...process.env, PATH: [...extraPaths, process.env.PATH || ''].join(':'), DISABLE_OMC: '1', CLAUDE_CODE_SIMPLE: '1' }
+    const richEnv = { ...process.env, PATH: [...extraPaths, process.env.PATH || ''].join(':'), DISABLE_OMC: '1' }
     const run = (args: string[]): Promise<string> => new Promise((resolve) => {
       execFile('claude', args, { timeout: 5000, env: richEnv }, (err: Error | null, stdout: string, stderr: string) => {
         resolve(stdout || stderr || (err?.message ?? ''))
@@ -605,10 +745,10 @@ ${data}`
     // AI 한국어 번역
     const translate = async (text: string, section: string): Promise<string> => {
       try {
-        const result = await aiService.chat(
-          `다음 Claude Code CLI "${section}" 도움말을 한국어로 번역해. 명령어/옵션명/코드는 원문 유지. 마크다운 테이블로 정리해서 보기 좋게.\n\n${text}`
+        return await aiService.ask(
+          `다음 Claude Code CLI "${section}" 도움말을 한국어로 번역해. 명령어/옵션명/코드는 원문 유지. 마크다운 테이블로 정리해서 보기 좋게.\n\n${text}`,
+          { maxBudget: '0.1' }
         )
-        return result.content
       } catch { return text }
     }
 
@@ -672,6 +812,14 @@ ${data}`
   gitHandle(IPC_CHANNELS.GIT_PRUNE, (repoPath) =>
     gitService.pruneWorktrees(repoPath as string)
   )
+
+  // Analytics (로컬 전용 사용 분석)
+  ipcMain.on(IPC_CHANNELS.ANALYTICS_TRACK, (_, event: { type: string; params?: Record<string, unknown> }) => {
+    analyticsService.track(event.type as import('../shared/types/analytics').AnalyticsEventType, event.params || {})
+  })
+  ipcMain.handle(IPC_CHANNELS.ANALYTICS_SUMMARY, (_, days?: number) => analyticsService.summary(days))
+  ipcMain.handle(IPC_CHANNELS.ANALYTICS_EXPORT, () => analyticsService.exportAll())
+  ipcMain.handle(IPC_CHANNELS.ANALYTICS_CLEAR, () => analyticsService.clear())
 
   // Dialog
   ipcMain.handle(IPC_CHANNELS.DIALOG_SELECT_FOLDER, async () => {

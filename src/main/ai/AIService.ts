@@ -117,18 +117,23 @@ function enrichedEnv(): Record<string, string> {
     ...(process.env as Record<string, string>),
     PATH: [...extraPaths, currentPath].join(':'),
     // OMC ultrawork 세션 복원 훅 비활성화 (매번 75k 토큰 로드 방지)
-    DISABLE_OMC: '1',
-    // Claude Code 간소화 모드
-    CLAUDE_CODE_SIMPLE: '1'
+    // NOTE: CLAUDE_CODE_SIMPLE=1은 --bare 모드와 동일 → OAuth 차단되므로 사용 금지
+    DISABLE_OMC: '1'
   }
 }
 
 export class AIService {
   private mainWindow: BrowserWindow | null = null
   private modelConfig: AIModelConfig = {}
+  private skillLoader: ((target: string) => Array<{ name: string; content: string }>) | null = null
 
   setMainWindow(win: BrowserWindow): void {
     this.mainWindow = win
+  }
+
+  /** 외부에서 target별 스킬 로더 주입 (SkillStore.forTarget과 연결) */
+  setSkillLoader(loader: (target: string) => Array<{ name: string; content: string }>): void {
+    this.skillLoader = loader
   }
 
   setModelConfig(config: AIModelConfig): void {
@@ -142,6 +147,31 @@ export class AIService {
   /** 기능별 모델 선택 (설정이 없으면 기본값 사용) */
   private pickModel(feature: keyof AIModelConfig, defaultModel: AIModelName): AIModelName {
     return this.modelConfig[feature] || defaultModel
+  }
+
+  /**
+   * base system prompt에 사용자의 스킬들을 merge.
+   * target의 스킬 + 'all' 스킬을 모두 포함.
+   * 스킬은 "사용자 정의 규칙" 섹션으로 system prompt 뒤에 추가되어 LLM이 강하게 준수.
+   */
+  private buildSystemPrompt(base: string, target: string): string {
+    if (!this.skillLoader) return base
+    let skills: Array<{ name: string; content: string }> = []
+    try {
+      const targetSkills = this.skillLoader(target)
+      skills = targetSkills
+    } catch { /* ok */ }
+    if (skills.length === 0) return base
+
+    const skillBlock = skills.map((s) => `### ${s.name}\n${s.content}`).join('\n\n')
+    return `${base}
+
+---
+
+[사용자 정의 규칙 — 반드시 준수]
+위 기본 규칙에 더해 아래 사용자 정의 규칙을 반드시 적용하세요. 충돌 시 사용자 규칙을 우선합니다.
+
+${skillBlock}`
   }
 
   /** 진행상황 이벤트 발행 */
@@ -344,9 +374,30 @@ export class AIService {
     const defaultModel = opts?.model || 'sonnet'
     const model = feature ? this.pickModel(feature, defaultModel) : defaultModel
 
+    // feature → skill target 매핑
+    const FEATURE_TO_TARGET: Partial<Record<keyof AIModelConfig, string>> = {
+      wikiSummarize: 'wiki',
+      wikiStructure: 'wiki',
+      wikiProofread: 'wiki',
+      wikiImprove: 'wiki',
+      wikiDraft: 'wiki',
+      summarizeTask: 'task',
+      briefing: 'briefing',
+      report: 'report',
+      meetingNote: 'calendar',
+      calendarAnalysis: 'calendar',
+      sessionSummary: 'insights',
+      generateSkill: 'all',
+      messengerCompose: 'messenger'
+    }
+    const target = feature ? FEATURE_TO_TARGET[feature] : undefined
+
+    const baseSystem = opts?.systemPrompt || '당신은 유용한 한국어 AI 비서입니다.'
+    const mergedSystem = target ? this.buildSystemPrompt(baseSystem, target) : baseSystem
+
     const args = buildArgs(prompt, {
       model,
-      systemPrompt: opts?.systemPrompt,
+      systemPrompt: mergedSystem,
       maxBudget: opts?.maxBudget || '0.3',
       allowMcp: false
     })
@@ -373,7 +424,7 @@ export class AIService {
   async generateBriefing(
     tasks: DoorayTask[],
     events: DoorayCalendarEvent[],
-    skills?: Array<{ name: string; content: string }>,
+    _skillsUnused?: Array<{ name: string; content: string }>, // deprecated: skillLoader 사용
     ccTasks?: DoorayTask[],
     dueTodayTasks?: DoorayTask[],
     requestId?: string
@@ -387,16 +438,19 @@ export class AIService {
 
     const taskData = tasks.slice(0, 50).map((t) => ({
       id: t.id, subject: t.subject, status: t.workflowClass,
-      project: t.projectCode, dueDate: t.dueDateAt, created: t.createdAt
+      workflowName: t.workflow?.name, project: t.projectCode,
+      tags: t.tags?.map((tag) => tag.name).filter(Boolean),
+      milestone: t.milestone?.name,
+      dueDate: t.dueDateAt, created: t.createdAt
     }))
 
     const eventData = events.map((e) => ({
-      subject: e.subject, start: e.startAt, end: e.endAt, location: e.location
+      subject: e.subject,
+      start: e.startedAt || e.startAt,
+      end: e.endedAt || e.endAt,
+      location: e.location,
+      allDay: e.wholeDayFlag
     }))
-
-    const skillBlock = skills && skills.length > 0
-      ? `\n\n[적용된 AI 스킬]\n${skills.map((s) => `### ${s.name}\n${s.content}`).join('\n\n')}`
-      : ''
 
     const ccData = (ccTasks || []).slice(0, 30).map((t) => ({
       id: t.id, subject: t.subject, status: t.workflowClass,
@@ -419,11 +473,11 @@ ${JSON.stringify(dueTodayData)}
 ${JSON.stringify(ccData)}
 
 [일정 ${eventData.length}개]
-${JSON.stringify(eventData)}${skillBlock}`
+${JSON.stringify(eventData)}`
 
     const args = buildArgs(prompt, {
       model: this.pickModel('briefing', 'sonnet'),
-      systemPrompt: BRIEFING_SYSTEM_PROMPT,
+      systemPrompt: this.buildSystemPrompt(BRIEFING_SYSTEM_PROMPT, 'briefing'),
       maxBudget: '0.3',
       allowMcp: false // 데이터가 이미 프롬프트에 있음, MCP 로딩 skip으로 속도 개선
     })
@@ -462,7 +516,7 @@ ${JSON.stringify(eventData)}${skillBlock}`
 
     const result = await this.runWithProgress(requestId, '태스크 요약 중...', buildArgs(prompt, {
       model: this.pickModel('summarizeTask', 'haiku'),
-      systemPrompt: '두레이 태스크를 간결하게 분석하는 AI. 한국어로 3줄 이내 요약.',
+      systemPrompt: this.buildSystemPrompt('두레이 태스크를 간결하게 분석하는 AI. 한국어로 3줄 이내 요약.', 'task'),
       maxBudget: '0.1'
     }))
 
@@ -480,7 +534,7 @@ ${JSON.stringify(eventData)}${skillBlock}`
 
     const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
     const period = type === 'daily' ? '일일' : '주간'
-    const done = tasks.filter((t) => t.workflowClass === 'done')
+    const done = tasks.filter((t) => t.workflowClass === 'closed')
     const working = tasks.filter((t) => t.workflowClass === 'working')
     const registered = tasks.filter((t) => t.workflowClass === 'registered')
 
@@ -488,7 +542,7 @@ ${JSON.stringify(eventData)}${skillBlock}`
 
     const args = buildArgs(prompt, {
       model: this.pickModel('report', 'sonnet'),
-      systemPrompt: '업무 보고서 전문 작성 AI. 간결하고 명확한 마크다운 보고서를 생성합니다. 한국어로 작성.',
+      systemPrompt: this.buildSystemPrompt('업무 보고서 전문 작성 AI. 간결하고 명확한 마크다운 보고서를 생성합니다. 한국어로 작성.', 'report'),
       maxBudget: '0.3'
     })
 
@@ -505,12 +559,12 @@ ${JSON.stringify(eventData)}${skillBlock}`
     const result = await this.runWithProgress(requestId, '위키 교정 중...', buildArgs(
       `다음 두레이 위키 문서를 교정하세요.\n\n제목: ${title}\n\n---\n${content.substring(0, 8000)}`, {
       model: this.pickModel('wikiProofread', 'opus'),
-      systemPrompt: `위키 문서 교정 전문가. 규칙:
+      systemPrompt: this.buildSystemPrompt(`위키 문서 교정 전문가. 규칙:
 - 맞춤법, 문법, 띄어쓰기 교정
 - 기술 용어는 원래대로 유지 (코드, 명령어, 경로 등)
 - 마크다운 형식 완벽 유지 (헤딩, 리스트, 코드블록, 테이블 등)
 - HTML 태그(<br>, <table> 등)도 그대로 유지
-- 교정된 전체 문서를 마크다운으로 출력 (설명 없이 결과만)`,
+- 교정된 전체 문서를 마크다운으로 출력 (설명 없이 결과만)`, 'wiki'),
       maxBudget: '1'
     }))
     return result.result
@@ -520,16 +574,106 @@ ${JSON.stringify(eventData)}${skillBlock}`
     const result = await this.runWithProgress(requestId, '위키 개선 중...', buildArgs(
       `다음 두레이 위키 문서를 개선하세요.\n\n제목: ${title}\n\n---\n${content.substring(0, 8000)}`, {
       model: this.pickModel('wikiImprove', 'opus'),
-      systemPrompt: `위키 문서 개선 전문가. 규칙:
+      systemPrompt: this.buildSystemPrompt(`위키 문서 개선 전문가. 규칙:
 - 가독성 향상: 긴 문단을 나누고, 핵심을 먼저 배치
 - 구조 개선: 적절한 헤딩 레벨, 목록 활용, 코드블록 정리
 - 내용은 변경하지 않되 표현을 더 명확하게
 - 불필요한 반복 제거
 - 마크다운 형식으로 개선된 전체 문서 출력 (설명 없이 결과만)
-- HTML 태그(<br>, <table> 등)도 유지`,
+- HTML 태그(<br>, <table> 등)도 유지`, 'wiki'),
       maxBudget: '1'
     }))
     return result.result
+  }
+
+  /**
+   * 메신저 메시지 정리/생성.
+   * 사용자가 말한 내용을 두레이 메신저에 보낼 수 있도록 깔끔하게 정리.
+   */
+  async composeMessengerMessage(instruction: string, channelName?: string, requestId?: string): Promise<string> {
+    const channelHint = channelName ? `\n대상 채널: ${channelName}` : ''
+    const prompt = `다음 내용을 두레이 메신저로 보낼 메시지로 정리하세요.${channelHint}\n\n내용:\n${instruction}`
+
+    const result = await this.runWithProgress(requestId, '메시지 작성 중...', buildArgs(prompt, {
+      model: this.pickModel('messengerCompose', 'sonnet'),
+      systemPrompt: this.buildSystemPrompt(`두레이 메신저 메시지 작성 전문가.
+
+규칙:
+- 메신저에 바로 붙여넣을 수 있는 자연스러운 메시지 본문만 출력 (설명/머리말 금지)
+- 업무적 신뢰감을 주되 과하게 딱딱하지 않은 한국어
+- 핵심을 먼저, 불필요한 수식어 제거
+- 여러 건이면 번호나 불릿으로 정리
+- 마크다운 일부 지원(**, \`code\`, 목록) — 과도한 마크업은 피함
+- 메시지 길이는 보내려는 내용에 맞춰 간결하게`, 'messenger'),
+      maxBudget: '0.2'
+    }))
+    return result.result
+  }
+
+  /**
+   * 자연어 지시 → FilterRule JSON 생성. 모니터링 와처에서 사용.
+   */
+  async generateFilterRule(instruction: string, requestId?: string): Promise<{
+    anyOf?: string[]
+    allOf?: string[]
+    regex?: string[]
+    exclude?: string[]
+    excludeRegex?: string[]
+    description: string
+  }> {
+    const prompt = `사용자의 자연어 요청을 두레이 메신저 메시지 필터 규칙(JSON)으로 변환하세요.
+
+요청:
+${instruction}
+
+반드시 아래 JSON만 응답하세요 (설명 문장/코드블록 금지):
+{
+  "anyOf": ["키워드1", "키워드2"],
+  "allOf": [],
+  "regex": [],
+  "exclude": [],
+  "excludeRegex": [],
+  "description": "포함 키워드 중심 한줄 요약"
+}
+
+핵심 원칙:
+- 사용자가 입력한 단어/주제는 기본적으로 **포함(anyOf)** 조건으로 해석
+- "XX 제외", "단 YY는 빼고", "아닌 것만" 같은 명시적 제외 표현이 있을 때만 exclude 사용
+- 사용자가 단순히 명사/주제만 적었다면 관련 동의어/유사어를 anyOf에 보강
+- 예: 입력 "리뷰 확인" → anyOf: ["리뷰", "review", "PR", "머지"], exclude: []
+- 예: 입력 "배포 알림" → anyOf: ["배포", "deploy", "릴리즈", "release"], exclude: []
+- 예: 입력 "장애, 에러만 단 테스트 제외" → anyOf: ["장애", "에러", "error", "fail"], exclude: ["테스트"]
+
+필드 설명:
+- anyOf: 이 중 하나만 포함되어도 매치 (OR) — 대부분 케이스에서 주력
+- allOf: 모두 포함되어야 매치 (AND) — 좁은 조건에만 사용
+- regex: 정규식 (i 플래그 자동 적용). 숫자 패턴, 포맷 매칭 필요할 때만
+- exclude: 이 단어 포함 시 무조건 제외 — 사용자가 명시적으로 제외 언급한 경우만
+- description: 1줄로 규칙 요약 (사용자에게 보여줌, "~을 포함한 메시지" 형태 권장)
+- 배열이 비어도 되지만 키는 항상 모두 포함`
+
+    const result = await this.runWithProgress(requestId, 'AI 필터 규칙 생성 중...', buildArgs(prompt, {
+      model: 'sonnet',
+      systemPrompt: '메시지 필터 규칙 생성 전문가. 항상 유효한 JSON만 응답합니다.',
+      maxBudget: '0.1'
+    }))
+
+    const text = result.result.trim()
+    // JSON 추출 (``` 코드블록 제거)
+    const clean = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/, '').trim()
+    try {
+      const parsed = JSON.parse(clean)
+      return {
+        anyOf: Array.isArray(parsed.anyOf) ? parsed.anyOf : [],
+        allOf: Array.isArray(parsed.allOf) ? parsed.allOf : [],
+        regex: Array.isArray(parsed.regex) ? parsed.regex : [],
+        exclude: Array.isArray(parsed.exclude) ? parsed.exclude : [],
+        excludeRegex: Array.isArray(parsed.excludeRegex) ? parsed.excludeRegex : [],
+        description: typeof parsed.description === 'string' ? parsed.description : instruction
+      }
+    } catch (err) {
+      throw new Error(`AI 응답 JSON 파싱 실패: ${err instanceof Error ? err.message : String(err)}\n응답: ${clean.substring(0, 200)}`)
+    }
   }
 
   async generateWikiDraft(taskSubject: string, taskBody?: string, projectCode?: string, requestId?: string): Promise<string> {
@@ -537,7 +681,7 @@ ${JSON.stringify(eventData)}${skillBlock}`
 
     const result = await this.runWithProgress(requestId, '위키 초안 작성 중...', buildArgs(prompt, {
       model: this.pickModel('wikiDraft', 'sonnet'),
-      systemPrompt: '두레이 위키 문서 전문 작성 AI. 개발 문서를 구조화된 마크다운으로 작성합니다.',
+      systemPrompt: this.buildSystemPrompt('두레이 위키 문서 전문 작성 AI. 개발 문서를 구조화된 마크다운으로 작성합니다.', 'wiki'),
       maxBudget: '0.2'
     }))
     return result.result
@@ -587,7 +731,7 @@ ${JSON.stringify(eventData)}${skillBlock}`
 
     const result = await this.runWithProgress(requestId, '회의록 생성 중...', buildArgs(prompt, {
       model: this.pickModel('meetingNote', 'haiku'),
-      systemPrompt: '회의록 템플릿 생성 AI. 구조화된 회의록을 작성합니다.',
+      systemPrompt: this.buildSystemPrompt('회의록 템플릿 생성 AI. 구조화된 회의록을 작성합니다.', 'calendar'),
       maxBudget: '0.1'
     }))
     return result.result

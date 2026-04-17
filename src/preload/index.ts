@@ -1,4 +1,24 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+
+// IpcRenderer 리스너 한도 상향 (기본 10, 다중 터미널 탭 + 각종 IPC 구독 때문에 넉넉히)
+ipcRenderer.setMaxListeners(100)
+
+// 터미널 출력 구독: 단일 IPC 리스너를 공유해서 핸들러 수만큼 이벤트 리스너가 누적되지 않게 함
+type TerminalOutputPayload = { id: string; data: string }
+const terminalOutputHandlers = new Set<(payload: TerminalOutputPayload) => void>()
+let terminalOutputSubscribed = false
+function subscribeTerminalOutput(cb: (payload: TerminalOutputPayload) => void): () => void {
+  terminalOutputHandlers.add(cb)
+  if (!terminalOutputSubscribed) {
+    terminalOutputSubscribed = true
+    ipcRenderer.on(IPC_CHANNELS.TERMINAL_OUTPUT, (_: IpcRendererEvent, payload: TerminalOutputPayload) => {
+      for (const h of terminalOutputHandlers) {
+        try { h(payload) } catch { /* ignore */ }
+      }
+    })
+  }
+  return () => { terminalOutputHandlers.delete(cb) }
+}
 import { IPC_CHANNELS } from '../shared/types/ipc'
 import type { McpServerConfig } from '../shared/types/mcp'
 import type { Skill, SkillSaveRequest } from '../shared/types/skills'
@@ -72,6 +92,12 @@ const api = {
       info: (projectId: string): Promise<DoorayProject> =>
         ipcRenderer.invoke(IPC_CHANNELS.DOORAY_PROJECT_INFO, projectId)
     },
+    /** 파일/이미지를 data URL로 가져오기 (인증 필요한 리소스용) */
+    fetchFile: (
+      path: string,
+      context?: { projectId?: string; postId?: string; wikiId?: string; pageId?: string }
+    ): Promise<string> =>
+      ipcRenderer.invoke(IPC_CHANNELS.DOORAY_FILE_FETCH, { path, context }),
     tasks: {
       list: (projectIds?: string[]): Promise<DoorayTask[]> =>
         ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASKS_LIST, projectIds),
@@ -80,7 +106,29 @@ const api = {
       update: (params: DoorayTaskUpdateParams): Promise<void> =>
         ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASKS_UPDATE, params),
       comments: (projectId: string, taskId: string): Promise<import('../shared/types/dooray').DoorayTaskComment[]> =>
-        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_COMMENTS, { projectId, taskId })
+        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_COMMENTS, { projectId, taskId }),
+      /** 프로젝트별 태스크 점진 로딩 이벤트 수신 */
+      onPartial: (callback: (payload: { projectId: string; tasks: DoorayTask[]; done: boolean }) => void): (() => void) => {
+        const handler = (_: IpcRendererEvent, payload: { projectId: string; tasks: DoorayTask[]; done: boolean }): void =>
+          callback(payload)
+        ipcRenderer.on(IPC_CHANNELS.DOORAY_TASKS_PARTIAL, handler)
+        return () => ipcRenderer.removeListener(IPC_CHANNELS.DOORAY_TASKS_PARTIAL, handler)
+      },
+      /** 태스크 생성 (커뮤니티 글쓰기) */
+      create: (params: { projectId: string; subject: string; body: string; assigneeIds?: string[] }): Promise<{ id: string }> =>
+        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_CREATE, params),
+      /** 태스크 댓글 생성 */
+      createComment: (params: { projectId: string; postId: string; content: string }): Promise<{ id: string }> =>
+        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_COMMENT_CREATE, params),
+      /** 파일 업로드 (이미지 등) */
+      uploadFile: (params: { projectId: string; postId: string; filename: string; mime: string; data: ArrayBuffer }): Promise<{ id: string }> =>
+        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_UPLOAD_FILE, params),
+      /** 태스크 본문 업데이트 */
+      updateBody: (params: { projectId: string; postId: string; subject: string; body: string }): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_UPDATE_BODY, params),
+      /** 댓글 본문 수정 */
+      updateComment: (params: { projectId: string; postId: string; logId: string; content: string }): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_COMMENT_UPDATE, params)
     },
     wiki: {
       domains: (): Promise<Array<{ id: string; name: string; type: string }>> =>
@@ -118,12 +166,8 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_SAVE_OUTPUT, id),
     restoreSaved: (): Promise<Array<{ meta: { id: string; name: string; cwd: string }; output: string }>> =>
       ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_RESTORE),
-    onOutput: (callback: (payload: { id: string; data: string }) => void): (() => void) => {
-      const handler = (_: IpcRendererEvent, payload: { id: string; data: string }): void =>
-        callback(payload)
-      ipcRenderer.on(IPC_CHANNELS.TERMINAL_OUTPUT, handler)
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.TERMINAL_OUTPUT, handler)
-    }
+    onOutput: (callback: (payload: { id: string; data: string }) => void): (() => void) =>
+      subscribeTerminalOutput(callback)
   },
 
   // Claude Code Bridge
@@ -176,7 +220,11 @@ const api = {
     getProjects: (): Promise<string[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_PROJECTS),
     setProjects: (projectIds: string[]): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_PROJECTS, projectIds)
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_PROJECTS, projectIds),
+    getCustomProjects: (): Promise<string[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_CUSTOM_PROJECTS),
+    setCustomProjects: (projectIds: string[]): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_CUSTOM_PROJECTS, projectIds)
   },
 
   // Clover Skills
@@ -246,6 +294,63 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.GIT_COMPARE_FILE, { repoPath, filePath, branch1, branch2 }),
     prune: (repoPath: string): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_PRUNE, repoPath)
+  },
+
+  // Analytics (로컬 전용)
+  analytics: {
+    track: (type: string, params?: Record<string, unknown>): void =>
+      ipcRenderer.send(IPC_CHANNELS.ANALYTICS_TRACK, { type, params }),
+    summary: (days?: number): Promise<import('../shared/types/analytics').AnalyticsSummary> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ANALYTICS_SUMMARY, days),
+    exportAll: (): Promise<import('../shared/types/analytics').AnalyticsEvent[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ANALYTICS_EXPORT),
+    clear: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ANALYTICS_CLEAR)
+  },
+
+  // Community (Dooray 공개 프로젝트를 백엔드로 사용)
+  community: {
+    posts: (projectId: string, page?: number, size?: number): Promise<{ posts: DoorayTask[]; totalCount: number }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.DOORAY_COMMUNITY_POSTS, { projectId, page, size })
+  },
+
+  // Messenger (Dooray 메신저)
+  messenger: {
+    listChannels: (force = false): Promise<import('../shared/types/messenger').DoorayChannel[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.DOORAY_MESSENGER_CHANNELS, { force }),
+    send: (channelId: string, text: string, organizationId?: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.DOORAY_MESSENGER_SEND, { channelId, text, organizationId }),
+    composeWithAI: (instruction: string, channelName?: string, requestId?: string): Promise<string> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_COMPOSE_MESSAGE, { instruction, channelName, requestId })
+  },
+
+  // Watcher (채널 모니터링)
+  watcher: {
+    list: (): Promise<import('../shared/types/watcher').Watcher[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WATCHER_LIST),
+    create: (req: import('../shared/types/watcher').WatcherCreateRequest): Promise<import('../shared/types/watcher').Watcher> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WATCHER_CREATE, req),
+    update: (id: string, patch: import('../shared/types/watcher').WatcherUpdateRequest): Promise<import('../shared/types/watcher').Watcher | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WATCHER_UPDATE, { id, patch }),
+    delete: (id: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WATCHER_DELETE, id),
+    messages: (watcherId: string): Promise<import('../shared/types/watcher').CollectedMessage[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WATCHER_MESSAGES, watcherId),
+    markRead: (ids: string[]): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WATCHER_MARK_READ, ids),
+    markAllRead: (watcherId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WATCHER_MARK_ALL_READ, watcherId),
+    refresh: (watcherId?: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WATCHER_REFRESH, watcherId),
+    unreadCounts: (): Promise<Record<string, number>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WATCHER_UNREAD_COUNT),
+    generateFilter: (instruction: string, requestId?: string): Promise<import('../shared/types/watcher').FilterRule> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_FILTER, { instruction, requestId }),
+    onNewMessages: (cb: (payload: { watcherId: string; messages: import('../shared/types/watcher').CollectedMessage[] }) => void): (() => void) => {
+      const handler = (_: IpcRendererEvent, payload: { watcherId: string; messages: import('../shared/types/watcher').CollectedMessage[] }): void => cb(payload)
+      ipcRenderer.on(IPC_CHANNELS.WATCHER_NEW_MESSAGES, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.WATCHER_NEW_MESSAGES, handler)
+    }
   },
 
   // Dialog

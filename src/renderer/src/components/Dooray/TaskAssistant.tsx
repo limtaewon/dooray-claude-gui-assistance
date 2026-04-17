@@ -19,20 +19,20 @@ const WORKFLOW_COLORS: Record<string, string> = {
 }
 
 const WORKFLOW_BG: Record<string, string> = {
+  backlog: 'bg-gray-400/10 border-gray-400/20',
   registered: 'bg-clover-orange/10 border-clover-orange/20',
   working: 'bg-clover-blue/10 border-clover-blue/20',
-  done: 'bg-emerald-400/10 border-emerald-400/20',
-  closed: 'bg-gray-500/10 border-gray-500/20'
+  closed: 'bg-emerald-400/10 border-emerald-400/20'
 }
 
 const WORKFLOW_LABELS: Record<string, string> = {
+  backlog: '백로그',
   registered: '등록',
   working: '진행 중',
-  done: '완료',
-  closed: '닫힘'
+  closed: '완료'
 }
 
-type WorkflowClass = 'registered' | 'working' | 'done' | 'closed'
+type WorkflowClass = 'backlog' | 'registered' | 'working' | 'closed'
 type Tab = 'tasks' | 'wiki' | 'calendar'
 
 const TAB_LABELS: Record<Tab, string> = {

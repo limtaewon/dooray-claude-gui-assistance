@@ -8,6 +8,11 @@ import ProjectFilter from '../common/ProjectFilter'
 import SkillQuickToggle from './SkillQuickToggle'
 import { useAIProgress } from '../../hooks/useAIProgress'
 import AIProgressIndicator from '../common/AIProgressIndicator'
+import DoorayImage, { DoorayFileContext } from '../common/DoorayImage'
+
+const markdownComponents = {
+  img: ({ src, alt }: { src?: string; alt?: string }) => <DoorayImage src={src} alt={alt} className="max-w-full rounded-lg" />
+}
 
 interface WikiDomain { id: string; name: string; type: string }
 interface TreeNode { page: DoorayWikiPage; children: TreeNode[]; loaded: boolean; expanded: boolean }
@@ -116,6 +121,8 @@ function WikiManager(): JSX.Element {
     if (!pageContent || !selectedPage) return
     setAiResult(null); setAiAction(action); setEditMode(false); setPushResult(null)
     const reqId = startAi()
+    const t0 = Date.now()
+    window.api.analytics.track(`ai.wiki.${action}` as never, { meta: { action } })
     try {
       let result: string
       if (action === 'proofread') {
@@ -195,6 +202,7 @@ function WikiManager(): JSX.Element {
   const canPush = (aiAction === 'proofread' || aiAction === 'improve') && (aiResult || editMode)
 
   return (
+    <DoorayFileContext.Provider value={{ wikiId: selectedDomain?.id, pageId: selectedPage?.id }}>
     <div className="h-full flex">
       {/* 좌측: 위키 도메인 */}
       {!domainCollapsed && (
@@ -284,7 +292,7 @@ function WikiManager(): JSX.Element {
                   <div className="flex items-center justify-center h-32 text-text-secondary text-sm">로딩 중...</div>
                 ) : (
                   <div className="markdown-body text-xs leading-relaxed">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{pageContent}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>{pageContent}</ReactMarkdown>
                   </div>
                 )}
               </div>
@@ -333,7 +341,7 @@ function WikiManager(): JSX.Element {
                         className="w-full min-h-[400px] bg-bg-primary border border-bg-border rounded-lg p-3 text-xs text-text-primary font-mono focus:outline-none focus:border-clover-blue resize-y" />
                     ) : (
                       <div className="markdown-body text-xs leading-relaxed">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{aiResult || ''}</ReactMarkdown>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>{aiResult || ''}</ReactMarkdown>
                       </div>
                     )}
                   </div>
@@ -346,6 +354,7 @@ function WikiManager(): JSX.Element {
         )}
       </div>
     </div>
+    </DoorayFileContext.Provider>
   )
 }
 

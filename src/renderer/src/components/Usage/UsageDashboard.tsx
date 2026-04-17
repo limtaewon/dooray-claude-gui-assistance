@@ -8,6 +8,7 @@ import {
   AreaChart, Area, PieChart as RPieChart, Pie, Cell
 } from 'recharts'
 import type { UsageSummary, UsageQueryParams } from '../../../../shared/types/usage'
+import { useTheme } from '../../hooks/useTheme'
 
 type Period = UsageQueryParams['period']
 
@@ -20,11 +21,21 @@ function fmt(n: number): string {
 const COLORS = ['#3B82F6', '#FB923C', '#22C55E', '#A78BFA', '#F472B6', '#FBBF24']
 
 function UsageDashboard(): JSX.Element {
+  const { theme } = useTheme()
   const [period, setPeriod] = useState<Period>('week')
   const [summary, setSummary] = useState<UsageSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [insightReport, setInsightReport] = useState<string | null>(null)
   const [insightLoading, setInsightLoading] = useState(false)
+
+  // 차트 축/그리드/툴팁 색상 — 테마별
+  const chart = useMemo(() => theme === 'dark' ? {
+    grid: '#374151', tick: '#9CA3AF',
+    tooltipBg: '#1F2937', tooltipBorder: '#374151', tooltipText: '#F9FAFB'
+  } : {
+    grid: '#E2E8F0', tick: '#64748B',
+    tooltipBg: '#FFFFFF', tooltipBorder: '#DCE3ED', tooltipText: '#0F172A'
+  }, [theme])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -70,8 +81,8 @@ function UsageDashboard(): JSX.Element {
   }, [summary])
 
   const tooltipStyle = useMemo(() => ({
-    backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: 8, color: '#F9FAFB', fontSize: 11
-  }), [])
+    backgroundColor: chart.tooltipBg, border: `1px solid ${chart.tooltipBorder}`, borderRadius: 8, color: chart.tooltipText, fontSize: 11
+  }), [chart])
 
   if (loading) return <div className="flex items-center justify-center h-full text-text-secondary text-sm">사용량 데이터 불러오는 중...</div>
   if (!summary) return <div className="flex items-center justify-center h-full text-text-secondary text-sm">데이터 없음</div>
@@ -143,9 +154,9 @@ function UsageDashboard(): JSX.Element {
           <h3 className="text-xs font-semibold text-text-primary mb-3">일별 토큰 사용량</h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={dailyData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis dataKey="date" tick={{ fill: '#9CA3AF', fontSize: 10 }} />
-              <YAxis tick={{ fill: '#9CA3AF', fontSize: 10 }} tickFormatter={fmt} />
+              <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+              <XAxis dataKey="date" tick={{ fill: chart.tick, fontSize: 10 }} />
+              <YAxis tick={{ fill: chart.tick, fontSize: 10 }} tickFormatter={fmt} />
               <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => fmt(v)} />
               <Legend wrapperStyle={{ fontSize: 10 }} />
               <Bar dataKey="입력" fill="#3B82F6" radius={[2, 2, 0, 0]} />
@@ -160,9 +171,9 @@ function UsageDashboard(): JSX.Element {
           <h3 className="text-xs font-semibold text-text-primary mb-3">일별 비용 추이</h3>
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={dailyData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis dataKey="date" tick={{ fill: '#9CA3AF', fontSize: 10 }} />
-              <YAxis tick={{ fill: '#9CA3AF', fontSize: 10 }} tickFormatter={(v) => `$${v}`} />
+              <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+              <XAxis dataKey="date" tick={{ fill: chart.tick, fontSize: 10 }} />
+              <YAxis tick={{ fill: chart.tick, fontSize: 10 }} tickFormatter={(v) => `$${v}`} />
               <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => `$${v}`} />
               <Area type="monotone" dataKey="비용" stroke="#FB923C" fill="#FB923C" fillOpacity={0.15} strokeWidth={2} />
             </AreaChart>
@@ -190,9 +201,9 @@ function UsageDashboard(): JSX.Element {
           <h3 className="text-xs font-semibold text-text-primary mb-3">시간대별 사용 패턴</h3>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={hourData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis dataKey="시간" tick={{ fill: '#9CA3AF', fontSize: 9 }} interval={2} />
-              <YAxis tick={{ fill: '#9CA3AF', fontSize: 10 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+              <XAxis dataKey="시간" tick={{ fill: chart.tick, fontSize: 9 }} interval={2} />
+              <YAxis tick={{ fill: chart.tick, fontSize: 10 }} />
               <Tooltip contentStyle={tooltipStyle} />
               <Bar dataKey="호출수" fill="#A78BFA" radius={[2, 2, 0, 0]} />
             </BarChart>

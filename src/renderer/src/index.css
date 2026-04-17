@@ -4,6 +4,92 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =================================
+   테마 토큰 (CSS variables)
+   data-theme="dark" (기본) / "light"로 전환
+   ================================= */
+:root,
+[data-theme='light'] {
+  /* ===== 배경 레이어 (cool neutral, 밝아지는 계단) ===== */
+  --bg-sidebar:        #E9ECF2;   /* 사이드바 — 가장 가라앉음 */
+  --bg-base:           #EFF1F5;   /* 메인 작업 영역 */
+  --bg-surface:        #F6F7FA;   /* 일반 카드 표면 */
+  --bg-surface-raised: #FCFCFD;   /* 강조 패널 (상세/모달) */
+  --bg-primary:        #EFF1F5;   /* alias → --bg-base */
+  --bg-surface-hover:  #E3E6EC;
+  --bg-subtle:         #E6E9EF;
+  --bg-hover:          #E3E6EC;
+  --bg-active:         #D8DCE3;
+  --bg-border:         #DFE2E8;
+  --bg-border-light:   #C7CBD3;
+  --bg-border-strong:  #C7CBD3;
+  /* ===== 텍스트 ===== */
+  --text-primary:      #1C2130;
+  --text-secondary:    #4F5769;
+  --text-tertiary:     #8A91A1;
+  /* ===== 액센트 ===== */
+  --accent-blue:       #2563EB;
+  --accent-blue-light: #3B82F6;
+  --accent-blue-soft:  #DCE6FB;
+  --accent-blue-fg:    #1E3A8A;
+  --accent-orange:     #EA580C;
+  --accent-orange-light: #FB923C;
+  --accent-orange-soft: #FBE4D5;
+  /* ===== 기타 ===== */
+  --scrollbar-track:   #E9ECF2;
+  --scrollbar-thumb:   #C7CBD3;
+  --scrollbar-thumb-hover: #8A91A1;
+  --code-bg:           #EDEFF4;
+  --code-text:         #A14A10;
+  --link:              #2563EB;
+  --shadow-sm:  0 1px 2px rgba(17,24,39,0.04), 0 1px 3px rgba(17,24,39,0.03);
+  --shadow-md:  0 2px 4px rgba(17,24,39,0.05), 0 8px 24px rgba(17,24,39,0.06);
+  --shadow-lg:  0 12px 40px rgba(17,24,39,0.10), 0 4px 12px rgba(17,24,39,0.06);
+  --shadow-raised: 0 2px 4px rgba(17,24,39,0.05), 0 8px 24px rgba(17,24,39,0.06);
+  --mark-bg:   #FEF3C7;
+  --mark-text: #92400E;
+  --overlay-bg: rgba(17,24,39,0.40);
+}
+
+[data-theme='dark'] {
+  /* ===== 배경 레이어 ===== */
+  --bg-sidebar:        #111A2A;
+  --bg-base:           #162032;
+  --bg-surface:        #1f2940;
+  --bg-surface-raised: #25304b;
+  --bg-primary:        #162032;   /* alias */
+  --bg-surface-hover:  #2a3553;
+  --bg-subtle:         #1a2436;
+  --bg-hover:          #2a3553;
+  --bg-active:         #34406a;
+  --bg-border:         #3a4566;
+  --bg-border-light:   #4b5773;
+  --bg-border-strong:  #4b5773;
+  --text-primary:      #F9FAFB;
+  --text-secondary:    #B4BCCE;
+  --text-tertiary:     #7A869E;
+  --accent-blue:       #3B82F6;
+  --accent-blue-light: #60A5FA;
+  --accent-blue-soft:  rgba(59,130,246,0.18);
+  --accent-blue-fg:    #93C5FD;
+  --accent-orange:     #FB923C;
+  --accent-orange-light: #FDBA74;
+  --accent-orange-soft: rgba(251,146,60,0.18);
+  --scrollbar-track:   #1a2436;
+  --scrollbar-thumb:   #4b5773;
+  --scrollbar-thumb-hover: #6b7a99;
+  --code-bg:           #1f2940;
+  --code-text:         #FDBA74;
+  --link:              #60A5FA;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
+  --shadow-lg: 0 10px 24px rgba(0,0,0,0.4);
+  --shadow-raised: 0 4px 16px rgba(0,0,0,0.35);
+  --mark-bg: rgba(251,146,60,0.25);
+  --mark-text: #FDBA74;
+  --overlay-bg: rgba(0,0,0,0.6);
+}
+
 /* xterm.js base styles */
 .xterm {
   position: relative;
@@ -14,23 +100,23 @@
   overflow-y: auto;
 }
 
-/* Scrollbar */
+/* Scrollbar — 테마 반응형 */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #111827;
+  background: var(--scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #4B5563;
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #6B7280;
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* Reset */
@@ -48,18 +134,20 @@ html, body, #root {
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
-/* Markdown body */
+/* Markdown body — CSS 변수 기반 */
 .markdown-body {
-  color: #F9FAFB;
+  color: var(--text-primary);
 }
 .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
-  color: #F9FAFB;
+  color: var(--text-primary);
   font-weight: 600;
   margin-top: 1.2em;
   margin-bottom: 0.5em;
-  border-bottom: 1px solid #374151;
+  border-bottom: 1px solid var(--bg-border);
   padding-bottom: 0.3em;
 }
 .markdown-body h1 { font-size: 1.25em; }
@@ -73,7 +161,7 @@ body {
   margin-right: 0.4em;
   width: 15px;
   height: 15px;
-  accent-color: #3B82F6;
+  accent-color: var(--accent-blue);
   cursor: default;
 }
 .markdown-body li input[type="checkbox"]:checked {
@@ -83,22 +171,22 @@ body {
   opacity: 0.5;
 }
 .markdown-body li:has(input[type="checkbox"]:checked) {
-  color: #9CA3AF;
+  color: var(--text-secondary);
 }
 .markdown-body li {
   list-style: none;
 }
 .markdown-body code {
-  background: #1F2937;
+  background: var(--code-bg);
   padding: 0.15em 0.4em;
   border-radius: 4px;
   font-size: 0.9em;
   font-family: 'JetBrains Mono', monospace;
-  color: #FDBA74;
+  color: var(--code-text);
 }
 .markdown-body pre {
-  background: #1F2937;
-  border: 1px solid #374151;
+  background: var(--code-bg);
+  border: 1px solid var(--bg-border);
   border-radius: 8px;
   padding: 0.8em 1em;
   overflow-x: auto;
@@ -107,13 +195,13 @@ body {
 .markdown-body pre code {
   background: none;
   padding: 0;
-  color: #F9FAFB;
+  color: var(--text-primary);
 }
 .markdown-body blockquote {
-  border-left: 3px solid #3B82F6;
+  border-left: 3px solid var(--accent-blue);
   padding-left: 1em;
   margin: 0.5em 0;
-  color: #9CA3AF;
+  color: var(--text-secondary);
 }
 .markdown-body table {
   width: 100%;
@@ -121,31 +209,30 @@ body {
   margin: 0.8em 0;
 }
 .markdown-body th, .markdown-body td {
-  border: 1px solid #374151;
+  border: 1px solid var(--bg-border);
   padding: 0.4em 0.8em;
   text-align: left;
 }
 .markdown-body th {
-  background: #1F2937;
+  background: var(--bg-surface);
   font-weight: 600;
 }
 .markdown-body a {
-  color: #60A5FA;
+  color: var(--link);
   text-decoration: none;
 }
 .markdown-body a:hover { text-decoration: underline; }
 .markdown-body hr {
   border: none;
-  border-top: 1px solid #374151;
+  border-top: 1px solid var(--bg-border);
   margin: 1em 0;
 }
 .markdown-body img {
   max-width: 100%;
   border-radius: 8px;
 }
-.markdown-body strong { color: #F9FAFB; }
+.markdown-body strong { color: var(--text-primary); }
 
-/* Markdown links - open externally */
 .markdown-body a[href] {
   cursor: pointer;
 }

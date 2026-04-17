@@ -70,4 +70,5 @@ export interface AIModelConfig {
   meetingNote?: AIModelName
   sessionSummary?: AIModelName
   calendarAnalysis?: AIModelName
+  messengerCompose?: AIModelName
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   GitBranch as GitBranchIcon,
   FolderOpen,
@@ -17,6 +17,7 @@ import {
   Search,
   Eye
 } from 'lucide-react'
+import TerminalPane from '../Terminal/TerminalPane'
 
 interface Worktree {
   path: string
@@ -61,13 +62,13 @@ interface CompareResult {
   rightBranch: string
 }
 
-type Panel = 'none' | 'diff' | 'compare' | 'file-compare'
+type Panel = 'none' | 'diff' | 'compare' | 'file-compare' | 'terminal'
 
 interface BranchWorkspaceProps {
   onOpenTerminal?: () => void
 }
 
-function BranchWorkspace({ onOpenTerminal }: BranchWorkspaceProps): JSX.Element {
+function BranchWorkspace({ onOpenTerminal: _onOpenTerminal }: BranchWorkspaceProps): JSX.Element {
   // 프로젝트 상태
   const [repoPath, setRepoPath] = useState<string>('')
   const [isRepo, setIsRepo] = useState(false)
@@ -90,6 +91,76 @@ function BranchWorkspace({ onOpenTerminal }: BranchWorkspaceProps): JSX.Element 
   const [fileCompare, setFileCompare] = useState<CompareResult | null>(null)
   const [compareBranches, setCompareBranches] = useState<[string, string]>(['', ''])
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set())
+  /** 워크트리 경로 → 터미널 세션 id (재클릭 시 기존 세션 재사용) */
+  const [termSessions, setTermSessions] = useState<Record<string, string>>({})
+  /** 탭 순서: 열려있는 워크트리 경로 목록 (오래된 순) */
+  const [openTermPaths, setOpenTermPaths] = useState<string[]>([])
+  /** 현재 활성 터미널의 워크트리 경로 */
+  const [activeTermPath, setActiveTermPath] = useState<string | null>(null)
+  /** 앱 시작 후 터미널 복원 완료 여부 (중복 방지) */
+  const termRestoredRef = useRef(false)
+
+  // 상태를 localStorage에 영속화
+  useEffect(() => {
+    localStorage.setItem('branchWorkspace.openTermPaths', JSON.stringify(openTermPaths))
+  }, [openTermPaths])
+  useEffect(() => {
+    localStorage.setItem('branchWorkspace.activeTermPath', activeTermPath || '')
+  }, [activeTermPath])
+
+  // 앱 시작 시 터미널 세션 복원 — 마지막으로 열려있던 브랜치 터미널들을 재생성
+  useEffect(() => {
+    if (termRestoredRef.current) return
+    termRestoredRef.current = true
+    try {
+      const saved = localStorage.getItem('branchWorkspace.openTermPaths')
+      if (!saved) return
+      const paths = JSON.parse(saved) as string[]
+      if (!Array.isArray(paths) || paths.length === 0) return
+      const savedActive = localStorage.getItem('branchWorkspace.activeTermPath') || paths[paths.length - 1]
+
+      // 각 경로에 대해 새 pty 세션 생성 (병렬)
+      Promise.all(paths.map(async (p) => {
+        try {
+          const session = await window.api.terminal.create({ cwd: p })
+          return { path: p, id: session.id }
+        } catch { return null }
+      })).then((results) => {
+        const nextSessions: Record<string, string> = {}
+        const nextPaths: string[] = []
+        for (const r of results) {
+          if (!r) continue
+          nextSessions[r.path] = r.id
+          nextPaths.push(r.path)
+        }
+        if (nextPaths.length > 0) {
+          setTermSessions(nextSessions)
+          setOpenTermPaths(nextPaths)
+          setActiveTermPath(nextPaths.includes(savedActive) ? savedActive : nextPaths[nextPaths.length - 1])
+          // 패널은 자동으로 열지 않음 — 사용자가 브랜치 클릭 시 나타남
+        }
+      }).catch(() => { /* ignore */ })
+    } catch { /* ignore */ }
+  }, [])
+
+  // Cmd/Ctrl + 1~9 로 터미널 탭 전환
+  useEffect(() => {
+    if (activePanel !== 'terminal') return
+    const handler = (e: KeyboardEvent): void => {
+      if (!(e.metaKey || e.ctrlKey)) return
+      // 입력 포커스가 input/textarea에 있으면 건너뜀 (typing 방해 방지)
+      const t = e.target as HTMLElement | null
+      const tag = t?.tagName?.toLowerCase()
+      if (tag === 'input' || tag === 'textarea') return
+      const num = parseInt(e.key, 10)
+      if (!Number.isFinite(num) || num < 1 || num > 9) return
+      if (num > openTermPaths.length) return
+      e.preventDefault()
+      setActiveTermPath(openTermPaths[num - 1])
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [activePanel, openTermPaths])
 
   // 앱 시작 시 마지막 프로젝트 복원
   useEffect(() => {
@@ -187,6 +258,11 @@ function BranchWorkspace({ onOpenTerminal }: BranchWorkspaceProps): JSX.Element 
     const confirmed = window.confirm(`워크트리 "${wt.branch}"를 제거하시겠습니까?\n커밋하지 않은 변경사항은 삭제됩니다.`)
     if (!confirmed) return
     try {
+      // 인라인 터미널 탭도 같이 정리
+      if (termSessions[wt.path]) {
+        await closeTerminalTab(wt.path)
+      }
+      if (selectedWorktree?.path === wt.path) setActivePanel('none')
       try {
         await window.api.git.removeWorktree({ repoPath, worktreePath: wt.path })
       } catch {
@@ -198,10 +274,46 @@ function BranchWorkspace({ onOpenTerminal }: BranchWorkspaceProps): JSX.Element 
     }
   }
 
-  // 터미널 열고 터미널 뷰로 전환
-  const openTerminal = (wt: Worktree): void => {
-    window.dispatchEvent(new CustomEvent('create-terminal', { detail: { cwd: wt.path } }))
-    onOpenTerminal?.()
+  // 우측 패널에 인라인 터미널 — 탭으로 여러 브랜치 동시 유지
+  const openTerminal = async (wt: Worktree): Promise<void> => {
+    setSelectedWorktree(wt)
+    setActivePanel('terminal')
+    setActiveTermPath(wt.path)
+    // 탭 순서에 없으면 추가
+    setOpenTermPaths((prev) => prev.includes(wt.path) ? prev : [...prev, wt.path])
+    // 기존 세션 있으면 재사용, 없으면 생성
+    if (termSessions[wt.path]) return
+    try {
+      const session = await window.api.terminal.create({ cwd: wt.path })
+      setTermSessions((prev) => ({ ...prev, [wt.path]: session.id }))
+    } catch (err) {
+      console.error('터미널 생성 실패:', err)
+    }
+  }
+
+  // 특정 탭 닫기 (세션 kill)
+  const closeTerminalTab = async (path: string): Promise<void> => {
+    const sessionId = termSessions[path]
+    if (sessionId) {
+      try { await window.api.terminal.kill(sessionId) } catch { /* ignore */ }
+    }
+    setTermSessions((prev) => {
+      const next = { ...prev }
+      delete next[path]
+      return next
+    })
+    setOpenTermPaths((prev) => {
+      const next = prev.filter((p) => p !== path)
+      // 현재 활성 탭을 닫았다면 다른 탭으로 전환
+      if (activeTermPath === path) {
+        if (next.length > 0) setActiveTermPath(next[next.length - 1])
+        else {
+          setActiveTermPath(null)
+          setActivePanel('none')
+        }
+      }
+      return next
+    })
   }
 
   // diff 보기
@@ -481,44 +593,113 @@ function BranchWorkspace({ onOpenTerminal }: BranchWorkspaceProps): JSX.Element 
         {/* 우측: 상세 패널 */}
         {activePanel !== 'none' && (
           <div className="flex-1 border-l border-bg-border flex flex-col overflow-hidden">
-            <div className="px-3 py-2 border-b border-bg-border flex items-center justify-between flex-shrink-0">
-              <span className="text-[11px] font-medium text-text-primary">
-                {activePanel === 'diff' && `${selectedWorktree?.branch} 변경사항`}
-                {activePanel === 'compare' && `${compareBranches[0]} ↔ ${compareBranches[1]}`}
-                {activePanel === 'file-compare' && fileCompare?.file}
-              </span>
-              <button
-                onClick={() => setActivePanel('none')}
-                className="p-1 rounded hover:bg-bg-surface-hover text-text-tertiary"
-              >
-                <X size={12} />
-              </button>
-            </div>
+            {/* 터미널 탭바 (터미널 모드일 때만) */}
+            {activePanel === 'terminal' ? (
+              <div className="flex items-center border-b border-bg-border bg-bg-surface flex-shrink-0 overflow-x-auto">
+                {openTermPaths.map((path, idx) => {
+                  const wt = worktrees.find((w) => w.path === path)
+                  const isActive = activeTermPath === path
+                  const label = wt?.branch || path.split('/').pop() || path
+                  const shortcutKey = idx < 9 ? String(idx + 1) : null
+                  const modKey = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform) ? '⌘' : 'Ctrl+'
+                  return (
+                    <div key={path}
+                      onClick={() => setActiveTermPath(path)}
+                      title={shortcutKey ? `${modKey}${shortcutKey} 로 전환` : undefined}
+                      className={`group flex items-center gap-1.5 px-3 py-2 text-[11px] cursor-pointer border-r border-bg-border transition-colors ${
+                        isActive
+                          ? 'bg-bg-primary text-clover-blue border-b-2 border-b-clover-blue'
+                          : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
+                      }`}>
+                      {shortcutKey && (
+                        <span className={`text-[9px] font-mono px-1 rounded ${
+                          isActive ? 'bg-clover-blue/20 text-clover-blue' : 'bg-bg-border text-text-tertiary'
+                        }`}>
+                          {shortcutKey}
+                        </span>
+                      )}
+                      <Terminal size={10} className={isActive ? 'text-clover-blue' : 'text-text-tertiary'} />
+                      <span className="font-mono truncate max-w-[160px]">{label}</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); closeTerminalTab(path) }}
+                        className="p-0.5 rounded hover:bg-red-500/10 text-text-tertiary hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="터미널 닫기"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  )
+                })}
+                <button
+                  onClick={() => setActivePanel('none')}
+                  className="ml-auto p-2 text-text-tertiary hover:text-text-primary"
+                  title="패널 닫기"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ) : (
+              <div className="px-3 py-2 border-b border-bg-border flex items-center justify-between flex-shrink-0">
+                <span className="text-[11px] font-medium text-text-primary flex items-center gap-1.5">
+                  {activePanel === 'diff' && `${selectedWorktree?.branch} 변경사항`}
+                  {activePanel === 'compare' && `${compareBranches[0]} ↔ ${compareBranches[1]}`}
+                  {activePanel === 'file-compare' && fileCompare?.file}
+                </span>
+                <button
+                  onClick={() => setActivePanel('none')}
+                  className="p-1 rounded hover:bg-bg-surface-hover text-text-tertiary"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            )}
 
-            <div className="flex-1 overflow-y-auto">
-              {activePanel === 'diff' && diffResult && (
-                <DiffPanel
-                  result={diffResult}
-                  branch={selectedWorktree?.branch || ''}
-                  repoPath={repoPath}
-                  onFileCompare={compareBranches[0] && compareBranches[1]
-                    ? (f) => viewFileCompare(f, compareBranches[0], compareBranches[1])
-                    : undefined
-                  }
-                />
-              )}
-              {activePanel === 'compare' && compareResult && (
-                <DiffPanel
-                  result={compareResult}
-                  branch={`${compareBranches[0]} → ${compareBranches[1]}`}
-                  repoPath={repoPath}
-                  onFileCompare={(f) => viewFileCompare(f, compareBranches[0], compareBranches[1])}
-                />
-              )}
-              {activePanel === 'file-compare' && fileCompare && (
-                <FileComparePanel result={fileCompare} onBack={() => setActivePanel('compare')} />
-              )}
-            </div>
+            {/* 터미널: 모든 탭 항상 마운트해서 상태 유지 (active만 보이게) */}
+            {activePanel === 'terminal' ? (
+              <div className="relative flex-1 overflow-hidden" style={{ background: '#111827' }}>
+                {openTermPaths.map((path) => {
+                  const sessionId = termSessions[path]
+                  if (!sessionId) return null
+                  return (
+                    <TerminalPane
+                      key={sessionId}
+                      sessionId={sessionId}
+                      isActive={activeTermPath === path}
+                    />
+                  )
+                })}
+                {openTermPaths.length === 0 || !termSessions[activeTermPath || ''] ? (
+                  <div className="flex items-center justify-center h-full text-xs text-text-tertiary">
+                    <Loader2 size={14} className="animate-spin mr-2" /> 터미널 준비 중...
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto">
+                {activePanel === 'diff' && diffResult && (
+                  <DiffPanel
+                    result={diffResult}
+                    branch={selectedWorktree?.branch || ''}
+                    repoPath={repoPath}
+                    onFileCompare={compareBranches[0] && compareBranches[1]
+                      ? (f) => viewFileCompare(f, compareBranches[0], compareBranches[1])
+                      : undefined
+                    }
+                  />
+                )}
+                {activePanel === 'compare' && compareResult && (
+                  <DiffPanel
+                    result={compareResult}
+                    branch={`${compareBranches[0]} → ${compareBranches[1]}`}
+                    repoPath={repoPath}
+                    onFileCompare={(f) => viewFileCompare(f, compareBranches[0], compareBranches[1])}
+                  />
+                )}
+                {activePanel === 'file-compare' && fileCompare && (
+                  <FileComparePanel result={fileCompare} onBack={() => setActivePanel('compare')} />
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

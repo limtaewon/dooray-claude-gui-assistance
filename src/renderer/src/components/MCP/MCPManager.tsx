@@ -47,6 +47,7 @@ function MCPManager(): JSX.Element {
   }
 
   const handleDelete = async (name: string): Promise<void> => {
+    if (!window.confirm(`"${name}" MCP 서버를 삭제할까요?\n설정 파일에서 제거되며 복구할 수 없습니다.`)) return
     try {
       await window.api.mcp.delete(name)
       await loadServers()

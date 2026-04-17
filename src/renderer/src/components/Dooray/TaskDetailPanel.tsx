@@ -3,7 +3,13 @@ import { X, Sparkles, Play, ExternalLink, Clock, User, MessageCircle } from 'luc
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
+import DoorayImage, { DoorayFileContext } from '../common/DoorayImage'
 import type { DoorayTask, DoorayTaskDetail, DoorayTaskComment } from '../../../../shared/types/dooray'
+
+// ReactMarkdown img 컴포넌트 override — 두레이 인증 필요 이미지 처리
+const markdownComponents = {
+  img: ({ src, alt }: { src?: string; alt?: string }) => <DoorayImage src={src} alt={alt} className="max-w-full rounded-lg" />
+}
 
 interface TaskDetailPanelProps {
   task: DoorayTask
@@ -61,6 +67,7 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
   const wfName = task.workflow?.name || task.workflowName || task.workflowClass
 
   return (
+    <DoorayFileContext.Provider value={{ projectId: task.projectId, postId: task.id }}>
     <div className="h-full flex flex-col bg-bg-primary">
       {/* 헤더 */}
       <div className="flex items-start justify-between p-4 border-b border-bg-border bg-bg-surface flex-shrink-0">
@@ -104,7 +111,7 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
             <span className="text-[11px] font-semibold text-clover-orange">AI 분석</span>
           </div>
           <div className="text-xs text-text-primary leading-relaxed markdown-body">
-            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{summary}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>{summary}</ReactMarkdown>
           </div>
         </div>
       )}
@@ -115,7 +122,7 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
           <div className="flex items-center justify-center h-32 text-text-secondary text-sm">로딩 중...</div>
         ) : bodyContent ? (
           <div className="markdown-body text-xs leading-relaxed">
-            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{bodyContent}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>{bodyContent}</ReactMarkdown>
           </div>
         ) : (
           <div className="text-text-secondary text-sm text-center py-8">태스크 본문이 비어있습니다.</div>
@@ -162,7 +169,7 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
                   </div>
                   {c.body?.content && (
                     <div className="markdown-body text-xs leading-relaxed">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{c.body.content}</ReactMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>{c.body.content}</ReactMarkdown>
                     </div>
                   )}
                 </div>
@@ -175,6 +182,7 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
         )}
       </div>
     </div>
+    </DoorayFileContext.Provider>
   )
 }
 

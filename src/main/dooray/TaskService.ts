@@ -1,3 +1,5 @@
+import { BrowserWindow } from 'electron'
+import { IPC_CHANNELS } from '../../shared/types/ipc'
 import { DoorayClient } from './DoorayClient'
 import type { DoorayTask, DoorayTaskDetail, DoorayTaskComment, DoorayTaskUpdateParams, DoorayProject } from '../../shared/types/dooray'
 
@@ -26,10 +28,21 @@ export class TaskService {
   private taskCache: Map<string, { tasks: DoorayTask[]; timestamp: number }> = new Map()
   private memberNameCache: Map<string, string> = new Map()
   private myMemberId: string | null = null
+  private mainWindow: BrowserWindow | null = null
   private static CACHE_TTL = 3 * 60 * 1000 // 3분
   private static PROJECT_LIST_TTL = 10 * 60 * 1000 // 10분
 
   constructor(private client: DoorayClient) {}
+
+  setMainWindow(win: BrowserWindow): void {
+    this.mainWindow = win
+  }
+
+  /** 점진 로딩: 프로젝트별 태스크 일부가 도착했을 때 UI에 전달 */
+  private emitPartial(projectId: string, tasks: DoorayTask[], done: boolean): void {
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) return
+    this.mainWindow.webContents.send(IPC_CHANNELS.DOORAY_TASKS_PARTIAL, { projectId, tasks, done })
+  }
 
   private async getMyMemberId(): Promise<string> {
     if (!this.myMemberId) {
@@ -41,10 +54,18 @@ export class TaskService {
     return this.myMemberId
   }
 
+  /** 수동 추가 프로젝트 ID 목록 (외부에서 주입) */
+  private customProjectIds: string[] = []
+  setCustomProjectIds(ids: string[]): void {
+    this.customProjectIds = Array.from(new Set(ids))
+    this.projectListCache = null // 목록 캐시 무효화
+  }
+
   async listMyProjects(): Promise<DoorayProject[]> {
     if (this.projectListCache && Date.now() - this.projectListCache.timestamp < TaskService.PROJECT_LIST_TTL) {
       return this.projectListCache.data
     }
+    const t0 = Date.now()
     // 비공개 프로젝트 + 내가 멤버인 공개 프로젝트 병렬 조회
     const [privateRes, publicRes] = await Promise.all([
       this.client.request<DoorayListResponse<DoorayProject>>(
@@ -64,6 +85,31 @@ export class TaskService {
         this.projectCache.set(p.id, p)
       }
     }
+
+    // 수동 추가 프로젝트 — 자동 조회에 안 잡히는 것만 개별 API로 받아서 isCustom 플래그 부여
+    const missingCustom = this.customProjectIds.filter((id) => !seen.has(id))
+    if (missingCustom.length > 0) {
+      const customProjects = await Promise.all(
+        missingCustom.map((id) =>
+          this.getProjectInfo(id)
+            .then((p) => ({ ...p, isCustom: true }))
+            .catch(() => null)
+        )
+      )
+      for (const p of customProjects) {
+        if (p && !seen.has(p.id)) {
+          seen.add(p.id)
+          projects.push(p)
+          this.projectCache.set(p.id, p)
+        }
+      }
+    }
+    // 이미 자동 조회된 프로젝트도 수동 추가 목록에 있으면 isCustom 마크
+    for (const p of projects) {
+      if (this.customProjectIds.includes(p.id)) p.isCustom = true
+    }
+
+    console.log(`[Projects] list: ${Date.now() - t0}ms`)
     this.projectListCache = { data: projects, timestamp: Date.now() }
     return projects
   }
@@ -102,12 +148,15 @@ export class TaskService {
     // 캐시 확인
     const cached = this.taskCache.get(projectId)
     if (!skipCache && cached && Date.now() - cached.timestamp < TaskService.CACHE_TTL) {
+      // 캐시 히트도 partial emit (UI가 일관되게 이벤트 기반으로 동작)
+      this.emitPartial(projectId, cached.tasks, true)
       return cached.tasks
     }
 
     const size = 100
     const MAX_PAGES = 5
     const project = this.projectCache.get(projectId)
+    const tStart = Date.now()
 
     // 태그 정보 로드 + 첫 페이지 동시 호출 (병렬)
     const [tagInfo, firstRes] = await Promise.all([
@@ -116,25 +165,12 @@ export class TaskService {
         `/project/v1/projects/${projectId}/posts?toMemberIds=${memberId}&size=${size}&page=0&order=-createdAt`
       ).catch(() => ({ header: { resultCode: 0, isSuccessful: false }, result: [], totalCount: 0 }))
     ])
+    const tFirst = Date.now()
+    console.log(`[Tasks] ${projectId.slice(-4)} firstPage+tags: ${tFirst - tStart}ms`)
 
     const firstPageTasks = firstRes.result || []
     const totalCount = firstRes.totalCount || firstPageTasks.length
 
-    // 나머지 페이지를 병렬로 호출
-    const totalPages = Math.min(MAX_PAGES, Math.ceil(totalCount / size))
-    const remainingPages: number[] = []
-    for (let p = 1; p < totalPages; p++) remainingPages.push(p)
-
-    const remainingResults = await Promise.all(
-      remainingPages.map((page) =>
-        this.client.request<DoorayListResponse<DoorayTask>>(
-          `/project/v1/projects/${projectId}/posts?toMemberIds=${memberId}&size=${size}&page=${page}&order=-createdAt`
-        ).catch(() => ({ header: { resultCode: 0, isSuccessful: false }, result: [], totalCount: 0 }))
-      )
-    )
-
-    // 모든 페이지 합치기
-    const allTasks: DoorayTask[] = []
     const enrichTask = (task: DoorayTask): void => {
       task.projectId = projectId
       task.projectCode = project?.code
@@ -147,13 +183,39 @@ export class TaskService {
           }
         }
       }
-      allTasks.push(task)
     }
 
+    // 첫 페이지 enrich 후 바로 UI로 partial emit (체감 속도 개선)
     for (const task of firstPageTasks) enrichTask(task)
+    const totalPages = Math.min(MAX_PAGES, Math.ceil(totalCount / size))
+    const hasMore = totalPages > 1
+    this.emitPartial(projectId, firstPageTasks, !hasMore)
+
+    // 나머지 페이지를 병렬로 호출
+    const remainingPages: number[] = []
+    for (let p = 1; p < totalPages; p++) remainingPages.push(p)
+
+    const remainingResults = await Promise.all(
+      remainingPages.map((page) =>
+        this.client.request<DoorayListResponse<DoorayTask>>(
+          `/project/v1/projects/${projectId}/posts?toMemberIds=${memberId}&size=${size}&page=${page}&order=-createdAt`
+        ).catch(() => ({ header: { resultCode: 0, isSuccessful: false }, result: [], totalCount: 0 }))
+      )
+    )
+    const tAll = Date.now()
+    console.log(`[Tasks] ${projectId.slice(-4)} remaining ${remainingPages.length}pages parallel: ${tAll - tFirst}ms (total ${tAll - tStart}ms, ${totalCount}개)`)
+
+    // 모든 페이지 합치기 (첫 페이지 + 나머지)
+    const allTasks: DoorayTask[] = [...firstPageTasks]
     for (const res of remainingResults) {
-      for (const task of res.result || []) enrichTask(task)
+      for (const task of res.result || []) {
+        enrichTask(task)
+        allTasks.push(task)
+      }
     }
+
+    // 전체 완료 후 최종 partial emit (done=true)
+    if (hasMore) this.emitPartial(projectId, allTasks, true)
 
     // 캐시 저장
     this.taskCache.set(projectId, { tasks: allTasks, timestamp: Date.now() })
@@ -361,5 +423,120 @@ export class TaskService {
         body: JSON.stringify({ workflowId: params.status })
       }
     )
+  }
+
+  /** 태스크(커뮤니티 게시글) 생성 */
+  async createTask(params: {
+    projectId: string
+    subject: string
+    body: string
+    assigneeIds?: string[] // 기본: 자기 자신
+  }): Promise<{ id: string }> {
+    const myId = await this.getMyMemberId()
+    const to = (params.assigneeIds && params.assigneeIds.length > 0
+      ? params.assigneeIds
+      : [myId]
+    ).map((id) => ({ type: 'member' as const, member: { organizationMemberId: id } }))
+
+    const res = await this.client.request<DoorayItemResponse<{ id: string }>>(
+      `/project/v1/projects/${params.projectId}/posts`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          subject: params.subject,
+          body: { mimeType: 'text/x-markdown', content: params.body },
+          dueDateFlag: false,
+          users: { to, cc: [] }
+        })
+      }
+    )
+    return { id: res.result.id }
+  }
+
+  /** 태스크 댓글 생성 (커뮤니티 댓글) */
+  async createTaskComment(params: {
+    projectId: string
+    postId: string
+    content: string
+  }): Promise<{ id: string }> {
+    const res = await this.client.request<DoorayItemResponse<{ id: string }>>(
+      `/project/v1/projects/${params.projectId}/posts/${params.postId}/logs`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          body: { mimeType: 'text/x-markdown', content: params.content }
+        })
+      }
+    )
+    return { id: res.result.id }
+  }
+
+  /** 태스크에 파일 업로드 (이미지 등) */
+  async uploadFileToTask(params: {
+    projectId: string
+    postId: string
+    filename: string
+    mime: string
+    data: ArrayBuffer
+  }): Promise<{ id: string }> {
+    return this.client.uploadFile(params)
+  }
+
+  /** 태스크 본문(제목+body)만 업데이트 — 이미지 업로드 후 링크 치환에 사용 */
+  async updateTaskBody(params: {
+    projectId: string
+    postId: string
+    subject: string
+    body: string
+  }): Promise<void> {
+    await this.client.request(
+      `/project/v1/projects/${params.projectId}/posts/${params.postId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          subject: params.subject,
+          body: { mimeType: 'text/x-markdown', content: params.body }
+        })
+      }
+    )
+  }
+
+  /** 댓글 본문 수정 */
+  async updateTaskComment(params: {
+    projectId: string
+    postId: string
+    logId: string
+    content: string
+  }): Promise<void> {
+    await this.client.request(
+      `/project/v1/projects/${params.projectId}/posts/${params.postId}/logs/${params.logId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          body: { mimeType: 'text/x-markdown', content: params.content }
+        })
+      }
+    )
+  }
+
+  /**
+   * 커뮤니티용 공개 프로젝트 태스크 리스트 조회.
+   * 내 담당만 필터하지 않고 전체 조회.
+   */
+  async listCommunityPosts(projectId: string, page = 0, size = 50): Promise<{
+    posts: DoorayTask[]
+    totalCount: number
+  }> {
+    const project = this.projectCache.get(projectId)
+    const res = await this.client.request<DoorayListResponse<DoorayTask>>(
+      `/project/v1/projects/${projectId}/posts?size=${size}&page=${page}&order=-createdAt`
+    ).catch(() => ({ header: { resultCode: 0, isSuccessful: false }, result: [] as DoorayTask[], totalCount: 0 }))
+
+    const posts = (res.result || []).map((t) => {
+      t.projectId = projectId
+      t.projectCode = project?.code
+      return t
+    })
+    return { posts, totalCount: res.totalCount || posts.length }
   }
 }

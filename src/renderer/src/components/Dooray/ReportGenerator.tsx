@@ -34,19 +34,22 @@ function ReportGenerator(): JSX.Element {
     setReport(null)
     setEditMode(false)
     const reqId = start()
+    const t0 = Date.now()
+    window.api.analytics.track('ai.report.start', { meta: { type: reportType } })
     try {
       const result = await window.api.ai.generateReport(reportType, reqId)
       setReport(result)
-      // 히스토리에 저장
       const updated = [{ ...result, savedAt: new Date().toISOString() }, ...history].slice(0, 20)
       await window.api.settings.set('reportHistory', updated)
       setHistory(updated)
+      window.api.analytics.track('ai.report.success', { durationMs: Date.now() - t0, success: true, meta: { type: reportType } })
     } catch (err) {
       setReport({
         title: '오류',
         content: err instanceof Error ? err.message : '보고서 생성에 실패했습니다.',
         generatedAt: new Date().toISOString()
       })
+      window.api.analytics.track('ai.report.error', { durationMs: Date.now() - t0, success: false })
     } finally {
       done()
     }

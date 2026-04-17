@@ -76,13 +76,18 @@ function TerminalPane({ sessionId, isActive, initialOutput }: TerminalPaneProps)
       if (id === sessionId) terminal.write(data)
     })
 
-    const resizeObserver = new ResizeObserver(() => {
+    const safeResize = (fa: FitAddon): void => {
       try {
-        fitAddon.fit()
-        const dims = fitAddon.proposeDimensions()
-        if (dims) window.api.terminal.resize({ id: sessionId, cols: dims.cols, rows: dims.rows })
+        fa.fit()
+        const dims = fa.proposeDimensions()
+        // cols/rows가 양수일 때만 전송 (컨테이너 크기가 0이면 node-pty가 에러)
+        if (dims && dims.cols > 0 && dims.rows > 0) {
+          window.api.terminal.resize({ id: sessionId, cols: dims.cols, rows: dims.rows })
+        }
       } catch {}
-    })
+    }
+
+    const resizeObserver = new ResizeObserver(() => safeResize(fitAddon))
     resizeObserver.observe(containerRef.current)
 
     return () => { cleanup(); resizeObserver.disconnect(); terminal.dispose() }
@@ -93,10 +98,14 @@ function TerminalPane({ sessionId, isActive, initialOutput }: TerminalPaneProps)
       // hidden → block 전환 후 레이아웃 완료를 기다린 뒤 fit
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
+          const fa = fitAddonRef.current
+          if (!fa) return
           try {
-            fitAddonRef.current?.fit()
-            const dims = fitAddonRef.current?.proposeDimensions()
-            if (dims) window.api.terminal.resize({ id: sessionId, cols: dims.cols, rows: dims.rows })
+            fa.fit()
+            const dims = fa.proposeDimensions()
+            if (dims && dims.cols > 0 && dims.rows > 0) {
+              window.api.terminal.resize({ id: sessionId, cols: dims.cols, rows: dims.rows })
+            }
           } catch {}
           terminalRef.current?.focus()
         })

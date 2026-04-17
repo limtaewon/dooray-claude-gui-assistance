@@ -1,27 +1,27 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ['./src/renderer/src/**/*.{ts,tsx,html}'],
-  darkMode: 'class',
+  darkMode: ['class', '[data-theme="dark"]'],
   theme: {
     extend: {
       colors: {
         clover: {
-          blue: '#3B82F6',
-          'blue-light': '#60A5FA',
-          orange: '#FB923C',
-          'orange-light': '#FDBA74'
+          blue: 'var(--accent-blue)',
+          'blue-light': 'var(--accent-blue-light)',
+          orange: 'var(--accent-orange)',
+          'orange-light': 'var(--accent-orange-light)'
         },
         bg: {
-          primary: '#111827',
-          surface: '#1F2937',
-          'surface-hover': '#263244',
-          border: '#374151',
-          'border-light': '#4B5563'
+          primary: 'var(--bg-primary)',
+          surface: 'var(--bg-surface)',
+          'surface-hover': 'var(--bg-surface-hover)',
+          border: 'var(--bg-border)',
+          'border-light': 'var(--bg-border-light)'
         },
         text: {
-          primary: '#F9FAFB',
-          secondary: '#9CA3AF',
-          tertiary: '#6B7280'
+          primary: 'var(--text-primary)',
+          secondary: 'var(--text-secondary)',
+          tertiary: 'var(--text-tertiary)'
         }
       },
       fontFamily: {

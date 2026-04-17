@@ -1,7 +1,12 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import { initTheme } from './hooks/useTheme'
+import { initLightPalette } from './components/Settings/ThemePicker'
 import './index.css'
+
+initTheme()
+initLightPalette()
 
 // 앱 내 링크 클릭 시 외부 브라우저로 열기 (Electron 네비게이션 방지)
 document.addEventListener('click', (e) => {

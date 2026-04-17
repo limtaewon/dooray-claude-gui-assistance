@@ -22,7 +22,9 @@ import type { CloverSkill, SkillTarget } from '../../shared/types/skill'
  *   ~/Library/Application Support/clover/briefing/skills/*.md
  *   ~/Library/Application Support/clover/report/skills/*.md
  */
-const TARGETS: SkillTarget[] = ['briefing', 'report', 'calendar', 'chat', 'insights', 'all']
+const TARGETS: SkillTarget[] = ['briefing', 'report', 'calendar', 'wiki', 'task', 'insights', 'all']
+// 'chat'은 구버전 호환용 (스킬 파일은 남아있을 수 있으므로 읽기 위해 유지)
+const LEGACY_TARGETS: string[] = ['chat']
 
 function parseFrontmatter(raw: string): { meta: Record<string, string>; content: string } {
   const match = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/)

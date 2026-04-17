@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, X, Terminal } from 'lucide-react'
+import { Plus, X, Terminal, Trash2 } from 'lucide-react'
 import TerminalPane from './TerminalPane'
 import type { TerminalSession } from '../../../../shared/types/terminal'
 
@@ -13,15 +13,15 @@ function TerminalView(): JSX.Element {
   const [activeId, setActiveId] = useState<string | null>(null)
   const restored = useRef(false)
 
-  // 앱 시작 시 저장된 세션 복원
+  // 앱 시작 시 저장된 세션 복원 (최대 5개까지만 — 누적 방지)
   useEffect(() => {
     if (restored.current) return
     restored.current = true
 
     window.api.terminal.restoreSaved().then(async (saved) => {
       if (!saved || saved.length === 0) return
-      // 저장된 세션마다 새 pty 생성 + 출력 복원
-      for (const s of saved) {
+      const limited = saved.slice(-5) // 최근 5개만 복원
+      for (const s of limited) {
         try {
           const session = await window.api.terminal.create({ cwd: s.meta.cwd || undefined })
           setEntries((prev) => [...prev, {
@@ -56,6 +56,16 @@ function TerminalView(): JSX.Element {
     },
     [activeId]
   )
+
+  const closeAll = useCallback(async () => {
+    if (entries.length === 0) return
+    if (!window.confirm(`${entries.length}개 터미널을 모두 닫을까요?`)) return
+    for (const e of entries) {
+      try { await window.api.terminal.kill(e.session.id) } catch {}
+    }
+    setEntries([])
+    setActiveId(null)
+  }, [entries])
 
   // 외부에서 터미널 생성 요청 수신 (BranchWorkspace 등)
   useEffect(() => {
@@ -99,11 +109,18 @@ function TerminalView(): JSX.Element {
           </div>
         ))}
         <button onClick={() => createSession()}
-          className="w-7 h-7 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover"
+          className="w-7 h-7 flex-shrink-0 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover"
           title="새 터미널 (⌘T)">
           <Plus size={14} />
         </button>
-        <span className="text-[9px] text-text-tertiary ml-1">⌘T 새탭 · ⌘W 닫기</span>
+        <span className="text-[9px] text-text-tertiary ml-1 flex-shrink-0">⌘T 새탭 · ⌘W 닫기</span>
+        {entries.length >= 3 && (
+          <button onClick={closeAll}
+            className="ml-auto flex-shrink-0 flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-text-tertiary hover:text-red-400 hover:bg-red-500/10 transition-colors"
+            title={`${entries.length}개 터미널 모두 닫기`}>
+            <Trash2 size={10} /> 모두 닫기 ({entries.length})
+          </button>
+        )}
       </div>
 
       <div className="flex-1 relative">

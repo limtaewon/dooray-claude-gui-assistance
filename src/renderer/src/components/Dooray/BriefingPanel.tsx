@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Sparkles, AlertTriangle, Target, Clock, Calendar, Lightbulb, RefreshCw, Trash2, ChevronDown } from 'lucide-react'
+import { Sparkles, AlertTriangle, Target, Clock, Calendar, Lightbulb, RefreshCw, Trash2, ChevronDown, ThumbsUp, ThumbsDown } from 'lucide-react'
 import type { AIBriefing } from '../../../../shared/types/ai'
 import SkillQuickToggle from './SkillQuickToggle'
 import { useAIProgress } from '../../hooks/useAIProgress'
 import AIProgressIndicator from '../common/AIProgressIndicator'
+import { ErrorView, EmptyView } from '../common/StateViews'
 
 type StoredBriefing = AIBriefing & { savedAt: string }
 
@@ -26,15 +27,25 @@ function BriefingPanel(): JSX.Element {
   const loadBriefing = async (): Promise<void> => {
     setError(null)
     const reqId = start()
+    const started = Date.now()
+    window.api.analytics.track('ai.briefing.start')
     try {
       const result = await window.api.ai.briefing(reqId)
       setBriefing(result)
-      // 저장
       await window.api.briefingStore.save(result)
       const list = await window.api.briefingStore.list()
       setHistory(list)
+      window.api.analytics.track('ai.briefing.success', {
+        durationMs: Date.now() - started,
+        success: true
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : '브리핑 생성 실패')
+      window.api.analytics.track('ai.briefing.error', {
+        durationMs: Date.now() - started,
+        success: false,
+        meta: { message: err instanceof Error ? err.message.substring(0, 100) : 'unknown' }
+      })
     } finally {
       done()
     }
@@ -46,6 +57,7 @@ function BriefingPanel(): JSX.Element {
   }
 
   const deleteBriefing = async (index: number): Promise<void> => {
+    if (!window.confirm('이 브리핑을 삭제할까요?\n삭제 후에는 복구할 수 없습니다.')) return
     await window.api.briefingStore.delete(index)
     const list = await window.api.briefingStore.list()
     setHistory(list)
@@ -55,9 +67,35 @@ function BriefingPanel(): JSX.Element {
 
   if (isActive) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-3 p-6">
-        <AIProgressIndicator progress={progress} showStreamPreview className="w-full max-w-md" />
-        <p className="text-[10px] text-text-tertiary">Claude Code CLI를 통해 처리 중</p>
+      <div className="h-full flex flex-col">
+        {/* 헤더 유지 */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-bg-border flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <Sparkles size={16} className="text-clover-orange animate-pulse" />
+            <span className="text-sm font-semibold text-text-primary">AI 브리핑 생성 중</span>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6">
+          <AIProgressIndicator
+            progress={progress}
+            showStreamPreview
+            size="large"
+            expectedTime="보통 30초 ~ 2분 걸립니다. 태스크가 많으면 더 오래 걸릴 수 있어요."
+            className="max-w-3xl mx-auto"
+          />
+          {/* 이전 브리핑이 있으면 흐리게 배경 표시 (기다리는 동안 참고) */}
+          {briefing && (
+            <div className="max-w-3xl mx-auto mt-6 opacity-30">
+              <p className="text-[10px] text-text-tertiary mb-2">↓ 이전 브리핑 (참고용)</p>
+              <p className="text-sm font-semibold text-text-primary mb-3">{briefing.greeting}</p>
+              {briefing.urgent.length > 0 && (
+                <div className="text-[11px] text-text-secondary">
+                  긴급: {briefing.urgent.map((u) => u.subject).join(', ')}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     )
   }
@@ -119,28 +157,16 @@ function BriefingPanel(): JSX.Element {
 
       {/* 브리핑 내용 */}
       <div className="flex-1 overflow-y-auto">
-        {error && (
-          <div className="p-4 text-center">
-            <p className="text-xs text-red-400 mb-2">{error}</p>
-            <button onClick={loadBriefing} className="text-xs text-clover-blue hover:underline">다시 시도</button>
-          </div>
-        )}
+        {error && <ErrorView message={error} onRetry={loadBriefing} />}
 
         {!briefing && !error && (
-          <div className="flex flex-col items-center justify-center h-full text-center px-4">
-            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-clover-orange/20 to-clover-blue/20 flex items-center justify-center mb-3">
-              <Sparkles size={28} className="text-clover-orange" />
-            </div>
-            <p className="text-sm font-semibold text-text-primary mb-1">오늘의 AI 브리핑</p>
-            <p className="text-xs text-text-secondary mb-4">태스크와 일정을 분석하여 오늘 집중할 업무를 추천합니다</p>
-            <button
-              onClick={loadBriefing}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-clover-orange to-clover-blue text-white text-sm font-medium hover:opacity-90 transition-opacity"
-            >
-              <Sparkles size={14} />
-              브리핑 생성
-            </button>
-          </div>
+          <EmptyView
+            icon={Sparkles}
+            title="오늘의 AI 브리핑"
+            description="태스크와 일정을 분석하여 오늘 집중할 업무를 추천합니다"
+            actionLabel="✨ 브리핑 생성"
+            onAction={loadBriefing}
+          />
         )}
 
         {briefing && (
@@ -193,6 +219,9 @@ function BriefingPanel(): JSX.Element {
                 </ol>
               </Section>
             )}
+
+            {/* 피드백 */}
+            <BriefingFeedback />
           </div>
         )}
       </div>
@@ -219,6 +248,64 @@ function TaskItem({ subject, detail }: { subject: string; detail: string }): JSX
     <div className="flex items-start gap-2 text-xs">
       <span className="text-text-primary flex-1">{subject}</span>
       <span className="text-text-secondary flex-shrink-0">{detail}</span>
+    </div>
+  )
+}
+
+/** 브리핑 피드백 — 스킬 개선 힌트 수집용 */
+function BriefingFeedback(): JSX.Element {
+  const [feedback, setFeedback] = useState<'up' | 'down' | null>(null)
+  const [comment, setComment] = useState('')
+  const [submitted, setSubmitted] = useState(false)
+
+  const submit = async (type: 'up' | 'down', text?: string): Promise<void> => {
+    setFeedback(type)
+    const history = (await window.api.settings.get('briefingFeedback') as Array<{ at: string; type: string; comment?: string }>) || []
+    history.push({ at: new Date().toISOString(), type, comment: text })
+    await window.api.settings.set('briefingFeedback', history.slice(-50))
+    window.api.analytics.track('ai.briefing.feedback', {
+      meta: { feedback: type, hasComment: !!text }
+    })
+    setSubmitted(true)
+  }
+
+  if (submitted) {
+    return (
+      <div className="text-center text-[10px] text-emerald-400 py-2">
+        ✓ 피드백 고마워요! 개선에 활용할게요.
+      </div>
+    )
+  }
+
+  return (
+    <div className="pt-3 border-t border-bg-border/50">
+      {feedback === null ? (
+        <div className="flex items-center justify-center gap-3 text-[11px] text-text-tertiary">
+          이번 브리핑 어땠나요?
+          <button onClick={() => submit('up')}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-400/10 text-emerald-400 hover:bg-emerald-400/20">
+            <ThumbsUp size={11} /> 좋아요
+          </button>
+          <button onClick={() => setFeedback('down')}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-400/10 text-red-400 hover:bg-red-400/20">
+            <ThumbsDown size={11} /> 아쉬워요
+          </button>
+        </div>
+      ) : feedback === 'down' ? (
+        <div className="space-y-2">
+          <p className="text-[10px] text-text-secondary text-center">뭐가 아쉬웠나요? (선택)</p>
+          <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={2}
+            placeholder="예: 긴급 기준이 안 맞아요, 멘션된 태스크를 더 강조해주세요"
+            className="w-full px-3 py-2 bg-bg-surface border border-bg-border rounded-lg text-[11px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue resize-none" />
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setFeedback(null)} className="text-[10px] text-text-tertiary hover:text-text-secondary">취소</button>
+            <button onClick={() => submit('down', comment)}
+              className="px-3 py-1 rounded-md bg-clover-blue text-white text-[10px] font-medium hover:bg-clover-blue/80">
+              제출
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

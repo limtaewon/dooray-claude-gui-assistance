@@ -30,6 +30,35 @@ export const IPC_CHANNELS = {
   DOORAY_CALENDAR_LIST: 'dooray:calendar:list',
   DOORAY_CALENDAR_EVENTS: 'dooray:calendar:events',
   DOORAY_PROJECT_INFO: 'dooray:project:info',
+  DOORAY_TASKS_PARTIAL: 'dooray:tasks:partial',
+  DOORAY_FILE_FETCH: 'dooray:file:fetch',
+  DOORAY_TASK_CREATE: 'dooray:task:create',
+  DOORAY_TASK_COMMENT_CREATE: 'dooray:task:comment:create',
+  DOORAY_TASK_UPLOAD_FILE: 'dooray:task:upload-file',
+  DOORAY_TASK_UPDATE_BODY: 'dooray:task:update-body',
+  DOORAY_TASK_COMMENT_UPDATE: 'dooray:task:comment:update',
+  DOORAY_COMMUNITY_POSTS: 'dooray:community:posts',
+  DOORAY_MESSENGER_CHANNELS: 'dooray:messenger:channels',
+  DOORAY_MESSENGER_SEND: 'dooray:messenger:send',
+
+  // AI - Messenger
+  AI_COMPOSE_MESSAGE: 'ai:compose-message',
+
+  // Watcher (채널 모니터링)
+  WATCHER_LIST: 'watcher:list',
+  WATCHER_CREATE: 'watcher:create',
+  WATCHER_UPDATE: 'watcher:update',
+  WATCHER_DELETE: 'watcher:delete',
+  WATCHER_MESSAGES: 'watcher:messages',
+  WATCHER_MARK_READ: 'watcher:mark-read',
+  WATCHER_MARK_ALL_READ: 'watcher:mark-all-read',
+  WATCHER_REFRESH: 'watcher:refresh',
+  WATCHER_UNREAD_COUNT: 'watcher:unread-count',
+  /** 새 메시지 도착 이벤트 (main → renderer) */
+  WATCHER_NEW_MESSAGES: 'watcher:new-messages',
+
+  // AI - 필터 규칙 생성
+  AI_GENERATE_FILTER: 'ai:generate-filter',
 
   // Dooray Task Detail
   DOORAY_TASK_DETAIL: 'dooray:task:detail',
@@ -68,6 +97,8 @@ export const IPC_CHANNELS = {
   SETTINGS_SET: 'settings:set',
   SETTINGS_GET_PROJECTS: 'settings:get-projects',
   SETTINGS_SET_PROJECTS: 'settings:set-projects',
+  SETTINGS_GET_CUSTOM_PROJECTS: 'settings:get-custom-projects',
+  SETTINGS_SET_CUSTOM_PROJECTS: 'settings:set-custom-projects',
 
   // Clover Skills
   CLOVER_SKILLS_LIST: 'clover-skills:list',
@@ -108,6 +139,12 @@ export const IPC_CHANNELS = {
   GIT_COMPARE_BRANCHES: 'git:compare-branches',
   GIT_COMPARE_FILE: 'git:compare-file',
   GIT_PRUNE: 'git:prune',
+
+  // Analytics
+  ANALYTICS_TRACK: 'analytics:track',
+  ANALYTICS_SUMMARY: 'analytics:summary',
+  ANALYTICS_EXPORT: 'analytics:export',
+  ANALYTICS_CLEAR: 'analytics:clear',
 
   // Dialog
   DIALOG_SELECT_FOLDER: 'dialog:select-folder',

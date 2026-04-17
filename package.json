@@ -10,9 +10,10 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "postinstall": "electron-rebuild -f -w node-pty",
-    "dist": "electron-vite build && electron-builder --mac",
-    "dist:win": "electron-vite build && electron-builder --win",
-    "dist:all": "electron-vite build && electron-builder --mac --win"
+    "icons": "node scripts/generate-icons.mjs",
+    "dist": "npm run icons && electron-vite build && electron-builder --mac",
+    "dist:win": "npm run icons && electron-vite build && electron-builder --win",
+    "dist:all": "npm run icons && electron-vite build && electron-builder --mac --win"
   },
   "build": {
     "appId": "com.clauday.app",

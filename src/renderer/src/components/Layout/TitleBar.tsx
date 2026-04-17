@@ -1,4 +1,5 @@
 import { Clover } from 'lucide-react'
+import GlobalAIIndicator from '../common/GlobalAIIndicator'
 
 function TitleBar(): JSX.Element {
   return (
@@ -8,6 +9,10 @@ function TitleBar(): JSX.Element {
         <Clover size={18} className="text-clover-orange" />
         <span className="text-sm font-semibold text-text-primary">Clauday</span>
         <span className="text-xs text-text-secondary">Claude Code GUI</span>
+      </div>
+      {/* 전역 AI 작업 인디케이터 — 어떤 탭에서든 AI가 돌고 있으면 여기 표시 */}
+      <div className="flex-1 flex justify-center no-drag relative z-10">
+        <GlobalAIIndicator />
       </div>
     </header>
   )

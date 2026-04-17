@@ -25,22 +25,53 @@ function getWorkflowName(task: DoorayTask): string {
   return task.workflow?.name || task.workflowName || task.workflowClass || '알 수 없음'
 }
 
-// 태그 스타일 캐시 (색상별 1회만 계산)
+/**
+ * 태그 칩 스타일.
+ * hue는 원색 유지, HSL L값을 테마별 고정 → WCAG AA(4.5:1) 대비 보장.
+ */
 const TAG_STYLE_CACHE = new Map<string, React.CSSProperties>()
+if (typeof window !== 'undefined') {
+  window.addEventListener('theme-changed', () => TAG_STYLE_CACHE.clear())
+}
+function currentTheme(): 'light' | 'dark' {
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'
+}
+function hexToHsl(hex: string): [number, number, number] {
+  const h = hex.replace('#', '')
+  const r = parseInt(h.slice(0, 2), 16) / 255
+  const g = parseInt(h.slice(2, 4), 16) / 255
+  const b = parseInt(h.slice(4, 6), 16) / 255
+  const max = Math.max(r, g, b), min = Math.min(r, g, b)
+  const l = (max + min) / 2
+  if (max === min) return [0, 0, Math.round(l * 100)]
+  const d = max - min
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+  let hue = 0
+  if (max === r) hue = ((g - b) / d + (g < b ? 6 : 0)) / 6
+  else if (max === g) hue = ((b - r) / d + 2) / 6
+  else hue = ((r - g) / d + 4) / 6
+  return [Math.round(hue * 360), Math.round(s * 100), Math.round(l * 100)]
+}
 function tagStyle(color?: string): React.CSSProperties {
   if (!color || color === 'ffffff') return {}
-  const cached = TAG_STYLE_CACHE.get(color)
+  const theme = currentTheme()
+  const key = `${theme}|${color}`
+  const cached = TAG_STYLE_CACHE.get(key)
   if (cached) return cached
-  const hex = color.replace('#', '')
-  const r = parseInt(hex.substring(0, 2), 16)
-  const g = parseInt(hex.substring(2, 4), 16)
-  const b = parseInt(hex.substring(4, 6), 16)
-  const style: React.CSSProperties = {
-    backgroundColor: `rgba(${r},${g},${b},0.15)`,
-    color: `rgb(${Math.min(r + 40, 255)},${Math.min(g + 40, 255)},${Math.min(b + 40, 255)})`,
-    borderColor: `rgba(${r},${g},${b},0.3)`
-  }
-  TAG_STYLE_CACHE.set(color, style)
+  const [h, s] = hexToHsl(color)
+  const sAdj = Math.min(s, 80)
+  const style: React.CSSProperties = theme === 'light'
+    ? {
+        backgroundColor: `hsl(${h} ${sAdj * 0.25}% 94%)`,
+        color: `hsl(${h} ${sAdj}% 25%)`,
+        borderColor: `hsl(${h} ${sAdj * 0.5}% 75%)`
+      }
+    : {
+        backgroundColor: `hsl(${h} ${sAdj * 0.2}% 18%)`,
+        color: `hsl(${h} ${sAdj}% 80%)`,
+        borderColor: `hsl(${h} ${sAdj * 0.35}% 40%)`
+      }
+  TAG_STYLE_CACHE.set(key, style)
   return style
 }
 
@@ -74,16 +105,33 @@ const TaskRow = memo(function TaskRow({ task, isSelected, currentTagFilter, onSe
           <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${WORKFLOW_BG_COLORS[wf] || 'bg-gray-500/10 text-gray-400'}`}>
             {wfName}
           </span>
-          {task.tags && task.tags.length > 0 && task.tags.map((tag) => (
-            <span
-              key={tag.id}
-              className="text-[9px] px-1.5 py-0.5 rounded-full border"
-              style={tagStyle(tag.color)}
-              onClick={(e) => { e.stopPropagation(); onToggleTag(tag.name || tag.id) }}
-            >
-              {tag.name || tag.id}
-            </span>
-          ))}
+          {task.tags && task.tags.length > 0 && (() => {
+            const MAX_VISIBLE = 3
+            const visible = task.tags.slice(0, MAX_VISIBLE)
+            const hidden = task.tags.length - MAX_VISIBLE
+            return (
+              <>
+                {visible.map((tag) => (
+                  <span
+                    key={tag.id}
+                    className="text-[9px] px-1.5 py-0.5 rounded-full border"
+                    style={tagStyle(tag.color)}
+                    onClick={(e) => { e.stopPropagation(); onToggleTag(tag.name || tag.id) }}
+                  >
+                    {tag.name || tag.id}
+                  </span>
+                ))}
+                {hidden > 0 && (
+                  <span
+                    className="text-[9px] px-1.5 py-0.5 rounded-full bg-bg-surface border border-bg-border text-text-tertiary cursor-default"
+                    title={task.tags.slice(MAX_VISIBLE).map((t) => t.name || t.id).join(', ')}
+                  >
+                    +{hidden}
+                  </span>
+                )}
+              </>
+            )
+          })()}
           {task.milestone?.name && (
             <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-400">
               {task.milestone.name}
@@ -167,17 +215,14 @@ function ProjectTaskView(): JSX.Element {
   const loadTasks = useCallback(async (projectId: string) => {
     setLoadingTasks(true)
     setError(null)
+    setTasks([])
     const t0 = performance.now()
     try {
       const list = await window.api.dooray.tasks.list([projectId])
       const t1 = performance.now()
-      console.log(`[TaskLoad] API ${(t1 - t0).toFixed(0)}ms · ${list.length}개`)
+      console.log(`[TaskLoad] API ${(t1 - t0).toFixed(0)}ms · ${list.length}개 (final)`)
+      // partial로 이미 채워졌어도 최종 리스트로 대체 (정합성)
       setTasks(list)
-      // setTasks 후 다음 프레임에 렌더 완료 시간 측정
-      requestAnimationFrame(() => {
-        const t2 = performance.now()
-        console.log(`[TaskLoad] Render ${(t2 - t1).toFixed(0)}ms (총 ${(t2 - t0).toFixed(0)}ms)`)
-      })
     } catch (err) {
       setError(err instanceof Error ? err.message : '태스크 로드 실패')
       setTasks([])
@@ -185,6 +230,28 @@ function ProjectTaskView(): JSX.Element {
       setLoadingTasks(false)
     }
   }, [])
+
+  // 점진 로딩 이벤트 구독: 첫 페이지 도착 시 바로 UI에 표시
+  useEffect(() => {
+    const unsub = window.api.dooray.tasks.onPartial(({ projectId, tasks: partialTasks, done }) => {
+      // 현재 선택된 프로젝트 것만 반영
+      const current = selectedProjectRef.current
+      if (!current || current.id !== projectId) return
+      setTasks(partialTasks)
+      if (!done) {
+        console.log(`[TaskLoad] Partial ${partialTasks.length}개 (계속 로딩 중)`)
+        // 첫 페이지 받았으니 로딩 표시 내림 (나머지는 백그라운드)
+        setLoadingTasks(false)
+      }
+    })
+    return unsub
+  }, [])
+
+  // selectedProject 최신값을 이벤트 핸들러에서 참조하기 위한 ref
+  const selectedProjectRef = useRef<DoorayProject | null>(null)
+  useEffect(() => {
+    selectedProjectRef.current = selectedProject
+  }, [selectedProject])
 
   useEffect(() => { loadProjects() }, [loadProjects])
   useEffect(() => {
