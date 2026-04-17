@@ -1,4 +1,7 @@
-import { execFile } from 'child_process'
+import { execFile, execFileSync } from 'child_process'
+import { existsSync } from 'fs'
+import { join } from 'path'
+import { homedir } from 'os'
 import type { DoorayTask, DoorayCalendarEvent } from '../../shared/types/dooray'
 import type { AIBriefing, AIReport } from '../../shared/types/ai'
 
@@ -46,7 +49,43 @@ const BRIEFING_SYSTEM_PROMPT = `두레이 업무 브리핑을 생성하세요. 3
   "recommendations": ["구체적 행동 제안 1", "구체적 행동 제안 2", "구체적 행동 제안 3"]
 }`
 
-const CLAUDE_CLI = process.env.CLAUDE_CLI_PATH || 'claude'
+/** 패키징된 앱에서도 claude CLI를 찾을 수 있도록 PATH 보강 */
+function resolveClaudePath(): string {
+  // 환경변수로 직접 지정된 경우
+  if (process.env.CLAUDE_CLI_PATH) return process.env.CLAUDE_CLI_PATH
+
+  // 이미 PATH에 있으면 그대로
+  try {
+    execFileSync('claude', ['--version'], { timeout: 3000, stdio: 'ignore' })
+    return 'claude'
+  } catch {}
+
+  // 일반적인 설치 경로 탐색
+  const home = homedir()
+  const candidates = [
+    join(home, '.claude', 'local', 'claude'),
+    join(home, '.claude', 'bin', 'claude'),
+    '/usr/local/bin/claude',
+    '/opt/homebrew/bin/claude',
+    join(home, '.local', 'bin', 'claude'),
+    join(home, '.npm-global', 'bin', 'claude')
+  ]
+
+  for (const p of candidates) {
+    if (existsSync(p)) return p
+  }
+
+  // 로그인 쉘에서 which로 탐색
+  try {
+    const shell = process.env.SHELL || '/bin/zsh'
+    const result = execFileSync(shell, ['-l', '-c', 'which claude'], { timeout: 5000 }).toString().trim()
+    if (result && existsSync(result)) return result
+  } catch {}
+
+  return 'claude' // 최후의 폴백
+}
+
+const CLAUDE_CLI = resolveClaudePath()
 
 function buildArgs(prompt: string, opts: {
   model?: string
@@ -71,6 +110,24 @@ function buildArgs(prompt: string, opts: {
   return args
 }
 
+/** 패키징 앱에서도 동작하도록 PATH 보강 */
+function enrichedEnv(): Record<string, string> {
+  const home = homedir()
+  const extraPaths = [
+    join(home, '.claude', 'local'),
+    join(home, '.claude', 'bin'),
+    '/usr/local/bin',
+    '/opt/homebrew/bin',
+    join(home, '.local', 'bin'),
+    join(home, '.npm-global', 'bin')
+  ]
+  const currentPath = process.env.PATH || '/usr/bin:/bin'
+  return {
+    ...(process.env as Record<string, string>),
+    PATH: [...extraPaths, currentPath].join(':')
+  }
+}
+
 export class AIService {
   private chatSessionId: string | null = null
 
@@ -82,7 +139,7 @@ export class AIService {
         {
           maxBuffer: 1024 * 1024 * 5,
           timeout: 120000,
-          env: process.env as Record<string, string>
+          env: enrichedEnv()
         },
         (error, stdout, stderr) => {
           if (error && !stdout) {
@@ -113,8 +170,7 @@ export class AIService {
 
   isAvailable(): boolean {
     try {
-      const { execFileSync } = require('child_process')
-      execFileSync(CLAUDE_CLI, ['--version'], { timeout: 5000 })
+      execFileSync(CLAUDE_CLI, ['--version'], { timeout: 5000, env: enrichedEnv() })
       return true
     } catch {
       return false

@@ -491,8 +491,13 @@ ${data}`
   // Claude CLI Info (한국어 번역 포함)
   ipcMain.handle(IPC_CHANNELS.CLAUDE_CLI_INFO, async () => {
     const { execFile } = require('child_process')
+    const { homedir } = require('os')
+    const { join } = require('path')
+    const home = homedir()
+    const extraPaths = [join(home, '.claude', 'local'), join(home, '.claude', 'bin'), '/usr/local/bin', '/opt/homebrew/bin', join(home, '.local', 'bin')]
+    const richEnv = { ...process.env, PATH: [...extraPaths, process.env.PATH || ''].join(':') }
     const run = (args: string[]): Promise<string> => new Promise((resolve) => {
-      execFile('claude', args, { timeout: 5000, env: process.env }, (err: Error | null, stdout: string, stderr: string) => {
+      execFile('claude', args, { timeout: 5000, env: richEnv }, (err: Error | null, stdout: string, stderr: string) => {
         resolve(stdout || stderr || (err?.message ?? ''))
       })
     })
