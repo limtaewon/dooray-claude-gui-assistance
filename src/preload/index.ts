@@ -13,7 +13,7 @@ import type {
   DoorayCalendarEvent,
   DoorayCalendarQueryParams
 } from '../shared/types/dooray'
-import type { AIChatRequest, AIChatResponse, AIBriefing, AIReport, AIReportRequest } from '../shared/types/ai'
+import type { AIBriefing, AIReport, AIProgressEvent, AIModelConfig, AIModelName } from '../shared/types/ai'
 import type { TerminalSession, TerminalCreateOptions, TerminalResizeOptions } from '../shared/types/terminal'
 import type {
   GitWorktree,
@@ -68,7 +68,9 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TOKEN_VALIDATE),
     projects: {
       list: (): Promise<DoorayProject[]> =>
-        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_PROJECTS_LIST)
+        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_PROJECTS_LIST),
+      info: (projectId: string): Promise<DoorayProject> =>
+        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_PROJECT_INFO, projectId)
     },
     tasks: {
       list: (projectIds?: string[]): Promise<DoorayTask[]> =>
@@ -134,26 +136,35 @@ const api = {
   ai: {
     available: (): Promise<boolean> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_AVAILABLE),
-    chat: (req: AIChatRequest): Promise<{ content: string; sessionId: string; cost: number }> =>
-      ipcRenderer.invoke(IPC_CHANNELS.AI_CHAT, req),
-    resetChat: (): Promise<boolean> =>
-      ipcRenderer.invoke(IPC_CHANNELS.AI_CHAT_RESET),
-    briefing: (): Promise<AIBriefing> =>
-      ipcRenderer.invoke(IPC_CHANNELS.AI_BRIEFING),
-    summarizeTask: (task: DoorayTask, body?: string): Promise<string> =>
-      ipcRenderer.invoke(IPC_CHANNELS.AI_SUMMARIZE_TASK, { task, body }),
-    generateReport: (type: 'daily' | 'weekly'): Promise<AIReport> =>
-      ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_REPORT, { type }),
-    generateWiki: (taskSubject: string, taskBody?: string, projectCode?: string): Promise<string> =>
-      ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_WIKI, { taskSubject, taskBody, projectCode }),
-    generateMeetingNote: (eventSubject: string, eventDescription?: string, attendees?: string[]): Promise<string> =>
-      ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_MEETING_NOTE, { eventSubject, eventDescription, attendees }),
-    wikiProofread: (title: string, content: string): Promise<string> =>
-      ipcRenderer.invoke(IPC_CHANNELS.AI_WIKI_PROOFREAD, { title, content }),
-    wikiImprove: (title: string, content: string): Promise<string> =>
-      ipcRenderer.invoke(IPC_CHANNELS.AI_WIKI_IMPROVE, { title, content }),
-    generateSkill: (request: string, target: string): Promise<{ name: string; description: string; content: string }> =>
-      ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_SKILL, { request, target })
+    ask: (params: { prompt: string; systemPrompt?: string; model?: AIModelName; maxBudget?: string; requestId?: string; feature?: keyof AIModelConfig }): Promise<string> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_ASK, params),
+    briefing: (requestId?: string): Promise<AIBriefing> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_BRIEFING, { requestId }),
+    summarizeTask: (task: DoorayTask, body?: string, requestId?: string): Promise<string> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_SUMMARIZE_TASK, { task, body, requestId }),
+    generateReport: (type: 'daily' | 'weekly', requestId?: string): Promise<AIReport> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_REPORT, { type, requestId }),
+    generateWiki: (taskSubject: string, taskBody?: string, projectCode?: string, requestId?: string): Promise<string> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_WIKI, { taskSubject, taskBody, projectCode, requestId }),
+    generateMeetingNote: (eventSubject: string, eventDescription?: string, attendees?: string[], requestId?: string): Promise<string> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_MEETING_NOTE, { eventSubject, eventDescription, attendees, requestId }),
+    wikiProofread: (title: string, content: string, requestId?: string): Promise<string> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_WIKI_PROOFREAD, { title, content, requestId }),
+    wikiImprove: (title: string, content: string, requestId?: string): Promise<string> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_WIKI_IMPROVE, { title, content, requestId }),
+    generateSkill: (request: string, target: string, requestId?: string): Promise<{ name: string; description: string; content: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_SKILL, { request, target, requestId }),
+    /** 진행상황 이벤트 구독 */
+    onProgress: (callback: (event: AIProgressEvent) => void): (() => void) => {
+      const handler = (_: IpcRendererEvent, event: AIProgressEvent): void => callback(event)
+      ipcRenderer.on(IPC_CHANNELS.AI_PROGRESS, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.AI_PROGRESS, handler)
+    },
+    /** 모델 설정 조회/저장 */
+    getModelConfig: (): Promise<AIModelConfig> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_MODEL_CONFIG_GET),
+    setModelConfig: (config: AIModelConfig): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_MODEL_CONFIG_SET, config)
   },
 
   // Settings
@@ -180,18 +191,6 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.CLOVER_SKILLS_DELETE, id),
     forTarget: (target: string): Promise<import('../shared/types/skill').CloverSkill[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.CLOVER_SKILLS_FOR_TARGET, target)
-  },
-
-  // Chat Store
-  chatStore: {
-    save: (id: string, messages: unknown[]): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.CHAT_SAVE, { id, messages }),
-    list: (): Promise<Array<{ id: string; messageCount: number; updatedAt: string; preview: string }>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.CHAT_LIST),
-    load: (id: string): Promise<unknown[]> =>
-      ipcRenderer.invoke(IPC_CHANNELS.CHAT_LOAD, id),
-    delete: (id: string): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.CHAT_DELETE, id)
   },
 
   // Briefing Store

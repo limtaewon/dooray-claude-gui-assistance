@@ -51,12 +51,17 @@ function TerminalPane({ sessionId, isActive, initialOutput }: TerminalPaneProps)
 
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)
-    terminal.open(containerRef.current)
-
-    try { fitAddon.fit() } catch {}
+    try {
+      terminal.open(containerRef.current)
+    } catch {}
 
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
+
+    // 다음 프레임에 fit (open 직후 dimensions 준비가 안 된 타이밍 이슈 회피)
+    requestAnimationFrame(() => {
+      try { fitAddon.fit() } catch {}
+    })
 
     // 저장된 출력 복원
     if (initialOutput) {

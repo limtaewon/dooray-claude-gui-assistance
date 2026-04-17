@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
 import {
   RefreshCw, CheckCircle2, Circle, Clock, AlertCircle,
   FolderOpen, ChevronRight, ChevronLeft, PanelLeftClose, PanelLeftOpen
@@ -25,19 +25,88 @@ function getWorkflowName(task: DoorayTask): string {
   return task.workflow?.name || task.workflowName || task.workflowClass || '알 수 없음'
 }
 
-// 태그 색상을 CSS 스타일로 변환 (dooray hex color → rgba)
+// 태그 스타일 캐시 (색상별 1회만 계산)
+const TAG_STYLE_CACHE = new Map<string, React.CSSProperties>()
 function tagStyle(color?: string): React.CSSProperties {
   if (!color || color === 'ffffff') return {}
+  const cached = TAG_STYLE_CACHE.get(color)
+  if (cached) return cached
   const hex = color.replace('#', '')
   const r = parseInt(hex.substring(0, 2), 16)
   const g = parseInt(hex.substring(2, 4), 16)
   const b = parseInt(hex.substring(4, 6), 16)
-  return {
+  const style: React.CSSProperties = {
     backgroundColor: `rgba(${r},${g},${b},0.15)`,
     color: `rgb(${Math.min(r + 40, 255)},${Math.min(g + 40, 255)},${Math.min(b + 40, 255)})`,
     borderColor: `rgba(${r},${g},${b},0.3)`
   }
+  TAG_STYLE_CACHE.set(color, style)
+  return style
 }
+
+/** 메모이즈된 태스크 로우 (참조 바뀔 때만 재렌더) */
+interface TaskRowProps {
+  task: DoorayTask
+  isSelected: boolean
+  currentTagFilter: string
+  onSelect: (task: DoorayTask) => void
+  onToggleTag: (tagKey: string) => void
+}
+
+const TaskRow = memo(function TaskRow({ task, isSelected, currentTagFilter, onSelect, onToggleTag }: TaskRowProps): JSX.Element {
+  const wf = task.workflowClass || 'registered'
+  const Icon = WORKFLOW_ICONS[wf] || Circle
+  const color = WORKFLOW_COLORS[wf]
+  const wfName = getWorkflowName(task)
+  return (
+    <div
+      onClick={() => onSelect(task)}
+      // content-visibility: 뷰포트 밖에 있을 때 렌더 스킵 (브라우저 내장 가상화)
+      style={{ contentVisibility: 'auto', containIntrinsicSize: '0 60px' }}
+      className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
+        isSelected ? 'bg-clover-blue/5' : 'hover:bg-bg-surface-hover'
+      }`}
+    >
+      <Icon size={14} className={`flex-shrink-0 ${color}`} />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-text-primary truncate">{task.subject}</p>
+        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+          <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${WORKFLOW_BG_COLORS[wf] || 'bg-gray-500/10 text-gray-400'}`}>
+            {wfName}
+          </span>
+          {task.tags && task.tags.length > 0 && task.tags.map((tag) => (
+            <span
+              key={tag.id}
+              className="text-[9px] px-1.5 py-0.5 rounded-full border"
+              style={tagStyle(tag.color)}
+              onClick={(e) => { e.stopPropagation(); onToggleTag(tag.name || tag.id) }}
+            >
+              {tag.name || tag.id}
+            </span>
+          ))}
+          {task.milestone?.name && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-400">
+              {task.milestone.name}
+            </span>
+          )}
+          {task.dueDateAt && (
+            <span className="text-[9px] text-text-tertiary">
+              마감 {new Date(task.dueDateAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+            </span>
+          )}
+        </div>
+      </div>
+      <ChevronRight size={12} className="text-text-tertiary flex-shrink-0" />
+    </div>
+  )
+}, (prev, next) =>
+  prev.task.id === next.task.id &&
+  prev.task.subject === next.task.subject &&
+  prev.task.workflowClass === next.task.workflowClass &&
+  prev.task.tags === next.task.tags &&
+  prev.isSelected === next.isSelected &&
+  prev.currentTagFilter === next.currentTagFilter
+)
 
 function ProjectTaskView(): JSX.Element {
   const [projects, setProjects] = useState<DoorayProject[]>([])
@@ -66,17 +135,23 @@ function ProjectTaskView(): JSX.Element {
   const loadProjects = useCallback(async () => {
     setLoadingProjects(true)
     try {
-      const [allProjects, pinnedIds] = await Promise.all([
+      const [allProjects, pinnedIds, customProjects] = await Promise.all([
         window.api.dooray.projects.list(),
-        window.api.settings.getProjects()
+        window.api.settings.getProjects(),
+        window.api.settings.get('customProjects') as Promise<DoorayProject[] | null>
       ])
+      // API 프로젝트 + 수동 추가 프로젝트 병합 (중복 제거)
+      const merged = [...allProjects]
+      for (const cp of customProjects || []) {
+        if (!allProjects.some((p) => p.id === cp.id)) merged.push(cp)
+      }
       let filtered: DoorayProject[]
       if (pinnedIds.length > 0) {
         filtered = pinnedIds
-          .map((id) => allProjects.find((p) => p.id === id))
+          .map((id) => merged.find((p) => p.id === id))
           .filter(Boolean) as DoorayProject[]
       } else {
-        filtered = allProjects
+        filtered = merged
       }
       setProjects(filtered)
       if (filtered.length > 0 && !selectedProject) {
@@ -92,9 +167,17 @@ function ProjectTaskView(): JSX.Element {
   const loadTasks = useCallback(async (projectId: string) => {
     setLoadingTasks(true)
     setError(null)
+    const t0 = performance.now()
     try {
       const list = await window.api.dooray.tasks.list([projectId])
+      const t1 = performance.now()
+      console.log(`[TaskLoad] API ${(t1 - t0).toFixed(0)}ms · ${list.length}개`)
       setTasks(list)
+      // setTasks 후 다음 프레임에 렌더 완료 시간 측정
+      requestAnimationFrame(() => {
+        const t2 = performance.now()
+        console.log(`[TaskLoad] Render ${(t2 - t1).toFixed(0)}ms (총 ${(t2 - t0).toFixed(0)}ms)`)
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : '태스크 로드 실패')
       setTasks([])
@@ -121,40 +204,54 @@ function ProjectTaskView(): JSX.Element {
     return () => el.removeEventListener('scroll', handler)
   }, [loadingTasks])
 
-  // 워크플로우 이름별 카운트 (커스텀 상태 지원)
-  const workflowCounts: Array<{ name: string; cls: string; count: number }> = []
-  const countMap = new Map<string, { cls: string; count: number }>()
-  for (const t of tasks) {
-    const name = getWorkflowName(t)
-    const cls = t.workflowClass || 'registered'
-    const existing = countMap.get(name)
-    if (existing) { existing.count++ } else { countMap.set(name, { cls, count: 1 }) }
-  }
-  countMap.forEach((v, k) => workflowCounts.push({ name: k, cls: v.cls, count: v.count }))
-  // 진행중 계열 → 등록 계열 → 완료 계열 순
-  const ORDER: Record<string, number> = { working: 0, registered: 1, backlog: 2, done: 3, closed: 4 }
-  workflowCounts.sort((a, b) => (ORDER[a.cls] ?? 2) - (ORDER[b.cls] ?? 2))
+  // 워크플로우 카운트 + 태그 목록 (tasks가 바뀔 때만 재계산)
+  const { workflowCounts, tagList } = useMemo(() => {
+    const countMap = new Map<string, { cls: string; count: number }>()
+    const tagsMap = new Map<string, { name: string; color: string; count: number }>()
+    for (const t of tasks) {
+      const name = getWorkflowName(t)
+      const cls = t.workflowClass || 'registered'
+      const existing = countMap.get(name)
+      if (existing) existing.count++
+      else countMap.set(name, { cls, count: 1 })
 
-  // 필터 적용
-  const filteredTasks = tasks.filter((t) => {
-    if (wfFilter !== '전체' && getWorkflowName(t) !== wfFilter) return false
-    if (tagFilter !== '전체' && !t.tags?.some((tag) => (tag.name || tag.id) === tagFilter)) return false
-    if (searchQuery && !t.subject.toLowerCase().includes(searchQuery.toLowerCase())) return false
-    return true
-  })
-
-  const visibleTasks = filteredTasks.slice(0, renderCount)
-
-  // 전체 태그 목록 (필터용)
-  const allTags = new Map<string, { name: string; color: string; count: number }>()
-  for (const t of tasks) {
-    for (const tag of t.tags || []) {
-      const key = tag.name || tag.id
-      const existing = allTags.get(key)
-      if (existing) { existing.count++ } else { allTags.set(key, { name: key, color: tag.color || 'ffffff', count: 1 }) }
+      if (t.tags) {
+        for (const tag of t.tags) {
+          const key = tag.name || tag.id
+          const tagExisting = tagsMap.get(key)
+          if (tagExisting) tagExisting.count++
+          else tagsMap.set(key, { name: key, color: tag.color || 'ffffff', count: 1 })
+        }
+      }
     }
-  }
-  const tagList = Array.from(allTags.values()).sort((a, b) => b.count - a.count)
+    const ORDER: Record<string, number> = { working: 0, registered: 1, backlog: 2, done: 3, closed: 4 }
+    const workflowArr = Array.from(countMap.entries())
+      .map(([k, v]) => ({ name: k, cls: v.cls, count: v.count }))
+      .sort((a, b) => (ORDER[a.cls] ?? 2) - (ORDER[b.cls] ?? 2))
+    const tagArr = Array.from(tagsMap.values()).sort((a, b) => b.count - a.count)
+    return { workflowCounts: workflowArr, tagList: tagArr }
+  }, [tasks])
+
+  // 필터 적용 (필터 조건이 바뀔 때만 재계산)
+  const filteredTasks = useMemo(() => {
+    const q = searchQuery.toLowerCase()
+    return tasks.filter((t) => {
+      if (wfFilter !== '전체' && getWorkflowName(t) !== wfFilter) return false
+      if (tagFilter !== '전체' && !t.tags?.some((tag) => (tag.name || tag.id) === tagFilter)) return false
+      if (q && !t.subject.toLowerCase().includes(q)) return false
+      return true
+    })
+  }, [tasks, wfFilter, tagFilter, searchQuery])
+
+  const visibleTasks = useMemo(() => filteredTasks.slice(0, renderCount), [filteredTasks, renderCount])
+
+  const handleSelectTask = useCallback((task: DoorayTask) => {
+    setSelectedTask((prev) => prev?.id === task.id ? null : task)
+  }, [])
+
+  const handleToggleTag = useCallback((tagKey: string) => {
+    setTagFilter((prev) => prev === tagKey ? '전체' : tagKey)
+  }, [])
 
   const handleSidebarResize = useCallback((delta: number) => {
     setSidebarWidth((w) => Math.max(120, Math.min(400, w + delta)))
@@ -209,8 +306,8 @@ function ProjectTaskView(): JSX.Element {
                           : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
                       }`}
                     >
-                      <FolderOpen size={13} className={isSelected ? 'text-clover-blue' : 'text-text-tertiary'} />
-                      <span className="text-xs font-medium truncate">{p.code}</span>
+                      <FolderOpen size={13} className={`flex-shrink-0 ${isSelected ? 'text-clover-blue' : 'text-text-tertiary'}`} />
+                      <span className="text-xs font-medium truncate min-w-0">{p.code}</span>
                     </button>
                   )
                 })
@@ -341,53 +438,16 @@ function ProjectTaskView(): JSX.Element {
                 </div>
               ) : (
                 <div className="divide-y divide-bg-border">
-                  {visibleTasks.map((task) => {
-                    const wf = task.workflowClass || 'registered'
-                    const Icon = WORKFLOW_ICONS[wf] || Circle
-                    const color = WORKFLOW_COLORS[wf]
-                    const wfName = getWorkflowName(task)
-                    const isSelected = selectedTask?.id === task.id
-                    return (
-                      <div
-                        key={task.id}
-                        onClick={() => setSelectedTask(isSelected ? null : task)}
-                        className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
-                          isSelected ? 'bg-clover-blue/5' : 'hover:bg-bg-surface-hover'
-                        }`}
-                      >
-                        <Icon size={14} className={`flex-shrink-0 ${color}`} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-text-primary truncate">{task.subject}</p>
-                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${WORKFLOW_BG_COLORS[wf] || 'bg-gray-500/10 text-gray-400'}`}>
-                              {wfName}
-                            </span>
-                            {task.tags && task.tags.length > 0 && task.tags.map((tag) => (
-                              <span
-                                key={tag.id}
-                                className="text-[9px] px-1.5 py-0.5 rounded-full border"
-                                style={tagStyle(tag.color)}
-                                onClick={(e) => { e.stopPropagation(); setTagFilter(tagFilter === (tag.name || tag.id) ? '전체' : (tag.name || tag.id)) }}
-                              >
-                                {tag.name || tag.id}
-                              </span>
-                            ))}
-                            {task.milestone?.name && (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-400">
-                                {task.milestone.name}
-                              </span>
-                            )}
-                            {task.dueDateAt && (
-                              <span className="text-[9px] text-text-tertiary">
-                                마감 {new Date(task.dueDateAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <ChevronRight size={12} className="text-text-tertiary flex-shrink-0" />
-                      </div>
-                    )
-                  })}
+                  {visibleTasks.map((task) => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      isSelected={selectedTask?.id === task.id}
+                      currentTagFilter={tagFilter}
+                      onSelect={handleSelectTask}
+                      onToggleTag={handleToggleTag}
+                    />
+                  ))}
                   {renderCount < filteredTasks.length && (
                     <div className="py-3 text-center text-[10px] text-text-tertiary">
                       {visibleTasks.length} / {filteredTasks.length}개 표시 — 스크롤하면 더 불러옵니다

@@ -1,9 +1,11 @@
-import { execFile, execFileSync } from 'child_process'
+import { execFile, execFileSync, spawn } from 'child_process'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
+import { BrowserWindow } from 'electron'
+import { IPC_CHANNELS } from '../../shared/types/ipc'
 import type { DoorayTask, DoorayCalendarEvent } from '../../shared/types/dooray'
-import type { AIBriefing, AIReport } from '../../shared/types/ai'
+import type { AIBriefing, AIReport, AIProgressEvent, AIModelName, AIModelConfig } from '../../shared/types/ai'
 
 interface ClaudeCliResult {
   type: string
@@ -13,17 +15,6 @@ interface ClaudeCliResult {
   is_error: boolean
   total_cost_usd: number
 }
-
-const CLAUDAY_SYSTEM_PROMPT = `당신은 "Clauday AI"입니다. NHN Dooray 업무 관리 비서입니다.
-
-규칙:
-- 항상 한국어로 응답
-- 간결하고 실용적으로 (불필요한 인사말 생략)
-- 태스크 상태: registered(등록), working(진행중), done(완료), closed(닫힘)
-- 날짜는 한국 시간 기준
-
-사용자의 두레이 태스크/위키/캘린더 데이터가 컨텍스트로 제공됩니다.
-자연어 명령에 따라 업무를 분석, 요약, 추천합니다.`
 
 const BRIEFING_SYSTEM_PROMPT = `두레이 업무 브리핑을 생성하세요. 3가지 데이터가 제공됩니다:
 1. 내 담당 태스크 (toMemberIds)
@@ -110,7 +101,7 @@ function buildArgs(prompt: string, opts: {
   return args
 }
 
-/** 패키징 앱에서도 동작하도록 PATH 보강 */
+/** 패키징 앱에서도 동작하도록 PATH 보강 + OMC/플러그인 훅 비활성화 (속도 최적화) */
 function enrichedEnv(): Record<string, string> {
   const home = homedir()
   const extraPaths = [
@@ -124,16 +115,58 @@ function enrichedEnv(): Record<string, string> {
   const currentPath = process.env.PATH || '/usr/bin:/bin'
   return {
     ...(process.env as Record<string, string>),
-    PATH: [...extraPaths, currentPath].join(':')
+    PATH: [...extraPaths, currentPath].join(':'),
+    // OMC ultrawork 세션 복원 훅 비활성화 (매번 75k 토큰 로드 방지)
+    DISABLE_OMC: '1',
+    // Claude Code 간소화 모드
+    CLAUDE_CODE_SIMPLE: '1'
   }
 }
 
 export class AIService {
-  private chatSessionId: string | null = null
+  private mainWindow: BrowserWindow | null = null
+  private modelConfig: AIModelConfig = {}
 
+  setMainWindow(win: BrowserWindow): void {
+    this.mainWindow = win
+  }
+
+  setModelConfig(config: AIModelConfig): void {
+    this.modelConfig = config
+  }
+
+  getModelConfig(): AIModelConfig {
+    return this.modelConfig
+  }
+
+  /** 기능별 모델 선택 (설정이 없으면 기본값 사용) */
+  private pickModel(feature: keyof AIModelConfig, defaultModel: AIModelName): AIModelName {
+    return this.modelConfig[feature] || defaultModel
+  }
+
+  /** 진행상황 이벤트 발행 */
+  private emitProgress(
+    requestId: string | undefined,
+    stage: AIProgressEvent['stage'],
+    message: string,
+    startedAt: number,
+    chunk?: string
+  ): void {
+    if (!requestId || !this.mainWindow || this.mainWindow.isDestroyed()) return
+    const event: AIProgressEvent = {
+      requestId,
+      stage,
+      message,
+      elapsedMs: Date.now() - startedAt,
+      ...(chunk !== undefined ? { chunk } : {})
+    }
+    this.mainWindow.webContents.send(IPC_CHANNELS.AI_PROGRESS, event)
+  }
+
+  /** 기본(non-streaming) claude 실행 */
   private runClaude(args: string[]): Promise<ClaudeCliResult> {
     return new Promise((resolve, reject) => {
-      const proc = execFile(
+      execFile(
         CLAUDE_CLI,
         args,
         {
@@ -168,6 +201,128 @@ export class AIService {
     })
   }
 
+  /**
+   * 스트리밍 claude 실행 (stream-json)
+   * 각 텍스트 청크를 onChunk로 전달하고, 최종 결과 반환
+   */
+  private runClaudeStream(
+    args: string[],
+    onChunk: (text: string) => void
+  ): Promise<ClaudeCliResult> {
+    return new Promise((resolve, reject) => {
+      // --output-format {json} 제거 후 stream-json 옵션 추가
+      const cleaned: string[] = []
+      for (let i = 0; i < args.length; i++) {
+        if (args[i] === '--output-format') { i++; continue }
+        cleaned.push(args[i])
+      }
+      cleaned.push(
+        '--output-format', 'stream-json',
+        '--include-partial-messages',
+        '--verbose'
+      )
+
+      const proc = spawn(CLAUDE_CLI, cleaned, { env: enrichedEnv() })
+      let buffer = ''
+      let finalResult: ClaudeCliResult | null = null
+      let accumulated = ''
+      let stderrBuf = ''
+
+      const timeout = setTimeout(() => {
+        proc.kill()
+        reject(new Error('Claude CLI 타임아웃 (120초)'))
+      }, 120000)
+
+      proc.stdout.on('data', (data: Buffer) => {
+        buffer += data.toString('utf-8')
+        let idx: number
+        while ((idx = buffer.indexOf('\n')) >= 0) {
+          const line = buffer.substring(0, idx).trim()
+          buffer = buffer.substring(idx + 1)
+          if (!line) continue
+          try {
+            const obj = JSON.parse(line)
+
+            // 최종 결과
+            if (obj.type === 'result') {
+              finalResult = {
+                type: 'result',
+                result: obj.result || accumulated,
+                duration_ms: obj.duration_ms || 0,
+                session_id: obj.session_id || '',
+                is_error: obj.is_error || false,
+                total_cost_usd: obj.total_cost_usd || 0
+              }
+              continue
+            }
+
+            // stream_event: content_block_delta with text_delta (가장 중요)
+            if (obj.type === 'stream_event' && obj.event?.type === 'content_block_delta') {
+              const delta = obj.event.delta
+              if (delta?.type === 'text_delta' && typeof delta.text === 'string') {
+                accumulated += delta.text
+                onChunk(delta.text)
+              }
+              // thinking_delta는 무시 (사용자에게 보여주지 않음)
+              continue
+            }
+
+            // assistant 메시지 (전체 블록 완료 시)
+            if (obj.type === 'assistant' && obj.message?.content) {
+              const content = obj.message.content
+              if (Array.isArray(content)) {
+                for (const block of content) {
+                  if (block.type === 'text' && typeof block.text === 'string') {
+                    // 이미 stream_event로 받은 경우 무시, 아니면 추가
+                    if (!accumulated.includes(block.text) && block.text.length > 0) {
+                      if (block.text.startsWith(accumulated)) {
+                        const d = block.text.substring(accumulated.length)
+                        if (d) { accumulated = block.text; onChunk(d) }
+                      } else if (accumulated.length === 0) {
+                        accumulated = block.text
+                        onChunk(block.text)
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          } catch {
+            // non-JSON 라인 무시
+          }
+        }
+      })
+
+      proc.stderr.on('data', (data: Buffer) => {
+        stderrBuf += data.toString('utf-8')
+      })
+
+      proc.on('error', (err) => {
+        clearTimeout(timeout)
+        reject(new Error(`Claude CLI 오류: ${err.message}`))
+      })
+
+      proc.on('close', (code) => {
+        clearTimeout(timeout)
+        if (finalResult) {
+          if (!finalResult.result && accumulated) finalResult.result = accumulated
+          resolve(finalResult)
+        } else if (accumulated) {
+          resolve({
+            type: 'result',
+            result: accumulated,
+            duration_ms: 0,
+            session_id: '',
+            is_error: false,
+            total_cost_usd: 0
+          })
+        } else {
+          reject(new Error(stderrBuf || `Claude CLI 종료 코드 ${code}`))
+        }
+      })
+    })
+  }
+
   isAvailable(): boolean {
     try {
       execFileSync(CLAUDE_CLI, ['--version'], { timeout: 5000, env: enrichedEnv() })
@@ -177,56 +332,42 @@ export class AIService {
     }
   }
 
-  resetConversation(): void {
-    this.chatSessionId = null
-  }
+  /**
+   * 범용 AI 호출 (세션 없음, 단순 프롬프트 → 응답)
+   * 위키 요약/구조분석, 세션 요약, 캘린더 분석 등에서 사용
+   */
+  async ask(
+    prompt: string,
+    opts?: { systemPrompt?: string; model?: AIModelName; maxBudget?: string; requestId?: string; feature?: keyof AIModelConfig }
+  ): Promise<string> {
+    const feature = opts?.feature
+    const defaultModel = opts?.model || 'sonnet'
+    const model = feature ? this.pickModel(feature, defaultModel) : defaultModel
 
-  async chat(
-    userMessage: string,
-    context?: { tasks?: DoorayTask[]; events?: DoorayCalendarEvent[] }
-  ): Promise<{ content: string; sessionId: string; cost: number }> {
-    let contextBlock = ''
-    if (context) {
-      if (context.tasks && context.tasks.length > 0) {
-        const taskLines = context.tasks.slice(0, 30).map((t) =>
-          `[${t.workflowClass}] ${t.projectCode || ''} | ${t.subject} (ID:${t.id}, 마감:${t.dueDateAt || '없음'})`
-        ).join('\n')
-        contextBlock += `\n\n[현재 태스크 목록]\n${taskLines}`
-      }
-      if (context.events && context.events.length > 0) {
-        const eventLines = context.events.map((e) =>
-          `${e.subject} (${e.startAt} ~ ${e.endAt})`
-        ).join('\n')
-        contextBlock += `\n\n[이번 주 일정]\n${eventLines}`
-      }
-    }
-
-    const fullMessage = contextBlock
-      ? `${userMessage}\n\n---\n컨텍스트:${contextBlock}`
-      : userMessage
-
-    const args = buildArgs(fullMessage, {
-      model: 'sonnet',
-      systemPrompt: CLAUDAY_SYSTEM_PROMPT,
-      maxBudget: '0.5',
-      allowMcp: true
+    const args = buildArgs(prompt, {
+      model,
+      systemPrompt: opts?.systemPrompt,
+      maxBudget: opts?.maxBudget || '0.3',
+      allowMcp: false
     })
 
-    if (this.chatSessionId) {
-      args.push('--session-id', this.chatSessionId)
-    }
+    const result = await this.runWithProgress(opts?.requestId, '✨ AI 응답 생성 중...', args)
+    return result.result
+  }
 
-    const result = await this.runClaude(args)
-
-    if (result.session_id) {
-      this.chatSessionId = result.session_id
-    }
-
-    return {
-      content: result.result,
-      sessionId: result.session_id,
-      cost: result.total_cost_usd
-    }
+  /** 스트리밍 기반으로 AI 호출 + 진행상황 이벤트 발행 */
+  private async runWithProgress(
+    requestId: string | undefined,
+    stageMessage: string,
+    args: string[]
+  ): Promise<ClaudeCliResult> {
+    const started = Date.now()
+    this.emitProgress(requestId, 'thinking', stageMessage, started)
+    const result = await this.runClaudeStream(args, (chunk) => {
+      this.emitProgress(requestId, 'streaming', stageMessage, started, chunk)
+    })
+    this.emitProgress(requestId, 'done', '완료', started)
+    return result
   }
 
   async generateBriefing(
@@ -234,8 +375,12 @@ export class AIService {
     events: DoorayCalendarEvent[],
     skills?: Array<{ name: string; content: string }>,
     ccTasks?: DoorayTask[],
-    dueTodayTasks?: DoorayTask[]
+    dueTodayTasks?: DoorayTask[],
+    requestId?: string
   ): Promise<AIBriefing> {
+    const started = Date.now()
+    this.emitProgress(requestId, 'collecting', '브리핑 데이터 준비 중...', started)
+
     const today = new Date().toLocaleDateString('ko-KR', {
       year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
     })
@@ -276,18 +421,35 @@ ${JSON.stringify(ccData)}
 [일정 ${eventData.length}개]
 ${JSON.stringify(eventData)}${skillBlock}`
 
-    const result = await this.runClaude(buildArgs(prompt, {
-      model: 'sonnet',
+    const args = buildArgs(prompt, {
+      model: this.pickModel('briefing', 'sonnet'),
       systemPrompt: BRIEFING_SYSTEM_PROMPT,
       maxBudget: '0.3',
-      allowMcp: true
-    }))
+      allowMcp: false // 데이터가 이미 프롬프트에 있음, MCP 로딩 skip으로 속도 개선
+    })
+
+    this.emitProgress(requestId, 'thinking', `🤖 Claude (${this.pickModel('briefing', 'sonnet')}) 시작 중...`, started)
+    let firstChunk = true
+    const result = await this.runClaudeStream(args, (chunk) => {
+      if (firstChunk) {
+        this.emitProgress(requestId, 'streaming', '✨ 응답 생성 중...', started, chunk)
+        firstChunk = false
+      } else {
+        this.emitProgress(requestId, 'streaming', '✨ 응답 생성 중...', started, chunk)
+      }
+    })
+    this.emitProgress(requestId, 'parsing', '결과 정리 중...', started)
 
     try {
       const jsonMatch = result.result.match(/\{[\s\S]*\}/)
-      if (jsonMatch) return JSON.parse(jsonMatch[0]) as AIBriefing
+      if (jsonMatch) {
+        const briefing = JSON.parse(jsonMatch[0]) as AIBriefing
+        this.emitProgress(requestId, 'done', '완료', started)
+        return briefing
+      }
     } catch { /* fallback */ }
 
+    this.emitProgress(requestId, 'done', '완료', started)
     return {
       greeting: '오늘도 좋은 하루 보내세요!',
       urgent: [], focus: [], mentioned: [], stale: [], todayEvents: [],
@@ -295,11 +457,11 @@ ${JSON.stringify(eventData)}${skillBlock}`
     }
   }
 
-  async summarizeTask(task: DoorayTask, taskBody?: string): Promise<string> {
+  async summarizeTask(task: DoorayTask, taskBody?: string, requestId?: string): Promise<string> {
     const prompt = `태스크: ${task.subject}\n상태: ${task.workflowClass}\n프로젝트: ${task.projectCode || '알 수 없음'}\n마감: ${task.dueDateAt || '없음'}\n\n${taskBody ? '본문:\n' + taskBody.substring(0, 3000) : '(본문 없음)'}\n\n핵심 목표, 현재 상태, 다음 액션을 3줄 이내로 요약.`
 
-    const result = await this.runClaude(buildArgs(prompt, {
-      model: 'haiku',
+    const result = await this.runWithProgress(requestId, '태스크 요약 중...', buildArgs(prompt, {
+      model: this.pickModel('summarizeTask', 'haiku'),
       systemPrompt: '두레이 태스크를 간결하게 분석하는 AI. 한국어로 3줄 이내 요약.',
       maxBudget: '0.1'
     }))
@@ -310,8 +472,12 @@ ${JSON.stringify(eventData)}${skillBlock}`
   async generateReport(
     type: 'daily' | 'weekly',
     tasks: DoorayTask[],
-    events: DoorayCalendarEvent[]
+    events: DoorayCalendarEvent[],
+    requestId?: string
   ): Promise<AIReport> {
+    const started = Date.now()
+    this.emitProgress(requestId, 'collecting', '업무 데이터 집계 중...', started)
+
     const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
     const period = type === 'daily' ? '일일' : '주간'
     const done = tasks.filter((t) => t.workflowClass === 'done')
@@ -320,19 +486,25 @@ ${JSON.stringify(eventData)}${skillBlock}`
 
     const prompt = `${period} 업무 보고서를 마크다운으로 작성.\n오늘: ${today}\n\n완료(${done.length}개):\n${done.slice(0, 20).map((t) => `- [${t.projectCode}] ${t.subject}`).join('\n') || '없음'}\n\n진행중(${working.length}개):\n${working.slice(0, 20).map((t) => `- [${t.projectCode}] ${t.subject}`).join('\n') || '없음'}\n\n예정(${registered.length}개):\n${registered.slice(0, 10).map((t) => `- [${t.projectCode}] ${t.subject}`).join('\n') || '없음'}\n\n일정(${events.length}개):\n${events.slice(0, 10).map((e) => `- ${e.subject} (${e.startAt})`).join('\n') || '없음'}`
 
-    const result = await this.runClaude(buildArgs(prompt, {
-      model: 'sonnet',
+    const args = buildArgs(prompt, {
+      model: this.pickModel('report', 'sonnet'),
       systemPrompt: '업무 보고서 전문 작성 AI. 간결하고 명확한 마크다운 보고서를 생성합니다. 한국어로 작성.',
       maxBudget: '0.3'
-    }))
+    })
+
+    this.emitProgress(requestId, 'thinking', `${period} 보고서 작성 중...`, started)
+    const result = await this.runClaudeStream(args, (chunk) => {
+      this.emitProgress(requestId, 'streaming', `${period} 보고서 작성 중...`, started, chunk)
+    })
+    this.emitProgress(requestId, 'done', '완료', started)
 
     return { title: `${period} 업무 보고서 - ${today}`, content: result.result, generatedAt: new Date().toISOString() }
   }
 
-  async wikiProofread(title: string, content: string): Promise<string> {
-    const result = await this.runClaude(buildArgs(
+  async wikiProofread(title: string, content: string, requestId?: string): Promise<string> {
+    const result = await this.runWithProgress(requestId, '위키 교정 중...', buildArgs(
       `다음 두레이 위키 문서를 교정하세요.\n\n제목: ${title}\n\n---\n${content.substring(0, 8000)}`, {
-      model: 'opus',
+      model: this.pickModel('wikiProofread', 'opus'),
       systemPrompt: `위키 문서 교정 전문가. 규칙:
 - 맞춤법, 문법, 띄어쓰기 교정
 - 기술 용어는 원래대로 유지 (코드, 명령어, 경로 등)
@@ -344,10 +516,10 @@ ${JSON.stringify(eventData)}${skillBlock}`
     return result.result
   }
 
-  async wikiImprove(title: string, content: string): Promise<string> {
-    const result = await this.runClaude(buildArgs(
+  async wikiImprove(title: string, content: string, requestId?: string): Promise<string> {
+    const result = await this.runWithProgress(requestId, '위키 개선 중...', buildArgs(
       `다음 두레이 위키 문서를 개선하세요.\n\n제목: ${title}\n\n---\n${content.substring(0, 8000)}`, {
-      model: 'opus',
+      model: this.pickModel('wikiImprove', 'opus'),
       systemPrompt: `위키 문서 개선 전문가. 규칙:
 - 가독성 향상: 긴 문단을 나누고, 핵심을 먼저 배치
 - 구조 개선: 적절한 헤딩 레벨, 목록 활용, 코드블록 정리
@@ -360,18 +532,18 @@ ${JSON.stringify(eventData)}${skillBlock}`
     return result.result
   }
 
-  async generateWikiDraft(taskSubject: string, taskBody?: string, projectCode?: string): Promise<string> {
+  async generateWikiDraft(taskSubject: string, taskBody?: string, projectCode?: string, requestId?: string): Promise<string> {
     const prompt = `완료 태스크 기반 위키 문서 초안을 마크다운으로 작성.\n프로젝트: ${projectCode || '알 수 없음'}\n태스크: ${taskSubject}\n${taskBody ? '\n본문:\n' + taskBody.substring(0, 3000) : ''}\n\n## 개요\n## 변경 내용\n## 영향 범위\n## 참고 사항`
 
-    const result = await this.runClaude(buildArgs(prompt, {
-      model: 'sonnet',
+    const result = await this.runWithProgress(requestId, '위키 초안 작성 중...', buildArgs(prompt, {
+      model: this.pickModel('wikiDraft', 'sonnet'),
       systemPrompt: '두레이 위키 문서 전문 작성 AI. 개발 문서를 구조화된 마크다운으로 작성합니다.',
       maxBudget: '0.2'
     }))
     return result.result
   }
 
-  async generateSkill(request: string, target: string): Promise<{ name: string; description: string; content: string }> {
+  async generateSkill(request: string, target: string, requestId?: string): Promise<{ name: string; description: string; content: string }> {
     const prompt = `사용자가 요청한 AI 스킬을 생성하세요.
 
 적용 대상: ${target}
@@ -384,8 +556,8 @@ ${JSON.stringify(eventData)}${skillBlock}`
   "content": "## 규칙\\n- 구체적인 조건과 동작\\n\\n## 출력 형식\\n- AI가 결과를 어떤 형태로 보여줄지"
 }`
 
-    const result = await this.runClaude(buildArgs(prompt, {
-      model: 'sonnet',
+    const result = await this.runWithProgress(requestId, '스킬 생성 중...', buildArgs(prompt, {
+      model: this.pickModel('generateSkill', 'sonnet'),
       systemPrompt: `두레이(Dooray) 업무 관리 AI 스킬 생성 전문가. 사용자의 요구사항을 분석하여 구체적이고 실행 가능한 스킬 규칙을 마크다운으로 작성합니다.
 
 스킬 규칙 작성 지침:
@@ -410,11 +582,11 @@ ${JSON.stringify(eventData)}${skillBlock}`
     }
   }
 
-  async generateMeetingNote(eventSubject: string, eventDescription?: string, attendees?: string[]): Promise<string> {
+  async generateMeetingNote(eventSubject: string, eventDescription?: string, attendees?: string[], requestId?: string): Promise<string> {
     const prompt = `회의록 템플릿을 마크다운으로 생성.\n회의명: ${eventSubject}\n${eventDescription ? '설명: ' + eventDescription : ''}\n${attendees?.length ? '참석자: ' + attendees.join(', ') : ''}`
 
-    const result = await this.runClaude(buildArgs(prompt, {
-      model: 'haiku',
+    const result = await this.runWithProgress(requestId, '회의록 생성 중...', buildArgs(prompt, {
+      model: this.pickModel('meetingNote', 'haiku'),
       systemPrompt: '회의록 템플릿 생성 AI. 구조화된 회의록을 작성합니다.',
       maxBudget: '0.1'
     }))

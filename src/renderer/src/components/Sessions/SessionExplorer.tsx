@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
 import { Search, FolderOpen, MessageSquare, Clock, Hash, Loader2, ChevronRight, Copy, Check, Sparkles, RefreshCw } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -63,29 +63,29 @@ function SessionExplorer(): JSX.Element {
     setSummarizing(true)
     try {
       const preview = messages.slice(0, 10).map((m) => `[${m.role}] ${m.content.substring(0, 200)}`).join('\n')
-      const result = await window.api.ai.chat({
-        message: `다음 Claude Code 세션의 대화를 한국어 3~5줄로 요약해줘. 무슨 작업을 했는지, 결과가 어땠는지 핵심만.\n\n${preview}`,
-        includeContext: false
+      const result = await window.api.ai.ask({
+        prompt: `다음 Claude Code 세션의 대화를 한국어 3~5줄로 요약해줘. 무슨 작업을 했는지, 결과가 어땠는지 핵심만.\n\n${preview}`,
+        feature: 'sessionSummary'
       })
-      setSummary(result.content)
+      setSummary(result)
     } catch { setSummary('요약 실패') }
     finally { setSummarizing(false) }
   }
 
-  // 프로젝트 목록 추출
-  const projects = [...new Set(sessions.map((s) => s.project))].sort()
+  // 프로젝트 목록 추출 (메모화)
+  const projects = useMemo(() => [...new Set(sessions.map((s) => s.project))].sort(), [sessions])
 
-  // 필터
-  const filtered = sessions.filter((s) => {
-    if (projectFilter && s.project !== projectFilter) return false
-    if (search) {
-      const q = search.toLowerCase()
+  // 필터 (메모화, 소문자 변환을 루프 밖으로)
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    return sessions.filter((s) => {
+      if (projectFilter && s.project !== projectFilter) return false
+      if (!q) return true
       return s.firstMsg.toLowerCase().includes(q) || s.project.toLowerCase().includes(q) || s.id.includes(q)
-    }
-    return true
-  })
+    })
+  }, [sessions, projectFilter, search])
 
-  const visible = filtered.slice(0, renderCount)
+  const visible = useMemo(() => filtered.slice(0, renderCount), [filtered, renderCount])
 
   const formatTime = (ts: string): string => {
     if (!ts) return ''
@@ -144,23 +144,13 @@ function SessionExplorer(): JSX.Element {
           ) : (
             <>
               {visible.map((s) => (
-                <div key={s.id} onClick={() => selectSession(s)}
-                  className={`px-4 py-2.5 border-b border-bg-border/50 cursor-pointer transition-colors ${
-                    selectedSession?.id === s.id ? 'bg-clover-blue/5' : 'hover:bg-bg-surface-hover'
-                  }`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-xs text-text-primary line-clamp-2 flex-1">{s.firstMsg}</p>
-                    <span className="text-[9px] text-text-tertiary flex-shrink-0">{formatTime(s.timestamp)}</span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[9px] text-text-tertiary flex items-center gap-0.5">
-                      <FolderOpen size={8} /> {s.project}
-                    </span>
-                    <span className="text-[9px] text-text-tertiary flex items-center gap-0.5">
-                      <Hash size={8} /> {s.lines}줄
-                    </span>
-                  </div>
-                </div>
+                <SessionRow
+                  key={s.id}
+                  session={s}
+                  isSelected={selectedSession?.id === s.id}
+                  onSelect={selectSession}
+                  formattedTime={formatTime(s.timestamp)}
+                />
               ))}
               {renderCount < filtered.length && (
                 <div className="py-2 text-center text-[9px] text-text-tertiary">{visible.length}/{filtered.length} · 스크롤하면 더 표시</div>
@@ -238,5 +228,37 @@ function SessionExplorer(): JSX.Element {
     </div>
   )
 }
+
+interface SessionRowProps {
+  session: Session
+  isSelected: boolean
+  onSelect: (s: Session) => void
+  formattedTime: string
+}
+
+const SessionRow = memo(function SessionRow({ session, isSelected, onSelect, formattedTime }: SessionRowProps) {
+  return (
+    <div
+      onClick={() => onSelect(session)}
+      style={{ contentVisibility: 'auto', containIntrinsicSize: '0 60px' }}
+      className={`px-4 py-2.5 border-b border-bg-border/50 cursor-pointer transition-colors ${
+        isSelected ? 'bg-clover-blue/5' : 'hover:bg-bg-surface-hover'
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs text-text-primary line-clamp-2 flex-1">{session.firstMsg}</p>
+        <span className="text-[9px] text-text-tertiary flex-shrink-0">{formattedTime}</span>
+      </div>
+      <div className="flex items-center gap-2 mt-1">
+        <span className="text-[9px] text-text-tertiary flex items-center gap-0.5">
+          <FolderOpen size={8} /> {session.project}
+        </span>
+        <span className="text-[9px] text-text-tertiary flex items-center gap-0.5">
+          <Hash size={8} /> {session.lines}줄
+        </span>
+      </div>
+    </div>
+  )
+})
 
 export default SessionExplorer

@@ -1,141 +1,162 @@
-import { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, Check, FolderOpen, Star, ArrowUp, ArrowDown, Zap, Settings } from 'lucide-react'
-import type { DoorayProject } from '../../../../shared/types/dooray'
-import SkillManager from './SkillManager'
-
-type SettingsTab = 'projects' | 'skills'
+import { useState, useEffect } from 'react'
+import { Check, Cpu } from 'lucide-react'
+import type { AIModelConfig, AIModelName } from '../../../../shared/types/ai'
 
 function SettingsView(): JSX.Element {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('projects')
-
   return (
     <div className="h-full flex flex-col">
-      {/* 탭 */}
       <div className="flex items-center h-10 bg-bg-surface border-b border-bg-border px-4 gap-1 flex-shrink-0">
-        <button onClick={() => setActiveTab('projects')}
-          className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md transition-all ${
-            activeTab === 'projects' ? 'bg-clover-blue/10 text-clover-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
-          }`}>
-          <Settings size={13} /> 프로젝트 설정
-        </button>
-        <button onClick={() => setActiveTab('skills')}
-          className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md transition-all ${
-            activeTab === 'skills' ? 'bg-gradient-to-r from-clover-orange/20 to-clover-blue/20 text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
-          }`}>
-          <Zap size={13} className={activeTab === 'skills' ? 'text-clover-orange' : ''} /> AI 스킬
-        </button>
+        <div className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md bg-clover-blue/10 text-clover-blue">
+          <Cpu size={13} /> AI 모델 설정
+        </div>
       </div>
-
       <div className="flex-1 overflow-y-auto">
-        {activeTab === 'projects' && <ProjectSettings />}
-        {activeTab === 'skills' && <SkillManager />}
+        <ModelSettings />
       </div>
     </div>
   )
 }
 
-function ProjectSettings(): JSX.Element {
-  const [allProjects, setAllProjects] = useState<DoorayProject[]>([])
-  const [pinnedIds, setPinnedIds] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
+/** 기능별 AI 모델 선택 */
+interface ModelFeatureDef {
+  key: keyof AIModelConfig
+  label: string
+  description: string
+  defaultModel: AIModelName
+}
+
+const MODEL_FEATURES: ModelFeatureDef[] = [
+  { key: 'briefing', label: 'AI 브리핑', description: '매일 업무 분석 및 추천', defaultModel: 'sonnet' },
+  { key: 'report', label: '일간/주간 보고서', description: '마크다운 업무 보고서 생성', defaultModel: 'sonnet' },
+  { key: 'wikiProofread', label: '위키 교정', description: '맞춤법/문법 교정', defaultModel: 'opus' },
+  { key: 'wikiImprove', label: '위키 개선', description: '가독성/구조 개선', defaultModel: 'opus' },
+  { key: 'wikiDraft', label: '위키 초안 작성', description: '태스크 기반 문서 초안', defaultModel: 'sonnet' },
+  { key: 'wikiSummarize', label: '위키 요약', description: '문서 3~5줄 요약', defaultModel: 'sonnet' },
+  { key: 'wikiStructure', label: '위키 구조 분석', description: '구조 및 개선 방안 제안', defaultModel: 'sonnet' },
+  { key: 'summarizeTask', label: '태스크 요약', description: '3줄 핵심 요약', defaultModel: 'haiku' },
+  { key: 'generateSkill', label: 'AI 스킬 생성', description: '사용자 맞춤 스킬 생성', defaultModel: 'sonnet' },
+  { key: 'meetingNote', label: '회의록 템플릿', description: '캘린더 이벤트 기반', defaultModel: 'haiku' },
+  { key: 'sessionSummary', label: '세션 요약', description: 'Claude Code 세션 대화 요약', defaultModel: 'sonnet' },
+  { key: 'calendarAnalysis', label: '캘린더 분석', description: '이번 주 일정 분석', defaultModel: 'sonnet' }
+]
+
+const MODEL_INFO: Record<AIModelName, { label: string; speed: string; quality: string; cost: string; color: string }> = {
+  haiku: { label: 'Haiku', speed: '매우 빠름', quality: '기본', cost: '$', color: 'text-emerald-400 bg-emerald-400/10' },
+  sonnet: { label: 'Sonnet', speed: '빠름', quality: '좋음', cost: '$$', color: 'text-clover-blue bg-clover-blue/10' },
+  opus: { label: 'Opus', speed: '느림', quality: '최상', cost: '$$$', color: 'text-clover-orange bg-clover-orange/10' }
+}
+
+function ModelSettings(): JSX.Element {
+  const [config, setConfig] = useState<AIModelConfig>({})
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const [projects, pinned] = await Promise.all([
-        window.api.dooray.projects.list(),
-        window.api.settings.getProjects()
-      ])
-      setAllProjects(projects)
-      setPinnedIds(pinned)
-    } catch (err) {
-      console.error('설정 로드 실패:', err)
-    } finally {
-      setLoading(false)
-    }
+  useEffect(() => {
+    window.api.ai.getModelConfig().then(setConfig).catch(() => setConfig({}))
   }, [])
 
-  useEffect(() => { loadData() }, [loadData])
-
-  const toggleProject = (projectId: string): void => {
-    setPinnedIds((prev) => prev.includes(projectId) ? prev.filter((id) => id !== projectId) : [...prev, projectId])
+  const setFeatureModel = (key: keyof AIModelConfig, model: AIModelName | 'default'): void => {
+    const next = { ...config }
+    if (model === 'default') delete next[key]
+    else next[key] = model
+    setConfig(next)
     setSaved(false)
   }
-  const selectAll = (): void => { setPinnedIds(allProjects.map((p) => p.id)); setSaved(false) }
-  const deselectAll = (): void => { setPinnedIds([]); setSaved(false) }
-  const moveProject = (index: number, direction: -1 | 1): void => {
-    const ni = index + direction
-    if (ni < 0 || ni >= pinnedIds.length) return
-    const ids = [...pinnedIds]; const [m] = ids.splice(index, 1); ids.splice(ni, 0, m)
-    setPinnedIds(ids); setSaved(false)
-  }
+
   const handleSave = async (): Promise<void> => {
     setSaving(true)
-    try { await window.api.settings.setProjects(pinnedIds); setSaved(true); setTimeout(() => setSaved(false), 2000) }
-    catch {} finally { setSaving(false) }
+    try {
+      await window.api.ai.setModelConfig(config)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch { /* ok */ }
+    finally { setSaving(false) }
   }
 
-  const pinnedProjects = pinnedIds.map((id) => allProjects.find((p) => p.id === id)).filter(Boolean) as DoorayProject[]
-  const unpinnedProjects = allProjects.filter((p) => !pinnedIds.includes(p.id))
-
-  if (loading) return <div className="flex items-center justify-center h-64 text-text-secondary text-sm gap-2"><RefreshCw size={14} className="animate-spin" /> 로딩 중...</div>
+  const resetAll = (): void => { setConfig({}); setSaved(false) }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
+    <div className="p-6 max-w-3xl mx-auto">
       <div className="mb-4">
-        <h3 className="text-sm font-semibold text-text-primary">표시할 프로젝트</h3>
-        <p className="text-[10px] text-text-tertiary mt-0.5">선택한 프로젝트만 태스크/위키/캘린더에 표시됩니다</p>
+        <h3 className="text-sm font-semibold text-text-primary">기능별 AI 모델</h3>
+        <p className="text-[10px] text-text-tertiary mt-0.5">
+          각 기능마다 원하는 모델을 선택하세요. Haiku는 빠르고 저렴, Opus는 품질 최상.
+        </p>
       </div>
 
+      {/* 모델 가이드 */}
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        {(Object.keys(MODEL_INFO) as AIModelName[]).map((m) => {
+          const info = MODEL_INFO[m]
+          return (
+            <div key={m} className="p-2.5 rounded-lg bg-bg-surface border border-bg-border">
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${info.color}`}>{info.label}</span>
+                <span className="text-[9px] text-text-tertiary">{info.cost}</span>
+              </div>
+              <div className="text-[9px] text-text-secondary">속도 {info.speed} · 품질 {info.quality}</div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* 기능별 설정 */}
       <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2 border-b border-bg-border">
-          <span className="text-[10px] text-text-tertiary">{pinnedIds.length}/{allProjects.length} 선택</span>
-          <div className="flex gap-2">
-            <button onClick={selectAll} className="text-[10px] text-clover-blue hover:underline">전체 선택</button>
-            <button onClick={deselectAll} className="text-[10px] text-text-secondary hover:underline">전체 해제</button>
-          </div>
-        </div>
-
-        {pinnedProjects.length > 0 && (
-          <div className="border-b border-bg-border">
-            <div className="px-4 py-1 bg-clover-blue/5"><span className="text-[10px] font-semibold text-clover-blue uppercase tracking-wide">선택됨</span></div>
-            {pinnedProjects.map((p, i) => (
-              <div key={p.id} className="flex items-center gap-3 px-4 py-1.5 hover:bg-bg-surface-hover">
-                <div className="flex flex-col gap-0.5 flex-shrink-0">
-                  <button onClick={() => moveProject(i, -1)} disabled={i === 0} className="text-text-tertiary hover:text-text-secondary disabled:opacity-20"><ArrowUp size={9} /></button>
-                  <button onClick={() => moveProject(i, 1)} disabled={i === pinnedProjects.length - 1} className="text-text-tertiary hover:text-text-secondary disabled:opacity-20"><ArrowDown size={9} /></button>
+        {MODEL_FEATURES.map((feat, i) => {
+          const current = config[feat.key]
+          return (
+            <div
+              key={feat.key}
+              className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? 'border-t border-bg-border/50' : ''}`}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-text-primary">{feat.label}</span>
+                  {!current && (
+                    <span className="text-[9px] text-text-tertiary px-1.5 py-0.5 rounded bg-bg-primary">
+                      기본 · {MODEL_INFO[feat.defaultModel].label}
+                    </span>
+                  )}
                 </div>
-                <button onClick={() => toggleProject(p.id)} className="w-4 h-4 rounded border bg-clover-blue border-clover-blue flex items-center justify-center flex-shrink-0"><Check size={10} className="text-white" /></button>
-                <FolderOpen size={13} className="text-clover-blue flex-shrink-0" />
-                <span className="text-xs font-medium text-text-primary">{p.code}</span>
+                <p className="text-[10px] text-text-tertiary mt-0.5">{feat.description}</p>
               </div>
-            ))}
-          </div>
-        )}
-
-        {unpinnedProjects.length > 0 && (
-          <div>
-            <div className="px-4 py-1 bg-bg-primary"><span className="text-[10px] font-semibold text-text-tertiary uppercase tracking-wide">미선택</span></div>
-            {unpinnedProjects.map((p) => (
-              <div key={p.id} onClick={() => toggleProject(p.id)} className="flex items-center gap-3 px-4 py-1.5 hover:bg-bg-surface-hover cursor-pointer">
-                <div className="w-4 h-0 flex-shrink-0" />
-                <button className="w-4 h-4 rounded border border-bg-border-light flex-shrink-0 hover:border-clover-blue" />
-                <FolderOpen size={13} className="text-text-tertiary flex-shrink-0" />
-                <span className="text-xs text-text-secondary">{p.code}</span>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {(['default', 'haiku', 'sonnet', 'opus'] as const).map((m) => {
+                  const isActive = m === 'default' ? !current : current === m
+                  const label = m === 'default' ? '기본' : MODEL_INFO[m].label
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => setFeatureModel(feat.key, m)}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-colors ${
+                        isActive
+                          ? m === 'default'
+                            ? 'bg-bg-border text-text-primary'
+                            : MODEL_INFO[m as AIModelName].color
+                          : 'bg-bg-primary text-text-secondary hover:text-text-primary border border-bg-border'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          )
+        })}
       </div>
 
-      <div className="mt-4 flex items-center justify-end gap-3">
-        {saved && <span className="flex items-center gap-1 text-xs text-emerald-400"><Check size={12} /> 저장됨</span>}
-        <button onClick={handleSave} disabled={saving}
-          className="px-5 py-2 rounded-lg bg-clover-blue text-white text-sm font-medium hover:bg-clover-blue/80 disabled:opacity-50">
-          {saving ? '저장 중...' : '저장'}
+      <div className="mt-4 flex items-center justify-between">
+        <button onClick={resetAll} className="text-xs text-text-tertiary hover:text-text-secondary">
+          전체 기본값으로 초기화
         </button>
+        <div className="flex items-center gap-3">
+          {saved && <span className="flex items-center gap-1 text-xs text-emerald-400"><Check size={12} /> 저장됨</span>}
+          <button onClick={handleSave} disabled={saving}
+            className="px-5 py-2 rounded-lg bg-clover-blue text-white text-sm font-medium hover:bg-clover-blue/80 disabled:opacity-50">
+            {saving ? '저장 중...' : '저장'}
+          </button>
+        </div>
       </div>
     </div>
   )

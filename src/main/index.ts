@@ -19,7 +19,6 @@ import type { McpServerConfig } from '../shared/types/mcp'
 import type { SkillSaveRequest } from '../shared/types/skills'
 import type { UsageQueryParams } from '../shared/types/usage'
 import type { DoorayTaskUpdateParams, DoorayWikiUpdateParams, DoorayCalendarQueryParams, DoorayTask } from '../shared/types/dooray'
-import type { AIChatRequest } from '../shared/types/ai'
 import type { TerminalCreateOptions, TerminalResizeOptions } from '../shared/types/terminal'
 import type { GitWorktreeCreateParams, GitWorktreeRemoveParams } from '../shared/types/git'
 
@@ -60,6 +59,9 @@ function createWindow(): BrowserWindow {
 
   configWatcher.setMainWindow(mainWindow)
   terminalManager.setMainWindow(mainWindow)
+  aiService.setMainWindow(mainWindow)
+  // 저장된 모델 설정 로드
+  aiService.setModelConfig((store.get('aiModelConfig', {}) as import('../shared/types/ai').AIModelConfig) || {})
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
@@ -118,6 +120,9 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.DOORAY_TOKEN_VALIDATE, () => doorayClient.validateToken())
   ipcMain.handle(IPC_CHANNELS.DOORAY_PROJECTS_LIST, () =>
     taskService.listMyProjects()
+  )
+  ipcMain.handle(IPC_CHANNELS.DOORAY_PROJECT_INFO, (_, projectId: string) =>
+    taskService.getProjectInfo(projectId)
   )
   ipcMain.handle(IPC_CHANNELS.DOORAY_TASKS_LIST, (_, projectIds?: string[]) =>
     taskService.listMyTasks(projectIds)
@@ -203,37 +208,78 @@ function registerIpcHandlers(): void {
 
   // AI
   ipcMain.handle(IPC_CHANNELS.AI_AVAILABLE, () => aiService.isAvailable())
-  ipcMain.handle(IPC_CHANNELS.AI_CHAT, async (_, req: AIChatRequest) => {
-    const context = req.includeContext ? { tasks: cachedTasks } : undefined
-    const chatSkills = skillStore.forTarget('chat')
-    const skillContext = chatSkills.map((s) => s.content).join('\n\n---\n\n')
-    const messageWithSkills = skillContext
-      ? `${req.message}\n\n---\n[적용된 AI 스킬 규칙]\n${skillContext}`
-      : req.message
-    return aiService.chat(messageWithSkills, context)
-  })
-  ipcMain.handle(IPC_CHANNELS.AI_CHAT_RESET, () => {
-    aiService.resetConversation()
-    return true
-  })
-  ipcMain.handle(IPC_CHANNELS.AI_BRIEFING, async () => {
+  ipcMain.handle(
+    IPC_CHANNELS.AI_ASK,
+    async (_, { prompt, systemPrompt, model, maxBudget, requestId, feature }: {
+      prompt: string
+      systemPrompt?: string
+      model?: import('../shared/types/ai').AIModelName
+      maxBudget?: string
+      requestId?: string
+      feature?: keyof import('../shared/types/ai').AIModelConfig
+    }) => aiService.ask(prompt, { systemPrompt, model, maxBudget, requestId, feature })
+  )
+  ipcMain.handle(IPC_CHANNELS.AI_BRIEFING, async (_, opts?: { requestId?: string }) => {
+    const requestId = opts?.requestId
+    const started = Date.now()
+    const emit = (message: string): void => {
+      if (!requestId) return
+      const win = BrowserWindow.getAllWindows()[0]
+      if (!win || win.isDestroyed()) return
+      win.webContents.send(IPC_CHANNELS.AI_PROGRESS, {
+        requestId,
+        stage: 'collecting',
+        message,
+        elapsedMs: Date.now() - started
+      })
+    }
     try {
       const now = new Date()
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
       const endOfWeek = new Date(startOfDay.getTime() + 7 * 24 * 60 * 60 * 1000)
 
-      // 병렬로 모든 데이터 수집
-      const [tasks, ccTasks, dueTodayTasks, events] = await Promise.all([
-        taskService.listMyTasks(),
-        taskService.listMyCcTasks(),
-        taskService.listDueTodayTasks(),
-        calendarService.getEvents({ from: startOfDay.toISOString(), to: endOfWeek.toISOString() })
-      ])
+      // 각 Dooray 호출을 병렬 실행하되, 진행상황은 개별 emit
+      emit('📋 담당 태스크 조회 중...')
+      const tasksP = taskService.listMyTasks().then((r) => {
+        emit(`✓ 담당 태스크 ${r.length}개`)
+        return r
+      })
+
+      emit('👥 CC/멘션 태스크 조회 중...')
+      const ccP = taskService.listMyCcTasks().then((r) => {
+        emit(`✓ CC 태스크 ${r.length}개`)
+        return r
+      })
+
+      emit('⏰ 오늘 마감 태스크 조회 중...')
+      const dueP = taskService.listDueTodayTasks().then((r) => {
+        emit(`✓ 오늘 마감 ${r.length}개`)
+        return r
+      })
+
+      emit('📅 이번주 일정 조회 중...')
+      const eventsP = calendarService
+        .getEvents({ from: startOfDay.toISOString(), to: endOfWeek.toISOString() })
+        .then((r) => {
+          emit(`✓ 일정 ${r.length}개`)
+          return r
+        })
+
+      const [tasks, ccTasks, dueTodayTasks, events] = await Promise.all([tasksP, ccP, dueP, eventsP])
       cachedTasks = tasks
 
-      // 브리핑 스킬 로드 (파일시스템)
+      emit('🔍 브리핑 스킬 로드 중...')
       const briefingSkills = skillStore.forTarget('briefing')
-      return aiService.generateBriefing(tasks, events, briefingSkills.map((s) => ({ name: s.name, content: s.content })), ccTasks, dueTodayTasks)
+      if (briefingSkills.length > 0) emit(`✓ 스킬 ${briefingSkills.length}개 적용`)
+
+      return aiService.generateBriefing(
+        tasks,
+        events,
+        briefingSkills.map((s) => ({ name: s.name, content: s.content })),
+        ccTasks,
+        dueTodayTasks,
+        requestId
+      )
     } catch (err) {
       return {
         greeting: '브리핑을 생성할 수 없습니다.',
@@ -244,10 +290,10 @@ function registerIpcHandlers(): void {
   })
   ipcMain.handle(
     IPC_CHANNELS.AI_SUMMARIZE_TASK,
-    async (_, { task, body }: { task: DoorayTask; body?: string }) =>
-      aiService.summarizeTask(task, body)
+    async (_, { task, body, requestId }: { task: DoorayTask; body?: string; requestId?: string }) =>
+      aiService.summarizeTask(task, body, requestId)
   )
-  ipcMain.handle(IPC_CHANNELS.AI_GENERATE_REPORT, async (_, { type }: { type: 'daily' | 'weekly' }) => {
+  ipcMain.handle(IPC_CHANNELS.AI_GENERATE_REPORT, async (_, { type, requestId }: { type: 'daily' | 'weekly'; requestId?: string }) => {
     try {
       const tasks = cachedTasks.length > 0 ? cachedTasks : await taskService.listMyTasks()
       const now = new Date()
@@ -257,21 +303,28 @@ function registerIpcHandlers(): void {
         from: startOfDay.toISOString(),
         to: endOfWeek.toISOString()
       })
-      return aiService.generateReport(type, tasks, events)
+      return aiService.generateReport(type, tasks, events, requestId)
     } catch (err) {
       return { title: '오류', content: err instanceof Error ? err.message : '보고서 생성 실패', generatedAt: new Date().toISOString() }
     }
   })
   ipcMain.handle(
     IPC_CHANNELS.AI_GENERATE_WIKI,
-    async (_, { taskSubject, taskBody, projectCode }: { taskSubject: string; taskBody?: string; projectCode?: string }) =>
-      aiService.generateWikiDraft(taskSubject, taskBody, projectCode)
+    async (_, { taskSubject, taskBody, projectCode, requestId }: { taskSubject: string; taskBody?: string; projectCode?: string; requestId?: string }) =>
+      aiService.generateWikiDraft(taskSubject, taskBody, projectCode, requestId)
   )
   ipcMain.handle(
     IPC_CHANNELS.AI_GENERATE_MEETING_NOTE,
-    async (_, { eventSubject, eventDescription, attendees }: { eventSubject: string; eventDescription?: string; attendees?: string[] }) =>
-      aiService.generateMeetingNote(eventSubject, eventDescription, attendees)
+    async (_, { eventSubject, eventDescription, attendees, requestId }: { eventSubject: string; eventDescription?: string; attendees?: string[]; requestId?: string }) =>
+      aiService.generateMeetingNote(eventSubject, eventDescription, attendees, requestId)
   )
+
+  // AI 모델 설정
+  ipcMain.handle(IPC_CHANNELS.AI_MODEL_CONFIG_GET, () => aiService.getModelConfig())
+  ipcMain.handle(IPC_CHANNELS.AI_MODEL_CONFIG_SET, (_, config: import('../shared/types/ai').AIModelConfig) => {
+    aiService.setModelConfig(config)
+    store.set('aiModelConfig', config)
+  })
 
   // Settings
   ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, (_, key: string) => store.get(key))
@@ -294,29 +347,6 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.CLOVER_SKILLS_DELETE, (_, id: string) => skillStore.delete(id))
   ipcMain.handle(IPC_CHANNELS.CLOVER_SKILLS_FOR_TARGET, (_, target: string) => skillStore.forTarget(target))
 
-  // Chat Store
-  ipcMain.handle(IPC_CHANNELS.CHAT_SAVE, (_, { id, messages }: { id: string; messages: unknown[] }) => {
-    const sessions = (store.get('chatSessions', {}) as Record<string, unknown>)
-    sessions[id] = { messages, updatedAt: new Date().toISOString() }
-    store.set('chatSessions', sessions)
-  })
-  ipcMain.handle(IPC_CHANNELS.CHAT_LIST, () => {
-    const sessions = (store.get('chatSessions', {}) as Record<string, { messages: unknown[]; updatedAt: string }>)
-    return Object.entries(sessions).map(([id, s]) => ({
-      id, messageCount: s.messages.length, updatedAt: s.updatedAt,
-      preview: (s.messages[s.messages.length - 1] as { content?: string })?.content?.substring(0, 50) || ''
-    })).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-  })
-  ipcMain.handle(IPC_CHANNELS.CHAT_LOAD, (_, id: string) => {
-    const sessions = (store.get('chatSessions', {}) as Record<string, { messages: unknown[] }>)
-    return sessions[id]?.messages || []
-  })
-  ipcMain.handle(IPC_CHANNELS.CHAT_DELETE, (_, id: string) => {
-    const sessions = (store.get('chatSessions', {}) as Record<string, unknown>)
-    delete sessions[id]
-    store.set('chatSessions', sessions)
-  })
-
   // Briefing Store
   ipcMain.handle(IPC_CHANNELS.BRIEFING_SAVE, (_, briefing: unknown) => {
     const list = (store.get('briefings', []) as unknown[])
@@ -332,48 +362,59 @@ function registerIpcHandlers(): void {
   })
 
   // AI Wiki
-  ipcMain.handle(IPC_CHANNELS.AI_WIKI_PROOFREAD, async (_, { title, content }: { title: string; content: string }) =>
-    aiService.wikiProofread(title, content)
+  ipcMain.handle(IPC_CHANNELS.AI_WIKI_PROOFREAD, async (_, { title, content, requestId }: { title: string; content: string; requestId?: string }) =>
+    aiService.wikiProofread(title, content, requestId)
   )
-  ipcMain.handle(IPC_CHANNELS.AI_WIKI_IMPROVE, async (_, { title, content }: { title: string; content: string }) =>
-    aiService.wikiImprove(title, content)
+  ipcMain.handle(IPC_CHANNELS.AI_WIKI_IMPROVE, async (_, { title, content, requestId }: { title: string; content: string; requestId?: string }) =>
+    aiService.wikiImprove(title, content, requestId)
   )
 
   // AI Skill Generator
   ipcMain.handle(
     IPC_CHANNELS.AI_GENERATE_SKILL,
-    async (_, { request, target }: { request: string; target: string }) =>
-      aiService.generateSkill(request, target)
+    async (_, { request, target, requestId }: { request: string; target: string; requestId?: string }) =>
+      aiService.generateSkill(request, target, requestId)
   )
 
   // Wiki domains
   ipcMain.handle(IPC_CHANNELS.DOORAY_WIKI_DOMAINS, () => wikiService.listDomains())
 
-  // Claude Sessions
-  ipcMain.handle(IPC_CHANNELS.CLAUDE_SESSIONS_LIST, async () => {
-    const { readdirSync, readFileSync, statSync } = require('fs')
-    const { join } = require('path')
-    const { homedir } = require('os')
-    const base = join(homedir(), '.claude', 'projects')
-    const sessions: Array<{ id: string; project: string; firstMsg: string; timestamp: string; lines: number }> = []
+  // Claude Sessions (mtime 기반 캐시 + 비동기 fs + 스트림 읽기)
+  interface SessionMeta { id: string; project: string; firstMsg: string; timestamp: string; lines: number }
+  interface SessionCacheEntry { meta: SessionMeta; mtimeMs: number; size: number; path: string }
+  const sessionCache = new Map<string, SessionCacheEntry>()
+  let sessionIdToPath = new Map<string, string>()
 
-    try {
-      for (const projDir of readdirSync(base)) {
-        const projPath = join(base, projDir)
-        try {
-          const files = readdirSync(projPath).filter((f: string) => f.endsWith('.jsonl') && !f.includes('subagent'))
-          for (const file of files) {
-            const fp = join(projPath, file)
-            try {
-              const content = readFileSync(fp, 'utf-8')
-              const lines = content.split('\n').filter((l: string) => l.trim())
-              const sid = file.replace('.jsonl', '')
-              const project = projDir.replace(/-/g, '/').replace(/^\/Users\/nhn\//, '~/').replace(/^\//, '')
-              let firstMsg = '', timestamp = ''
-              for (const line of lines.slice(0, 50)) {
+  ipcMain.handle(IPC_CHANNELS.CLAUDE_SESSIONS_LIST, async () => {
+    const fs = await import('fs')
+    const fsp = fs.promises
+    const { join } = await import('path')
+    const { homedir } = await import('os')
+    const base = join(homedir(), '.claude', 'projects')
+
+    const parseFirstMessage = (fp: string): Promise<{ firstMsg: string; timestamp: string; lines: number }> =>
+      new Promise((resolve) => {
+        let firstMsg = '', timestamp = '', lines = 0, buf = ''
+        const stream = fs.createReadStream(fp, { encoding: 'utf-8', highWaterMark: 32 * 1024 })
+        let done = false
+        const finish = (): void => {
+          if (done) return
+          done = true
+          stream.destroy()
+          resolve({ firstMsg, timestamp, lines })
+        }
+        stream.on('data', (chunk: string | Buffer) => {
+          buf += chunk.toString()
+          let idx: number
+          while ((idx = buf.indexOf('\n')) >= 0) {
+            const line = buf.substring(0, idx).trim()
+            buf = buf.substring(idx + 1)
+            if (line) {
+              lines++
+              if (!firstMsg) {
                 try {
                   const d = JSON.parse(line)
-                  if (d.type === 'user' && !firstMsg) {
+                  if (d.type === 'user') {
                     const msg = d.message || {}
                     let c = msg.content || ''
                     if (Array.isArray(c)) c = c.map((x: Record<string, string>) => x.text || '').join(' ')
@@ -381,46 +422,97 @@ function registerIpcHandlers(): void {
                     timestamp = d.timestamp || ''
                   }
                 } catch {}
-                if (firstMsg) break
               }
-              if (firstMsg && !firstMsg.startsWith('Caveat:')) {
-                sessions.push({ id: sid, project, firstMsg, timestamp, lines: lines.length })
-              }
-            } catch {}
+            }
+            // 첫 메시지 찾고 50줄 샘플했으면 조기 종료
+            if (firstMsg && lines >= 50) { finish(); return }
           }
-        } catch {}
-      }
-    } catch {}
+        })
+        stream.on('end', finish)
+        stream.on('error', finish)
+      })
+
+    const newIdToPath = new Map<string, string>()
+    const sessions: SessionMeta[] = []
+
+    let projDirs: string[] = []
+    try { projDirs = await fsp.readdir(base) } catch { return [] }
+
+    // 프로젝트별 파일 스캔은 병렬, 각 프로젝트 내에서도 파일들 병렬
+    await Promise.all(projDirs.map(async (projDir) => {
+      const projPath = join(base, projDir)
+      let files: string[] = []
+      try {
+        const entries = await fsp.readdir(projPath)
+        files = entries.filter((f) => f.endsWith('.jsonl') && !f.includes('subagent'))
+      } catch { return }
+      const project = projDir.replace(/-/g, '/').replace(/^\/Users\/nhn\//, '~/').replace(/^\//, '')
+
+      await Promise.all(files.map(async (file) => {
+        const fp = join(projPath, file)
+        const sid = file.replace('.jsonl', '')
+        newIdToPath.set(sid, fp)
+        let stat: { mtimeMs: number; size: number }
+        try { stat = await fsp.stat(fp) } catch { return }
+
+        const cached = sessionCache.get(sid)
+        if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+          sessions.push(cached.meta)
+          return
+        }
+        const parsed = await parseFirstMessage(fp)
+        if (parsed.firstMsg && !parsed.firstMsg.startsWith('Caveat:')) {
+          const meta: SessionMeta = { id: sid, project, firstMsg: parsed.firstMsg, timestamp: parsed.timestamp, lines: parsed.lines }
+          sessionCache.set(sid, { meta, mtimeMs: stat.mtimeMs, size: stat.size, path: fp })
+          sessions.push(meta)
+        }
+      }))
+    }))
+
+    // 삭제된 세션 제거
+    for (const sid of Array.from(sessionCache.keys())) {
+      if (!newIdToPath.has(sid)) sessionCache.delete(sid)
+    }
+    sessionIdToPath = newIdToPath
 
     return sessions.sort((a, b) => b.timestamp.localeCompare(a.timestamp))
   })
 
   ipcMain.handle(IPC_CHANNELS.CLAUDE_SESSIONS_DETAIL, async (_, sessionId: string) => {
-    const { readdirSync, readFileSync } = require('fs')
-    const { join } = require('path')
-    const { homedir } = require('os')
-    const base = join(homedir(), '.claude', 'projects')
-    const messages: Array<{ role: string; content: string; timestamp: string }> = []
+    const fsp = (await import('fs')).promises
+    const { join } = await import('path')
+    const { homedir } = await import('os')
 
-    for (const projDir of readdirSync(base)) {
-      const fp = join(base, projDir, `${sessionId}.jsonl`)
+    // 인덱스에서 경로 조회, 없으면 직접 탐색
+    let fp = sessionIdToPath.get(sessionId)
+    if (!fp) {
+      const base = join(homedir(), '.claude', 'projects')
       try {
-        const content = readFileSync(fp, 'utf-8')
-        for (const line of content.split('\n').filter((l: string) => l.trim())) {
-          try {
-            const d = JSON.parse(line)
-            if (d.type === 'user' || d.type === 'assistant') {
-              const msg = d.message || {}
-              let c = msg.content || ''
-              if (Array.isArray(c)) c = c.map((x: Record<string, string>) => x.text || '').join(' ')
-              messages.push({ role: d.type, content: String(c).substring(0, 2000), timestamp: d.timestamp || '' })
-            }
-          } catch {}
+        const projDirs = await fsp.readdir(base)
+        for (const projDir of projDirs) {
+          const candidate = join(base, projDir, `${sessionId}.jsonl`)
+          try { await fsp.access(candidate); fp = candidate; break } catch {}
         }
-        break
       } catch {}
     }
+    if (!fp) return []
 
+    const messages: Array<{ role: string; content: string; timestamp: string }> = []
+    try {
+      const content = await fsp.readFile(fp, 'utf-8')
+      for (const line of content.split('\n')) {
+        if (!line.trim()) continue
+        try {
+          const d = JSON.parse(line)
+          if (d.type === 'user' || d.type === 'assistant') {
+            const msg = d.message || {}
+            let c = msg.content || ''
+            if (Array.isArray(c)) c = c.map((x: Record<string, string>) => x.text || '').join(' ')
+            messages.push({ role: d.type, content: String(c).substring(0, 2000), timestamp: d.timestamp || '' })
+          }
+        } catch {}
+      }
+    } catch {}
     return messages
   })
 
@@ -495,7 +587,7 @@ ${data}`
     const { join } = require('path')
     const home = homedir()
     const extraPaths = [join(home, '.claude', 'local'), join(home, '.claude', 'bin'), '/usr/local/bin', '/opt/homebrew/bin', join(home, '.local', 'bin')]
-    const richEnv = { ...process.env, PATH: [...extraPaths, process.env.PATH || ''].join(':') }
+    const richEnv = { ...process.env, PATH: [...extraPaths, process.env.PATH || ''].join(':'), DISABLE_OMC: '1', CLAUDE_CODE_SIMPLE: '1' }
     const run = (args: string[]): Promise<string> => new Promise((resolve) => {
       execFile('claude', args, { timeout: 5000, env: richEnv }, (err: Error | null, stdout: string, stderr: string) => {
         resolve(stdout || stderr || (err?.message ?? ''))

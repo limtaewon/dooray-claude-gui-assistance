@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, memo } from 'react'
 import { FolderOpen, ChevronRight, ChevronDown, RefreshCw, FileText, Sparkles, Loader2, Copy, Check, Search, PanelLeftClose, PanelLeftOpen, Upload, Eye, Edit3 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -6,6 +6,8 @@ import rehypeRaw from 'rehype-raw'
 import type { DoorayWikiPage } from '../../../../shared/types/dooray'
 import ProjectFilter from '../common/ProjectFilter'
 import SkillQuickToggle from './SkillQuickToggle'
+import { useAIProgress } from '../../hooks/useAIProgress'
+import AIProgressIndicator from '../common/AIProgressIndicator'
 
 interface WikiDomain { id: string; name: string; type: string }
 interface TreeNode { page: DoorayWikiPage; children: TreeNode[]; loaded: boolean; expanded: boolean }
@@ -26,9 +28,9 @@ function WikiManager(): JSX.Element {
 
   // AI 결과
   const [aiResult, setAiResult] = useState<string | null>(null)
-  const [aiLoading, setAiLoading] = useState(false)
   const [aiAction, setAiAction] = useState<string>('')
   const [copied, setCopied] = useState(false)
+  const { progress: aiProgress, start: startAi, done: doneAi, isActive: aiLoading } = useAIProgress()
   // 편집/반영
   const [editMode, setEditMode] = useState(false)
   const [editContent, setEditContent] = useState('')
@@ -112,26 +114,29 @@ function WikiManager(): JSX.Element {
   // AI 도구 (opus 모델)
   const runAi = async (action: string): Promise<void> => {
     if (!pageContent || !selectedPage) return
-    setAiLoading(true); setAiResult(null); setAiAction(action); setEditMode(false); setPushResult(null)
+    setAiResult(null); setAiAction(action); setEditMode(false); setPushResult(null)
+    const reqId = startAi()
     try {
       let result: string
       if (action === 'proofread') {
-        result = await window.api.ai.wikiProofread(pageTitle(selectedPage), pageContent)
+        result = await window.api.ai.wikiProofread(pageTitle(selectedPage), pageContent, reqId)
       } else if (action === 'improve') {
-        result = await window.api.ai.wikiImprove(pageTitle(selectedPage), pageContent)
+        result = await window.api.ai.wikiImprove(pageTitle(selectedPage), pageContent, reqId)
       } else {
-        // 요약, 구조분석은 기존 chat으로
         const prompts: Record<string, string> = {
           summarize: `다음 위키 문서를 3~5줄로 요약하세요.\n\n${pageContent.substring(0, 5000)}`,
           structure: `다음 위키 문서의 구조를 분석하고 개선 방안을 제안하세요.\n\n${pageContent.substring(0, 5000)}`
         }
-        const res = await window.api.ai.chat({ message: prompts[action] || '', includeContext: false })
-        result = res.content
+        result = await window.api.ai.ask({
+          prompt: prompts[action] || '',
+          feature: action === 'summarize' ? 'wikiSummarize' : 'wikiStructure',
+          requestId: reqId
+        })
       }
       setAiResult(result)
       setEditContent(result)
     } catch (err) { setAiResult(`오류: ${err instanceof Error ? err.message : '알 수 없는 오류'}`) }
-    finally { setAiLoading(false) }
+    finally { doneAi() }
   }
 
   // 두레이 위키에 반영
@@ -164,27 +169,27 @@ function WikiManager(): JSX.Element {
     setCopied(true); setTimeout(() => setCopied(false), 2000)
   }
 
-  // 검색 필터
-  const filterTree = (nodes: TreeNode[], q: string): TreeNode[] => {
-    if (!q) return nodes
-    const lower = q.toLowerCase()
-    return nodes.filter((n) => pageTitle(n.page).toLowerCase().includes(lower) || (n.children.length > 0 && filterTree(n.children, q).length > 0))
-  }
+  // 검색 필터 (메모화)
+  const filteredNodes = useMemo(() => {
+    if (!searchQuery) return rootNodes
+    const lower = searchQuery.toLowerCase()
+    const filter = (nodes: TreeNode[]): TreeNode[] =>
+      nodes.filter((n) => pageTitle(n.page).toLowerCase().includes(lower) || (n.children.length > 0 && filter(n.children).length > 0))
+    return filter(rootNodes)
+  }, [rootNodes, searchQuery])
 
   const renderTree = (nodes: TreeNode[], depth: number): JSX.Element[] =>
     nodes.map((node) => (
-      <div key={node.page.id}>
-        <div className={`flex items-center gap-1 py-1 cursor-pointer transition-colors rounded ${
-          selectedPage?.id === node.page.id ? 'bg-clover-blue/10 text-clover-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
-        }`} style={{ paddingLeft: `${depth * 14 + 6}px` }}>
-          <button onClick={(e) => { e.stopPropagation(); toggleNode(node.page.id) }} className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
-            {node.expanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
-          </button>
-          <FileText size={11} className="flex-shrink-0 text-text-tertiary" />
-          <span onClick={() => selectPage(node.page)} className="text-[11px] truncate flex-1">{pageTitle(node.page)}</span>
-        </div>
-        {node.expanded && node.children.length > 0 && renderTree(node.children, depth + 1)}
-      </div>
+      <TreeRow
+        key={node.page.id}
+        node={node}
+        depth={depth}
+        isSelected={selectedPage?.id === node.page.id}
+        onToggle={toggleNode}
+        onSelect={selectPage}
+      >
+        {node.expanded && node.children.length > 0 ? renderTree(node.children, depth + 1) : null}
+      </TreeRow>
     ))
 
   const canPush = (aiAction === 'proofread' || aiAction === 'improve') && (aiResult || editMode)
@@ -208,8 +213,8 @@ function WikiManager(): JSX.Element {
                 className={`w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors ${
                   selectedDomain?.id === d.id ? 'bg-clover-blue/10 text-clover-blue border-r-2 border-clover-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
                 }`}>
-                <FolderOpen size={11} className={selectedDomain?.id === d.id ? 'text-clover-blue' : 'text-text-tertiary'} />
-                <span className="text-[11px] font-medium truncate">{d.name}</span>
+                <FolderOpen size={11} className={`flex-shrink-0 ${selectedDomain?.id === d.id ? 'text-clover-blue' : 'text-text-tertiary'}`} />
+                <span className="text-[11px] font-medium truncate min-w-0">{d.name}</span>
               </button>
             ))}
           </div>
@@ -238,8 +243,8 @@ function WikiManager(): JSX.Element {
             </div>
             <div className="flex-1 overflow-y-auto py-1">
               {loadingPages ? <div className="text-[10px] text-text-tertiary text-center py-4">로딩...</div>
-                : filterTree(rootNodes, searchQuery).length === 0 ? <div className="text-[10px] text-text-tertiary text-center py-4">{searchQuery ? '검색 결과 없음' : '페이지 없음'}</div>
-                : renderTree(filterTree(rootNodes, searchQuery), 0)}
+                : filteredNodes.length === 0 ? <div className="text-[10px] text-text-tertiary text-center py-4">{searchQuery ? '검색 결과 없음' : '페이지 없음'}</div>
+                : renderTree(filteredNodes, 0)}
             </div>
           </>
         )}
@@ -322,10 +327,7 @@ function WikiManager(): JSX.Element {
                   )}
                   <div className="flex-1 overflow-y-auto p-4">
                     {aiLoading ? (
-                      <div className="flex flex-col items-center gap-2 py-12 text-text-secondary text-xs">
-                        <Loader2 size={18} className="animate-spin text-clover-orange" />
-                        Opus 모델로 {aiAction === 'proofread' ? '교정' : aiAction === 'improve' ? '개선' : '분석'} 중...
-                      </div>
+                      <AIProgressIndicator progress={aiProgress} showStreamPreview />
                     ) : editMode ? (
                       <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)}
                         className="w-full min-h-[400px] bg-bg-primary border border-bg-border rounded-lg p-3 text-xs text-text-primary font-mono focus:outline-none focus:border-clover-blue resize-y" />
@@ -346,5 +348,41 @@ function WikiManager(): JSX.Element {
     </div>
   )
 }
+
+interface TreeRowProps {
+  node: TreeNode
+  depth: number
+  isSelected: boolean
+  onToggle: (id: string) => void
+  onSelect: (page: DoorayWikiPage) => void
+  children?: React.ReactNode
+}
+
+const TreeRow = memo(function TreeRow({ node, depth, isSelected, onToggle, onSelect, children }: TreeRowProps) {
+  return (
+    <div>
+      <div
+        style={{ paddingLeft: `${depth * 14 + 6}px`, contentVisibility: 'auto', containIntrinsicSize: '0 24px' }}
+        className={`flex items-center gap-1 py-1 cursor-pointer transition-colors rounded ${
+          isSelected ? 'bg-clover-blue/10 text-clover-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
+        }`}
+      >
+        <button onClick={(e) => { e.stopPropagation(); onToggle(node.page.id) }} className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
+          {node.expanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+        </button>
+        <FileText size={11} className="flex-shrink-0 text-text-tertiary" />
+        <span onClick={() => onSelect(node.page)} className="text-[11px] truncate flex-1">{pageTitle(node.page)}</span>
+      </div>
+      {children}
+    </div>
+  )
+}, (prev, next) =>
+  prev.node.page.id === next.node.page.id &&
+  prev.node.expanded === next.node.expanded &&
+  prev.node.children === next.node.children &&
+  prev.depth === next.depth &&
+  prev.isSelected === next.isSelected &&
+  prev.children === next.children
+)
 
 export default WikiManager

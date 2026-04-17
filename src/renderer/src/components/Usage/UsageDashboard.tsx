@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { RefreshCw, DollarSign, Cpu, Zap, Clock, TrendingUp, BarChart3, PieChart, Sparkles, Loader2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -34,45 +34,47 @@ function UsageDashboard(): JSX.Element {
 
   useEffect(() => { load() }, [load])
 
+  // 차트 데이터 (summary가 바뀔 때만 재계산)
+  const { dailyData, modelData, hourData, cacheHitRate, avgCostPerDay, totalTokens } = useMemo(() => {
+    if (!summary) {
+      return { dailyData: [], modelData: [], hourData: [], cacheHitRate: '0', avgCostPerDay: '0', totalTokens: 0 }
+    }
+    const daily = Object.entries(summary.byDate).map(([date, recs]) => {
+      let inT = 0, outT = 0, cacheT = 0, costT = 0
+      for (const r of recs) {
+        inT += r.inputTokens; outT += r.outputTokens; cacheT += r.cacheReadInputTokens; costT += r.costUsd
+      }
+      return { date: date.slice(5), 입력: inT, 출력: outT, 캐시: cacheT, 비용: +costT.toFixed(2), 호출수: recs.length }
+    }).sort((a, b) => a.date.localeCompare(b.date))
+
+    const model = Object.entries(summary.byModel).map(([m, recs]) => {
+      let cost = 0, tokens = 0
+      for (const r of recs) { cost += r.costUsd; tokens += r.inputTokens + r.outputTokens }
+      return { name: m.replace('claude-', '').replace(/-\d{8}$/, ''), 비용: +cost.toFixed(2), 호출수: recs.length, 토큰: tokens }
+    }).sort((a, b) => b.비용 - a.비용)
+
+    const hour = Array.from({ length: 24 }, (_, h) => {
+      const recs = summary.byHour[h] || []
+      let tokens = 0
+      for (const r of recs) tokens += r.inputTokens + r.outputTokens
+      return { 시간: `${h}시`, 호출수: recs.length, 토큰: tokens }
+    })
+
+    const hitRate = summary.totalInputTokens > 0
+      ? ((summary.totalCacheReadTokens / (summary.totalInputTokens + summary.totalCacheReadTokens)) * 100).toFixed(1)
+      : '0'
+    const avgCost = daily.length > 0 ? (summary.totalCostUsd / daily.length).toFixed(2) : '0'
+    const totalTok = summary.totalInputTokens + summary.totalOutputTokens
+
+    return { dailyData: daily, modelData: model, hourData: hour, cacheHitRate: hitRate, avgCostPerDay: avgCost, totalTokens: totalTok }
+  }, [summary])
+
+  const tooltipStyle = useMemo(() => ({
+    backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: 8, color: '#F9FAFB', fontSize: 11
+  }), [])
+
   if (loading) return <div className="flex items-center justify-center h-full text-text-secondary text-sm">사용량 데이터 불러오는 중...</div>
   if (!summary) return <div className="flex items-center justify-center h-full text-text-secondary text-sm">데이터 없음</div>
-
-  // 차트 데이터
-  const dailyData = Object.entries(summary.byDate).map(([date, recs]) => ({
-    date: date.slice(5), // MM-DD
-    입력: recs.reduce((s, r) => s + r.inputTokens, 0),
-    출력: recs.reduce((s, r) => s + r.outputTokens, 0),
-    캐시: recs.reduce((s, r) => s + r.cacheReadInputTokens, 0),
-    비용: +recs.reduce((s, r) => s + r.costUsd, 0).toFixed(2),
-    호출수: recs.length
-  })).sort((a, b) => a.date.localeCompare(b.date))
-
-  const modelData = Object.entries(summary.byModel).map(([model, recs]) => ({
-    name: model.replace('claude-', '').replace(/-\d{8}$/, ''),
-    비용: +recs.reduce((s, r) => s + r.costUsd, 0).toFixed(2),
-    호출수: recs.length,
-    토큰: recs.reduce((s, r) => s + r.inputTokens + r.outputTokens, 0)
-  })).sort((a, b) => b.비용 - a.비용)
-
-  const hourData = Array.from({ length: 24 }, (_, h) => ({
-    시간: `${h}시`,
-    호출수: (summary.byHour[h] || []).length,
-    토큰: (summary.byHour[h] || []).reduce((s, r) => s + r.inputTokens + r.outputTokens, 0)
-  }))
-
-  const cacheHitRate = summary.totalInputTokens > 0
-    ? ((summary.totalCacheReadTokens / (summary.totalInputTokens + summary.totalCacheReadTokens)) * 100).toFixed(1)
-    : '0'
-
-  const avgCostPerDay = dailyData.length > 0
-    ? (summary.totalCostUsd / dailyData.length).toFixed(2)
-    : '0'
-
-  const totalTokens = summary.totalInputTokens + summary.totalOutputTokens
-
-  const tooltipStyle = {
-    backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: 8, color: '#F9FAFB', fontSize: 11
-  }
 
   return (
     <div className="h-full overflow-y-auto p-6">

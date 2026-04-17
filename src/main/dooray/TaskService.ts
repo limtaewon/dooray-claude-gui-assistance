@@ -21,11 +21,13 @@ interface TagInfo { id: string; name: string; color?: string }
 
 export class TaskService {
   private projectCache: Map<string, DoorayProject> = new Map()
+  private projectListCache: { data: DoorayProject[]; timestamp: number } | null = null
   private tagCache: Map<string, Map<string, { name: string; color: string }>> = new Map()
   private taskCache: Map<string, { tasks: DoorayTask[]; timestamp: number }> = new Map()
   private memberNameCache: Map<string, string> = new Map()
   private myMemberId: string | null = null
   private static CACHE_TTL = 3 * 60 * 1000 // 3분
+  private static PROJECT_LIST_TTL = 10 * 60 * 1000 // 10분
 
   constructor(private client: DoorayClient) {}
 
@@ -40,14 +42,41 @@ export class TaskService {
   }
 
   async listMyProjects(): Promise<DoorayProject[]> {
-    const res = await this.client.request<DoorayListResponse<DoorayProject>>(
-      '/project/v1/projects?member=me&size=100'
-    )
-    const projects = res.result || []
-    for (const p of projects) {
-      this.projectCache.set(p.id, p)
+    if (this.projectListCache && Date.now() - this.projectListCache.timestamp < TaskService.PROJECT_LIST_TTL) {
+      return this.projectListCache.data
     }
+    // 비공개 프로젝트 + 내가 멤버인 공개 프로젝트 병렬 조회
+    const [privateRes, publicRes] = await Promise.all([
+      this.client.request<DoorayListResponse<DoorayProject>>(
+        '/project/v1/projects?member=me&size=100'
+      ),
+      this.client.request<DoorayListResponse<DoorayProject>>(
+        '/project/v1/projects?type=public&scope=private&size=100'
+      ).catch(() => ({ header: { resultCode: 0, isSuccessful: false }, result: [] as DoorayProject[], totalCount: 0 }))
+    ])
+
+    const seen = new Set<string>()
+    const projects: DoorayProject[] = []
+    for (const p of [...(privateRes.result || []), ...(publicRes.result || [])]) {
+      if (!seen.has(p.id)) {
+        seen.add(p.id)
+        projects.push(p)
+        this.projectCache.set(p.id, p)
+      }
+    }
+    this.projectListCache = { data: projects, timestamp: Date.now() }
     return projects
+  }
+
+  async getProjectInfo(projectId: string): Promise<DoorayProject> {
+    const cached = this.projectCache.get(projectId)
+    if (cached) return cached
+    const res = await this.client.request<DoorayItemResponse<DoorayProject>>(
+      `/project/v1/projects/${projectId}`
+    )
+    const project = res.result
+    this.projectCache.set(project.id, project)
+    return project
   }
 
   // 단일 프로젝트의 내 담당 태스크 전체 로드 (페이지네이션)
@@ -76,42 +105,54 @@ export class TaskService {
       return cached.tasks
     }
 
-    const allTasks: DoorayTask[] = []
-    let page = 0
     const size = 100
+    const MAX_PAGES = 5
+    const project = this.projectCache.get(projectId)
 
-    const tagInfo = await this.loadTagInfo(projectId)
+    // 태그 정보 로드 + 첫 페이지 동시 호출 (병렬)
+    const [tagInfo, firstRes] = await Promise.all([
+      this.loadTagInfo(projectId),
+      this.client.request<DoorayListResponse<DoorayTask>>(
+        `/project/v1/projects/${projectId}/posts?toMemberIds=${memberId}&size=${size}&page=0&order=-createdAt`
+      ).catch(() => ({ header: { resultCode: 0, isSuccessful: false }, result: [], totalCount: 0 }))
+    ])
 
-    while (true) {
-      try {
-        const res = await this.client.request<DoorayListResponse<DoorayTask>>(
+    const firstPageTasks = firstRes.result || []
+    const totalCount = firstRes.totalCount || firstPageTasks.length
+
+    // 나머지 페이지를 병렬로 호출
+    const totalPages = Math.min(MAX_PAGES, Math.ceil(totalCount / size))
+    const remainingPages: number[] = []
+    for (let p = 1; p < totalPages; p++) remainingPages.push(p)
+
+    const remainingResults = await Promise.all(
+      remainingPages.map((page) =>
+        this.client.request<DoorayListResponse<DoorayTask>>(
           `/project/v1/projects/${projectId}/posts?toMemberIds=${memberId}&size=${size}&page=${page}&order=-createdAt`
-        )
-        const tasks = res.result || []
-        const project = this.projectCache.get(projectId)
+        ).catch(() => ({ header: { resultCode: 0, isSuccessful: false }, result: [], totalCount: 0 }))
+      )
+    )
 
-        for (const task of tasks) {
-          task.projectId = projectId
-          task.projectCode = project?.code
-          // 태그 ID → 이름+색상 매핑
-          if (task.tags) {
-            for (const tag of task.tags) {
-              const info = tagInfo.get(tag.id)
-              if (info) {
-                if (!tag.name) tag.name = info.name
-                ;(tag as Record<string, unknown>).color = info.color
-              }
-            }
+    // 모든 페이지 합치기
+    const allTasks: DoorayTask[] = []
+    const enrichTask = (task: DoorayTask): void => {
+      task.projectId = projectId
+      task.projectCode = project?.code
+      if (task.tags) {
+        for (const tag of task.tags) {
+          const info = tagInfo.get(tag.id)
+          if (info) {
+            if (!tag.name) tag.name = info.name
+            ;(tag as Record<string, unknown>).color = info.color
           }
-          allTasks.push(task)
         }
-
-        if (tasks.length < size) break
-        page++
-        if (page >= 5) break
-      } catch {
-        break
       }
+      allTasks.push(task)
+    }
+
+    for (const task of firstPageTasks) enrichTask(task)
+    for (const res of remainingResults) {
+      for (const task of res.result || []) enrichTask(task)
     }
 
     // 캐시 저장

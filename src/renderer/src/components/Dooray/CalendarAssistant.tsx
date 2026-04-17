@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, memo } from 'react'
 import { RefreshCw, Clock, MapPin, AlertCircle, CalendarDays, Sparkles, Loader2, Settings, Check, FolderOpen } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -19,23 +19,22 @@ function CalendarFilter({ events, filterIds, onFilter }: {
     )
   }, [])
 
-  // API 목록 + 이벤트에서 추출한 캘린더 합산 (중복 제거)
-  const eventCalMap = new Map(events.filter((e) => e.calendar?.id).map((e) => [e.calendar!.id, e.calendar!.name]))
-  const allMap = new Map<string, string>()
-  for (const c of apiCalendars) allMap.set(c.id, c.name)
-  for (const [id, name] of eventCalMap) allMap.set(id, name)
-
-  // 이벤트 수 카운트
-  const countMap = new Map<string, number>()
-  for (const e of events) {
-    const cid = e.calendar?.id
-    if (cid) countMap.set(cid, (countMap.get(cid) || 0) + 1)
-  }
-
-  // 정렬: 이벤트 있는 것 먼저, 그 안에서 이름순
-  const calendars = Array.from(allMap.entries())
-    .map(([id, name]) => ({ id, name, count: countMap.get(id) || 0 }))
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+  // API + 이벤트 파생 캘린더 합산 + 카운트 (events/apiCalendars가 바뀔 때만 재계산)
+  const calendars = useMemo(() => {
+    const allMap = new Map<string, string>()
+    for (const c of apiCalendars) allMap.set(c.id, c.name)
+    for (const e of events) {
+      if (e.calendar?.id) allMap.set(e.calendar.id, e.calendar.name)
+    }
+    const countMap = new Map<string, number>()
+    for (const e of events) {
+      const cid = e.calendar?.id
+      if (cid) countMap.set(cid, (countMap.get(cid) || 0) + 1)
+    }
+    return Array.from(allMap.entries())
+      .map(([id, name]) => ({ id, name, count: countMap.get(id) || 0 }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+  }, [apiCalendars, events])
 
   const toggle = (id: string): void => {
     onFilter(filterIds.includes(id) ? filterIds.filter((p) => p !== id) : [...filterIds, id])
@@ -161,53 +160,46 @@ function CalendarAssistant(): JSX.Element {
       }
       const eventText = lines.join('\n')
 
-      const result = await window.api.ai.chat({
-        message: `오늘: ${today}\n\n이번 주 일정 (날짜별 정리):\n${eventText}\n\n위 일정을 분석해줘. 각 이벤트의 날짜를 정확히 확인해서:\n1. 오늘(${today})의 시간별 빈 시간대 (업무시간 09:00-18:00 기준)\n2. 이번 주 가장 바쁜 날 vs 여유있는 날\n3. 연속 회의 경고 (30분 이하 간격인 것만)\n4. 준비가 필요한 일정 (발표, 리뷰 등)\n5. 업무 집중 가능 시간대 추천 (날짜별)`,
-        includeContext: false
+      const result = await window.api.ai.ask({
+        prompt: `오늘: ${today}\n\n이번 주 일정 (날짜별 정리):\n${eventText}\n\n위 일정을 분석해줘. 각 이벤트의 날짜를 정확히 확인해서:\n1. 오늘(${today})의 시간별 빈 시간대 (업무시간 09:00-18:00 기준)\n2. 이번 주 가장 바쁜 날 vs 여유있는 날\n3. 연속 회의 경고 (30분 이하 간격인 것만)\n4. 준비가 필요한 일정 (발표, 리뷰 등)\n5. 업무 집중 가능 시간대 추천 (날짜별)`,
+        feature: 'calendarAnalysis'
       })
-      setAiResult(result.content)
+      setAiResult(result)
     } catch (err) { setAiResult(`오류: ${err instanceof Error ? err.message : ''}`) }
     finally { setAiLoading(false) }
   }
 
-  // 캘린더 필터 적용
-  const displayEvents = filterIds.length > 0
-    ? events.filter((e) => e.calendar?.id && filterIds.includes(e.calendar.id))
-    : events
+  // 캘린더 필터 적용 (메모화)
+  const displayEvents = useMemo(() =>
+    filterIds.length > 0
+      ? events.filter((e) => e.calendar?.id && filterIds.includes(e.calendar.id))
+      : events,
+    [events, filterIds]
+  )
 
   // 오늘 기준
-  const now = new Date()
-  const todayKey = localDateKey(now)
+  const todayKey = useMemo(() => localDateKey(new Date()), [])
 
-  // 날짜 그룹
-  // 장기 이벤트(2일+): 오늘에 한 번만 표시 (기간 표기)
-  // 단일/종일: 시작일에 표시
-  const groupedByDate: Record<string, DoorayCalendarEvent[]> = {}
-  for (const event of displayEvents) {
-    const startStr = getStart(event)
-    if (!startStr) continue
-    try {
-      const evStart = fixDate(startStr)
-      const evEnd = fixDate(getEnd(event))
-      if (isNaN(evStart.getTime())) continue
-
-      const duration = !isNaN(evEnd.getTime()) ? evEnd.getTime() - evStart.getTime() : 0
-      const isLong = duration > 2 * 24 * 60 * 60 * 1000
-
-      let dateKey: string
-      if (isLong) {
-        // 장기: 오늘에 배치
-        dateKey = todayKey
-      } else {
-        dateKey = localDateKey(evStart)
-      }
-
-      if (!groupedByDate[dateKey]) groupedByDate[dateKey] = []
-      if (!groupedByDate[dateKey].some((e) => e.id === event.id)) {
-        groupedByDate[dateKey].push(event)
-      }
-    } catch {}
-  }
+  // 날짜 그룹 + 정렬된 엔트리 (메모화)
+  const { groupedByDate, sortedDateEntries } = useMemo(() => {
+    const grouped: Record<string, DoorayCalendarEvent[]> = {}
+    for (const event of displayEvents) {
+      const startStr = getStart(event)
+      if (!startStr) continue
+      try {
+        const evStart = fixDate(startStr)
+        const evEnd = fixDate(getEnd(event))
+        if (isNaN(evStart.getTime())) continue
+        const duration = !isNaN(evEnd.getTime()) ? evEnd.getTime() - evStart.getTime() : 0
+        const isLong = duration > 2 * 24 * 60 * 60 * 1000
+        const dateKey = isLong ? todayKey : localDateKey(evStart)
+        if (!grouped[dateKey]) grouped[dateKey] = []
+        if (!grouped[dateKey].some((e) => e.id === event.id)) grouped[dateKey].push(event)
+      } catch {}
+    }
+    const sorted = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b))
+    return { groupedByDate: grouped, sortedDateEntries: sorted }
+  }, [displayEvents, todayKey])
 
   return (
     <div className="h-full flex flex-col">
@@ -260,7 +252,7 @@ function CalendarAssistant(): JSX.Element {
           <div className="text-text-secondary text-sm text-center py-8">이번 주 일정이 없습니다.</div>
         ) : (
           <div className="space-y-5">
-            {Object.entries(groupedByDate).sort(([a], [b]) => a.localeCompare(b)).map(([dateKey, dayEvents]) => {
+            {sortedDateEntries.map(([dateKey, dayEvents]) => {
               const todayLocal = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
               const isToday = dateKey === todayLocal
               return (

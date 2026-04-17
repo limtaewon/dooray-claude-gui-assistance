@@ -128,11 +128,15 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
               <User size={11} /> 담당자
             </h4>
             <div className="flex flex-wrap gap-1.5">
-              {detail.users.to.map((u) => (
-                <span key={u.member.id} className="text-[10px] px-2 py-0.5 rounded-full bg-bg-surface border border-bg-border text-text-primary">
-                  {u.member.name}
-                </span>
-              ))}
+              {detail.users.to.map((u, i) => {
+                const name = u?.member?.name || u?.emailUser?.emailAddress || '알 수 없음'
+                const key = u?.member?.id || u?.emailUser?.emailAddress || `user-${i}`
+                return (
+                  <span key={key} className="text-[10px] px-2 py-0.5 rounded-full bg-bg-surface border border-bg-border text-text-primary">
+                    {name}
+                  </span>
+                )
+              })}
             </div>
           </div>
         )}

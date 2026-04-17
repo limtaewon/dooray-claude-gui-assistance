@@ -19,25 +19,65 @@ interface WikiDomain {
 }
 
 export class WikiService {
+  private domainsCache: { data: WikiDomain[]; timestamp: number } | null = null
+  private pageListCache = new Map<string, { pages: DoorayWikiPage[]; timestamp: number }>()
+  private static LIST_TTL = 3 * 60 * 1000 // 3분
+
   constructor(private client: DoorayClient) {}
 
-  // 접근 가능한 위키 도메인 목록
+  // 접근 가능한 위키 도메인 목록 (3분 캐시)
   async listDomains(): Promise<WikiDomain[]> {
+    if (this.domainsCache && Date.now() - this.domainsCache.timestamp < WikiService.LIST_TTL) {
+      return this.domainsCache.data
+    }
     const res = await this.client.request<DoorayListResponse<WikiDomain>>(
       '/wiki/v1/wikis?size=50&page=0'
     )
-    return res.result || []
+    const data = res.result || []
+    this.domainsCache = { data, timestamp: Date.now() }
+    return data
   }
 
-  // 위키 페이지 목록 (parentPageId가 없으면 루트, 있으면 하위)
+  // 위키 페이지 목록 (병렬 페이지네이션 + TTL 캐시)
   async list(wikiId: string, parentPageId?: string): Promise<DoorayWikiPage[]> {
-    const params = parentPageId
-      ? `parentPageId=${parentPageId}`
-      : ''
-    const res = await this.client.request<DoorayListResponse<DoorayWikiPage>>(
-      `/wiki/v1/wikis/${wikiId}/pages?${params}&size=100`
+    const cacheKey = `${wikiId}|${parentPageId || 'root'}`
+    const cached = this.pageListCache.get(cacheKey)
+    if (cached && Date.now() - cached.timestamp < WikiService.LIST_TTL) {
+      return cached.pages
+    }
+
+    const size = 100
+    const MAX_PAGES = 5
+    const baseParams = parentPageId ? `parentPageId=${parentPageId}&` : ''
+
+    // 첫 페이지로 totalCount 확인
+    const firstRes = await this.client.request<DoorayListResponse<DoorayWikiPage>>(
+      `/wiki/v1/wikis/${wikiId}/pages?${baseParams}size=${size}&page=0`
+    ).catch(() => ({ header: { resultCode: 0, isSuccessful: false }, result: [], totalCount: 0 }))
+
+    const firstPageItems = firstRes.result || []
+    const totalCount = firstRes.totalCount || firstPageItems.length
+    const totalPages = Math.min(MAX_PAGES, Math.ceil(totalCount / size))
+
+    // 나머지 페이지 병렬 호출
+    const remaining: number[] = []
+    for (let p = 1; p < totalPages; p++) remaining.push(p)
+
+    const rest = await Promise.all(
+      remaining.map((page) =>
+        this.client.request<DoorayListResponse<DoorayWikiPage>>(
+          `/wiki/v1/wikis/${wikiId}/pages?${baseParams}size=${size}&page=${page}`
+        ).catch(() => ({ header: { resultCode: 0, isSuccessful: false }, result: [], totalCount: 0 }))
+      )
     )
-    return res.result || []
+
+    const allPages: DoorayWikiPage[] = [...firstPageItems]
+    for (const r of rest) {
+      if (r.result) allPages.push(...r.result)
+    }
+
+    this.pageListCache.set(cacheKey, { pages: allPages, timestamp: Date.now() })
+    return allPages
   }
 
   // 특정 페이지 내용 조회
@@ -76,5 +116,7 @@ export class WikiService {
         }
       )
     }
+    // 캐시 무효화 (수정된 페이지의 목록 캐시 제거)
+    this.pageListCache.clear()
   }
 }

@@ -29,6 +29,7 @@ export const IPC_CHANNELS = {
   DOORAY_WIKI_UPDATE: 'dooray:wiki:update',
   DOORAY_CALENDAR_LIST: 'dooray:calendar:list',
   DOORAY_CALENDAR_EVENTS: 'dooray:calendar:events',
+  DOORAY_PROJECT_INFO: 'dooray:project:info',
 
   // Dooray Task Detail
   DOORAY_TASK_DETAIL: 'dooray:task:detail',
@@ -49,13 +50,15 @@ export const IPC_CHANNELS = {
 
   // AI
   AI_AVAILABLE: 'ai:available',
-  AI_CHAT: 'ai:chat',
-  AI_CHAT_RESET: 'ai:chat:reset',
+  AI_ASK: 'ai:ask',
   AI_BRIEFING: 'ai:briefing',
   AI_SUMMARIZE_TASK: 'ai:summarize-task',
   AI_GENERATE_REPORT: 'ai:generate-report',
   AI_GENERATE_WIKI: 'ai:generate-wiki',
   AI_GENERATE_MEETING_NOTE: 'ai:generate-meeting-note',
+  AI_PROGRESS: 'ai:progress',
+  AI_MODEL_CONFIG_GET: 'ai:model-config:get',
+  AI_MODEL_CONFIG_SET: 'ai:model-config:set',
 
   // Dooray Wiki
   DOORAY_WIKI_DOMAINS: 'dooray:wiki:domains',
@@ -77,12 +80,6 @@ export const IPC_CHANNELS = {
   AI_WIKI_PROOFREAD: 'ai:wiki-proofread',
   AI_WIKI_IMPROVE: 'ai:wiki-improve',
   AI_GENERATE_SKILL: 'ai:generate-skill',
-
-  // Chat Store
-  CHAT_SAVE: 'chat:save',
-  CHAT_LIST: 'chat:list',
-  CHAT_LOAD: 'chat:load',
-  CHAT_DELETE: 'chat:delete',
 
   // Briefing Store
   BRIEFING_SAVE: 'briefing:save',

@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react'
-import { Sparkles, AlertTriangle, Target, Clock, Calendar, Lightbulb, RefreshCw, Loader2, Trash2, ChevronDown } from 'lucide-react'
+import { Sparkles, AlertTriangle, Target, Clock, Calendar, Lightbulb, RefreshCw, Trash2, ChevronDown } from 'lucide-react'
 import type { AIBriefing } from '../../../../shared/types/ai'
 import SkillQuickToggle from './SkillQuickToggle'
+import { useAIProgress } from '../../hooks/useAIProgress'
+import AIProgressIndicator from '../common/AIProgressIndicator'
 
 type StoredBriefing = AIBriefing & { savedAt: string }
 
 function BriefingPanel(): JSX.Element {
   const [briefing, setBriefing] = useState<AIBriefing | null>(null)
   const [history, setHistory] = useState<StoredBriefing[]>([])
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showHistory, setShowHistory] = useState(false)
+  const { progress, start, done, isActive } = useAIProgress()
 
   // 히스토리 로드
   useEffect(() => {
@@ -22,10 +24,10 @@ function BriefingPanel(): JSX.Element {
   }, [])
 
   const loadBriefing = async (): Promise<void> => {
-    setLoading(true)
     setError(null)
+    const reqId = start()
     try {
-      const result = await window.api.ai.briefing()
+      const result = await window.api.ai.briefing(reqId)
       setBriefing(result)
       // 저장
       await window.api.briefingStore.save(result)
@@ -34,7 +36,7 @@ function BriefingPanel(): JSX.Element {
     } catch (err) {
       setError(err instanceof Error ? err.message : '브리핑 생성 실패')
     } finally {
-      setLoading(false)
+      done()
     }
   }
 
@@ -51,11 +53,10 @@ function BriefingPanel(): JSX.Element {
     else setBriefing(null)
   }
 
-  if (loading) {
+  if (isActive) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-3">
-        <Loader2 size={24} className="animate-spin text-clover-orange" />
-        <p className="text-sm text-text-secondary">AI가 업무를 분석하고 있습니다...</p>
+      <div className="flex flex-col items-center justify-center h-full gap-3 p-6">
+        <AIProgressIndicator progress={progress} showStreamPreview className="w-full max-w-md" />
         <p className="text-[10px] text-text-tertiary">Claude Code CLI를 통해 처리 중</p>
       </div>
     )

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plus, RefreshCw } from 'lucide-react'
 import MCPCard from './MCPCard'
 import MCPForm from './MCPForm'
@@ -55,7 +55,7 @@ function MCPManager(): JSX.Element {
     }
   }
 
-  const entries = Object.entries(servers)
+  const entries = useMemo(() => Object.entries(servers), [servers])
 
   return (
     <div className="h-full overflow-y-auto p-6">

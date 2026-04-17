@@ -10,8 +10,9 @@ import TerminalView from './components/Terminal/TerminalView'
 import ClaudeManual from './components/ClaudeManual/ClaudeManual'
 import SessionExplorer from './components/Sessions/SessionExplorer'
 import BranchWorkspace from './components/Git/BranchWorkspace'
+import SettingsView from './components/Settings/SettingsView'
 
-type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git'
+type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings'
 
 function App(): JSX.Element {
   const [activeView, setActiveView] = useState<View>('dooray')
@@ -46,6 +47,7 @@ function App(): JSX.Element {
           {activeView === 'usage' && <UsageDashboard />}
           {activeView === 'manual' && <ClaudeManual />}
           {activeView === 'sessions' && <SessionExplorer />}
+          {activeView === 'settings' && <SettingsView />}
         </main>
       </div>
     </div>

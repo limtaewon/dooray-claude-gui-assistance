@@ -13,6 +13,9 @@ interface Calendar {
 }
 
 export class CalendarService {
+  private calendarsCache: { data: Calendar[]; timestamp: number } | null = null
+  private static CAL_TTL = 5 * 60 * 1000 // 5분
+
   constructor(private client: DoorayClient) {}
 
   private sortEvents(events: DoorayCalendarEvent[]): DoorayCalendarEvent[] {
@@ -24,21 +27,20 @@ export class CalendarService {
   }
 
   async listCalendars(): Promise<Calendar[]> {
+    if (this.calendarsCache && Date.now() - this.calendarsCache.timestamp < CalendarService.CAL_TTL) {
+      return this.calendarsCache.data
+    }
     try {
       const res = await this.client.request<DoorayListResponse<Calendar>>('/calendar/v1/calendars')
-      return res.result || []
+      const data = res.result || []
+      this.calendarsCache = { data, timestamp: Date.now() }
+      return data
     } catch { return [] }
   }
 
   private async getMyCalendarIds(): Promise<string[]> {
-    try {
-      const res = await this.client.request<DoorayListResponse<Calendar>>(
-        '/calendar/v1/calendars'
-      )
-      return (res.result || []).map((c) => c.id)
-    } catch {
-      return []
-    }
+    const list = await this.listCalendars()
+    return list.map((c) => c.id)
   }
 
   async getEvents(params: DoorayCalendarQueryParams): Promise<DoorayCalendarEvent[]> {

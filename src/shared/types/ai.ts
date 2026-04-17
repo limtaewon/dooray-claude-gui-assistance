@@ -22,16 +22,6 @@ export interface AIBriefing {
   recommendations: string[]
 }
 
-export interface AIChatRequest {
-  message: string
-  includeContext?: boolean
-}
-
-export interface AIChatResponse {
-  content: string
-  toolCalls?: AIToolCall[]
-}
-
 export interface AIReportRequest {
   type: 'daily' | 'weekly'
 }
@@ -53,4 +43,31 @@ export interface AIMeetingNoteRequest {
   eventDescription?: string
   startAt: string
   attendees?: string[]
+}
+
+export interface AIProgressEvent {
+  requestId: string
+  stage: 'collecting' | 'thinking' | 'streaming' | 'parsing' | 'done' | 'error'
+  message: string
+  elapsedMs: number
+  /** 스트리밍 청크 (stage='streaming'일 때) */
+  chunk?: string
+}
+
+export type AIModelName = 'haiku' | 'sonnet' | 'opus'
+
+/** 기능별 모델 선택 설정 */
+export interface AIModelConfig {
+  briefing?: AIModelName
+  report?: AIModelName
+  wikiProofread?: AIModelName
+  wikiImprove?: AIModelName
+  wikiDraft?: AIModelName
+  wikiSummarize?: AIModelName
+  wikiStructure?: AIModelName
+  summarizeTask?: AIModelName
+  generateSkill?: AIModelName
+  meetingNote?: AIModelName
+  sessionSummary?: AIModelName
+  calendarAnalysis?: AIModelName
 }

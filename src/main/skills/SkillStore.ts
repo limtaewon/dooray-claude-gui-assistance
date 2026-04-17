@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { join } from 'path'
-import { readFileSync, writeFileSync, readdirSync, unlinkSync, mkdirSync, existsSync } from 'fs'
+import { homedir } from 'os'
+import { readFileSync, writeFileSync, readdirSync, unlinkSync, mkdirSync, existsSync, copyFileSync, statSync } from 'fs'
 import type { CloverSkill, SkillTarget } from '../../shared/types/skill'
 
 /**
@@ -81,6 +82,40 @@ export class SkillStore {
 
   constructor() {
     this.baseDir = app.getPath('userData')
+    this.migrateFromLegacyPaths()
+  }
+
+  /** 구 버전(clover) 및 dev 경로에서 스킬 자동 이전 */
+  private migrateFromLegacyPaths(): void {
+    const legacyRoots = [
+      join(homedir(), 'Library', 'Application Support', 'clover'),
+      join(homedir(), 'Library', 'Application Support', 'clauday')
+    ].filter((p) => p !== this.baseDir)
+
+    for (const root of legacyRoots) {
+      if (!existsSync(root)) continue
+      for (const target of TARGETS) {
+        const srcDir = join(root, target, 'skills')
+        if (!existsSync(srcDir)) continue
+        const destDir = this.targetDir(target)
+        if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true })
+
+        try {
+          for (const file of readdirSync(srcDir)) {
+            if (!file.endsWith('.md') && !file.endsWith('.json')) continue
+            const src = join(srcDir, file)
+            const dest = join(destDir, file)
+            // 이미 있으면 더 최근 파일 유지
+            if (existsSync(dest)) {
+              try {
+                if (statSync(src).mtimeMs <= statSync(dest).mtimeMs) continue
+              } catch { continue }
+            }
+            try { copyFileSync(src, dest) } catch { /* ok */ }
+          }
+        } catch { /* ok */ }
+      }
+    }
   }
 
   private targetDir(target: string): string {
@@ -109,9 +144,24 @@ export class SkillStore {
     return skills
   }
 
+  /** 인메모리 캐시 (save/delete 시 무효화) */
+  private skillCache = new Map<string, CloverSkill[]>()
+
+  private readCached(target: string): CloverSkill[] {
+    const cached = this.skillCache.get(target)
+    if (cached) return cached
+    const skills = this.readSkillsFromDir(target)
+    this.skillCache.set(target, skills)
+    return skills
+  }
+
+  private invalidateCache(): void {
+    this.skillCache.clear()
+  }
+
   list(): CloverSkill[] {
     const all: CloverSkill[] = []
-    for (const target of TARGETS) all.push(...this.readSkillsFromDir(target))
+    for (const target of TARGETS) all.push(...this.readCached(target))
     return all.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))
   }
 
@@ -138,6 +188,7 @@ export class SkillStore {
     // .md 형식으로 저장
     this.ensureDir(skill.target)
     writeFileSync(this.filePath(skill.target, skill.id), toFrontmatter(skill), 'utf-8')
+    this.invalidateCache()
   }
 
   delete(id: string): void {
@@ -146,10 +197,11 @@ export class SkillStore {
       try { unlinkSync(join(this.targetDir(target), `${safeName}.md`)) } catch { /* ok */ }
       try { unlinkSync(join(this.targetDir(target), `${safeName}.json`)) } catch { /* ok */ }
     }
+    this.invalidateCache()
   }
 
   forTarget(target: string): CloverSkill[] {
-    const skills = [...this.readSkillsFromDir(target), ...this.readSkillsFromDir('all')]
+    const skills = [...this.readCached(target), ...this.readCached('all')]
     return skills.filter((s) => s.enabled && s.autoApply)
   }
 }

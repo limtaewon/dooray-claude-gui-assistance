@@ -1,20 +1,22 @@
 import { useState, useEffect, useCallback } from 'react'
-import { FileText, Loader2, Copy, Check, Download, ChevronDown, Trash2, Clock } from 'lucide-react'
+import { FileText, Copy, Check, Download, ChevronDown, Trash2, Clock } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import type { AIReport } from '../../../../shared/types/ai'
 import SkillQuickToggle from './SkillQuickToggle'
+import { useAIProgress } from '../../hooks/useAIProgress'
+import AIProgressIndicator from '../common/AIProgressIndicator'
 
 function ReportGenerator(): JSX.Element {
   const [report, setReport] = useState<AIReport | null>(null)
-  const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
   const [reportType, setReportType] = useState<'daily' | 'weekly'>('daily')
   const [history, setHistory] = useState<Array<AIReport & { savedAt: string }>>([])
   const [showHistory, setShowHistory] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [editContent, setEditContent] = useState('')
+  const { progress, start, done, isActive } = useAIProgress()
 
   // 히스토리 로드
   const loadHistory = useCallback(async () => {
@@ -29,11 +31,11 @@ function ReportGenerator(): JSX.Element {
   useEffect(() => { loadHistory() }, [loadHistory])
 
   const handleGenerate = async (): Promise<void> => {
-    setLoading(true)
     setReport(null)
     setEditMode(false)
+    const reqId = start()
     try {
-      const result = await window.api.ai.generateReport(reportType)
+      const result = await window.api.ai.generateReport(reportType, reqId)
       setReport(result)
       // 히스토리에 저장
       const updated = [{ ...result, savedAt: new Date().toISOString() }, ...history].slice(0, 20)
@@ -46,7 +48,7 @@ function ReportGenerator(): JSX.Element {
         generatedAt: new Date().toISOString()
       })
     } finally {
-      setLoading(false)
+      done()
     }
   }
 
@@ -100,9 +102,9 @@ function ReportGenerator(): JSX.Element {
           </div>
           <div className="flex items-center gap-2">
             <SkillQuickToggle target="report" />
-            <button onClick={handleGenerate} disabled={loading}
+            <button onClick={handleGenerate} disabled={isActive}
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-clover-orange to-clover-blue text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50">
-              {loading ? <><Loader2 size={14} className="animate-spin" /> 생성 중...</> : <><FileText size={14} /> 보고서 생성</>}
+              <FileText size={14} /> {isActive ? '생성 중...' : '보고서 생성'}
             </button>
           </div>
         </div>
@@ -152,14 +154,13 @@ function ReportGenerator(): JSX.Element {
 
       {/* 본문 */}
       <div className="flex-1 overflow-y-auto">
-        {loading && (
-          <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <Loader2 size={24} className="animate-spin text-clover-orange" />
-            <p className="text-sm text-text-secondary">Claude Code로 보고서 생성 중...</p>
+        {isActive && (
+          <div className="p-6 flex flex-col items-center gap-3">
+            <AIProgressIndicator progress={progress} showStreamPreview className="w-full max-w-2xl" />
           </div>
         )}
 
-        {report && !loading && (
+        {report && !isActive && (
           <div className="p-6">
             {/* 보고서 카드 */}
             <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden">
@@ -207,7 +208,7 @@ function ReportGenerator(): JSX.Element {
           </div>
         )}
 
-        {!report && !loading && (
+        {!report && !isActive && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <FileText size={40} className="text-text-tertiary mb-3" />
             <p className="text-sm text-text-secondary">보고서 유형을 선택하고 "생성" 버튼을 누르세요</p>

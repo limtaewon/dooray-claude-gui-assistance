@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Book, Terminal, Zap, Settings, MessageSquare, GitBranch, Shield, Cpu, Search, DollarSign, Wrench, Bot, FileCode, Clover } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -792,10 +792,12 @@ function ClaudeManual(): JSX.Element {
   const [activeSection, setActiveSection] = useState('start')
   const [searchQuery, setSearchQuery] = useState('')
 
-  const section = SECTIONS.find((s) => s.id === activeSection)
-  const filtered = searchQuery
-    ? SECTIONS.filter((s) => s.title.includes(searchQuery) || s.content.toLowerCase().includes(searchQuery.toLowerCase()))
-    : SECTIONS
+  const section = useMemo(() => SECTIONS.find((s) => s.id === activeSection), [activeSection])
+  const filtered = useMemo(() => {
+    if (!searchQuery) return SECTIONS
+    const q = searchQuery.toLowerCase()
+    return SECTIONS.filter((s) => s.title.toLowerCase().includes(q) || s.content.toLowerCase().includes(q))
+  }, [searchQuery])
 
   return (
     <div className="h-full flex">
