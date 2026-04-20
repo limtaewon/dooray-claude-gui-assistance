@@ -9,10 +9,10 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "postinstall": "electron-rebuild -f -w node-pty",
+    "postinstall": "electron-rebuild -f -w node-pty,keytar",
     "icons": "node scripts/generate-icons.mjs",
     "dist": "npm run icons && electron-vite build && electron-builder --mac",
-    "dist:win": "npm run icons && electron-vite build && electron-builder --win",
+    "dist:win": "electron-vite build && electron-builder --win",
     "dist:all": "npm run icons && electron-vite build && electron-builder --mac --win"
   },
   "build": {
@@ -26,6 +26,10 @@
       "node_modules/**/*",
       "!node_modules/.cache"
     ],
+    "asarUnpack": [
+      "node_modules/node-pty/**/*",
+      "node_modules/keytar/**/*"
+    ],
     "mac": {
       "target": ["dmg"],
       "icon": "build/icon.icns",
@@ -33,11 +37,14 @@
     },
     "win": {
       "target": ["nsis"],
-      "icon": "build/icon.ico"
+      "icon": "build/icon.ico",
+      "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "installerLanguages": ["Korean", "English"],
+      "language": "1042"
     }
   },
   "dependencies": {

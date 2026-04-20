@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Plus, Save, Sparkles, Search, X } from 'lucide-react'
+import { Plus, Save, Sparkles, Search, X, TrendingUp, AlignLeft } from 'lucide-react'
 import SkillCard from './SkillCard'
 import SkillEditor from './SkillEditor'
 import SkillCreateModal from './SkillCreateModal'
@@ -12,6 +12,11 @@ function SkillsManager(): JSX.Element {
   const [isDirty, setIsDirty] = useState(false)
   const [creating, setCreating] = useState(false)
   const [search, setSearch] = useState('')
+  const [sortByUsage, setSortByUsage] = useState(false)
+  const [skillUsage, setSkillUsage] = useState<Record<string, number>>(() => {
+    try { return JSON.parse(localStorage.getItem('clauday_skill_usage') || '{}') }
+    catch { return {} }
+  })
 
   const loadSkills = useCallback(async () => {
     try {
@@ -34,6 +39,10 @@ function SkillsManager(): JSX.Element {
     setActiveSkill(skill)
     setEditorContent(skill.content)
     setIsDirty(false)
+    // 사용 빈도 트래킹
+    const updated = { ...skillUsage, [skill.filename]: (skillUsage[skill.filename] || 0) + 1 }
+    setSkillUsage(updated)
+    localStorage.setItem('clauday_skill_usage', JSON.stringify(updated))
   }
 
   const handleCreated = async (skill: Skill): Promise<void> => {
@@ -74,14 +83,34 @@ function SkillsManager(): JSX.Element {
   }
 
   const filteredSkills = useMemo(() => {
-    if (!search.trim()) return skills
-    const q = search.toLowerCase()
-    return skills.filter((s) =>
-      s.name.toLowerCase().includes(q) ||
-      s.filename.toLowerCase().includes(q) ||
-      s.content.toLowerCase().includes(q)
-    )
-  }, [skills, search])
+    const q = search.trim().toLowerCase()
+    if (q) {
+      // 관련도 정렬: 이름 시작 > 이름 포함 > 파일명 포함 > 내용 포함
+      const filtered = skills.filter((s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.filename.toLowerCase().includes(q) ||
+        s.content.toLowerCase().includes(q)
+      )
+      return filtered.sort((a, b) => {
+        const rank = (s: Skill): number => {
+          const n = s.name.toLowerCase()
+          const f = s.filename.toLowerCase()
+          if (n.startsWith(q)) return 0
+          if (n.includes(q)) return 1
+          if (f.includes(q)) return 2
+          return 3
+        }
+        const diff = rank(a) - rank(b)
+        return diff !== 0 ? diff : a.name.localeCompare(b.name)
+      })
+    }
+    if (sortByUsage) {
+      return [...skills].sort(
+        (a, b) => (skillUsage[b.filename] || 0) - (skillUsage[a.filename] || 0) || a.name.localeCompare(b.name)
+      )
+    }
+    return skills
+  }, [skills, search, sortByUsage, skillUsage])
 
   const handleEditorChange = (value: string): void => {
     setEditorContent(value)
@@ -94,11 +123,18 @@ function SkillsManager(): JSX.Element {
       <div className="w-64 bg-bg-surface border-r border-bg-border flex flex-col">
         <div className="p-3 border-b border-bg-border space-y-2">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-text-primary">Skills</h2>
+            <h2 className="text-sm font-semibold text-text-primary">스킬</h2>
             <div className="flex items-center gap-1">
               <span className="text-[10px] text-text-tertiary">
                 {search ? `${filteredSkills.length}/${skills.length}` : skills.length}
               </span>
+              <button
+                onClick={() => setSortByUsage((v) => !v)}
+                className={`p-1 rounded transition-colors ${sortByUsage ? 'text-clover-blue bg-clover-blue/10' : 'text-text-tertiary hover:text-text-primary hover:bg-bg-border'}`}
+                title={sortByUsage ? '이름 순으로 정렬' : '사용 빈도 순으로 정렬'}
+              >
+                {sortByUsage ? <TrendingUp size={12} /> : <AlignLeft size={12} />}
+              </button>
               <button
                 onClick={() => setCreating(true)}
                 className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-gradient-to-r from-clover-orange/15 to-clover-blue/15 text-clover-blue border border-clover-blue/25 hover:from-clover-orange/25 hover:to-clover-blue/25 transition-colors"
@@ -132,6 +168,7 @@ function SkillsManager(): JSX.Element {
               key={skill.filename}
               skill={skill}
               isActive={activeSkill?.filename === skill.filename}
+              usageCount={skillUsage[skill.filename] || 0}
               onSelect={() => handleSelect(skill)}
               onDelete={() => handleDelete(skill)}
             />
@@ -168,7 +205,7 @@ function SkillsManager(): JSX.Element {
                 }`}
               >
                 <Save size={12} />
-                Save
+                저장
               </button>
             </div>
             <div className="flex-1">

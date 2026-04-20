@@ -486,18 +486,18 @@ function BranchWorkspace({ onOpenTerminal: _onOpenTerminal }: BranchWorkspacePro
               <select
                 value={compareBranches[0]}
                 onChange={(e) => setCompareBranches([e.target.value, compareBranches[1]])}
-                className="flex-1 px-2 py-1 bg-bg-primary border border-bg-border rounded text-[10px] text-text-primary focus:outline-none focus:border-clover-blue"
+                className="flex-1 min-w-0 px-2 py-1 bg-bg-primary border border-bg-border rounded text-[10px] text-text-primary focus:outline-none focus:border-clover-blue"
               >
                 <option value="">브랜치 1</option>
                 {worktrees.map((w) => (
                   <option key={w.path} value={w.branch}>{w.branch}</option>
                 ))}
               </select>
-              <span className="text-[10px] text-text-tertiary">vs</span>
+              <span className="text-[10px] text-text-tertiary flex-shrink-0">vs</span>
               <select
                 value={compareBranches[1]}
                 onChange={(e) => setCompareBranches([compareBranches[0], e.target.value])}
-                className="flex-1 px-2 py-1 bg-bg-primary border border-bg-border rounded text-[10px] text-text-primary focus:outline-none focus:border-clover-blue"
+                className="flex-1 min-w-0 px-2 py-1 bg-bg-primary border border-bg-border rounded text-[10px] text-text-primary focus:outline-none focus:border-clover-blue"
               >
                 <option value="">브랜치 2</option>
                 {worktrees.map((w) => (
@@ -506,12 +506,16 @@ function BranchWorkspace({ onOpenTerminal: _onOpenTerminal }: BranchWorkspacePro
               </select>
               <button
                 onClick={runCompare}
-                disabled={!compareBranches[0] || !compareBranches[1]}
-                className="px-2 py-1 rounded bg-clover-blue/10 text-clover-blue text-[10px] font-medium hover:bg-clover-blue/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                disabled={!compareBranches[0] || !compareBranches[1] || compareBranches[0] === compareBranches[1]}
+                className="flex-shrink-0 px-2.5 py-1 rounded bg-clover-blue/10 text-clover-blue text-[10px] font-medium hover:bg-clover-blue/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                title={compareBranches[0] === compareBranches[1] && compareBranches[0] ? '같은 브랜치는 비교할 수 없습니다' : ''}
               >
                 비교
               </button>
             </div>
+            {compareBranches[0] && compareBranches[1] && compareBranches[0] === compareBranches[1] && (
+              <p className="mt-1.5 text-[9px] text-amber-400">같은 브랜치를 선택했습니다</p>
+            )}
           </div>
 
           {/* 워크트리 카드들 */}

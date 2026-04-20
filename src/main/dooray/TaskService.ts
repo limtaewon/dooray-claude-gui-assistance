@@ -72,7 +72,7 @@ export class TaskService {
         '/project/v1/projects?member=me&size=100'
       ),
       this.client.request<DoorayListResponse<DoorayProject>>(
-        '/project/v1/projects?type=public&scope=private&size=100'
+        '/project/v1/projects?type=public&size=100'
       ).catch(() => ({ header: { resultCode: 0, isSuccessful: false }, result: [] as DoorayProject[], totalCount: 0 }))
     ])
 

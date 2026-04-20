@@ -22,17 +22,29 @@ export class TerminalManager {
 
   create(options: TerminalCreateOptions = {}): TerminalSession {
     const id = randomUUID()
-    const shell = process.env.SHELL || '/bin/zsh'
-    const command = options.command || shell
+    const isWindows = process.platform === 'win32'
+    const defaultShell = isWindows
+      ? (process.env.COMSPEC || 'cmd.exe')
+      : (process.env.SHELL || '/bin/zsh')
+    const command = options.command || defaultShell
     const args = options.args || []
-    const cwd = options.cwd || process.env.HOME || '/'
+    const cwd = options.cwd || require('os').homedir()
 
     const ptyProcess = pty.spawn(command, args, {
       name: 'xterm-256color',
       cols: 120,
       rows: 30,
       cwd,
-      env: process.env as Record<string, string>
+      env: {
+        ...process.env,
+        // 패키징 앱에서 LANG 미설정 시 한글 깨짐 방지 (macOS/Linux only)
+        ...(isWindows ? {} : {
+          LANG: process.env.LANG || 'ko_KR.UTF-8',
+          LC_ALL: process.env.LC_ALL || process.env.LANG || 'ko_KR.UTF-8',
+          LC_CTYPE: process.env.LC_CTYPE || process.env.LANG || 'ko_KR.UTF-8',
+        }),
+        TERM: 'xterm-256color',
+      } as Record<string, string>
     })
 
     const meta: TerminalSession = {

@@ -4,11 +4,12 @@ import type { Skill } from '../../../../shared/types/skills'
 interface SkillCardProps {
   skill: Skill
   isActive: boolean
+  usageCount?: number
   onSelect: () => void
   onDelete: () => void
 }
 
-function SkillCard({ skill, isActive, onSelect, onDelete }: SkillCardProps): JSX.Element {
+function SkillCard({ skill, isActive, usageCount = 0, onSelect, onDelete }: SkillCardProps): JSX.Element {
   return (
     <div
       onClick={onSelect}
@@ -22,9 +23,14 @@ function SkillCard({ skill, isActive, onSelect, onDelete }: SkillCardProps): JSX
         <FileText size={16} className={isActive ? 'text-clover-blue' : 'text-text-secondary'} />
         <div className="min-w-0">
           <p className="text-sm font-medium text-text-primary truncate">{skill.name}</p>
-          <p className="text-[10px] text-text-secondary mt-0.5">
-            {new Date(skill.updatedAt).toLocaleDateString()}
-          </p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <p className="text-[10px] text-text-secondary">
+              {new Date(skill.updatedAt).toLocaleDateString()}
+            </p>
+            {usageCount > 0 && (
+              <span className="text-[9px] text-clover-blue/70 font-medium">{usageCount}회</span>
+            )}
+          </div>
         </div>
       </div>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

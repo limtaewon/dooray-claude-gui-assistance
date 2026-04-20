@@ -1,6 +1,6 @@
 import { execFile, execFileSync, spawn } from 'child_process'
 import { existsSync } from 'fs'
-import { join } from 'path'
+import { join, delimiter as pathDelimiter } from 'path'
 import { homedir } from 'os'
 import { BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '../../shared/types/ipc'
@@ -45,15 +45,29 @@ function resolveClaudePath(): string {
   // 환경변수로 직접 지정된 경우
   if (process.env.CLAUDE_CLI_PATH) return process.env.CLAUDE_CLI_PATH
 
+  const isWindows = process.platform === 'win32'
+  const home = homedir()
+
   // 이미 PATH에 있으면 그대로
   try {
-    execFileSync('claude', ['--version'], { timeout: 3000, stdio: 'ignore' })
-    return 'claude'
+    execFileSync(isWindows ? 'claude.cmd' : 'claude', ['--version'], { timeout: 3000, stdio: 'ignore', shell: isWindows })
+    return isWindows ? 'claude.cmd' : 'claude'
   } catch {}
+  if (isWindows) {
+    try {
+      execFileSync('claude', ['--version'], { timeout: 3000, stdio: 'ignore', shell: true })
+      return 'claude'
+    } catch {}
+  }
 
-  // 일반적인 설치 경로 탐색
-  const home = homedir()
-  const candidates = [
+  // 플랫폼별 일반적인 설치 경로 탐색
+  const candidates = isWindows ? [
+    join(home, '.claude', 'local', 'claude.cmd'),
+    join(home, '.claude', 'bin', 'claude.cmd'),
+    join(home, 'AppData', 'Roaming', 'npm', 'claude.cmd'),
+    join(home, 'AppData', 'Local', 'npm', 'claude.cmd'),
+    join(home, 'AppData', 'Roaming', 'npm', 'claude'),
+  ] : [
     join(home, '.claude', 'local', 'claude'),
     join(home, '.claude', 'bin', 'claude'),
     '/usr/local/bin/claude',
@@ -66,12 +80,19 @@ function resolveClaudePath(): string {
     if (existsSync(p)) return p
   }
 
-  // 로그인 쉘에서 which로 탐색
-  try {
-    const shell = process.env.SHELL || '/bin/zsh'
-    const result = execFileSync(shell, ['-l', '-c', 'which claude'], { timeout: 5000 }).toString().trim()
-    if (result && existsSync(result)) return result
-  } catch {}
+  // 셸에서 탐색
+  if (isWindows) {
+    try {
+      const result = execFileSync('where', ['claude'], { timeout: 5000 }).toString().trim().split('\n')[0].trim()
+      if (result && existsSync(result)) return result
+    } catch {}
+  } else {
+    try {
+      const shell = process.env.SHELL || '/bin/zsh'
+      const result = execFileSync(shell, ['-l', '-c', 'which claude'], { timeout: 5000 }).toString().trim()
+      if (result && existsSync(result)) return result
+    } catch {}
+  }
 
   return 'claude' // 최후의 폴백
 }
@@ -104,7 +125,13 @@ function buildArgs(prompt: string, opts: {
 /** 패키징 앱에서도 동작하도록 PATH 보강 + OMC/플러그인 훅 비활성화 (속도 최적화) */
 function enrichedEnv(): Record<string, string> {
   const home = homedir()
-  const extraPaths = [
+  const isWindows = process.platform === 'win32'
+  const extraPaths = isWindows ? [
+    join(home, '.claude', 'local'),
+    join(home, '.claude', 'bin'),
+    join(home, 'AppData', 'Roaming', 'npm'),
+    join(home, 'AppData', 'Local', 'npm'),
+  ] : [
     join(home, '.claude', 'local'),
     join(home, '.claude', 'bin'),
     '/usr/local/bin',
@@ -112,12 +139,11 @@ function enrichedEnv(): Record<string, string> {
     join(home, '.local', 'bin'),
     join(home, '.npm-global', 'bin')
   ]
-  const currentPath = process.env.PATH || '/usr/bin:/bin'
+  const currentPath = process.env.PATH || (isWindows ? '' : '/usr/bin:/bin')
   return {
     ...(process.env as Record<string, string>),
-    PATH: [...extraPaths, currentPath].join(':'),
+    PATH: [...extraPaths, currentPath].join(pathDelimiter),
     // OMC ultrawork 세션 복원 훅 비활성화 (매번 75k 토큰 로드 방지)
-    // NOTE: CLAUDE_CODE_SIMPLE=1은 --bare 모드와 동일 → OAuth 차단되므로 사용 금지
     DISABLE_OMC: '1'
   }
 }

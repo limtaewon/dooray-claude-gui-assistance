@@ -317,7 +317,7 @@ function registerIpcHandlers(): void {
       const session = terminalManager.create({
         command: 'claude',
         args: ['-p', prompt, '--model', 'sonnet'],
-        cwd: process.env.HOME || '/'
+        cwd: require('os').homedir()
       })
       return session
     }
@@ -586,7 +586,11 @@ function registerIpcHandlers(): void {
         const entries = await fsp.readdir(projPath)
         files = entries.filter((f) => f.endsWith('.jsonl') && !f.includes('subagent'))
       } catch { return }
-      const project = projDir.replace(/-/g, '/').replace(/^\/Users\/nhn\//, '~/').replace(/^\//, '')
+      const rawPath = projDir.replace(/-/g, '/')
+      const homeNorm = require('os').homedir().replace(/\\/g, '/')
+      const project = rawPath.startsWith(homeNorm + '/')
+        ? '~/' + rawPath.slice(homeNorm.length + 1)
+        : rawPath.replace(/^\//, '')
 
       await Promise.all(files.map(async (file) => {
         const fp = join(projPath, file)
@@ -647,8 +651,14 @@ function registerIpcHandlers(): void {
           if (d.type === 'user' || d.type === 'assistant') {
             const msg = d.message || {}
             let c = msg.content || ''
-            if (Array.isArray(c)) c = c.map((x: Record<string, string>) => x.text || '').join(' ')
-            messages.push({ role: d.type, content: String(c).substring(0, 2000), timestamp: d.timestamp || '' })
+            if (Array.isArray(c)) {
+              // text 타입 블록만 추출 (tool_use, tool_result 등 공백 라인 방지)
+              c = c.filter((x: Record<string, unknown>) => x.type === 'text')
+                   .map((x: Record<string, string>) => x.text || '').join('\n').trim()
+            }
+            const finalContent = String(c).trim()
+            if (!finalContent) continue  // 빈 메시지 (tool_use 등) 스킵
+            messages.push({ role: d.type, content: finalContent.substring(0, 2000), timestamp: d.timestamp || '' })
           }
         } catch {}
       }
@@ -726,8 +736,12 @@ ${data}`,
     const { homedir } = require('os')
     const { join } = require('path')
     const home = homedir()
-    const extraPaths = [join(home, '.claude', 'local'), join(home, '.claude', 'bin'), '/usr/local/bin', '/opt/homebrew/bin', join(home, '.local', 'bin')]
-    const richEnv = { ...process.env, PATH: [...extraPaths, process.env.PATH || ''].join(':'), DISABLE_OMC: '1' }
+    const { delimiter: pathDelim } = require('path')
+    const isWin = process.platform === 'win32'
+    const extraPaths = isWin
+      ? [join(home, '.claude', 'local'), join(home, '.claude', 'bin'), join(home, 'AppData', 'Roaming', 'npm'), join(home, 'AppData', 'Local', 'npm')]
+      : [join(home, '.claude', 'local'), join(home, '.claude', 'bin'), '/usr/local/bin', '/opt/homebrew/bin', join(home, '.local', 'bin')]
+    const richEnv = { ...process.env, PATH: [...extraPaths, process.env.PATH || ''].join(pathDelim), DISABLE_OMC: '1' }
     const run = (args: string[]): Promise<string> => new Promise((resolve) => {
       execFile('claude', args, { timeout: 5000, env: richEnv }, (err: Error | null, stdout: string, stderr: string) => {
         resolve(stdout || stderr || (err?.message ?? ''))
