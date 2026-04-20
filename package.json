@@ -42,9 +42,7 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "installerLanguages": ["Korean", "English"],
-      "language": "1042"
+      "allowToChangeInstallationDirectory": true
     }
   },
   "dependencies": {
