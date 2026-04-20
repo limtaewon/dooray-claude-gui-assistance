@@ -39,11 +39,12 @@ export class DoorayClient {
   }
 
   // electron.net.request 사용 - fetch와 달리 리다이렉트 시 Authorization 헤더 유지
-  async request<T>(path: string, options: { method?: string; body?: string } = {}): Promise<T> {
+  async request<T>(path: string, options: { method?: string; body?: string; timeoutMs?: number } = {}): Promise<T> {
     const token = await this.getToken()
     if (!token) throw new Error('Dooray API 토큰이 설정되지 않았습니다')
 
     const url = `${BASE_URL}${path}`
+    const timeoutMs = options.timeoutMs ?? 15000
 
     return new Promise<T>((resolve, reject) => {
       const req = net.request({
@@ -59,6 +60,17 @@ export class DoorayClient {
 
       let responseBody = ''
       let statusCode = 0
+      let settled = false
+      const settle = (fn: () => void): void => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        fn()
+      }
+      const timer = setTimeout(() => {
+        try { req.abort() } catch { /* ok */ }
+        settle(() => reject(new Error(`Dooray API 타임아웃 (${timeoutMs}ms): ${path}`)))
+      }, timeoutMs)
 
       req.on('response', (response) => {
         statusCode = response.statusCode!
@@ -75,24 +87,25 @@ export class DoorayClient {
               if (errBody.resultMessage) errorMsg = errBody.resultMessage
               else if (errBody.message) errorMsg = errBody.message
             } catch { /* ignore */ }
-            reject(new Error(`Dooray API 오류 (${statusCode}): ${errorMsg}`))
+            settle(() => reject(new Error(`Dooray API 오류 (${statusCode}): ${errorMsg}`)))
             return
           }
 
           try {
-            resolve(JSON.parse(responseBody) as T)
+            const parsed = JSON.parse(responseBody) as T
+            settle(() => resolve(parsed))
           } catch {
-            reject(new Error(`응답 파싱 오류: ${responseBody.substring(0, 200)}`))
+            settle(() => reject(new Error(`응답 파싱 오류: ${responseBody.substring(0, 200)}`)))
           }
         })
 
         response.on('error', (err: Error) => {
-          reject(new Error(`응답 오류: ${err.message}`))
+          settle(() => reject(new Error(`응답 오류: ${err.message}`)))
         })
       })
 
       req.on('error', (err: Error) => {
-        reject(new Error(`네트워크 오류: ${err.message}`))
+        settle(() => reject(new Error(`네트워크 오류: ${err.message}`)))
       })
 
       if (options.body) req.write(options.body)

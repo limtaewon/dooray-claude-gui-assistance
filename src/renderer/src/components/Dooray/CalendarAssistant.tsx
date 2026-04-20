@@ -15,9 +15,9 @@ function CalendarFilter({ events, filterIds, onFilter }: {
   const [apiCalendars, setApiCalendars] = useState<Array<{ id: string; name: string }>>([])
 
   useEffect(() => {
-    window.api.dooray.calendar.list().then((cals) =>
-      setApiCalendars(cals.map((c) => ({ id: c.id, name: c.name })))
-    )
+    window.api.dooray.calendar.list()
+      .then((cals) => setApiCalendars(cals.map((c) => ({ id: c.id, name: c.name }))))
+      .catch((err) => { console.error('[calendar] list failed:', err); setApiCalendars([]) })
   }, [])
 
   // API + 이벤트 파생 캘린더 합산 + 카운트 (events/apiCalendars가 바뀔 때만 재계산)

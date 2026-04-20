@@ -99,6 +99,30 @@ function resolveClaudePath(): string {
 
 const CLAUDE_CLI = resolveClaudePath()
 
+/**
+ * Claude CLI 오류를 사용자 친화적 메시지로 변환.
+ * "Not logged in" 같은 원인 불분명 에러에 복구 가이드 첨부.
+ */
+function wrapClaudeError(message: string, stderr?: string): Error {
+  const full = `${message}\n${stderr || ''}`.toLowerCase()
+  const isAuth = full.includes('not logged in')
+    || full.includes('unauthorized')
+    || full.includes('401')
+    || full.includes('credentials not found')
+    || full.includes('please run /login')
+    || full.includes('please login')
+  if (isAuth) {
+    return new Error(
+      'Claude 로그인이 필요합니다.\n\n' +
+      '해결 방법:\n' +
+      '1) 터미널에서 `claude` 를 실행하여 /login 으로 로그인\n' +
+      '2) 또는 환경변수 ANTHROPIC_API_KEY 설정 후 앱 재시작\n\n' +
+      `원본 오류: ${message.substring(0, 200)}`
+    )
+  }
+  return new Error(`Claude CLI 오류: ${message}`)
+}
+
 function buildArgs(prompt: string, opts: {
   model?: string
   systemPrompt?: string
@@ -122,6 +146,12 @@ function buildArgs(prompt: string, opts: {
   return args
 }
 
+/** 사용자 설정에서 주입 가능한 ANTHROPIC_API_KEY 보관소 */
+let userAnthropicApiKey: string | null = null
+export function setUserAnthropicApiKey(key: string | null): void {
+  userAnthropicApiKey = key && key.trim() ? key.trim() : null
+}
+
 /** 패키징 앱에서도 동작하도록 PATH 보강 + OMC/플러그인 훅 비활성화 (속도 최적화) */
 function enrichedEnv(): Record<string, string> {
   const home = homedir()
@@ -140,12 +170,17 @@ function enrichedEnv(): Record<string, string> {
     join(home, '.npm-global', 'bin')
   ]
   const currentPath = process.env.PATH || (isWindows ? '' : '/usr/bin:/bin')
-  return {
+  const env: Record<string, string> = {
     ...(process.env as Record<string, string>),
     PATH: [...extraPaths, currentPath].join(pathDelimiter),
     // OMC ultrawork 세션 복원 훅 비활성화 (매번 75k 토큰 로드 방지)
     DISABLE_OMC: '1'
   }
+  // 사용자가 설정에 API 키를 입력했으면 우선 적용 (키체인 접근 불가능한 패키징 앱 대비)
+  if (userAnthropicApiKey) {
+    env.ANTHROPIC_API_KEY = userAnthropicApiKey
+  }
+  return env
 }
 
 export class AIService {
@@ -232,13 +267,13 @@ ${skillBlock}`
         },
         (error, stdout, stderr) => {
           if (error && !stdout) {
-            reject(new Error(`Claude CLI 오류: ${error.message}`))
+            reject(wrapClaudeError(error.message, stderr))
             return
           }
           try {
             const result = JSON.parse(stdout) as ClaudeCliResult
             if (result.is_error) {
-              reject(new Error(`AI 응답 오류: ${result.result}`))
+              reject(wrapClaudeError(result.result, stderr))
               return
             }
             resolve(result)
@@ -355,7 +390,7 @@ ${skillBlock}`
 
       proc.on('error', (err) => {
         clearTimeout(timeout)
-        reject(new Error(`Claude CLI 오류: ${err.message}`))
+        reject(wrapClaudeError(err.message, stderrBuf))
       })
 
       proc.on('close', (code) => {
@@ -373,7 +408,7 @@ ${skillBlock}`
             total_cost_usd: 0
           })
         } else {
-          reject(new Error(stderrBuf || `Claude CLI 종료 코드 ${code}`))
+          reject(wrapClaudeError(stderrBuf || `Claude CLI 종료 코드 ${code}`, stderrBuf))
         }
       })
     })
@@ -520,20 +555,31 @@ ${JSON.stringify(eventData)}`
     })
     this.emitProgress(requestId, 'parsing', '결과 정리 중...', started)
 
+    // JSON 추출 — 마크다운 코드블록(```json ... ```) 처리 및 에러 명확화
+    const raw = (result.result || '').trim()
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim()
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      this.emitProgress(requestId, 'done', '완료', started)
+      throw new Error(`AI 응답에서 JSON을 찾지 못했습니다.\n\n응답: ${raw.substring(0, 400)}`)
+    }
     try {
-      const jsonMatch = result.result.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        const briefing = JSON.parse(jsonMatch[0]) as AIBriefing
-        this.emitProgress(requestId, 'done', '완료', started)
-        return briefing
+      const briefing = JSON.parse(jsonMatch[0]) as AIBriefing
+      // 필수 배열 필드 기본값 보정 (일부 누락된 경우)
+      const safe: AIBriefing = {
+        greeting: briefing.greeting || '오늘도 좋은 하루 보내세요!',
+        urgent: Array.isArray(briefing.urgent) ? briefing.urgent : [],
+        focus: Array.isArray(briefing.focus) ? briefing.focus : [],
+        mentioned: Array.isArray(briefing.mentioned) ? briefing.mentioned : [],
+        stale: Array.isArray(briefing.stale) ? briefing.stale : [],
+        todayEvents: Array.isArray(briefing.todayEvents) ? briefing.todayEvents : [],
+        recommendations: Array.isArray(briefing.recommendations) ? briefing.recommendations : []
       }
-    } catch { /* fallback */ }
-
-    this.emitProgress(requestId, 'done', '완료', started)
-    return {
-      greeting: '오늘도 좋은 하루 보내세요!',
-      urgent: [], focus: [], mentioned: [], stale: [], todayEvents: [],
-      recommendations: ['태스크 목록을 확인해보세요.']
+      this.emitProgress(requestId, 'done', '완료', started)
+      return safe
+    } catch (err) {
+      this.emitProgress(requestId, 'done', '완료', started)
+      throw new Error(`AI JSON 파싱 실패: ${err instanceof Error ? err.message : String(err)}\n\n응답: ${jsonMatch[0].substring(0, 400)}`)
     }
   }
 

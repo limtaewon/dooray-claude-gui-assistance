@@ -30,12 +30,10 @@ export class CalendarService {
     if (this.calendarsCache && Date.now() - this.calendarsCache.timestamp < CalendarService.CAL_TTL) {
       return this.calendarsCache.data
     }
-    try {
-      const res = await this.client.request<DoorayListResponse<Calendar>>('/calendar/v1/calendars')
-      const data = res.result || []
-      this.calendarsCache = { data, timestamp: Date.now() }
-      return data
-    } catch { return [] }
+    const res = await this.client.request<DoorayListResponse<Calendar>>('/calendar/v1/calendars')
+    const data = res.result || []
+    this.calendarsCache = { data, timestamp: Date.now() }
+    return data
   }
 
   private async getMyCalendarIds(): Promise<string[]> {
@@ -51,24 +49,36 @@ export class CalendarService {
       // 와일드카드 패턴으로 한 번에 조회 시도
       const calendarParam = calendarIds.join(',')
       const res = await this.client.request<DoorayListResponse<DoorayCalendarEvent>>(
-        `/calendar/v1/calendars/*/events?timeMin=${encodeURIComponent(params.from)}&timeMax=${encodeURIComponent(params.to)}&calendars=${calendarParam}`
+        `/calendar/v1/calendars/*/events?timeMin=${encodeURIComponent(params.from)}&timeMax=${encodeURIComponent(params.to)}&calendars=${calendarParam}`,
+        { timeoutMs: 12000 }
       )
       const events = res.result || []
       return this.sortEvents(events)
-    } catch {
-      // 와일드카드 실패 시 개별 캘린더 조회로 폴백
+    } catch (wildcardErr) {
+      // 와일드카드 실패 시 개별 캘린더 조회로 폴백 (전체 캘린더 대상, 병렬)
       const allEvents: DoorayCalendarEvent[] = []
+      const seen = new Set<string>()
       const results = await Promise.allSettled(
-        calendarIds.slice(0, 5).map((calendarId) =>
+        calendarIds.map((calendarId) =>
           this.client.request<DoorayListResponse<DoorayCalendarEvent>>(
-            `/calendar/v1/calendars/${calendarId}/events?timeMin=${encodeURIComponent(params.from)}&timeMax=${encodeURIComponent(params.to)}&size=50`
+            `/calendar/v1/calendars/${calendarId}/events?timeMin=${encodeURIComponent(params.from)}&timeMax=${encodeURIComponent(params.to)}&size=50`,
+            { timeoutMs: 10000 }
           )
         )
       )
+      let failureCount = 0
       for (const result of results) {
         if (result.status === 'fulfilled') {
-          allEvents.push(...(result.value.result || []))
+          for (const ev of (result.value.result || [])) {
+            if (ev.id && !seen.has(ev.id)) { seen.add(ev.id); allEvents.push(ev) }
+          }
+        } else {
+          failureCount++
         }
+      }
+      // 모두 실패하면 상위 오류를 surface (UI에서 에러 표시)
+      if (allEvents.length === 0 && failureCount === calendarIds.length) {
+        throw new Error(`캘린더 조회 실패: ${wildcardErr instanceof Error ? wildcardErr.message : '알 수 없는 오류'}`)
       }
       return this.sortEvents(allEvents)
     }

@@ -11,7 +11,7 @@ import { WikiService } from './dooray/WikiService'
 import { CalendarService } from './dooray/CalendarService'
 import { MessengerService } from './dooray/MessengerService'
 import { WatcherService } from './watcher/WatcherService'
-import { AIService } from './ai/AIService'
+import { AIService, setUserAnthropicApiKey } from './ai/AIService'
 import Store from 'electron-store'
 import { TerminalManager } from './terminal/TerminalManager'
 import { SkillStore } from './skills/SkillStore'
@@ -82,6 +82,8 @@ function createWindow(): BrowserWindow {
   })
   // 저장된 모델 설정 로드
   aiService.setModelConfig((store.get('aiModelConfig', {}) as import('../shared/types/ai').AIModelConfig) || {})
+  // 저장된 Anthropic API 키 로드 (패키징 앱에서 키체인 접근 실패 시 대안)
+  setUserAnthropicApiKey((store.get('anthropicApiKey', '') as string) || null)
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
@@ -461,6 +463,9 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, (_, key: string) => store.get(key))
   ipcMain.handle(IPC_CHANNELS.SETTINGS_SET, (_, { key, value }: { key: string; value: unknown }) => {
     store.set(key, value)
+    if (key === 'anthropicApiKey') {
+      setUserAnthropicApiKey(typeof value === 'string' ? value : null)
+    }
   })
   ipcMain.handle(IPC_CHANNELS.SETTINGS_GET_PROJECTS, () =>
     store.get('pinnedProjects', []) as string[]
