@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
 import {
   RefreshCw, CheckCircle2, Circle, Clock, AlertCircle,
-  FolderOpen, ChevronRight, ChevronLeft, PanelLeftClose, PanelLeftOpen
+  FolderOpen, ChevronRight, ChevronLeft, PanelLeftClose, PanelLeftOpen, Search, X
 } from 'lucide-react'
 import type { DoorayTask, DoorayProject } from '../../../../shared/types/dooray'
 import TaskDetailPanel from './TaskDetailPanel'
@@ -179,14 +179,16 @@ function ProjectTaskView(): JSX.Element {
   const [sidebarWidth, setSidebarWidth] = useState(200)
   const [detailWidth, setDetailWidth] = useState(480)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [projectQuery, setProjectQuery] = useState('')
 
   const loadProjects = useCallback(async () => {
     setLoadingProjects(true)
     try {
-      const [allProjects, pinnedIds, customProjects] = await Promise.all([
+      const [allProjects, pinnedIds, customProjects, lastProjectId] = await Promise.all([
         window.api.dooray.projects.list(),
         window.api.settings.getProjects(),
-        window.api.settings.get('customProjects') as Promise<DoorayProject[] | null>
+        window.api.settings.get('customProjects') as Promise<DoorayProject[] | null>,
+        window.api.settings.get('lastSelectedProjectId') as Promise<string | null>
       ])
       // API 프로젝트 + 수동 추가 프로젝트 병합 (중복 제거)
       const merged = [...allProjects]
@@ -203,7 +205,9 @@ function ProjectTaskView(): JSX.Element {
       }
       setProjects(filtered)
       if (filtered.length > 0 && !selectedProject) {
-        setSelectedProject(filtered[0])
+        // 마지막 선택 프로젝트가 있으면 복원, 없으면 첫번째
+        const last = lastProjectId ? filtered.find((p) => p.id === lastProjectId) : null
+        setSelectedProject(last || filtered[0])
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '프로젝트 로드 실패')
@@ -255,7 +259,11 @@ function ProjectTaskView(): JSX.Element {
 
   useEffect(() => { loadProjects() }, [loadProjects])
   useEffect(() => {
-    if (selectedProject) { loadTasks(selectedProject.id); setSelectedTask(null); setWfFilter('전체'); setTagFilter('전체'); setSearchQuery(''); setRenderCount(50) }
+    if (selectedProject) {
+      loadTasks(selectedProject.id); setSelectedTask(null); setWfFilter('전체'); setTagFilter('전체'); setSearchQuery(''); setRenderCount(50)
+      // 마지막 선택 프로젝트 저장 (다음 세션에 복원)
+      window.api.settings.set('lastSelectedProjectId', selectedProject.id)
+    }
   }, [selectedProject, loadTasks])
 
   // 스크롤 하단 감지 → 추가 로드
@@ -357,11 +365,37 @@ function ProjectTaskView(): JSX.Element {
                 </button>
               </div>
             </div>
+            {/* 프로젝트 인라인 검색 */}
+            {projects.length > 5 && (
+              <div className="px-2 py-1.5 border-b border-bg-border">
+                <div className="relative">
+                  <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary" />
+                  <input
+                    type="text"
+                    value={projectQuery}
+                    onChange={(e) => setProjectQuery(e.target.value)}
+                    placeholder="프로젝트 검색"
+                    className="w-full pl-6 pr-6 py-1 bg-bg-primary border border-bg-border rounded text-[10px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue"
+                  />
+                  {projectQuery && (
+                    <button onClick={() => setProjectQuery('')}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary">
+                      <X size={10} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="flex-1 overflow-y-auto py-1">
               {loadingProjects ? (
                 <div className="text-[10px] text-text-tertiary text-center py-4">로딩...</div>
-              ) : (
-                projects.map((p) => {
+              ) : (() => {
+                const q = projectQuery.trim().toLowerCase()
+                const visible = q ? projects.filter((p) => p.code.toLowerCase().includes(q)) : projects
+                if (visible.length === 0) {
+                  return <div className="text-[10px] text-text-tertiary text-center py-4">검색 결과 없음</div>
+                }
+                return visible.map((p) => {
                   const isSelected = selectedProject?.id === p.id
                   return (
                     <button
@@ -378,7 +412,7 @@ function ProjectTaskView(): JSX.Element {
                     </button>
                   )
                 })
-              )}
+              })()}
             </div>
           </div>
           <ResizeHandle onResize={handleSidebarResize} />
