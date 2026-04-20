@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, X, Terminal, Trash2 } from 'lucide-react'
+import { Plus, X, Terminal, Trash2, FolderOpen, ChevronDown, Sparkles } from 'lucide-react'
 import TerminalPane from './TerminalPane'
 import type { TerminalSession } from '../../../../shared/types/terminal'
+
+type ShellMode = 'default' | 'claude'
 
 interface SessionWithOutput {
   session: TerminalSession
@@ -34,12 +36,27 @@ function TerminalView(): JSX.Element {
     })
   }, [])
 
-  const createSession = useCallback(async (cwd?: string) => {
-    const session = await window.api.terminal.create(cwd ? { cwd } : {})
-    const label = cwd ? (cwd.split('/').pop() || '~') : '~'
+  const createSession = useCallback(async (opts?: { cwd?: string; mode?: ShellMode }) => {
+    const cwd = opts?.cwd
+    const mode = opts?.mode || 'default'
+    const createOpts: { cwd?: string; command?: string; args?: string[] } = {}
+    if (cwd) createOpts.cwd = cwd
+    if (mode === 'claude') {
+      createOpts.command = 'claude'
+      createOpts.args = []
+    }
+    const session = await window.api.terminal.create(createOpts)
+    const base = cwd ? (cwd.split('/').pop() || '~') : '~'
+    const label = mode === 'claude' ? `claude ${base}` : base
     setEntries((prev) => [...prev, { session: { ...session, name: label } }])
     setActiveId(session.id)
   }, [])
+
+  const createSessionAtFolder = useCallback(async (mode: ShellMode = 'default') => {
+    const folder = await window.api.dialog.selectFolder()
+    if (!folder) return
+    await createSession({ cwd: folder, mode })
+  }, [createSession])
 
   const closeSession = useCallback(
     async (id: string) => {
@@ -70,8 +87,8 @@ function TerminalView(): JSX.Element {
   // 외부에서 터미널 생성 요청 수신 (BranchWorkspace 등)
   useEffect(() => {
     const handler = (e: Event): void => {
-      const { cwd } = (e as CustomEvent).detail || {}
-      createSession(cwd)
+      const { cwd, mode } = (e as CustomEvent).detail || {}
+      createSession({ cwd, mode })
     }
     window.addEventListener('create-terminal', handler)
     return () => window.removeEventListener('create-terminal', handler)
@@ -90,7 +107,7 @@ function TerminalView(): JSX.Element {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [activeId, createSession, closeSession])
+  }, [activeId, createSession, closeSession, entries])
 
   return (
     <div className="flex flex-col h-full bg-bg-primary">
@@ -108,11 +125,12 @@ function TerminalView(): JSX.Element {
             </button>
           </div>
         ))}
-        <button onClick={() => createSession()}
-          className="w-7 h-7 flex-shrink-0 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover"
-          title="새 터미널 (⌘T)">
-          <Plus size={14} />
-        </button>
+        <NewTerminalButton
+          onDefault={() => createSession()}
+          onClaude={() => createSession({ mode: 'claude' })}
+          onFolder={() => createSessionAtFolder('default')}
+          onFolderClaude={() => createSessionAtFolder('claude')}
+        />
         <span className="text-[9px] text-text-tertiary ml-1 flex-shrink-0">⌘T 새탭 · ⌘W 닫기</span>
         {entries.length >= 3 && (
           <button onClick={closeAll}
@@ -129,12 +147,22 @@ function TerminalView(): JSX.Element {
             <Terminal size={48} className="text-text-tertiary" />
             <div className="text-center">
               <p className="text-sm text-text-primary font-medium mb-1">터미널</p>
-              <p className="text-xs text-text-secondary mb-4">새 터미널 세션을 시작하세요</p>
+              <p className="text-xs text-text-secondary mb-4">일반 셸 또는 Claude Code를 시작하세요</p>
             </div>
-            <button onClick={() => createSession()}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-clover-blue text-white text-sm hover:bg-clover-blue/80">
-              <Terminal size={14} /> 새 터미널 열기
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => createSession()}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-clover-blue text-white text-sm hover:bg-clover-blue/80">
+                <Terminal size={14} /> 일반 터미널
+              </button>
+              <button onClick={() => createSession({ mode: 'claude' })}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-clover-orange to-clover-blue text-white text-sm hover:opacity-90">
+                <Sparkles size={14} /> Claude Code
+              </button>
+              <button onClick={() => createSessionAtFolder('default')}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-bg-surface border border-bg-border text-text-primary text-sm hover:bg-bg-surface-hover">
+                <FolderOpen size={14} /> 폴더 선택
+              </button>
+            </div>
             <p className="text-[10px] text-text-tertiary">⌘T로 언제든 새 탭을 열 수 있습니다</p>
           </div>
         ) : (
@@ -148,6 +176,61 @@ function TerminalView(): JSX.Element {
           ))
         )}
       </div>
+    </div>
+  )
+}
+
+/** 새 터미널 생성 버튼 + 드롭다운 (일반/Claude/폴더 선택) */
+function NewTerminalButton({ onDefault, onClaude, onFolder, onFolderClaude }: {
+  onDefault: () => void
+  onClaude: () => void
+  onFolder: () => void
+  onFolderClaude: () => void
+}): JSX.Element {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="relative flex-shrink-0">
+      <div className="flex items-center">
+        <button onClick={onDefault}
+          className="w-7 h-7 rounded-l flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover"
+          title="새 일반 터미널 (⌘T)">
+          <Plus size={14} />
+        </button>
+        <button onClick={() => setOpen(!open)}
+          className="w-4 h-7 rounded-r flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover border-l border-bg-border/50"
+          title="터미널 옵션">
+          <ChevronDown size={10} />
+        </button>
+      </div>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 w-56 bg-bg-surface border border-bg-border rounded-lg shadow-2xl z-40 py-1">
+            <button onClick={() => { setOpen(false); onDefault() }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-[11px] text-text-primary hover:bg-bg-surface-hover text-left">
+              <Terminal size={12} className="text-text-tertiary" />
+              <span className="flex-1">일반 터미널</span>
+              <span className="text-[9px] text-text-tertiary">⌘T</span>
+            </button>
+            <button onClick={() => { setOpen(false); onClaude() }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-[11px] text-text-primary hover:bg-bg-surface-hover text-left">
+              <Sparkles size={12} className="text-clover-orange" />
+              <span>Claude Code</span>
+            </button>
+            <div className="h-px bg-bg-border my-1" />
+            <button onClick={() => { setOpen(false); onFolder() }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-[11px] text-text-primary hover:bg-bg-surface-hover text-left">
+              <FolderOpen size={12} className="text-text-tertiary" />
+              <span>폴더 선택 후 일반 터미널</span>
+            </button>
+            <button onClick={() => { setOpen(false); onFolderClaude() }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-[11px] text-text-primary hover:bg-bg-surface-hover text-left">
+              <FolderOpen size={12} className="text-clover-orange" />
+              <span>폴더 선택 후 Claude Code</span>
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }
