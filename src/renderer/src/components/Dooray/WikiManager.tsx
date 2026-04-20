@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react'
-import { FolderOpen, ChevronRight, ChevronDown, RefreshCw, FileText, Sparkles, Loader2, Copy, Check, Search, PanelLeftClose, PanelLeftOpen, Upload, Eye, Edit3 } from 'lucide-react'
+import { FolderOpen, ChevronRight, ChevronDown, RefreshCw, FileText, Sparkles, Loader2, Copy, Check, Search, PanelLeftClose, PanelLeftOpen, Upload, Eye, Edit3, ArrowUp, ArrowDown } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -45,17 +45,39 @@ function WikiManager(): JSX.Element {
   const loadDomains = useCallback(async () => {
     setLoadingDomains(true)
     try {
-      const [list, pinnedWikis] = await Promise.all([
+      const [list, pinnedWikis, customOrder] = await Promise.all([
         window.api.dooray.wiki.domains(),
-        window.api.settings.get('pinnedWikis') as Promise<string[] | null>
+        window.api.settings.get('pinnedWikis') as Promise<string[] | null>,
+        window.api.settings.get('wikiDomainOrder') as Promise<string[] | null>
       ])
       const pinnedIds = pinnedWikis || []
       const filtered = pinnedIds.length > 0 ? list.filter((d) => pinnedIds.includes(d.id)) : list
-      const result = filtered.length > 0 ? filtered : list
-      setDomains(result)
-      if (result.length > 0 && !selectedDomain) setSelectedDomain(result[0])
+      const base = filtered.length > 0 ? filtered : list
+      // 사용자 정의 순서 적용 (커스텀 순서에 있는 것 먼저, 나머지는 기본 순서)
+      const order = customOrder || []
+      const byId = new Map(base.map((d) => [d.id, d]))
+      const ordered: WikiDomain[] = []
+      for (const id of order) {
+        const d = byId.get(id)
+        if (d) { ordered.push(d); byId.delete(id) }
+      }
+      for (const d of base) if (byId.has(d.id)) ordered.push(d)
+      setDomains(ordered)
+      if (ordered.length > 0 && !selectedDomain) setSelectedDomain(ordered[0])
     } catch {} finally { setLoadingDomains(false) }
   }, [])
+
+  const moveDomain = async (id: string, direction: -1 | 1): Promise<void> => {
+    const idx = domains.findIndex((d) => d.id === id)
+    if (idx < 0) return
+    const newIdx = idx + direction
+    if (newIdx < 0 || newIdx >= domains.length) return
+    const next = [...domains]
+    const [moved] = next.splice(idx, 1)
+    next.splice(newIdx, 0, moved)
+    setDomains(next)
+    await window.api.settings.set('wikiDomainOrder', next.map((d) => d.id))
+  }
 
   const loadRootPages = useCallback(async (domainId: string) => {
     setLoadingPages(true)
@@ -216,15 +238,32 @@ function WikiManager(): JSX.Element {
             </div>
           </div>
           <div className="flex-1 overflow-y-auto py-1">
-            {domains.map((d) => (
-              <button key={d.id} onClick={() => setSelectedDomain(d)}
-                className={`w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors ${
-                  selectedDomain?.id === d.id ? 'bg-clover-blue/10 text-clover-blue border-r-2 border-clover-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
-                }`}>
-                <FolderOpen size={11} className={`flex-shrink-0 ${selectedDomain?.id === d.id ? 'text-clover-blue' : 'text-text-tertiary'}`} />
-                <span className="text-[11px] font-medium truncate min-w-0">{d.name}</span>
-              </button>
-            ))}
+            {domains.map((d, idx) => {
+              const isSelected = selectedDomain?.id === d.id
+              return (
+                <div key={d.id} className="flex items-center group">
+                  <button onClick={() => setSelectedDomain(d)}
+                    className={`flex-1 flex items-center gap-2 px-3 py-1.5 text-left transition-colors ${
+                      isSelected ? 'bg-clover-blue/10 text-clover-blue border-r-2 border-clover-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
+                    }`}>
+                    <FolderOpen size={11} className={`flex-shrink-0 ${isSelected ? 'text-clover-blue' : 'text-text-tertiary'}`} />
+                    <span className="text-[11px] font-medium truncate min-w-0">{d.name}</span>
+                  </button>
+                  <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity mr-1">
+                    <button onClick={() => moveDomain(d.id, -1)} disabled={idx === 0}
+                      className="p-0.5 text-text-tertiary hover:text-text-primary disabled:opacity-30 disabled:hover:text-text-tertiary"
+                      title="위로">
+                      <ArrowUp size={9} />
+                    </button>
+                    <button onClick={() => moveDomain(d.id, 1)} disabled={idx === domains.length - 1}
+                      className="p-0.5 text-text-tertiary hover:text-text-primary disabled:opacity-30 disabled:hover:text-text-tertiary"
+                      title="아래로">
+                      <ArrowDown size={9} />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
