@@ -9,6 +9,8 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -32,9 +34,7 @@ jobs:
           npm_config_python: ${{ steps.python.outputs.python-path }}
 
       - name: Build Windows exe
-        run: npm run dist:win
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run dist:win -- --publish never
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
