@@ -55,17 +55,29 @@ export class CalendarService {
       const events = res.result || []
       return this.sortEvents(events)
     } catch (wildcardErr) {
-      // 와일드카드 실패 시 개별 캘린더 조회로 폴백 (전체 캘린더 대상, 병렬)
+      // 와일드카드 실패 시 개별 캘린더 조회로 폴백
+      // 동시 호출 4개로 제한해서 Rate limiter 보호
       const allEvents: DoorayCalendarEvent[] = []
       const seen = new Set<string>()
-      const results = await Promise.allSettled(
-        calendarIds.map((calendarId) =>
-          this.client.request<DoorayListResponse<DoorayCalendarEvent>>(
-            `/calendar/v1/calendars/${calendarId}/events?timeMin=${encodeURIComponent(params.from)}&timeMax=${encodeURIComponent(params.to)}&size=50`,
-            { timeoutMs: 10000 }
-          )
-        )
-      )
+      const CONCURRENCY = 4
+      const results: PromiseSettledResult<DoorayListResponse<DoorayCalendarEvent>>[] = new Array(calendarIds.length)
+      let nextIdx = 0
+      const workers = Array.from({ length: Math.min(CONCURRENCY, calendarIds.length) }, async () => {
+        while (true) {
+          const i = nextIdx++
+          if (i >= calendarIds.length) return
+          try {
+            const value = await this.client.request<DoorayListResponse<DoorayCalendarEvent>>(
+              `/calendar/v1/calendars/${calendarIds[i]}/events?timeMin=${encodeURIComponent(params.from)}&timeMax=${encodeURIComponent(params.to)}&size=50`,
+              { timeoutMs: 10000 }
+            )
+            results[i] = { status: 'fulfilled', value }
+          } catch (err) {
+            results[i] = { status: 'rejected', reason: err }
+          }
+        }
+      })
+      await Promise.all(workers)
       let failureCount = 0
       for (const result of results) {
         if (result.status === 'fulfilled') {

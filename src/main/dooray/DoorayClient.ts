@@ -39,10 +39,29 @@ export class DoorayClient {
   }
 
   // electron.net.request 사용 - fetch와 달리 리다이렉트 시 Authorization 헤더 유지
-  async request<T>(path: string, options: { method?: string; body?: string; timeoutMs?: number } = {}): Promise<T> {
+  async request<T>(path: string, options: { method?: string; body?: string; timeoutMs?: number; retryOn429?: number } = {}): Promise<T> {
     const token = await this.getToken()
     if (!token) throw new Error('Dooray API 토큰이 설정되지 않았습니다')
 
+    // 429 발생 시 backoff 후 재시도 (기본 2회까지)
+    const maxRetries = options.retryOn429 ?? 2
+    let attempt = 0
+    while (true) {
+      try {
+        return await this.requestOnce<T>(path, options, token)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        const is429 = msg.includes('(429)')
+        if (!is429 || attempt >= maxRetries) throw err
+        attempt++
+        const waitMs = 1000 * Math.pow(2, attempt - 1) // 1s, 2s, 4s
+        console.warn(`[DoorayClient] 429 rate limit hit on ${path}, retry ${attempt}/${maxRetries} after ${waitMs}ms`)
+        await new Promise((r) => setTimeout(r, waitMs))
+      }
+    }
+  }
+
+  private requestOnce<T>(path: string, options: { method?: string; body?: string; timeoutMs?: number }, token: string): Promise<T> {
     const url = `${BASE_URL}${path}`
     const timeoutMs = options.timeoutMs ?? 15000
 

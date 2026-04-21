@@ -32,6 +32,11 @@ export class TaskService {
   private static CACHE_TTL = 3 * 60 * 1000 // 3분
   private static PROJECT_LIST_TTL = 10 * 60 * 1000 // 10분
 
+  /** 동시 API 호출 개수 제한 (두레이 Rate Limiter 보호) */
+  private static MAX_CONCURRENT = 4
+  /** in-flight listMyTasks promise dedupe (같은 key로 동시 요청 시 한 번만 실행) */
+  private inFlightListMyTasks: Map<string, Promise<DoorayTask[]>> = new Map()
+
   constructor(private client: DoorayClient) {}
 
   setMainWindow(win: BrowserWindow): void {
@@ -154,7 +159,8 @@ export class TaskService {
     }
 
     const size = 100
-    const MAX_PAGES = 5
+    // 페이지를 2로 줄여 전체 호출 수 대폭 감소 (200개 이내는 대부분 1-2페이지로 충분)
+    const MAX_PAGES = 2
     const project = this.projectCache.get(projectId)
     const tStart = Date.now()
 
@@ -223,6 +229,19 @@ export class TaskService {
   }
 
   async listMyTasks(projectIds?: string[]): Promise<DoorayTask[]> {
+    // in-flight dedupe: 대시보드/다른 탭이 동시에 호출해도 실제 요청은 한 번만
+    const key = projectIds?.join(',') || '__ALL__'
+    const existing = this.inFlightListMyTasks.get(key)
+    if (existing) return existing
+
+    const promise = this.runListMyTasks(projectIds).finally(() => {
+      this.inFlightListMyTasks.delete(key)
+    })
+    this.inFlightListMyTasks.set(key, promise)
+    return promise
+  }
+
+  private async runListMyTasks(projectIds?: string[]): Promise<DoorayTask[]> {
     const memberId = await this.getMyMemberId()
 
     let ids: string[]
@@ -236,11 +255,11 @@ export class TaskService {
     const allTasks: DoorayTask[] = []
     const seen = new Set<string>()
 
-    // 병렬 조회 (최대 20개 프로젝트)
-    const results = await Promise.allSettled(
-      ids.slice(0, 20).map((projectId) =>
-        this.fetchTasksForProject(projectId, memberId)
-      )
+    // 동시 요청을 MAX_CONCURRENT 로 제한해서 두레이 Rate Limiter 보호
+    const results = await mapWithConcurrency(
+      ids.slice(0, 20),
+      TaskService.MAX_CONCURRENT,
+      (projectId) => this.fetchTasksForProject(projectId, memberId)
     )
 
     for (const result of results) {
@@ -278,8 +297,10 @@ export class TaskService {
     const allTasks: DoorayTask[] = []
     const seen = new Set<string>()
 
-    const results = await Promise.allSettled(
-      ids.slice(0, 20).map(async (projectId) => {
+    const results = await mapWithConcurrency(
+      ids.slice(0, 20),
+      TaskService.MAX_CONCURRENT,
+      async (projectId) => {
         try {
           const res = await this.client.request<DoorayListResponse<DoorayTask>>(
             `/project/v1/projects/${projectId}/posts?ccMemberIds=${memberId}&postWorkflowClasses=registered,working&size=50&page=0&order=-createdAt`
@@ -287,7 +308,7 @@ export class TaskService {
           const project = this.projectCache.get(projectId)
           return (res.result || []).map((t) => { t.projectId = projectId; t.projectCode = project?.code; return t })
         } catch { return [] }
-      })
+      }
     )
 
     for (const result of results) {
@@ -306,15 +327,17 @@ export class TaskService {
     const memberId = await this.getMyMemberId()
     const projects = await this.listMyProjects()
     const allTasks: DoorayTask[] = []
-    const results = await Promise.allSettled(
-      projects.slice(0, 20).map(async (p) => {
+    const results = await mapWithConcurrency(
+      projects.slice(0, 20),
+      TaskService.MAX_CONCURRENT,
+      async (p) => {
         try {
           const res = await this.client.request<DoorayListResponse<DoorayTask>>(
             `/project/v1/projects/${p.id}/posts?toMemberIds=${memberId}&dueAt=today&postWorkflowClasses=registered,working&size=50`
           )
           return (res.result || []).map((t) => { t.projectId = p.id; t.projectCode = p.code; return t })
         } catch { return [] }
-      })
+      }
     )
     for (const r of results) { if (r.status === 'fulfilled') allTasks.push(...r.value) }
     return allTasks
@@ -325,15 +348,17 @@ export class TaskService {
     const memberId = await this.getMyMemberId()
     const projects = await this.listMyProjects()
     const allTasks: DoorayTask[] = []
-    const results = await Promise.allSettled(
-      projects.slice(0, 20).map(async (p) => {
+    const results = await mapWithConcurrency(
+      projects.slice(0, 20),
+      TaskService.MAX_CONCURRENT,
+      async (p) => {
         try {
           const res = await this.client.request<DoorayListResponse<DoorayTask>>(
             `/project/v1/projects/${p.id}/posts?toMemberIds=${memberId}&dueAt=thisweek&postWorkflowClasses=registered,working&size=50`
           )
           return (res.result || []).map((t) => { t.projectId = p.id; t.projectCode = p.code; return t })
         } catch { return [] }
-      })
+      }
     )
     for (const r of results) { if (r.status === 'fulfilled') allTasks.push(...r.value) }
     return allTasks
@@ -588,4 +613,29 @@ export class TaskService {
     })
     return { posts, totalCount: res.totalCount || posts.length }
   }
+}
+
+/** 동시 실행 수를 제한하는 Promise.allSettled.
+ * Rate limiter 보호용 — 전체 결과는 순서 보존. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>
+): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = new Array(items.length)
+  let nextIdx = 0
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (true) {
+      const i = nextIdx++
+      if (i >= items.length) return
+      try {
+        const value = await fn(items[i], i)
+        results[i] = { status: 'fulfilled', value }
+      } catch (err) {
+        results[i] = { status: 'rejected', reason: err }
+      }
+    }
+  })
+  await Promise.all(workers)
+  return results
 }
