@@ -47,6 +47,7 @@ const listeners = new Set<(t: Theme) => void>()
 
 function setSharedTheme(next: Theme): void {
   if (sharedTheme === next) return
+  console.log(`[useTheme] setSharedTheme ${sharedTheme} → ${next}`, new Error('stack').stack?.split('\n').slice(1, 5).join(' → '))
   sharedTheme = next
   localStorage.setItem(STORAGE_KEY, next)
   applyTheme(next)
