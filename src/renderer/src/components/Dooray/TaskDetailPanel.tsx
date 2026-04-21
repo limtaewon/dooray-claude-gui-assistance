@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Sparkles, Play, ExternalLink, Clock, User, MessageCircle } from 'lucide-react'
+import { X, Sparkles, Play, ExternalLink, Clock, User, MessageCircle, GitPullRequest, Loader2, Check, AlertCircle } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -24,6 +24,13 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
   const [summarizing, setSummarizing] = useState(false)
   const [comments, setComments] = useState<DoorayTaskComment[]>([])
   const [loadingComments, setLoadingComments] = useState(false)
+
+  // AI 코드리뷰 → 코멘트 상태
+  const [reviewing, setReviewing] = useState(false)
+  const [reviewPreview, setReviewPreview] = useState<string | null>(null)
+  const [reviewRepoPath, setReviewRepoPath] = useState<string>('')
+  const [posting, setPosting] = useState(false)
+  const [reviewStatus, setReviewStatus] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
   useEffect(() => {
     const load = async (): Promise<void> => {
@@ -63,6 +70,74 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
     }
   }
 
+  /** AI 코드리뷰 → 태스크 코멘트 초안 생성 */
+  const handleCodeReview = async (): Promise<void> => {
+    setReviewStatus(null)
+    setReviewPreview(null)
+    let path = reviewRepoPath
+    if (!path) {
+      const selected = await window.api.dialog.selectFolder()
+      if (!selected) return
+      path = selected
+      setReviewRepoPath(selected)
+    }
+    setReviewing(true)
+    try {
+      const isRepo = await window.api.git.isRepo(path)
+      if (!isRepo) throw new Error('선택한 폴더는 Git 저장소가 아닙니다')
+      const diff = await window.api.git.diff(path)
+      if (!diff.patch || diff.patch.trim().length === 0) {
+        throw new Error('변경사항이 없습니다. 리뷰할 diff가 비어있습니다.')
+      }
+      const trimmed = diff.patch.substring(0, 20000)
+      const prompt = `다음 git diff를 코드 리뷰하세요. 두레이 태스크 "${task.subject}"에 대한 변경사항입니다.
+
+[변경 파일]
+${diff.files.map((f) => `- ${f.status} ${f.file} (+${f.additions}/-${f.deletions})`).join('\n')}
+
+[diff]
+\`\`\`diff
+${trimmed}
+\`\`\`
+
+리뷰 지침:
+- 마크다운으로 작성, 두레이 태스크에 그대로 코멘트로 붙여넣을 수 있도록
+- 섹션: ## 요약 / ## 잘된 점 / ## 개선 제안 / ## 버그·리스크
+- 구체적인 파일:라인 언급, 짧고 실행 가능한 제안 위주
+- 없는 섹션은 생략`
+
+      const result = await window.api.ai.ask({ prompt, feature: 'wikiProofread' })
+      setReviewPreview(result)
+    } catch (err) {
+      setReviewStatus({ type: 'err', text: err instanceof Error ? err.message : '코드리뷰 실패' })
+    } finally {
+      setReviewing(false)
+    }
+  }
+
+  const postReviewAsComment = async (): Promise<void> => {
+    if (!reviewPreview) return
+    setPosting(true); setReviewStatus(null)
+    try {
+      await window.api.dooray.tasks.createComment({
+        projectId: task.projectId,
+        postId: task.id,
+        content: reviewPreview
+      })
+      setReviewStatus({ type: 'ok', text: '두레이 태스크에 코멘트가 작성되었습니다' })
+      setReviewPreview(null)
+      // 댓글 목록 새로고침
+      try {
+        const list = await window.api.dooray.tasks.comments(task.projectId, task.id)
+        setComments(list)
+      } catch { /* ok */ }
+    } catch (err) {
+      setReviewStatus({ type: 'err', text: err instanceof Error ? err.message : '코멘트 작성 실패' })
+    } finally {
+      setPosting(false)
+    }
+  }
+
   const bodyContent = detail?.body?.content || ''
   const wfName = task.workflow?.name || task.workflowName || task.workflowClass
 
@@ -91,17 +166,58 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
       </div>
 
       {/* 액션 버튼 */}
-      <div className="flex gap-2 p-3 border-b border-bg-border flex-shrink-0">
+      <div className="flex gap-2 p-3 border-b border-bg-border flex-shrink-0 flex-wrap">
         <button onClick={handleSummarize} disabled={summarizing}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-clover-orange/20 to-clover-blue/20 border border-clover-orange/30 text-xs font-medium text-text-primary hover:from-clover-orange/30 hover:to-clover-blue/30 transition-all disabled:opacity-50">
           <Sparkles size={12} className={`text-clover-orange ${summarizing ? 'animate-pulse' : ''}`} />
           {summarizing ? 'AI 분석 중...' : 'AI 분석'}
+        </button>
+        <button onClick={handleCodeReview} disabled={reviewing}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20 transition-all disabled:opacity-50"
+          title="현재 작업 중인 git 저장소의 diff를 AI가 리뷰하여 두레이 코멘트 초안을 만듭니다">
+          {reviewing ? <Loader2 size={12} className="animate-spin" /> : <GitPullRequest size={12} />}
+          {reviewing ? '리뷰 중...' : 'AI 코드리뷰'}
         </button>
         <a href={`https://nhnent.dooray.com/project/posts/${task.id}`} target="_blank" rel="noopener noreferrer"
           className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-clover-blue/10 border border-clover-blue/30 text-xs text-clover-blue hover:bg-clover-blue/20 transition-all">
           <ExternalLink size={12} /> 두레이에서 보기
         </a>
       </div>
+
+      {/* AI 코드리뷰 미리보기 */}
+      {reviewPreview && (
+        <div className="mx-3 mt-3 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/30 flex-shrink-0 max-h-[40vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-2 sticky top-0 bg-bg-primary/80 backdrop-blur-sm py-1">
+            <div className="flex items-center gap-1.5">
+              <GitPullRequest size={12} className="text-emerald-400" />
+              <span className="text-[11px] font-semibold text-emerald-400">AI 코드리뷰 코멘트 미리보기</span>
+              <span className="text-[9px] text-text-tertiary">{reviewRepoPath}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={postReviewAsComment} disabled={posting}
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50">
+                {posting ? <Loader2 size={9} className="animate-spin" /> : <MessageCircle size={9} />}
+                {posting ? '게시 중...' : '코멘트로 게시'}
+              </button>
+              <button onClick={() => setReviewPreview(null)} className="text-text-tertiary hover:text-text-secondary">
+                <X size={11} />
+              </button>
+            </div>
+          </div>
+          <div className="markdown-body text-xs leading-relaxed">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>{reviewPreview}</ReactMarkdown>
+          </div>
+        </div>
+      )}
+      {reviewStatus && (
+        <div className={`mx-3 mt-2 flex items-center gap-1.5 px-3 py-2 rounded-md text-[11px] ${
+          reviewStatus.type === 'ok' ? 'bg-emerald-400/10 text-emerald-400 border border-emerald-400/30'
+            : 'bg-red-500/10 text-red-400 border border-red-500/30'
+        }`}>
+          {reviewStatus.type === 'ok' ? <Check size={11} /> : <AlertCircle size={11} />}
+          {reviewStatus.text}
+        </div>
+      )}
 
       {/* AI 요약 */}
       {summary && (
