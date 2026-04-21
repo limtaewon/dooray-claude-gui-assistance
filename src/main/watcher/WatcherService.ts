@@ -172,8 +172,19 @@ export class WatcherService {
     const cutoff = new Date(Date.now() - RETENTION_MS).toISOString()
 
     const existing = this.allMessages()
-    const existingIds = new Set(existing.map((m) => m.id))
+    const existingById = new Map(existing.map((m) => [m.id, m]))
     const newMessages: CollectedMessage[] = []
+    const updatedIds: Array<{ id: string; authorName: string; text: string }> = []
+
+    // 채널별 매칭된 로그를 먼저 모은 뒤, 멤버 이름을 일괄 조회 후 메시지 생성
+    const matchedPerChannel: Array<{
+      channelId: string
+      channelName: string
+      log: DoorayChannelLog
+      text: string
+      createdAt: string
+      matchedTerms: string[]
+    }> = []
 
     for (let i = 0; i < watcher.channelIds.length; i++) {
       const channelId = watcher.channelIds[i]
@@ -188,10 +199,6 @@ export class WatcherService {
         continue
       }
       console.log(`[WatcherService] ${watcher.name} / ${channelName}: ${logs.length}건 fetched`)
-      if (logs.length > 0) {
-        const sample = logs[0]
-        console.log(`[WatcherService] sender:`, JSON.stringify(sample.sender).substring(0, 300))
-      }
 
       let matchedCount = 0
       for (const log of logs) {
@@ -205,40 +212,65 @@ export class WatcherService {
         const matched = matchFilter(text, watcher.filter)
         if (!matched) continue
         matchedCount++
-
-        const authorName =
-          log.sender?.name ||
-          log.creator?.member?.name ||
-          '알 수 없음'
-        const authorId =
-          log.sender?.organizationMemberId ||
-          log.creator?.member?.organizationMemberId
-
-        const msg: CollectedMessage = {
-          id: hashId(watcher.id, channelId, log.id),
-          watcherId: watcher.id,
-          channelId,
-          channelName,
-          messageId: log.id,
-          text,
-          authorName,
-          authorId,
-          createdAt,
-          matchedTerms: matched.terms,
-          read: false
-        }
-        if (!existingIds.has(msg.id)) {
-          existingIds.add(msg.id)
-          newMessages.push(msg)
-        }
+        matchedPerChannel.push({ channelId, channelName, log, text, createdAt, matchedTerms: matched.terms })
       }
       console.log(`[WatcherService] ${watcher.name} / ${channelName}: 매치 ${matchedCount}개`)
     }
 
-    if (newMessages.length > 0) {
-      const all = [...existing, ...newMessages]
+    // 매칭된 메시지들의 sender 멤버 ID 모아서 일괄 이름 조회 (API 호출 최소화)
+    const memberIds = new Set<string>()
+    for (const m of matchedPerChannel) {
+      const id = m.log.sender?.organizationMemberId || m.log.creator?.member?.organizationMemberId
+      if (id) memberIds.add(id)
+    }
+    await this.messenger.resolveMemberNames(Array.from(memberIds))
+
+    // 메시지 객체 생성
+    for (const m of matchedPerChannel) {
+      const authorId = m.log.sender?.organizationMemberId || m.log.creator?.member?.organizationMemberId
+      const nameFromLog = m.log.sender?.name || m.log.creator?.member?.name
+      const resolvedName = authorId ? await this.messenger.getMemberName(authorId) : ''
+      const authorName = nameFromLog || resolvedName || '알 수 없음'
+
+      const msgId = hashId(watcher.id, m.channelId, m.log.id)
+      const prev = existingById.get(msgId)
+      if (prev) {
+        // 이미 저장된 메시지는 authorName/text만 보정 (이전 '알 수 없음' 또는 JSON 원본 케이스)
+        const needsNameFix = prev.authorName === '알 수 없음' && authorName !== '알 수 없음'
+        const needsTextFix = prev.text !== m.text
+        if (needsNameFix || needsTextFix) {
+          updatedIds.push({ id: msgId, authorName, text: m.text })
+        }
+        continue
+      }
+      const msg: CollectedMessage = {
+        id: msgId,
+        watcherId: watcher.id,
+        channelId: m.channelId,
+        channelName: m.channelName,
+        messageId: m.log.id,
+        text: m.text,
+        authorName,
+        authorId,
+        createdAt: m.createdAt,
+        matchedTerms: m.matchedTerms,
+        read: false
+      }
+      existingById.set(msgId, msg)
+      newMessages.push(msg)
+    }
+
+    if (newMessages.length > 0 || updatedIds.length > 0) {
+      const updateMap = new Map(updatedIds.map((u) => [u.id, u]))
+      const updatedExisting = existing.map((m) => {
+        const u = updateMap.get(m.id)
+        return u ? { ...m, authorName: u.authorName, text: u.text } : m
+      })
+      const all = [...updatedExisting, ...newMessages]
       this.store.set('messages', all)
-      this.emitNewMessages(watcher.id, newMessages)
+      if (newMessages.length > 0) {
+        this.emitNewMessages(watcher.id, newMessages)
+      }
     }
 
     // 마지막 체크 시각 갱신
@@ -274,20 +306,72 @@ function hashId(watcherId: string, channelId: string, messageId: string): string
 
 function extractText(log: DoorayChannelLog): string {
   // 가능한 본문 필드를 순서대로 시도 (두레이 메신저 로그 필드명 변동 대응)
-  if (typeof log.text === 'string' && log.text.trim()) return log.text
-  if (typeof log.message === 'string' && log.message.trim()) return log.message
-  if (typeof log.messageText === 'string' && log.messageText.trim()) return log.messageText
-  if (typeof log.content === 'string' && log.content.trim()) return log.content
-  if (typeof log.body === 'string' && log.body.trim()) return log.body
+  const candidates: string[] = []
+  if (typeof log.text === 'string' && log.text.trim()) candidates.push(log.text)
+  if (typeof log.message === 'string' && log.message.trim()) candidates.push(log.message)
+  if (typeof log.messageText === 'string' && log.messageText.trim()) candidates.push(log.messageText)
+  if (typeof log.content === 'string' && log.content.trim()) candidates.push(log.content)
+  if (typeof log.body === 'string' && log.body.trim()) candidates.push(log.body)
   if (log.content && typeof log.content === 'object' && 'content' in log.content) {
     const c = (log.content as { content?: unknown }).content
-    if (typeof c === 'string' && c.trim()) return c
+    if (typeof c === 'string' && c.trim()) candidates.push(c)
   }
   if (log.body && typeof log.body === 'object' && 'content' in log.body) {
     const c = (log.body as { content?: unknown }).content
-    if (typeof c === 'string' && c.trim()) return c
+    if (typeof c === 'string' && c.trim()) candidates.push(c)
+  }
+  for (const raw of candidates) {
+    const plain = unwrapRichText(raw)
+    if (plain) return plain
   }
   return ''
+}
+
+/**
+ * 봇/웹훅이 보내는 rich-text JSON 포맷을 평문으로 변환.
+ * 예: '{"type":0,"text":"...","attachments":[...]}' → "..."
+ * 예: '{"blocks":[{"text":"..."}, ...]}' → 텍스트 합침
+ * 파싱 실패 시 원본 반환.
+ */
+function unwrapRichText(raw: string): string {
+  const trimmed = raw.trim()
+  // JSON 객체/배열로 시작하지 않으면 그냥 평문
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return trimmed
+  try {
+    const parsed = JSON.parse(trimmed)
+    const pieces: string[] = []
+    collectText(parsed, pieces)
+    const joined = pieces.join('\n').trim()
+    return joined || trimmed
+  } catch {
+    return trimmed
+  }
+}
+
+function collectText(node: unknown, out: string[]): void {
+  if (node == null) return
+  if (typeof node === 'string') {
+    if (node.trim()) out.push(node)
+    return
+  }
+  if (Array.isArray(node)) {
+    for (const child of node) collectText(child, out)
+    return
+  }
+  if (typeof node === 'object') {
+    const obj = node as Record<string, unknown>
+    // 우선순위 높은 텍스트 필드
+    for (const key of ['text', 'content', 'title', 'pretext', 'fallback', 'message']) {
+      const v = obj[key]
+      if (typeof v === 'string' && v.trim()) out.push(v)
+      else if (v && typeof v === 'object') collectText(v, out)
+    }
+    // 블록/첨부 구조 재귀
+    for (const key of ['blocks', 'attachments', 'elements', 'fields']) {
+      const v = obj[key]
+      if (v) collectText(v, out)
+    }
+  }
 }
 
 /** FilterRule 매칭. 매치되면 어떤 용어가 맞았는지 반환 */

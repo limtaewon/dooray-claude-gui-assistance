@@ -51,8 +51,34 @@ interface DoorayChannelRaw {
 export class MessengerService {
   private channelCache: { data: DoorayChannel[]; at: number } | null = null
   private static CACHE_TTL = 60 * 1000 // 1분
+  private memberNameCache: Map<string, string> = new Map()
 
   constructor(private client: DoorayClient) {}
+
+  /** 멤버 ID → 이름 조회 (캐시). 실패 시 빈 문자열. */
+  async getMemberName(memberId: string): Promise<string> {
+    if (!memberId) return ''
+    if (this.memberNameCache.has(memberId)) return this.memberNameCache.get(memberId)!
+    try {
+      const res = await this.client.request<{ result: { name: string } }>(
+        `/common/v1/members/${memberId}`
+      )
+      const name = res.result?.name || ''
+      this.memberNameCache.set(memberId, name)
+      return name
+    } catch {
+      // 실패 케이스도 캐시 (계속 재시도 방지)
+      this.memberNameCache.set(memberId, '')
+      return ''
+    }
+  }
+
+  /** 여러 멤버 ID를 병렬로 이름 조회 (내부적으로 캐시됨) */
+  async resolveMemberNames(memberIds: string[]): Promise<void> {
+    const unknown = memberIds.filter((id) => id && !this.memberNameCache.has(id))
+    if (unknown.length === 0) return
+    await Promise.allSettled(unknown.map((id) => this.getMemberName(id)))
+  }
 
   async listChannels(force = false): Promise<DoorayChannel[]> {
     const now = Date.now()
