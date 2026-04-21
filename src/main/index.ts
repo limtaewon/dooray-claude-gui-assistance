@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, dialog, Menu } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { McpConfigManager } from './config/McpConfigManager'
@@ -850,7 +850,71 @@ ${data}`,
   })
 }
 
+/**
+ * 커스텀 애플리케이션 메뉴 설치.
+ * 기본 Electron 메뉴는 Cmd+W(Close), Cmd+M(Minimize), Cmd+1-9(Window 전환) 등을
+ * renderer보다 먼저 가로채므로, 앱 내 단축키(⌘T/⌘W/⌘1~9 터미널 탭)가 동작하지 않음.
+ * 필수 항목만 유지한 커스텀 메뉴로 충돌 제거.
+ */
+function installAppMenu(): void {
+  const isMac = process.platform === 'darwin'
+  const template: Electron.MenuItemConstructorOptions[] = [
+    ...(isMac ? [{
+      label: app.name,
+      submenu: [
+        { role: 'about' as const },
+        { type: 'separator' as const },
+        { role: 'hide' as const },
+        { role: 'hideOthers' as const },
+        { role: 'unhide' as const },
+        { type: 'separator' as const },
+        { role: 'quit' as const }
+      ]
+    }] : []),
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' }
+      ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload', accelerator: 'CmdOrCtrl+Shift+R' },
+        { role: 'forceReload', accelerator: 'CmdOrCtrl+Shift+Alt+R' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }
+      ]
+    },
+    {
+      label: 'Window',
+      // Cmd+W(close), Cmd+M(minimize), Cmd+1-9 같은 앱 내 단축키와 충돌하는 기본 항목 제거
+      submenu: [
+        { label: 'Minimize', accelerator: '', click: () => BrowserWindow.getFocusedWindow()?.minimize() },
+        { label: 'Zoom', click: () => {
+          const w = BrowserWindow.getFocusedWindow()
+          if (w) w.isMaximized() ? w.unmaximize() : w.maximize()
+        }},
+        ...(isMac ? [{ type: 'separator' as const }, { role: 'front' as const }] : [])
+      ]
+    }
+  ]
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
+
 app.whenReady().then(() => {
+  installAppMenu()
   registerIpcHandlers()
   configWatcher.start()
   createWindow()
