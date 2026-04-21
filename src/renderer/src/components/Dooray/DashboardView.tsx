@@ -52,13 +52,20 @@ function DashboardView(): JSX.Element {
   useEffect(() => { load() }, [load])
 
   // 선택한 프로젝트의 두레이 템플릿 목록 로드
+  const [templatesError, setTemplatesError] = useState<string | null>(null)
   useEffect(() => {
-    if (!nlProject) { setTemplates([]); return }
+    if (!nlProject) { setTemplates([]); setTemplatesError(null); return }
     let cancelled = false
     setTemplatesLoading(true)
+    setTemplatesError(null)
     window.api.dooray.tasks.templates(nlProject)
-      .then((list) => { if (!cancelled) setTemplates(list || []) })
-      .catch(() => { if (!cancelled) setTemplates([]) })
+      .then((list) => { if (!cancelled) { setTemplates(list || []); setTemplatesError(null) } })
+      .catch((err) => {
+        if (!cancelled) {
+          setTemplates([])
+          setTemplatesError(err instanceof Error ? err.message : '템플릿 불러오기 실패')
+        }
+      })
       .finally(() => { if (!cancelled) setTemplatesLoading(false) })
     return () => { cancelled = true }
   }, [nlProject])
@@ -165,25 +172,29 @@ JSON 형태로만 응답하세요 (설명/머리말 없이):
             <h3 className="text-sm font-semibold text-text-primary">자연어로 태스크 생성</h3>
             <span className="text-[10px] text-text-tertiary">AI가 제목과 본문을 구조화해서 두레이에 생성합니다</span>
             <div className="ml-auto flex items-center gap-1">
-              {/* 두레이 템플릿 드롭다운 */}
+              {/* 두레이 템플릿 드롭다운 — 스킬 버튼과 동일한 사이즈 */}
               <div className="relative">
                 <button
                   onClick={() => setTemplateMenuOpen(!templateMenuOpen)}
                   disabled={!nlProject || templatesLoading}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] bg-bg-primary border border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light disabled:opacity-40"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-all bg-bg-surface border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light disabled:opacity-40"
                   title={nlProject ? '두레이 프로젝트 템플릿에서 불러오기' : '프로젝트를 먼저 선택하세요'}
                 >
-                  {templatesLoading ? <Loader2 size={10} className="animate-spin" /> : <FileText size={10} />}
-                  템플릿 {templates.length > 0 && <span className="text-text-tertiary">({templates.length})</span>}
-                  <ChevronDown size={9} />
+                  {templatesLoading ? <Loader2 size={12} className="animate-spin" /> : <FileText size={12} />}
+                  템플릿{templates.length > 0 ? ` ${templates.length}` : ''}
+                  <ChevronDown size={10} />
                 </button>
                 {templateMenuOpen && (
                   <>
                     <div className="fixed inset-0 z-30" onClick={() => setTemplateMenuOpen(false)} />
-                    <div className="absolute right-0 top-full mt-1 w-64 bg-bg-surface border border-bg-border rounded-lg shadow-2xl z-40 py-1 max-h-72 overflow-y-auto">
-                      {templates.length === 0 ? (
-                        <div className="px-3 py-2 text-[10px] text-text-tertiary">
-                          이 프로젝트에 저장된 템플릿이 없습니다
+                    <div className="absolute right-0 top-full mt-1 w-72 bg-bg-surface border border-bg-border rounded-lg shadow-2xl z-40 py-1 max-h-72 overflow-y-auto">
+                      {templatesError ? (
+                        <div className="px-3 py-2 text-[10px] text-red-400 whitespace-pre-wrap">
+                          템플릿 불러오기 실패:{'\n'}{templatesError}
+                        </div>
+                      ) : templates.length === 0 ? (
+                        <div className="px-3 py-2 text-[11px] text-text-tertiary">
+                          {templatesLoading ? '불러오는 중...' : '이 프로젝트에 저장된 템플릿이 없습니다'}
                         </div>
                       ) : (
                         templates.map((t) => (
@@ -192,7 +203,7 @@ JSON 형태로만 응답하세요 (설명/머리말 없이):
                             onClick={() => pickTemplate(t.id)}
                             className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-text-primary hover:bg-bg-surface-hover text-left"
                           >
-                            <FileText size={10} className="text-text-tertiary flex-shrink-0" />
+                            <FileText size={11} className="text-text-tertiary flex-shrink-0" />
                             <span className="truncate">{t.name}</span>
                           </button>
                         ))
@@ -217,7 +228,7 @@ JSON 형태로만 응답하세요 (설명/머리말 없이):
               <select
                 value={nlProject}
                 onChange={(e) => setNlProject(e.target.value)}
-                className="px-2 py-1 rounded-md bg-bg-primary border border-bg-border text-xs text-text-primary focus:outline-none focus:border-clover-blue"
+                className="px-3 py-1.5 rounded-md bg-bg-primary border border-bg-border text-xs font-medium text-text-primary focus:outline-none focus:border-clover-blue"
               >
                 {projects.map((p) => <option key={p.id} value={p.id}>{p.code}</option>)}
               </select>

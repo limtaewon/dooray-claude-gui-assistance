@@ -425,35 +425,52 @@ export class TaskService {
     )
   }
 
-  /** 프로젝트 태스크 템플릿 목록 조회 */
+  /** 프로젝트 태스크 템플릿 목록 조회.
+   * Dooray 엔드포인트 후보를 순차 시도 (조직/버전별 path 차이 대응). */
   async listProjectTemplates(projectId: string): Promise<Array<{ id: string; name: string }>> {
-    try {
-      const res = await this.client.request<DoorayListResponse<{ id: string; name: string }>>(
-        `/project/v1/projects/${projectId}/post-templates?size=100`
-      )
-      return (res.result || []).map((t) => ({ id: t.id, name: t.name }))
-    } catch {
-      return []
+    const endpoints = [
+      `/project/v1/projects/${projectId}/post-templates?size=100`,
+      `/project/v1/projects/${projectId}/templates?size=100`,
+      `/project/v1/projects/${projectId}/posts/templates?size=100`
+    ]
+    let lastError: unknown = null
+    for (const path of endpoints) {
+      try {
+        const res = await this.client.request<DoorayListResponse<{ id: string; name?: string; subject?: string; title?: string }>>(path)
+        const list = (res.result || []).map((t) => ({ id: t.id, name: t.name || t.subject || t.title || '(이름 없음)' }))
+        console.log(`[TaskService] templates OK via ${path}: ${list.length}개`)
+        return list
+      } catch (err) {
+        lastError = err
+        console.warn(`[TaskService] templates ${path} 실패:`, err instanceof Error ? err.message : err)
+      }
     }
+    console.error('[TaskService] 모든 템플릿 엔드포인트 실패. 마지막 오류:', lastError)
+    throw lastError instanceof Error ? lastError : new Error('프로젝트 템플릿을 불러올 수 없습니다')
   }
 
   /** 프로젝트 태스크 템플릿 상세 (제목/본문) */
   async getProjectTemplate(projectId: string, templateId: string): Promise<{ id: string; name: string; subject: string; body: string } | null> {
-    try {
-      const res = await this.client.request<DoorayItemResponse<{
-        id: string
-        name: string
-        subject?: string
-        body?: { mimeType?: string; content?: string } | string
-      }>>(
-        `/project/v1/projects/${projectId}/post-templates/${templateId}`
-      )
-      const t = res.result
-      const body = typeof t.body === 'string' ? t.body : (t.body?.content || '')
-      return { id: t.id, name: t.name, subject: t.subject || '', body }
-    } catch {
-      return null
+    const endpoints = [
+      `/project/v1/projects/${projectId}/post-templates/${templateId}`,
+      `/project/v1/projects/${projectId}/templates/${templateId}`,
+      `/project/v1/projects/${projectId}/posts/templates/${templateId}`
+    ]
+    for (const path of endpoints) {
+      try {
+        const res = await this.client.request<DoorayItemResponse<{
+          id: string
+          name?: string
+          subject?: string
+          title?: string
+          body?: { mimeType?: string; content?: string } | string
+        }>>(path)
+        const t = res.result
+        const body = typeof t.body === 'string' ? t.body : (t.body?.content || '')
+        return { id: t.id, name: t.name || t.subject || t.title || '', subject: t.subject || t.title || '', body }
+      } catch { /* try next */ }
     }
+    return null
   }
 
   /** 태스크(커뮤니티 게시글) 생성 */
