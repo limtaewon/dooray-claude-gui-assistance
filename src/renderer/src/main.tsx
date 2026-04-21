@@ -3,13 +3,12 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import { initTheme, reconcileThemeFromStore } from './hooks/useTheme'
 import { initFontSettings, reconcileFontFromStore } from './hooks/useFontSettings'
-import { initLightPalette } from './components/Settings/ThemePicker'
 import './index.css'
 
 // 동기적으로 localStorage 기반 부트 (FOUC 방지)
+// initTheme이 data-theme + data-palette를 모두 설정해 디자인 시스템 CSS 셀렉터에 맞춰줌
 initTheme()
 initFontSettings()
-initLightPalette()
 
 // electron-store의 영속 값으로 교정 (localStorage가 flush 안된 경우 대비).
 // Chromium localStorage는 강제 종료 시 flush가 보장되지 않아서 이중화 필요.

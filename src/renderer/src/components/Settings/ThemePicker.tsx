@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Check, Palette } from 'lucide-react'
+import { Check, Palette as PaletteIcon } from 'lucide-react'
+import { useTheme as useThemeFromHook, type Palette } from '../../hooks/useTheme'
 
 /**
  * 라이트 모드 팔레트 후보들. 각 후보는 3층 구조(사이드바/메인/상세) + 액센트 미리보기.
@@ -144,29 +144,11 @@ const PALETTES: LightPalette[] = [
 
 const STORAGE_KEY = 'light-palette'
 
-function applyPalette(palette: LightPalette): void {
-  // 다크 모드에서는 선택만 저장하고 인라인 주입은 하지 않음
-  // (주입하면 다크 테마 토큰을 덮어써버림)
-  const theme = document.documentElement.getAttribute('data-theme')
-  if (theme !== 'dark') {
-    const root = document.documentElement
-    Object.entries(palette.vars).forEach(([k, v]) => root.style.setProperty(k, v))
-  }
-  localStorage.setItem(STORAGE_KEY, palette.id)
-}
-
+/** @deprecated Design System v1부터 팔레트는 useTheme + data-palette 속성으로 관리.
+ *  이 함수는 레거시 main.tsx 호환을 위해 no-op으로 유지.
+ *  실제 적용은 useTheme.initTheme()가 담당. */
 export function initLightPalette(): void {
-  // 다크 모드일 때는 라이트 팔레트를 적용하지 않음
-  // (적용 시 인라인 스타일이 [data-theme='dark'] 규칙을 덮어써버림)
-  const theme = document.documentElement.getAttribute('data-theme')
-  if (theme === 'dark') return
-  const id = localStorage.getItem(STORAGE_KEY)
-  if (!id) return
-  const p = PALETTES.find((x) => x.id === id)
-  if (p) {
-    const root = document.documentElement
-    Object.entries(p.vars).forEach(([k, v]) => root.style.setProperty(k, v))
-  }
+  /* no-op: useTheme이 data-palette 속성을 설정해 CSS 셀렉터로 팔레트 적용 */
 }
 
 function PreviewMockup({ palette, active, onPick }: {
@@ -244,18 +226,19 @@ function PreviewMockup({ palette, active, onPick }: {
 }
 
 function ThemePicker(): JSX.Element {
-  const [selected, setSelected] = useState<string>(() => localStorage.getItem(STORAGE_KEY) || 'cool-minimal')
-
-  useEffect(() => {
-    const p = PALETTES.find((x) => x.id === selected)
-    if (p) applyPalette(p)
-  }, [selected])
+  // useTheme의 palette를 단일 source of truth로 사용. data-palette 속성이 자동 반영됨.
+  const { palette, setPalette } = useThemeFromHook()
+  const selected = palette
+  const setSelected = (id: string): void => {
+    const p = PALETTES.find((x) => x.id === id)
+    if (p) setPalette(p.id as Palette)
+  }
 
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
         <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-clover-blue/10 border border-clover-blue/30">
-          <Palette size={14} className="text-clover-blue" />
+          <PaletteIcon size={14} className="text-clover-blue" />
         </div>
         <div>
           <h3 className="text-sm font-semibold text-text-primary">라이트 팔레트 고르기</h3>
@@ -271,7 +254,7 @@ function ThemePicker(): JSX.Element {
 
       <div className="mt-4 flex items-center justify-between text-[10px] text-text-tertiary">
         <span>💡 다크모드에서는 이 선택이 무시되고 기본 다크 팔레트가 적용됩니다</span>
-        <button onClick={() => { localStorage.removeItem(STORAGE_KEY); window.location.reload() }}
+        <button onClick={() => setSelected('cool-minimal')}
           className="px-2 py-1 rounded hover:text-text-secondary">
           기본값으로 초기화
         </button>

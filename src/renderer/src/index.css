@@ -1,21 +1,79 @@
+/* ============================================================
+   Clauday Design Tokens (Design System v1)
+   Dark default + 5 light palettes + semantic type
+   See: handoff/bundle.md :: colors_and_type.css
+   ============================================================ */
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* =================================
-   테마 토큰 (CSS variables)
-   data-theme="dark" (기본) / "light"로 전환
-   ================================= */
+/* -------- brand (테마 무관) -------- */
+:root {
+  --clover-orange:        #EA580C;   /* Dooray */
+  --clover-orange-light:  #FB923C;
+  --clover-orange-soft:   #FBE4D5;
+  --clover-blue:          #2563EB;   /* Claude */
+  --clover-blue-light:    #3B82F6;
+  --clover-blue-soft:     #DCE6FB;
+
+  /* 시맨틱 */
+  --success:  #22C55E;
+  --warning:  #FBBF24;
+  --danger:   #EF4444;
+  --info:     #3B82F6;
+  --mention:  #A78BFA;
+
+  /* spacing (Tailwind 4px base) */
+  --space-0-5: 2px;   --space-1: 4px;    --space-1-5: 6px;
+  --space-2:   8px;   --space-2-5: 10px; --space-3: 12px;
+  --space-4:   16px;  --space-5: 20px;   --space-6: 24px;
+  --space-8:   32px;  --space-10: 40px;  --space-12: 48px;
+
+  /* radii (표준) */
+  --radius-xs:  4px;  /* 뱃지/칩 */
+  --radius-sm:  6px;  /* 작은 버튼·필드 행·탭 */
+  --radius-md:  8px;  /* 카드·버튼·입력 대부분 */
+  --radius-lg:  12px; /* 컨테이너·모달 */
+  --radius-xl:  16px; /* 대형 힐로 */
+  --radius-full: 9999px;
+
+  /* type families */
+  --font-ui:    'Inter', 'Pretendard Variable', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', system-ui, sans-serif;
+  --font-mono:  'JetBrains Mono', ui-monospace, SFMono-Regular, 'Menlo', monospace;
+
+  /* type scale (px, 16px 기준) */
+  --t-9:  9px;
+  --t-10: 10px;
+  --t-11: 11px;
+  --t-12: 12px;
+  --t-13: 13px;
+  --t-14: 14px;
+  --t-15: 15px;
+  --t-16: 16px;
+  --t-18: 18px;
+  --t-20: 20px;
+  --t-24: 24px;
+
+  /* app font scaling hook (useFontSettings에서 덮어씀) */
+  --app-font-scale: 1;
+  --app-font-family: var(--font-ui);
+}
+
+/* ============================================================
+   THEME — light default (Cool Minimal)
+   ============================================================ */
 :root,
 [data-theme='light'] {
-  /* ===== 배경 레이어 (cool neutral, 밝아지는 계단) ===== */
-  --bg-sidebar:        #E9ECF2;   /* 사이드바 — 가장 가라앉음 */
-  --bg-base:           #EFF1F5;   /* 메인 작업 영역 */
-  --bg-surface:        #F6F7FA;   /* 일반 카드 표면 */
-  --bg-surface-raised: #FCFCFD;   /* 강조 패널 (상세/모달) */
-  --bg-primary:        #EFF1F5;   /* alias → --bg-base */
+  /* 배경 레이어 (4단 계단) */
+  --bg-sidebar:        #E9ECF2;
+  --bg-base:           #EFF1F5;
+  --bg-surface:        #F6F7FA;
+  --bg-surface-raised: #FCFCFD;
+  --bg-primary:        var(--bg-base);
   --bg-surface-hover:  #E3E6EC;
   --bg-subtle:         #E6E9EF;
   --bg-hover:          #E3E6EC;
@@ -23,41 +81,47 @@
   --bg-border:         #DFE2E8;
   --bg-border-light:   #C7CBD3;
   --bg-border-strong:  #C7CBD3;
-  /* ===== 텍스트 ===== */
+
+  /* 텍스트 (3단) */
   --text-primary:      #1C2130;
   --text-secondary:    #4F5769;
   --text-tertiary:     #8A91A1;
-  /* ===== 액센트 ===== */
-  --accent-blue:       #2563EB;
-  --accent-blue-light: #3B82F6;
-  --accent-blue-soft:  #DCE6FB;
-  --accent-blue-fg:    #1E3A8A;
-  --accent-orange:     #EA580C;
-  --accent-orange-light: #FB923C;
-  --accent-orange-soft: #FBE4D5;
-  /* ===== 기타 ===== */
-  --scrollbar-track:   #E9ECF2;
-  --scrollbar-thumb:   #C7CBD3;
+
+  /* 액센트 — 라이트 컨텍스트 */
+  --accent-blue:         var(--clover-blue);
+  --accent-blue-light:   var(--clover-blue-light);
+  --accent-blue-soft:    var(--clover-blue-soft);
+  --accent-blue-fg:      #1E3A8A;
+  --accent-orange:       var(--clover-orange);
+  --accent-orange-light: var(--clover-orange-light);
+  --accent-orange-soft:  var(--clover-orange-soft);
+
+  /* 기타 */
+  --link:                var(--clover-blue);
+  --code-bg:             #EDEFF4;
+  --code-text:           #A14A10;
+  --mark-bg:             #FEF3C7;
+  --mark-text:           #92400E;
+  --scrollbar-track:     #E9ECF2;
+  --scrollbar-thumb:     #C7CBD3;
   --scrollbar-thumb-hover: #8A91A1;
-  --code-bg:           #EDEFF4;
-  --code-text:         #A14A10;
-  --link:              #2563EB;
-  --shadow-sm:  0 1px 2px rgba(17,24,39,0.04), 0 1px 3px rgba(17,24,39,0.03);
-  --shadow-md:  0 2px 4px rgba(17,24,39,0.05), 0 8px 24px rgba(17,24,39,0.06);
-  --shadow-lg:  0 12px 40px rgba(17,24,39,0.10), 0 4px 12px rgba(17,24,39,0.06);
-  --shadow-raised: 0 2px 4px rgba(17,24,39,0.05), 0 8px 24px rgba(17,24,39,0.06);
-  --mark-bg:   #FEF3C7;
-  --mark-text: #92400E;
-  --overlay-bg: rgba(17,24,39,0.40);
+  --overlay-bg:          rgba(17,24,39,0.40);
+
+  --shadow-sm:      0 1px 2px rgba(17,24,39,0.04), 0 1px 3px rgba(17,24,39,0.03);
+  --shadow-md:      0 2px 4px rgba(17,24,39,0.05), 0 8px 24px rgba(17,24,39,0.06);
+  --shadow-lg:      0 12px 40px rgba(17,24,39,0.10), 0 4px 12px rgba(17,24,39,0.06);
+  --shadow-raised:  var(--shadow-md);
 }
 
+/* ============================================================
+   THEME — dark
+   ============================================================ */
 [data-theme='dark'] {
-  /* ===== 배경 레이어 ===== */
   --bg-sidebar:        #111A2A;
   --bg-base:           #162032;
   --bg-surface:        #1f2940;
   --bg-surface-raised: #25304b;
-  --bg-primary:        #162032;   /* alias */
+  --bg-primary:        var(--bg-base);
   --bg-surface-hover:  #2a3553;
   --bg-subtle:         #1a2436;
   --bg-hover:          #2a3553;
@@ -65,32 +129,98 @@
   --bg-border:         #3a4566;
   --bg-border-light:   #4b5773;
   --bg-border-strong:  #4b5773;
+
   --text-primary:      #F9FAFB;
   --text-secondary:    #B4BCCE;
   --text-tertiary:     #7A869E;
-  --accent-blue:       #3B82F6;
-  --accent-blue-light: #60A5FA;
-  --accent-blue-soft:  rgba(59,130,246,0.18);
-  --accent-blue-fg:    #93C5FD;
-  --accent-orange:     #FB923C;
+
+  --accent-blue:         #3B82F6;
+  --accent-blue-light:   #60A5FA;
+  --accent-blue-soft:    rgba(59,130,246,0.18);
+  --accent-blue-fg:      #93C5FD;
+  --accent-orange:       #FB923C;
   --accent-orange-light: #FDBA74;
-  --accent-orange-soft: rgba(251,146,60,0.18);
+  --accent-orange-soft:  rgba(251,146,60,0.18);
+
+  --link:              #60A5FA;
+  --code-bg:           #1f2940;
+  --code-text:         #FDBA74;
+  --mark-bg:           rgba(251,146,60,0.25);
+  --mark-text:         #FDBA74;
   --scrollbar-track:   #1a2436;
   --scrollbar-thumb:   #4b5773;
   --scrollbar-thumb-hover: #6b7a99;
-  --code-bg:           #1f2940;
-  --code-text:         #FDBA74;
-  --link:              #60A5FA;
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
-  --shadow-lg: 0 10px 24px rgba(0,0,0,0.4);
-  --shadow-raised: 0 4px 16px rgba(0,0,0,0.35);
-  --mark-bg: rgba(251,146,60,0.25);
-  --mark-text: #FDBA74;
-  --overlay-bg: rgba(0,0,0,0.6);
+  --overlay-bg:        rgba(0,0,0,0.6);
+
+  --shadow-sm:      0 1px 2px rgba(0,0,0,0.2);
+  --shadow-md:      0 4px 12px rgba(0,0,0,0.3);
+  --shadow-lg:      0 10px 24px rgba(0,0,0,0.4);
+  --shadow-raised:  0 4px 16px rgba(0,0,0,0.35);
 }
 
-/* xterm.js base styles */
+/* ============================================================
+   LIGHT PALETTE VARIANTS
+   Activate via  [data-theme='light'][data-palette='<id>']
+   (ThemePicker에서 data-palette 속성 또는 인라인 style로 주입)
+   ============================================================ */
+[data-theme='light'][data-palette='cool-minimal'] {
+  --bg-sidebar: #E9ECF2;  --bg-base: #EFF1F5;  --bg-surface: #F6F7FA;  --bg-surface-raised: #FCFCFD;
+  --bg-primary: #EFF1F5;  --bg-surface-hover: #E3E6EC;  --bg-subtle: #E6E9EF;
+  --bg-hover: #E3E6EC;  --bg-active: #D7DBE3;  --bg-border: #D8DCE4;
+  --bg-border-light: #BFC4CE;  --bg-border-strong: #BFC4CE;
+  --text-primary: #0F172A;  --text-secondary: #334155;  --text-tertiary: #64748B;
+}
+[data-theme='light'][data-palette='crisp-white'] {
+  --bg-sidebar: #F5F6F8;  --bg-base: #FAFAFB;  --bg-surface: #FFFFFF;  --bg-surface-raised: #FFFFFF;
+  --bg-primary: #FAFAFB;  --bg-surface-hover: #F0F1F3;  --bg-subtle: #F3F4F6;
+  --bg-hover: #F0F1F3;  --bg-active: #E5E7EB;  --bg-border: #E5E7EB;
+  --bg-border-light: #D1D5DB;  --bg-border-strong: #D1D5DB;
+  --text-primary: #111827;  --text-secondary: #4B5563;  --text-tertiary: #9CA3AF;
+}
+[data-theme='light'][data-palette='soft-blue'] {
+  --bg-sidebar: #E2E6EE;  --bg-base: #E9EDF3;  --bg-surface: #F2F4F8;  --bg-surface-raised: #FBFCFD;
+  --bg-primary: #E9EDF3;  --bg-surface-hover: #DCE0E9;  --bg-subtle: #DFE3EB;
+  --bg-hover: #DCE0E9;  --bg-active: #CED4DE;  --bg-border: #D1D6DE;
+  --bg-border-light: #B6BCC6;  --bg-border-strong: #B6BCC6;
+  --text-primary: #101828;  --text-secondary: #414D5F;  --text-tertiary: #798396;
+}
+[data-theme='light'][data-palette='graphite'] {
+  --bg-sidebar: #DEE2EA;  --bg-base: #E6E9EF;  --bg-surface: #F0F2F6;  --bg-surface-raised: #FAFBFC;
+  --bg-primary: #E6E9EF;  --bg-surface-hover: #D9DCE4;  --bg-subtle: #DCDFE7;
+  --bg-hover: #D9DCE4;  --bg-active: #CBCFD9;  --bg-border: #CDD2DB;
+  --bg-border-light: #B0B6C2;  --bg-border-strong: #B0B6C2;
+  --text-primary: #0F172A;  --text-secondary: #334155;  --text-tertiary: #64748B;
+}
+[data-theme='light'][data-palette='paper'] {
+  --bg-sidebar: #EEEEEE;  --bg-base: #F4F4F4;  --bg-surface: #FAFAFA;  --bg-surface-raised: #FFFFFF;
+  --bg-primary: #F4F4F4;  --bg-surface-hover: #E8E8E8;  --bg-subtle: #EBEBEB;
+  --bg-hover: #E8E8E8;  --bg-active: #DCDCDC;  --bg-border: #E0E0E0;
+  --bg-border-light: #C4C4C4;  --bg-border-strong: #C4C4C4;
+  --text-primary: #1A1A1A;  --text-secondary: #4A4A4A;  --text-tertiary: #8A8A8A;
+}
+
+/* ============================================================
+   SEMANTIC TYPE (앱 맥락에 맞춘 스케일)
+   ============================================================ */
+.text-title   { font-size: var(--t-18); font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; }
+.text-section { font-size: var(--t-14); font-weight: 600; color: var(--text-primary); }
+.text-body    { font-size: var(--t-12); font-weight: 400; color: var(--text-primary); }
+.text-meta    { font-size: var(--t-11); font-weight: 400; color: var(--text-secondary); }
+.text-caption { font-size: var(--t-10); font-weight: 400; color: var(--text-tertiary); }
+.text-mini    { font-size: var(--t-9);  font-weight: 500; color: var(--text-tertiary); letter-spacing: 0.02em; }
+.text-label   { font-size: var(--t-10); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); }
+
+.num-xl { font-size: var(--t-24); font-weight: 700; color: var(--text-primary); line-height: 1.1; }
+.num-lg { font-size: var(--t-20); font-weight: 700; color: var(--text-primary); line-height: 1.1; }
+
+/* AI gradient text/BG (강조 스팟) */
+.ai-gradient-bg   { background: linear-gradient(90deg, var(--clover-orange), var(--clover-blue)); color:#fff; }
+.ai-gradient-text { background: linear-gradient(90deg, var(--clover-orange), var(--clover-blue));
+                    -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* ============================================================
+   xterm.js base styles
+   ============================================================ */
 .xterm {
   position: relative;
   user-select: none;
@@ -100,26 +230,20 @@
   overflow-y: auto;
 }
 
-/* Scrollbar — 테마 반응형 */
+/* ============================================================
+   Scrollbar — 테마 반응형
+   ============================================================ */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
-::-webkit-scrollbar-track {
-  background: var(--scrollbar-track);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--scrollbar-thumb-hover);
-}
-
-/* Reset */
+/* ============================================================
+   Reset + root layout
+   ============================================================ */
 * {
   margin: 0;
   padding: 0;
@@ -131,7 +255,7 @@ html, body, #root {
   width: 100%;
 }
 
-/* 글자 배율: Tailwind가 rem 기반이라 html 단위 font-size를 바꿔야 전체 스케일됨.
+/* Tailwind가 rem 기반이라 html 단위 font-size를 바꿔야 전체 스케일됨.
    기본 16px × scale. scale=1이면 Tailwind 기본과 동일. */
 html {
   font-size: calc(16px * var(--app-font-scale, 1));
@@ -142,16 +266,17 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background: var(--bg-primary);
   color: var(--text-primary);
-  font-family: var(--app-font-family, 'Inter', 'Pretendard Variable', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', system-ui, sans-serif);
+  font-family: var(--app-font-family);
+  line-height: 1.55;
 }
 
-/* 앱 전역 폰트 패밀리 상속: 모든 텍스트 요소가 body의 font-family를 따르게.
-   코드/mono 영역은 자체 font-family를 유지 */
 input, textarea, select, button {
   font-family: inherit;
 }
 
-/* Markdown body — CSS 변수 기반 */
+/* ============================================================
+   Markdown body — CSS 변수 기반
+   ============================================================ */
 .markdown-body {
   color: var(--text-primary);
 }
@@ -177,100 +302,57 @@ input, textarea, select, button {
   accent-color: var(--accent-blue);
   cursor: default;
 }
-.markdown-body li input[type="checkbox"]:checked {
-  accent-color: #22C55E;
-}
-.markdown-body li input[type="checkbox"]:not(:checked) {
-  opacity: 0.5;
-}
-.markdown-body li:has(input[type="checkbox"]:checked) {
-  color: var(--text-secondary);
-}
-.markdown-body li {
-  list-style: none;
-}
+.markdown-body li input[type="checkbox"]:checked { accent-color: var(--success); }
+.markdown-body li input[type="checkbox"]:not(:checked) { opacity: 0.5; }
+.markdown-body li:has(input[type="checkbox"]:checked) { color: var(--text-secondary); }
+.markdown-body li { list-style: none; }
 .markdown-body code {
   background: var(--code-bg);
   padding: 0.15em 0.4em;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   font-size: 0.9em;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   color: var(--code-text);
 }
 .markdown-body pre {
   background: var(--code-bg);
   border: 1px solid var(--bg-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 0.8em 1em;
   overflow-x: auto;
   margin: 0.8em 0;
 }
-.markdown-body pre code {
-  background: none;
-  padding: 0;
-  color: var(--text-primary);
-}
+.markdown-body pre code { background: none; padding: 0; color: var(--text-primary); }
 .markdown-body blockquote {
   border-left: 3px solid var(--accent-blue);
   padding-left: 1em;
   margin: 0.5em 0;
   color: var(--text-secondary);
 }
-.markdown-body table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 0.8em 0;
-}
+.markdown-body table { width: 100%; border-collapse: collapse; margin: 0.8em 0; }
 .markdown-body th, .markdown-body td {
   border: 1px solid var(--bg-border);
   padding: 0.4em 0.8em;
   text-align: left;
 }
-.markdown-body th {
-  background: var(--bg-surface);
-  font-weight: 600;
-}
-.markdown-body a {
-  color: var(--link);
-  text-decoration: none;
-}
+.markdown-body th { background: var(--bg-surface); font-weight: 600; }
+.markdown-body a { color: var(--link); text-decoration: none; }
 .markdown-body a:hover { text-decoration: underline; }
-.markdown-body hr {
-  border: none;
-  border-top: 1px solid var(--bg-border);
-  margin: 1em 0;
-}
-.markdown-body img {
-  max-width: 100%;
-  border-radius: 8px;
-}
+.markdown-body a[href] { cursor: pointer; }
+.markdown-body hr { border: none; border-top: 1px solid var(--bg-border); margin: 1em 0; }
+.markdown-body img { max-width: 100%; border-radius: var(--radius-md); }
 .markdown-body strong { color: var(--text-primary); }
 
-.markdown-body a[href] {
-  cursor: pointer;
-}
+/* ============================================================
+   Title bar drag region + :invalid 오버라이드
+   ============================================================ */
+.drag-region { -webkit-app-region: drag; }
+.no-drag     { -webkit-app-region: no-drag; }
 
-/* Title bar drag region */
-.drag-region {
-  -webkit-app-region: drag;
-}
-
-.no-drag {
-  -webkit-app-region: no-drag;
-}
-
-/* 브라우저 기본 :invalid 빨간 테두리/그림자 제거
-   (required/pattern 속성이 걸린 입력이 앱 실행 직후 빨갛게 보이는 UX 문제 방지) */
-input, textarea, select {
-  box-shadow: none;
-}
-input:invalid,
-textarea:invalid,
-select:invalid {
+/* 브라우저 기본 :invalid 빨간 테두리/그림자 제거 */
+input, textarea, select { box-shadow: none; }
+input:invalid, textarea:invalid, select:invalid {
   box-shadow: none;
   outline: none;
 }
-input:-moz-ui-invalid,
-textarea:-moz-ui-invalid {
-  box-shadow: none;
-}
+input:-moz-ui-invalid, textarea:-moz-ui-invalid { box-shadow: none; }
