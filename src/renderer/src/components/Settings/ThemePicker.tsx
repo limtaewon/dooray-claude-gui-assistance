@@ -145,12 +145,21 @@ const PALETTES: LightPalette[] = [
 const STORAGE_KEY = 'light-palette'
 
 function applyPalette(palette: LightPalette): void {
-  const root = document.documentElement
-  Object.entries(palette.vars).forEach(([k, v]) => root.style.setProperty(k, v))
+  // 다크 모드에서는 선택만 저장하고 인라인 주입은 하지 않음
+  // (주입하면 다크 테마 토큰을 덮어써버림)
+  const theme = document.documentElement.getAttribute('data-theme')
+  if (theme !== 'dark') {
+    const root = document.documentElement
+    Object.entries(palette.vars).forEach(([k, v]) => root.style.setProperty(k, v))
+  }
   localStorage.setItem(STORAGE_KEY, palette.id)
 }
 
 export function initLightPalette(): void {
+  // 다크 모드일 때는 라이트 팔레트를 적용하지 않음
+  // (적용 시 인라인 스타일이 [data-theme='dark'] 규칙을 덮어써버림)
+  const theme = document.documentElement.getAttribute('data-theme')
+  if (theme === 'dark') return
   const id = localStorage.getItem(STORAGE_KEY)
   if (!id) return
   const p = PALETTES.find((x) => x.id === id)
