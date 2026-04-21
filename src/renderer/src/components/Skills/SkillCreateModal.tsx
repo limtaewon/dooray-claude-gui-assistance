@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Sparkles, Edit3, Loader2, Check, AlertCircle, FileText } from 'lucide-react'
 import type { Skill } from '../../../../shared/types/skills'
 
@@ -18,6 +18,26 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [generated, setGenerated] = useState<{ name: string; description: string; content: string } | null>(null)
 
+  // MCP 선택 (스킬 생성 중 실시간 조회용)
+  const [mcpServers, setMcpServers] = useState<string[]>([])
+  const [selectedMcp, setSelectedMcp] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (mode !== 'ai') return
+    window.api.mcp.list()
+      .then((servers) => setMcpServers(Object.keys(servers || {})))
+      .catch(() => setMcpServers([]))
+  }, [mode])
+
+  const toggleMcp = (name: string): void => {
+    setSelectedMcp((prev) => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
+
   // 직접 작성용
   const [manualName, setManualName] = useState('')
 
@@ -25,7 +45,8 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
     if (!instruction.trim()) return
     setGenerating(true); setError(null); setGenerated(null)
     try {
-      const result = await window.api.ai.generateSkill(instruction, 'all')
+      const mcpList = Array.from(selectedMcp)
+      const result = await window.api.ai.generateSkill(instruction, 'all', undefined, mcpList)
       setGenerated(result)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'AI 생성 실패')
@@ -128,13 +149,52 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
                 className="w-full min-h-[120px] px-3 py-2.5 rounded-lg bg-bg-subtle border border-bg-border text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue resize-y"
               />
               <div className="flex items-center justify-between mt-2">
-                <span className="text-[10px] text-text-tertiary">구체적일수록 좋습니다</span>
+                <span className="text-[10px] text-text-tertiary">구체적일수록 좋습니다 · 모델: Opus (고정)</span>
                 <button onClick={handleGenerate} disabled={generating || !instruction.trim()}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-clover-orange to-clover-blue disabled:opacity-40 hover:opacity-90">
                   {generating ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                  {generating ? 'AI 생성 중...' : generated ? '다시 생성' : '생성하기'}
+                  {generating ? '스킬 생성 중...' : generated ? '다시 생성' : `생성하기${selectedMcp.size > 0 ? ` (MCP ${selectedMcp.size})` : ''}`}
                 </button>
               </div>
+            </div>
+
+            {/* MCP 서버 선택 — 스킬 생성 중 실시간 데이터 조회용 */}
+            <div>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <span className="text-[11px] font-semibold text-text-secondary">MCP 서버 활용 (선택)</span>
+                <span className="text-[10px] text-text-tertiary">선택한 MCP로 실제 ID·값을 조회해 스킬에 박아넣습니다</span>
+              </div>
+              {mcpServers.length === 0 ? (
+                <div className="px-3 py-2 rounded-lg bg-bg-subtle border border-bg-border text-[10px] text-text-tertiary">
+                  등록된 MCP 서버가 없습니다 (MCP 탭에서 추가 가능)
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {mcpServers.map((name) => {
+                    const checked = selectedMcp.has(name)
+                    return (
+                      <button key={name} onClick={() => toggleMcp(name)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] border transition-colors ${
+                          checked
+                            ? 'bg-clover-blue/15 border-clover-blue/40 text-clover-blue font-medium'
+                            : 'bg-bg-subtle border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light'
+                        }`}>
+                        <span className={`w-3 h-3 rounded border flex items-center justify-center flex-shrink-0 ${
+                          checked ? 'bg-clover-blue border-clover-blue' : 'border-bg-border-light'
+                        }`}>
+                          {checked && <span className="text-white text-[8px]">✓</span>}
+                        </span>
+                        {name}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+              {selectedMcp.size > 0 && (
+                <p className="text-[10px] text-clover-orange mt-1.5">
+                  ⚠ MCP 조회는 시간이 더 걸려요 (30초~2분). 비용도 증가.
+                </p>
+              )}
             </div>
 
             {/* 생성 결과 미리보기 */}

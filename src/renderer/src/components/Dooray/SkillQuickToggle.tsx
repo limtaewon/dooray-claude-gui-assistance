@@ -351,7 +351,7 @@ function SkillQuickToggle({ target }: SkillQuickToggleProps): JSX.Element {
                   <button onClick={handleAiGenerate} disabled={!aiPrompt.trim() || aiLoading}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-blue-500 text-white text-[11px] font-medium hover:opacity-90 disabled:opacity-40">
                     {aiLoading
-                      ? <><Loader2 size={11} className="animate-spin" /> {selectedMcp.size > 0 ? 'MCP 조회 중...' : '생성 중...'}</>
+                      ? <><Loader2 size={11} className="animate-spin" /> 스킬 생성 중...</>
                       : <><Sparkles size={11} /> 스킬 생성{selectedMcp.size > 0 ? ` (MCP ${selectedMcp.size})` : ''}</>
                     }
                   </button>

@@ -795,8 +795,9 @@ ${instruction}
   "content": "## 규칙\\n- 구체적인 조건과 동작\\n\\n## 출력 형식\\n- AI가 결과를 어떤 형태로 보여줄지"
 }`
 
-    const result = await this.runWithProgress(requestId, useMcp ? '스킬 생성 중 (MCP 조회 포함)...' : '스킬 생성 중...', buildArgs(prompt, {
-      model: this.pickModel('generateSkill', 'sonnet'),
+    const result = await this.runWithProgress(requestId, '스킬 생성 중...', buildArgs(prompt, {
+      // 스킬 생성은 품질이 중요하므로 항상 Opus 사용 (사용자 설정 무시)
+      model: 'opus',
       // MCP 사용 시 effort 올려서 도구 호출 여유 확보
       effort: useMcp ? 'medium' : 'low',
       mcpServers,

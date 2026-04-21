@@ -57,7 +57,7 @@ const MODEL_FEATURES: ModelFeatureDef[] = [
   { key: 'wikiSummarize', label: '위키 요약', description: '문서 3~5줄 요약', defaultModel: 'sonnet' },
   { key: 'wikiStructure', label: '위키 구조 분석', description: '구조 및 개선 방안 제안', defaultModel: 'sonnet' },
   { key: 'summarizeTask', label: '태스크 요약', description: '3줄 핵심 요약', defaultModel: 'haiku' },
-  { key: 'generateSkill', label: 'AI 스킬 생성', description: '사용자 맞춤 스킬 생성', defaultModel: 'sonnet' },
+  // AI 스킬 생성은 품질 우선 — 항상 Opus 고정 (SettingsView 노출 제거)
   { key: 'meetingNote', label: '회의록 템플릿', description: '캘린더 이벤트 기반', defaultModel: 'haiku' },
   { key: 'sessionSummary', label: '세션 요약', description: 'Claude Code 세션 대화 요약', defaultModel: 'sonnet' },
   { key: 'calendarAnalysis', label: '캘린더 분석', description: '이번 주 일정 분석', defaultModel: 'sonnet' },
