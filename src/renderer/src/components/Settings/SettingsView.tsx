@@ -15,7 +15,7 @@ function SettingsView(): JSX.Element {
     { id: 'models', icon: Cpu, label: 'AI 모델' },
     { id: 'insights', icon: BarChart2, label: '사용 인사이트' },
     { id: 'dooray', icon: Key, label: '두레이 연결' },
-    { id: 'app', icon: SlidersHorizontal, label: '앱 동작' }
+    { id: 'app', icon: SlidersHorizontal, label: '외관 & 동작' }
   ]
 
   return (

@@ -112,12 +112,10 @@ function TerminalView(): JSX.Element {
 
   return (
     <div className="flex flex-col h-full bg-bg-primary">
-      <div className="flex items-center h-9 bg-bg-surface border-b border-bg-border px-2 gap-1 overflow-x-auto flex-shrink-0">
+      <div className="ds-tabbar">
         {entries.map(({ session }) => (
           <div key={session.id} onClick={() => setActiveId(session.id)}
-            className={`flex items-center gap-1.5 px-3 h-7 rounded text-xs cursor-pointer transition-colors group ${
-              activeId === session.id ? 'bg-clover-blue text-white' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
-            }`}>
+            className={`ds-tab group ${activeId === session.id ? 'active' : ''}`}>
             <Terminal size={11} />
             <span className="font-mono truncate max-w-[140px]">{session.name}</span>
             <button onClick={(e) => { e.stopPropagation(); closeSession(session.id) }}
