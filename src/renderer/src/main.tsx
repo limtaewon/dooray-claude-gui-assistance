@@ -4,6 +4,7 @@ import App from './App'
 import { initTheme, reconcileThemeFromStore } from './hooks/useTheme'
 import { initFontSettings, reconcileFontFromStore } from './hooks/useFontSettings'
 import './index.css'
+import './design-system.css'
 
 // 동기적으로 localStorage 기반 부트 (FOUC 방지)
 // initTheme이 data-theme + data-palette를 모두 설정해 디자인 시스템 CSS 셀렉터에 맞춰줌

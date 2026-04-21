@@ -10,9 +10,9 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Design System v1 utility classes (.ds-btn, .ds-card, .ds-chip 등) */
-@import './design-system.css';
+/* Design System v1 utility 클래스 (.ds-btn, .ds-card, .ds-chip, .ds-tabbar 등)
+   main.tsx 에서 './design-system.css'를 별도 import하므로 여기서 @import 하지 않음
+   (CSS 스펙: @import는 @tailwind 이후에 위치할 수 없음) */
 
 /* -------- brand (테마 무관) -------- */
 :root {
