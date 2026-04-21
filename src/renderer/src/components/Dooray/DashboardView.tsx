@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   LayoutDashboard, Sparkles, Loader2, CheckCircle2, Clock, Target,
-  AlertCircle, ArrowRight, Send, FileText, ChevronDown, RotateCcw, Wand2
+  AlertCircle, ArrowRight, Send, FileText, ChevronDown, ChevronRight, RotateCcw, Wand2, Plus
 } from 'lucide-react'
 import type { DoorayTask, DoorayProject } from '../../../../shared/types/dooray'
 import SkillQuickToggle from './SkillQuickToggle'
+
+const CREATE_EXPANDED_KEY = 'dashboard.createExpanded'
 
 /**
  * Phase 1: AI 업무 대시보드
@@ -34,6 +36,14 @@ function DashboardView(): JSX.Element {
   const [templatesLoading, setTemplatesLoading] = useState(false)
   const [templatesError, setTemplatesError] = useState<string | null>(null)
   const [templateMenuOpen, setTemplateMenuOpen] = useState(false)
+
+  // 빠른 생성 섹션 접힘/펼침 (기본: 접힘)
+  const [createExpanded, setCreateExpanded] = useState<boolean>(() => {
+    return localStorage.getItem(CREATE_EXPANDED_KEY) === '1'
+  })
+  useEffect(() => {
+    localStorage.setItem(CREATE_EXPANDED_KEY, createExpanded ? '1' : '0')
+  }, [createExpanded])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -188,16 +198,36 @@ function DashboardView(): JSX.Element {
           <StatCard label="완료" value={stats.closed} icon={CheckCircle2} color="text-emerald-400" loading={loading} />
         </div>
 
-        {/* 태스크 빠른 생성 */}
-        <div className="rounded-xl border border-bg-border bg-bg-surface p-4 space-y-3">
+        {/* 태스크 빠른 생성 (접힘/펼침) */}
+        <div className={`rounded-xl border border-bg-border bg-bg-surface ${createExpanded ? 'p-4 space-y-3' : 'p-3'}`}>
           <div className="flex items-center gap-2">
-            <Sparkles size={14} className="text-clover-orange" />
-            <h3 className="text-sm font-semibold text-text-primary">태스크 빠른 생성</h3>
-            <span className="text-[10px] text-text-tertiary">템플릿 · AI · 직접 입력 모두 가능</span>
-            <div className="ml-auto">
+            <button
+              onClick={() => setCreateExpanded(!createExpanded)}
+              className="flex items-center gap-2 flex-1 text-left hover:text-clover-blue transition-colors"
+              title={createExpanded ? '접기' : '펼치기'}
+            >
+              {createExpanded
+                ? <ChevronDown size={14} className="text-text-secondary" />
+                : <ChevronRight size={14} className="text-text-secondary" />
+              }
+              <Sparkles size={14} className="text-clover-orange" />
+              <h3 className="text-sm font-semibold text-text-primary">태스크 빠른 생성</h3>
+              <span className="text-[10px] text-text-tertiary">템플릿 · AI · 직접 입력 모두 가능</span>
+            </button>
+            {!createExpanded && (
+              <button
+                onClick={() => setCreateExpanded(true)}
+                className="flex items-center gap-1 px-2 py-1 rounded-md bg-clover-blue/10 text-clover-blue text-[10px] font-medium hover:bg-clover-blue/20"
+              >
+                <Plus size={10} /> 새 태스크
+              </button>
+            )}
+            {createExpanded && (
               <SkillQuickToggle target="task" />
-            </div>
+            )}
           </div>
+
+          {createExpanded && <>
 
           {/* 툴바 */}
           <div className="flex items-center gap-2 flex-wrap">
@@ -332,6 +362,16 @@ function DashboardView(): JSX.Element {
                 : 'bg-red-500/10 text-red-400 border border-red-500/30'
             }`}>
               {result.type === 'ok' ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+              {result.text}
+            </div>
+          )}
+
+          </>}
+
+          {/* 접힘 상태에서 성공 결과만 잠깐 노출 */}
+          {!createExpanded && result?.type === 'ok' && (
+            <div className="mt-2 flex items-center gap-2 px-3 py-1.5 rounded-md text-[11px] bg-emerald-400/10 text-emerald-400 border border-emerald-400/30">
+              <CheckCircle2 size={11} />
               {result.text}
             </div>
           )}
