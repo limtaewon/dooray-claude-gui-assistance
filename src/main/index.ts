@@ -526,8 +526,8 @@ function registerIpcHandlers(): void {
   // AI Skill Generator
   ipcMain.handle(
     IPC_CHANNELS.AI_GENERATE_SKILL,
-    async (_, { request, target, requestId }: { request: string; target: string; requestId?: string }) =>
-      aiService.generateSkill(request, target, requestId)
+    async (_, { request, target, requestId, mcpServers }: { request: string; target: string; requestId?: string; mcpServers?: string[] }) =>
+      aiService.generateSkill(request, target, requestId, mcpServers)
   )
 
   // Wiki domains

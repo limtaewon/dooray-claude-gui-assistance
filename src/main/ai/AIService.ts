@@ -129,6 +129,8 @@ function buildArgs(prompt: string, opts: {
   maxBudget?: string
   effort?: string
   allowMcp?: boolean
+  /** 특정 MCP 서버만 선택적으로 허용. 지정되면 allowMcp 설정과 무관하게 이 목록만 허용 */
+  mcpServers?: string[]
 }): string[] {
   const args = [
     '-p', prompt,
@@ -139,8 +141,12 @@ function buildArgs(prompt: string, opts: {
   ]
   if (opts.systemPrompt) args.push('--append-system-prompt', opts.systemPrompt)
   if (opts.maxBudget) args.push('--max-budget-usd', opts.maxBudget)
-  // MCP 도구 허용 (dooray-mcp, clickhouse 등)
-  if (opts.allowMcp) {
+  // 사용자가 선택한 MCP 서버만 허용
+  if (opts.mcpServers && opts.mcpServers.length > 0) {
+    const patterns = opts.mcpServers.map((name) => `mcp__${name}__*`).join(',')
+    args.push('--allowedTools', patterns)
+  } else if (opts.allowMcp) {
+    // 레거시 호환: allowMcp:true일 때는 기본 몇 개 허용
     args.push('--allowedTools', 'mcp__dooray-mcp__*,mcp__mcp-clickhouse__*,mcp__mysql-nfi__*')
   }
   return args
@@ -759,21 +765,41 @@ ${instruction}
     return result.result
   }
 
-  async generateSkill(request: string, target: string, requestId?: string): Promise<{ name: string; description: string; content: string }> {
+  async generateSkill(
+    request: string,
+    target: string,
+    requestId?: string,
+    mcpServers?: string[]
+  ): Promise<{ name: string; description: string; content: string }> {
+    const useMcp = !!(mcpServers && mcpServers.length > 0)
+    const mcpHint = useMcp ? `
+
+[MCP 도구 사용 권한]
+아래 MCP 서버 도구를 호출하여 실제 데이터(ID, 이름, 설정값 등)를 조회한 뒤
+조회 결과를 스킬 content에 그대로 박아 넣으세요. 스킬이 나중에 실행될 때
+다시 MCP를 호출할 필요 없도록, 구체적인 ID/값을 content에 기록하세요.
+
+허용 MCP: ${mcpServers!.join(', ')}
+
+예: "FI 휴가 캘린더 ID는 12345" 처럼 조회 결과를 스킬 본문에 고정값으로 기록.` : ''
+
     const prompt = `사용자가 요청한 AI 스킬을 생성하세요.
 
 적용 대상: ${target}
-사용자 요청: ${request}
+사용자 요청: ${request}${mcpHint}
 
-반드시 아래 JSON만 응답하세요:
+반드시 아래 JSON만 응답하세요 (설명/머리말/코드블록 금지):
 {
   "name": "스킬 이름 (짧고 명확하게)",
   "description": "한줄 설명",
   "content": "## 규칙\\n- 구체적인 조건과 동작\\n\\n## 출력 형식\\n- AI가 결과를 어떤 형태로 보여줄지"
 }`
 
-    const result = await this.runWithProgress(requestId, '스킬 생성 중...', buildArgs(prompt, {
+    const result = await this.runWithProgress(requestId, useMcp ? '스킬 생성 중 (MCP 조회 포함)...' : '스킬 생성 중...', buildArgs(prompt, {
       model: this.pickModel('generateSkill', 'sonnet'),
+      // MCP 사용 시 effort 올려서 도구 호출 여유 확보
+      effort: useMcp ? 'medium' : 'low',
+      mcpServers,
       systemPrompt: `두레이(Dooray) 업무 관리 AI 스킬 생성 전문가. 사용자의 요구사항을 분석하여 구체적이고 실행 가능한 스킬 규칙을 마크다운으로 작성합니다.
 
 스킬 규칙 작성 지침:
@@ -782,8 +808,13 @@ ${instruction}
 - 캘린더 필드: subject, startedAt, endedAt, location, wholeDayFlag
 - 프로젝트별로 다른 워크플로우 이름이 있을 수 있음
 - 마일스톤은 "26년 15주차" 같은 형식
-- 구체적인 조건, 비교 로직, 출력 형식을 명확하게 작성`,
-      maxBudget: '0.3'
+- 구체적인 조건, 비교 로직, 출력 형식을 명확하게 작성
+${useMcp ? `
+[MCP 활용]
+- 허용된 MCP 도구로 먼저 필요한 ID/설정을 조회 (예: 멤버 이름 → ID, 캘린더 이름 → ID)
+- 조회 결과를 스킬 content에 하드코딩하여 런타임에 다시 조회할 필요 없게 만들기
+- 도구 호출은 꼭 필요한 만큼만, 최소한으로` : ''}`,
+      maxBudget: useMcp ? '1.0' : '0.3'
     }))
 
     try {

@@ -21,6 +21,25 @@ function SkillQuickToggle({ target }: SkillQuickToggleProps): JSX.Element {
   // AI 생성
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
+  const [mcpServers, setMcpServers] = useState<string[]>([])
+  const [selectedMcp, setSelectedMcp] = useState<Set<string>>(new Set())
+
+  // MCP 서버 목록 로드 (AI 생성 모드 진입 시)
+  useEffect(() => {
+    if (mode !== 'ai-generate') return
+    window.api.mcp.list()
+      .then((servers) => setMcpServers(Object.keys(servers || {})))
+      .catch(() => setMcpServers([]))
+  }, [mode])
+
+  const toggleMcp = (name: string): void => {
+    setSelectedMcp((prev) => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
 
   const load = useCallback(async () => {
     const all = await window.api.cloverSkills.list()
@@ -90,20 +109,22 @@ function SkillQuickToggle({ target }: SkillQuickToggleProps): JSX.Element {
   const handleAiGenerate = async (): Promise<void> => {
     if (!aiPrompt.trim()) return
     setAiLoading(true)
-    window.api.analytics.track('ai.skill.generate', { meta: { target } })
+    const mcpList = Array.from(selectedMcp)
+    window.api.analytics.track('ai.skill.generate', { meta: { target, mcpCount: mcpList.length } })
     try {
-      const result = await window.api.ai.generateSkill(aiPrompt.trim(), target)
+      const result = await window.api.ai.generateSkill(aiPrompt.trim(), target, undefined, mcpList)
       setEditing({
         id: `skill-${Date.now()}`, name: result.name, description: result.description,
         target, enabled: true, content: result.content, autoApply: true,
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
       })
-      // AI가 만든 스킬 생성 이벤트 (source='ai')
       window.api.analytics.track('skill.create', { meta: { target, source: 'ai' } })
       setMode('edit')
       setAiPrompt('')
+      setSelectedMcp(new Set())
     } catch (err) {
       console.error('스킬 생성 실패:', err)
+      alert(`스킬 생성 실패: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setAiLoading(false)
     }
@@ -280,16 +301,59 @@ function SkillQuickToggle({ target }: SkillQuickToggleProps): JSX.Element {
                 <textarea
                   value={aiPrompt}
                   onChange={(e) => setAiPrompt(e.target.value)}
-                  placeholder="예: 배포 프로젝트에서 마일스톤이 현재 주차인데 NEON에 내 태스크가 없으면 알려줘"
+                  placeholder="예: 임태원과 FI 휴가 캘린더 일정만 브리핑해줘 (dooray-mcp 체크 → AI가 ID 조회해서 박아넣음)"
                   rows={3}
                   autoFocus
-                  className="w-full px-3 py-2 bg-bg-primary border border-bg-border rounded-lg text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue resize-none mb-2"
+                  className="w-full px-3 py-2 bg-bg-primary border border-bg-border rounded-lg text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue resize-none mb-3"
                 />
+
+                {/* MCP 선택 — 스킬 생성 중 실시간 데이터 조회용 */}
+                <div className="mb-3">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <span className="text-[10px] font-semibold text-text-secondary">MCP 서버 활용 (선택)</span>
+                    <span className="text-[9px] text-text-tertiary">선택한 MCP로 실제 ID·값을 조회해 스킬에 박아넣습니다</span>
+                  </div>
+                  {mcpServers.length === 0 ? (
+                    <div className="px-2 py-1.5 rounded bg-bg-primary border border-bg-border text-[10px] text-text-tertiary">
+                      등록된 MCP 서버가 없습니다 (MCP 탭에서 추가 가능)
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {mcpServers.map((name) => {
+                        const checked = selectedMcp.has(name)
+                        return (
+                          <button key={name} onClick={() => toggleMcp(name)}
+                            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border transition-colors ${
+                              checked
+                                ? 'bg-clover-blue/15 border-clover-blue/40 text-clover-blue font-medium'
+                                : 'bg-bg-primary border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light'
+                            }`}>
+                            <span className={`w-3 h-3 rounded border flex items-center justify-center flex-shrink-0 ${
+                              checked ? 'bg-clover-blue border-clover-blue' : 'border-bg-border-light'
+                            }`}>
+                              {checked && <span className="text-white text-[8px]">✓</span>}
+                            </span>
+                            {name}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {selectedMcp.size > 0 && (
+                    <p className="text-[9px] text-clover-orange mt-1.5">
+                      ⚠ MCP 조회는 시간이 더 걸려요 (30초~2분). 비용도 증가.
+                    </p>
+                  )}
+                </div>
+
                 <div className="flex justify-between items-center">
                   <button onClick={() => setMode('list')} className="text-[10px] text-text-tertiary hover:text-text-secondary">취소</button>
                   <button onClick={handleAiGenerate} disabled={!aiPrompt.trim() || aiLoading}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-blue-500 text-white text-[11px] font-medium hover:opacity-90 disabled:opacity-40">
-                    {aiLoading ? <><Loader2 size={11} className="animate-spin" /> 생성 중...</> : <><Sparkles size={11} /> 스킬 생성</>}
+                    {aiLoading
+                      ? <><Loader2 size={11} className="animate-spin" /> {selectedMcp.size > 0 ? 'MCP 조회 중...' : '생성 중...'}</>
+                      : <><Sparkles size={11} /> 스킬 생성{selectedMcp.size > 0 ? ` (MCP ${selectedMcp.size})` : ''}</>
+                    }
                   </button>
                 </div>
               </div>

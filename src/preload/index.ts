@@ -202,8 +202,8 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.AI_WIKI_PROOFREAD, { title, content, requestId }),
     wikiImprove: (title: string, content: string, requestId?: string): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_WIKI_IMPROVE, { title, content, requestId }),
-    generateSkill: (request: string, target: string, requestId?: string): Promise<{ name: string; description: string; content: string }> =>
-      ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_SKILL, { request, target, requestId }),
+    generateSkill: (request: string, target: string, requestId?: string, mcpServers?: string[]): Promise<{ name: string; description: string; content: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_SKILL, { request, target, requestId, mcpServers }),
     /** 진행상황 이벤트 구독 */
     onProgress: (callback: (event: AIProgressEvent) => void): (() => void) => {
       const handler = (_: IpcRendererEvent, event: AIProgressEvent): void => callback(event)
