@@ -338,7 +338,7 @@ JSON 형태로만 응답:
                     )}
                   </div>
 
-                  <SkillQuickToggle target="task" />
+                  <SkillQuickToggle target="task" size="xs" />
                   <Button variant="ai" size="xs" onClick={composeWithAI}
                     disabled={composing}
                     leftIcon={composing ? <Loader2 size={10} className="animate-spin" /> : <Wand2 size={10} />}>

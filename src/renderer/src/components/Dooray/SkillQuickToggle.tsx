@@ -8,11 +8,13 @@ import { SKILL_TEMPLATES, type SkillTemplate } from '../../../../shared/types/sk
 
 interface SkillQuickToggleProps {
   target: SkillTarget
+  /** 트리거 버튼 크기. 기본 'md'. DS 툴바에서 쓸 땐 'xs' 권장 */
+  size?: 'xs' | 'sm' | 'md'
 }
 
 type Mode = 'list' | 'edit' | 'ai-generate' | 'template' | 'preview'
 
-function SkillQuickToggle({ target }: SkillQuickToggleProps): JSX.Element {
+function SkillQuickToggle({ target, size = 'md' }: SkillQuickToggleProps): JSX.Element {
   const [open, setOpen] = useState(false)
   const [skills, setSkills] = useState<CloverSkill[]>([])
   const [mode, setMode] = useState<Mode>('list')
@@ -169,15 +171,19 @@ function SkillQuickToggle({ target }: SkillQuickToggleProps): JSX.Element {
   const activeCount = skills.filter((s) => s.enabled).length
   const templates = SKILL_TEMPLATES.filter((t) => t.target === target)
 
+  const sizeCls = size === 'md' ? '' : ` ${size}`
+  const iconSize = size === 'xs' ? 10 : size === 'sm' ? 11 : 12
+
   return (
     <div className="relative">
       <button onClick={() => open ? close() : setOpen(true)}
-        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
-          activeCount > 0
-            ? 'bg-amber-500/15 border-amber-400/40 text-amber-300 hover:bg-amber-500/25'
-            : 'bg-bg-surface border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light'
-        }`}>
-        <Zap size={12} className={activeCount > 0 ? 'text-amber-400' : ''} />
+        className={`ds-btn ${activeCount > 0 ? '' : 'secondary'}${sizeCls}`}
+        style={activeCount > 0 ? {
+          background: 'rgba(245, 158, 11, 0.15)',
+          color: '#FCD34D',
+          borderColor: 'rgba(251, 191, 36, 0.4)'
+        } : undefined}>
+        <Zap size={iconSize} className={activeCount > 0 ? 'text-amber-400' : ''} />
         스킬{activeCount > 0 ? ` ${activeCount}` : ''}
       </button>
 
