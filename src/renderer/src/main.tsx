@@ -1,14 +1,20 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
-import { initTheme } from './hooks/useTheme'
-import { initFontSettings } from './hooks/useFontSettings'
+import { initTheme, reconcileThemeFromStore } from './hooks/useTheme'
+import { initFontSettings, reconcileFontFromStore } from './hooks/useFontSettings'
 import { initLightPalette } from './components/Settings/ThemePicker'
 import './index.css'
 
+// 동기적으로 localStorage 기반 부트 (FOUC 방지)
 initTheme()
 initFontSettings()
 initLightPalette()
+
+// electron-store의 영속 값으로 교정 (localStorage가 flush 안된 경우 대비).
+// Chromium localStorage는 강제 종료 시 flush가 보장되지 않아서 이중화 필요.
+void reconcileThemeFromStore()
+void reconcileFontFromStore()
 
 // 앱 내 링크 클릭 시 외부 브라우저로 열기 (Electron 네비게이션 방지)
 document.addEventListener('click', (e) => {

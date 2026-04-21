@@ -19,37 +19,38 @@ function clearPaletteInlineStyles(): void {
 
 function applyTheme(theme: Theme): void {
   document.documentElement.setAttribute('data-theme', theme)
-  // 다크 모드에서는 ThemePicker의 라이트 팔레트 인라인 스타일이 남아있으면
-  // [data-theme='dark'] 규칙이 덮어쓰이지 못하므로 제거.
   if (theme === 'dark') {
     clearPaletteInlineStyles()
   } else {
-    // 라이트로 돌아오면 저장된 팔레트 다시 주입 (FOUC 재방지)
-    // 동적 import로 순환 참조 방지
     import('../components/Settings/ThemePicker').then((m) => m.initLightPalette()).catch(() => {})
   }
-  // 테마 전환 이벤트 브로드캐스트 (캐시 가진 컴포넌트들이 무효화할 수 있게)
   window.dispatchEvent(new CustomEvent('theme-changed', { detail: theme }))
 }
 
-function readStored(): Theme {
-  const v = localStorage.getItem(STORAGE_KEY)
-  // 기본값: light
+function normalize(v: unknown): Theme {
   return v === 'dark' ? 'dark' : 'light'
 }
 
-/** 공유 테마 상태.
- * useTheme은 여러 컴포넌트에서 호출되기 때문에 각자 독립 state를 가지면
- * stale 값이 localStorage로 덮어써지는 race 조건이 생김. 모듈 레벨 단일
- * source of truth + pub/sub로 모든 인스턴스가 같은 값을 보도록 함. */
-let sharedTheme: Theme = readStored()
+/** 공유 테마 상태 (모듈 레벨).
+ * 저장소는 localStorage + electron-store 이중 기록:
+ * - localStorage: 빠른 FOUC 방지용 (initTheme 동기 실행)
+ * - electron-store: 신뢰할 수 있는 영속성 (Chromium localStorage flush 지연 문제 회피)
+ * 읽을 때는 electron-store 우선, 없으면 localStorage. */
+let sharedTheme: Theme = (() => {
+  try { return normalize(localStorage.getItem(STORAGE_KEY)) } catch { return 'light' }
+})()
 const listeners = new Set<(t: Theme) => void>()
+
+function persistTheme(next: Theme): void {
+  try { localStorage.setItem(STORAGE_KEY, next) } catch { /* ok */ }
+  try { window.api?.settings?.set?.(STORAGE_KEY, next) } catch { /* ok */ }
+}
 
 function setSharedTheme(next: Theme): void {
   if (sharedTheme === next) return
-  console.log(`[useTheme] setSharedTheme ${sharedTheme} → ${next}`, new Error('stack').stack?.split('\n').slice(1, 5).join(' → '))
+  console.log(`[useTheme] ${sharedTheme} → ${next}`)
   sharedTheme = next
-  localStorage.setItem(STORAGE_KEY, next)
+  persistTheme(next)
   applyTheme(next)
   for (const fn of listeners) fn(next)
 }
@@ -58,7 +59,6 @@ export function useTheme(): { theme: Theme; setTheme: (t: Theme) => void; toggle
   const [theme, setLocal] = useState<Theme>(sharedTheme)
 
   useEffect(() => {
-    // 초기 구독 시점에 shared와 local이 다르면 동기화 (StrictMode 더블 마운트 대비)
     if (sharedTheme !== theme) setLocal(sharedTheme)
     const listener = (t: Theme): void => setLocal(t)
     listeners.add(listener)
@@ -72,8 +72,30 @@ export function useTheme(): { theme: Theme; setTheme: (t: Theme) => void; toggle
   return { theme, setTheme, toggle }
 }
 
-// App 부트스트랩에서 한번 호출하여 FOUC 방지
+/** App 부트스트랩에서 동기 호출 — FOUC 방지용 (localStorage 값으로 즉시 적용). */
 export function initTheme(): void {
-  sharedTheme = readStored()
-  applyTheme(sharedTheme)
+  let v: Theme = 'light'
+  try { v = normalize(localStorage.getItem(STORAGE_KEY)) } catch { /* ok */ }
+  sharedTheme = v
+  applyTheme(v)
+}
+
+/** 앱 부트스트랩 이후 electron-store의 영속 값으로 교정 (localStorage보다 우선).
+ * main 프로세스의 store는 디스크 즉시 기록되어 SIGTERM에도 안전. */
+export async function reconcileThemeFromStore(): Promise<void> {
+  try {
+    const stored = await window.api?.settings?.get?.(STORAGE_KEY)
+    if (stored === 'dark' || stored === 'light') {
+      if (sharedTheme !== stored) {
+        console.log(`[useTheme] reconcile localStorage=${sharedTheme} → store=${stored}`)
+        sharedTheme = stored
+        try { localStorage.setItem(STORAGE_KEY, stored) } catch { /* ok */ }
+        applyTheme(stored)
+        for (const fn of listeners) fn(stored)
+      }
+    } else if (sharedTheme) {
+      // store가 비어있으면 현재 값을 store에 기록
+      window.api?.settings?.set?.(STORAGE_KEY, sharedTheme)
+    }
+  } catch { /* ok */ }
 }

@@ -58,7 +58,9 @@ const listeners = new Set<(s: FontSettings) => void>()
 function setShared(next: FontSettings): void {
   if (sharedSettings.family === next.family && sharedSettings.scale === next.scale) return
   sharedSettings = next
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+  const json = JSON.stringify(next)
+  try { localStorage.setItem(STORAGE_KEY, json) } catch { /* ok */ }
+  try { window.api?.settings?.set?.(STORAGE_KEY, json) } catch { /* ok */ }
   applyFont(next)
   for (const fn of listeners) fn(next)
 }
@@ -95,8 +97,31 @@ export function useFontSettings(): {
   return { settings, setFamily, setScale, reset }
 }
 
-// App 부트스트랩에서 호출 — FOUC 방지
+// App 부트스트랩에서 호출 — FOUC 방지 (localStorage 기반 동기)
 export function initFontSettings(): void {
   sharedSettings = readStored()
   applyFont(sharedSettings)
+}
+
+/** electron-store 영속 값으로 교정 (localStorage flush 안 됐을 때 대비) */
+export async function reconcileFontFromStore(): Promise<void> {
+  try {
+    const raw = await window.api?.settings?.get?.(STORAGE_KEY)
+    if (typeof raw !== 'string' || !raw) {
+      // store 비어있으면 현재 값을 기록
+      window.api?.settings?.set?.(STORAGE_KEY, JSON.stringify(sharedSettings))
+      return
+    }
+    const parsed = JSON.parse(raw) as Partial<FontSettings>
+    const family = (parsed.family && parsed.family in FAMILY_STACKS ? parsed.family : 'default') as FontFamily
+    const scaleNum = Number(parsed.scale)
+    const scale = Number.isFinite(scaleNum) ? Math.max(0.75, Math.min(1.6, scaleNum)) : 1.0
+    const next: FontSettings = { family, scale }
+    if (sharedSettings.family !== next.family || sharedSettings.scale !== next.scale) {
+      sharedSettings = next
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch { /* ok */ }
+      applyFont(next)
+      for (const fn of listeners) fn(next)
+    }
+  } catch { /* ok */ }
 }
