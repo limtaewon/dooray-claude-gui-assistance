@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Plus, X, Terminal, Trash2, FolderOpen, ChevronDown, Sparkles } from 'lucide-react'
 import TerminalPane from './TerminalPane'
 import type { TerminalSession } from '../../../../shared/types/terminal'
@@ -180,7 +181,8 @@ function TerminalView(): JSX.Element {
   )
 }
 
-/** 새 터미널 생성 버튼 + 드롭다운 (일반/Claude/폴더 선택) */
+/** 새 터미널 생성 버튼 + 드롭다운 (일반/Claude/폴더 선택)
+ * 드롭다운은 portal로 document.body에 렌더 — 부모 탭바의 overflow-x-auto 클리핑 회피 */
 function NewTerminalButton({ onDefault, onClaude, onFolder, onFolderClaude }: {
   onDefault: () => void
   onClaude: () => void
@@ -188,24 +190,42 @@ function NewTerminalButton({ onDefault, onClaude, onFolder, onFolderClaude }: {
   onFolderClaude: () => void
 }): JSX.Element {
   const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
+  const chevronRef = useRef<HTMLButtonElement>(null)
+
+  const toggle = (): void => {
+    if (open) {
+      setOpen(false)
+      return
+    }
+    const rect = chevronRef.current?.getBoundingClientRect()
+    if (rect) {
+      // 드롭다운 폭 224px(w-56). 화면 우측 경계 초과 시 버튼 오른쪽 정렬
+      const width = 224
+      const preferredLeft = rect.left
+      const maxLeft = window.innerWidth - width - 8
+      setPos({ left: Math.min(preferredLeft, Math.max(8, maxLeft)), top: rect.bottom + 4 })
+    }
+    setOpen(true)
+  }
+
   return (
-    <div className="relative flex-shrink-0">
-      <div className="flex items-center">
-        <button onClick={onDefault}
-          className="w-7 h-7 rounded-l flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover"
-          title="새 일반 터미널 (⌘T)">
-          <Plus size={14} />
-        </button>
-        <button onClick={() => setOpen(!open)}
-          className="w-4 h-7 rounded-r flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover border-l border-bg-border/50"
-          title="터미널 옵션">
-          <ChevronDown size={10} />
-        </button>
-      </div>
-      {open && (
+    <div className="flex items-center flex-shrink-0">
+      <button onClick={onDefault}
+        className="w-7 h-7 rounded-l flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover"
+        title="새 일반 터미널 (⌘T)">
+        <Plus size={14} />
+      </button>
+      <button ref={chevronRef} onClick={toggle}
+        className="w-5 h-7 rounded-r flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover border-l border-bg-border/50"
+        title="터미널 옵션">
+        <ChevronDown size={11} />
+      </button>
+      {open && pos && createPortal(
         <>
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 w-56 bg-bg-surface border border-bg-border rounded-lg shadow-2xl z-40 py-1">
+          <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
+          <div className="fixed w-56 bg-bg-surface border border-bg-border rounded-lg shadow-2xl z-[9999] py-1"
+            style={{ left: pos.left, top: pos.top }}>
             <button onClick={() => { setOpen(false); onDefault() }}
               className="w-full flex items-center gap-2 px-3 py-2 text-[11px] text-text-primary hover:bg-bg-surface-hover text-left">
               <Terminal size={12} className="text-text-tertiary" />
@@ -229,7 +249,8 @@ function NewTerminalButton({ onDefault, onClaude, onFolder, onFolderClaude }: {
               <span>폴더 선택 후 Claude Code</span>
             </button>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   )
