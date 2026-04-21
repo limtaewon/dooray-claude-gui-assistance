@@ -11,6 +11,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Design System v1 utility classes (.ds-btn, .ds-card, .ds-chip 등) */
+@import './design-system.css';
+
 /* -------- brand (테마 무관) -------- */
 :root {
   --clover-orange:        #EA580C;   /* Dooray */
