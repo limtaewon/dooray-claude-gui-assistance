@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Check, Cpu, Key, Eye, EyeOff, ExternalLink, SlidersHorizontal, LogOut, BarChart2, Moon, Sun } from 'lucide-react'
+import { Check, Cpu, Key, Eye, EyeOff, ExternalLink, SlidersHorizontal, LogOut, BarChart2, Moon, Sun, Type } from 'lucide-react'
 import type { AIModelConfig, AIModelName } from '../../../../shared/types/ai'
 import UsageInsights from './UsageInsights'
 import { useTheme } from '../../hooks/useTheme'
+import { useFontSettings, FONT_FAMILY_LABELS, type FontFamily } from '../../hooks/useFontSettings'
 import ThemePicker from './ThemePicker'
 
 type SettingsTab = 'models' | 'dooray' | 'app' | 'insights'
@@ -362,6 +363,15 @@ function AppBehaviorSettings(): JSX.Element {
         </div>
       )}
 
+      {/* 글꼴 & 크기 */}
+      <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden mb-3">
+        <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30 flex items-center gap-2">
+          <Type size={12} className="text-text-secondary" />
+          <span className="text-xs font-medium text-text-primary">글꼴 & 크기</span>
+        </div>
+        <FontSettingsSection />
+      </div>
+
       {/* 시작 뷰 */}
       <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden">
         <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30">
@@ -391,6 +401,91 @@ function AppBehaviorSettings(): JSX.Element {
       <p className="text-[10px] text-text-tertiary mt-3">
         💡 <strong className="text-text-secondary">AI 스킬 관리</strong>는 각 AI 기능 화면 우측의 <span className="text-amber-400 font-medium">스킬</span> 버튼에서 바로 할 수 있습니다.
       </p>
+    </div>
+  )
+}
+
+/** 글꼴 종류 + 크기 배율 설정 */
+function FontSettingsSection(): JSX.Element {
+  const { settings, setFamily, setScale, reset } = useFontSettings()
+  const pct = Math.round(settings.scale * 100)
+
+  const FAMILIES: FontFamily[] = ['default', 'pretendard', 'appleSystem', 'notoSansKr', 'sans', 'serif']
+  const SCALE_PRESETS: Array<{ value: number; label: string }> = [
+    { value: 0.875, label: '작게' },
+    { value: 1.0, label: '기본' },
+    { value: 1.125, label: '크게' },
+    { value: 1.25, label: '더 크게' },
+    { value: 1.4, label: '가장 크게' }
+  ]
+
+  return (
+    <div className="p-3 space-y-4">
+      {/* 폰트 패밀리 */}
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[11px] text-text-secondary">폰트</span>
+          <span className="text-[10px] text-text-tertiary">OS에 설치된 폰트만 표시됩니다</span>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {FAMILIES.map((f) => {
+            const active = settings.family === f
+            return (
+              <button key={f} onClick={() => setFamily(f)}
+                className={`px-3 py-2 rounded-md text-left transition-colors border ${
+                  active ? 'bg-clover-blue/10 border-clover-blue/40' : 'bg-bg-primary border-bg-border hover:border-bg-border-light'
+                }`}>
+                <span className={`block text-xs ${active ? 'text-clover-blue font-medium' : 'text-text-primary'}`}>
+                  {FONT_FAMILY_LABELS[f]}
+                </span>
+                <span className="block text-[10px] text-text-tertiary mt-0.5">안녕하세요 Abc 123</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* 크기 배율 */}
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[11px] text-text-secondary">글자 크기</span>
+          <span className="text-[11px] text-text-primary font-mono">{pct}%</span>
+        </div>
+        <input
+          type="range"
+          min={75}
+          max={160}
+          step={5}
+          value={pct}
+          onChange={(e) => setScale(Number(e.target.value) / 100)}
+          className="w-full accent-clover-blue"
+        />
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {SCALE_PRESETS.map((p) => (
+            <button key={p.value} onClick={() => setScale(p.value)}
+              className={`px-2.5 py-1 rounded-md text-[10px] border transition-colors ${
+                Math.abs(settings.scale - p.value) < 0.01
+                  ? 'bg-clover-blue/10 border-clover-blue/40 text-clover-blue font-medium'
+                  : 'bg-bg-primary border-bg-border text-text-secondary hover:text-text-primary'
+              }`}>
+              {p.label} <span className="text-text-tertiary">{Math.round(p.value * 100)}%</span>
+            </button>
+          ))}
+          <button onClick={reset}
+            className="ml-auto px-2.5 py-1 rounded-md text-[10px] text-text-tertiary hover:text-text-secondary">
+            기본값으로
+          </button>
+        </div>
+      </div>
+
+      {/* 미리보기 */}
+      <div className="rounded-lg border border-bg-border bg-bg-primary p-3">
+        <p className="text-[10px] text-text-tertiary mb-1.5">미리보기</p>
+        <p className="text-sm text-text-primary leading-relaxed">
+          안녕하세요. Clauday v1.1.0 입니다. The quick brown fox jumps over the lazy dog. 1234567890
+        </p>
+        <p className="text-xs text-text-secondary mt-1">작은 텍스트 예시 — 필터, 뱃지, 설명에 사용됩니다.</p>
+      </div>
     </div>
   )
 }

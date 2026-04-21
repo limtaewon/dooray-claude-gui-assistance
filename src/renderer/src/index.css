@@ -131,11 +131,24 @@ html, body, #root {
   width: 100%;
 }
 
+/* 글자 배율: Tailwind가 rem 기반이라 html 단위 font-size를 바꿔야 전체 스케일됨.
+   기본 16px × scale. scale=1이면 Tailwind 기본과 동일. */
+html {
+  font-size: calc(16px * var(--app-font-scale, 1));
+}
+
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: var(--bg-primary);
   color: var(--text-primary);
+  font-family: var(--app-font-family, 'Inter', 'Pretendard Variable', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', system-ui, sans-serif);
+}
+
+/* 앱 전역 폰트 패밀리 상속: 모든 텍스트 요소가 body의 font-family를 따르게.
+   코드/mono 영역은 자체 font-family를 유지 */
+input, textarea, select, button {
+  font-family: inherit;
 }
 
 /* Markdown body — CSS 변수 기반 */
