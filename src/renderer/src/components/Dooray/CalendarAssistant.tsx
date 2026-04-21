@@ -53,16 +53,16 @@ function CalendarFilter({ events, filterIds, onFilter }: {
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div className="absolute right-0 top-full mt-1 w-64 bg-bg-surface border border-bg-border rounded-xl shadow-2xl z-40 overflow-hidden">
             <div className="px-3 py-2 border-b border-bg-border bg-bg-surface-hover">
-              <span className="text-[11px] font-semibold text-gray-100">표시할 캘린더 선택</span>
+              <span className="text-[11px] font-semibold text-text-primary">표시할 캘린더 선택</span>
               <span className="text-[9px] text-text-tertiary ml-2">{filterIds.length > 0 ? `${filterIds.length}개` : '전체'}</span>
             </div>
             <div className="max-h-60 overflow-y-auto py-1">
               {calendars.map((c) => (
                 <button key={c.id} onClick={() => toggle(c.id)} className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-bg-surface-hover text-left">
-                  <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 ${filterIds.includes(c.id) ? 'bg-blue-500 border-blue-500' : 'border-gray-600'}`}>
+                  <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 ${filterIds.includes(c.id) ? 'bg-clover-blue border-clover-blue' : 'border-bg-border-light'}`}>
                     {filterIds.includes(c.id) && <Check size={9} className="text-white" />}
                   </div>
-                  <span className={`text-[11px] truncate flex-1 ${filterIds.includes(c.id) ? 'text-gray-100' : 'text-gray-400'}`}>{c.name}</span>
+                  <span className={`text-[11px] truncate flex-1 ${filterIds.includes(c.id) ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>{c.name}</span>
                   {c.count > 0 && <span className="text-[9px] text-text-tertiary flex-shrink-0">{c.count}</span>}
                 </button>
               ))}

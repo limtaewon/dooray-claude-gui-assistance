@@ -165,16 +165,16 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
                     <button onClick={() => toggle(p.id)}
                       className="flex-1 flex items-center gap-2 px-3 py-1.5 hover:bg-bg-surface-hover transition-colors text-left">
                       <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 ${
-                        checked ? 'bg-blue-500 border-blue-500' : 'border-gray-600'
+                        checked ? 'bg-clover-blue border-clover-blue' : 'border-bg-border-light'
                       }`}>
                         {checked && <Check size={9} className="text-white" />}
                       </div>
                       {isCustom ? (
-                        <Link size={11} className={`flex-shrink-0 ${checked ? 'text-amber-400' : 'text-amber-600'}`} />
+                        <Link size={11} className={`flex-shrink-0 ${checked ? 'text-clover-orange' : 'text-text-tertiary'}`} />
                       ) : (
-                        <FolderOpen size={11} className={`flex-shrink-0 ${checked ? 'text-blue-400' : 'text-text-tertiary'}`} />
+                        <FolderOpen size={11} className={`flex-shrink-0 ${checked ? 'text-clover-blue' : 'text-text-tertiary'}`} />
                       )}
-                      <span className={`text-[11px] truncate min-w-0 ${checked ? 'text-text-primary' : 'text-gray-400'}`}>{p.code}</span>
+                      <span className={`text-[11px] truncate min-w-0 ${checked ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>{p.code}</span>
                     </button>
                     {isCustom && (
                       <button onClick={() => removeCustomProject(p.id)}

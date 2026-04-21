@@ -9,11 +9,10 @@ import CalendarAssistant from './CalendarAssistant'
 import ReportGenerator from './ReportGenerator'
 import MessengerAssistant from './MessengerAssistant'
 import DashboardView from './DashboardView'
-import TeamInsights from './TeamInsights'
 
-type Tab = 'dashboard' | 'tasks' | 'wiki' | 'calendar' | 'messenger' | 'briefing' | 'report' | 'insights'
+type Tab = 'dashboard' | 'tasks' | 'wiki' | 'calendar' | 'messenger' | 'briefing' | 'report'
 
-const AI_TABS = new Set<Tab>(['dashboard', 'briefing', 'report', 'messenger', 'insights'])
+const AI_TABS = new Set<Tab>(['dashboard', 'briefing', 'report', 'messenger'])
 
 interface DoorayAssistantProps {
   onDisconnect?: () => void
@@ -29,8 +28,7 @@ function DoorayAssistant({ onDisconnect }: DoorayAssistantProps): JSX.Element {
     { id: 'calendar', icon: CalendarIcon, label: '캘린더' },
     { id: 'messenger', icon: MessageCircle, label: '메신저' },
     { id: 'briefing', icon: Sparkles, label: '브리핑' },
-    { id: 'report', icon: FileText, label: '보고서' },
-    { id: 'insights', icon: Sparkles, label: '인사이트' }
+    { id: 'report', icon: FileText, label: '보고서' }
   ]
 
   const vis = (tab: Tab): string =>
@@ -77,7 +75,6 @@ function DoorayAssistant({ onDisconnect }: DoorayAssistantProps): JSX.Element {
         <div className={`absolute inset-0 ${vis('messenger')}`}><MessengerAssistant /></div>
         <div className={`absolute inset-0 ${vis('briefing')}`}><BriefingPanel /></div>
         <div className={`absolute inset-0 ${vis('report')}`}><ReportGenerator /></div>
-        <div className={`absolute inset-0 ${vis('insights')}`}><TeamInsights /></div>
       </div>
     </div>
   )
