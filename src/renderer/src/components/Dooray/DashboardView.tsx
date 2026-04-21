@@ -256,7 +256,14 @@ function TodayFocusList({ tasks, loading }: { tasks: DoorayTask[]; loading: bool
   return (
     <div className="space-y-1">
       {focus.map((t) => (
-        <div key={t.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-bg-surface-hover">
+        <a
+          key={t.id}
+          href={`https://nhnent.dooray.com/project/posts/${t.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-bg-surface-hover transition-colors"
+          title="두레이에서 열기"
+        >
           <span className={`text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
             t.workflowClass === 'working' ? 'bg-clover-blue/10 text-clover-blue' : 'bg-clover-orange/10 text-clover-orange'
           }`}>
@@ -270,7 +277,7 @@ function TodayFocusList({ tasks, loading }: { tasks: DoorayTask[]; loading: bool
             </span>
           )}
           <ArrowRight size={10} className="text-text-tertiary flex-shrink-0" />
-        </div>
+        </a>
       ))}
     </div>
   )

@@ -175,25 +175,25 @@ function BriefingPanel(): JSX.Element {
 
             {briefing.urgent.length > 0 && (
               <Section icon={AlertTriangle} iconColor="text-red-400" title="긴급" bgColor="from-red-500/5 to-transparent border-red-500/20">
-                {briefing.urgent.map((item, i) => <TaskItem key={i} subject={item.subject} detail={item.reason} />)}
+                {briefing.urgent.map((item, i) => <TaskItem key={i} taskId={item.taskId} subject={item.subject} detail={item.reason} />)}
               </Section>
             )}
 
             {briefing.focus.length > 0 && (
               <Section icon={Target} iconColor="text-clover-blue" title="오늘 집중" bgColor="from-clover-blue/5 to-transparent border-clover-blue/20">
-                {briefing.focus.map((item, i) => <TaskItem key={i} subject={item.subject} detail={item.reason} />)}
+                {briefing.focus.map((item, i) => <TaskItem key={i} taskId={item.taskId} subject={item.subject} detail={item.reason} />)}
               </Section>
             )}
 
             {briefing.mentioned && briefing.mentioned.length > 0 && (
               <Section icon={AlertTriangle} iconColor="text-violet-400" title="멘션됨 (내가 알아야 할 것)" bgColor="from-violet-500/5 to-transparent border-violet-500/20">
-                {briefing.mentioned.map((item, i) => <TaskItem key={i} subject={item.subject} detail={item.reason} />)}
+                {briefing.mentioned.map((item, i) => <TaskItem key={i} taskId={item.taskId} subject={item.subject} detail={item.reason} />)}
               </Section>
             )}
 
             {briefing.stale.length > 0 && (
               <Section icon={Clock} iconColor="text-clover-orange" title="착수 필요" bgColor="from-clover-orange/5 to-transparent border-clover-orange/20">
-                {briefing.stale.map((item, i) => <TaskItem key={i} subject={item.subject} detail={`${item.daysSinceCreated}일째`} />)}
+                {briefing.stale.map((item, i) => <TaskItem key={i} taskId={item.taskId} subject={item.subject} detail={`${item.daysSinceCreated}일째`} />)}
               </Section>
             )}
 
@@ -243,11 +243,25 @@ function Section({ icon: Icon, iconColor, title, bgColor, children }: {
   )
 }
 
-function TaskItem({ subject, detail }: { subject: string; detail: string }): JSX.Element {
-  return (
-    <div className="flex items-start gap-2 text-xs">
+function TaskItem({ taskId, subject, detail }: { taskId?: string; subject: string; detail: string }): JSX.Element {
+  const content = (
+    <>
       <span className="text-text-primary flex-1">{subject}</span>
       <span className="text-text-secondary flex-shrink-0">{detail}</span>
+    </>
+  )
+  if (taskId) {
+    return (
+      <a href={`https://nhnent.dooray.com/project/posts/${taskId}`} target="_blank" rel="noopener noreferrer"
+        className="flex items-start gap-2 text-xs px-1.5 -mx-1.5 py-1 rounded hover:bg-bg-surface-hover transition-colors cursor-pointer"
+        title="두레이에서 열기">
+        {content}
+      </a>
+    )
+  }
+  return (
+    <div className="flex items-start gap-2 text-xs">
+      {content}
     </div>
   )
 }
