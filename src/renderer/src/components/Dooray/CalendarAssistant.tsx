@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react'
-import { RefreshCw, Clock, MapPin, AlertCircle, CalendarDays, Sparkles, Loader2, Settings, Check, FolderOpen } from 'lucide-react'
+import { RefreshCw, Clock, MapPin, AlertCircle, CalendarDays, Sparkles, Loader2, Settings, Check, FolderOpen, FileText, Copy } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -123,6 +123,27 @@ function CalendarAssistant(): JSX.Element {
   // AI
   const [aiResult, setAiResult] = useState<string | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
+  const [meetingNoteForId, setMeetingNoteForId] = useState<string | null>(null)
+  const [meetingNote, setMeetingNote] = useState<string>('')
+  const [copied, setCopied] = useState(false)
+
+  const generateMeetingNote = async (event: DoorayCalendarEvent): Promise<void> => {
+    setMeetingNoteForId(event.id)
+    setMeetingNote('')
+    try {
+      const note = await window.api.ai.generateMeetingNote(event.subject, event.description)
+      setMeetingNote(note)
+    } catch (err) {
+      setMeetingNote(`오류: ${err instanceof Error ? err.message : ''}`)
+    }
+  }
+
+  const copyNote = async (): Promise<void> => {
+    if (!meetingNote) return
+    await navigator.clipboard.writeText(meetingNote)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
 
   const loadEvents = useCallback(async () => {
     setLoading(true); setError(null)
@@ -324,23 +345,61 @@ function CalendarAssistant(): JSX.Element {
                   <div className="space-y-1.5">
                     {dayEvents.map((event, i) => {
                       const isAllDay = event.wholeDayFlag || (!safeTime(getStart(event)) && !safeTime(getEnd(event)))
+                      const showingNote = meetingNoteForId === event.id
                       return (
-                        <div key={`${event.id || i}-${dateKey}`} className="flex items-start gap-3 p-2.5 bg-bg-surface border border-bg-border rounded-lg hover:border-bg-border-light transition-colors">
-                          <div className={`w-1 min-h-[32px] rounded-full flex-shrink-0 ${isAllDay ? 'bg-clover-orange' : 'bg-clover-blue'}`} />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs text-text-primary">{event.subject || '(제목 없음)'}</p>
-                            <div className="flex items-center gap-3 mt-0.5">
-                              <div className="flex items-center gap-1 text-[10px] text-text-secondary">
-                                <Clock size={9} />
-                                {isAllDay ? '종일' : `${safeTime(getStart(event))} - ${safeTime(getEnd(event))}`}
-                              </div>
-                              {event.location && (
+                        <div key={`${event.id || i}-${dateKey}`} className="bg-bg-surface border border-bg-border rounded-lg hover:border-bg-border-light transition-colors">
+                          <div className="flex items-start gap-3 p-2.5 group">
+                            <div className={`w-1 min-h-[32px] rounded-full flex-shrink-0 ${isAllDay ? 'bg-clover-orange' : 'bg-clover-blue'}`} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-text-primary">{event.subject || '(제목 없음)'}</p>
+                              <div className="flex items-center gap-3 mt-0.5">
                                 <div className="flex items-center gap-1 text-[10px] text-text-secondary">
-                                  <MapPin size={9} /> {event.location}
+                                  <Clock size={9} />
+                                  {isAllDay ? '종일' : `${safeTime(getStart(event))} - ${safeTime(getEnd(event))}`}
+                                </div>
+                                {event.location && (
+                                  <div className="flex items-center gap-1 text-[10px] text-text-secondary">
+                                    <MapPin size={9} /> {event.location}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => showingNote ? setMeetingNoteForId(null) : generateMeetingNote(event)}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-clover-blue hover:bg-clover-blue/10 flex-shrink-0"
+                              title="AI 회의록 생성"
+                            >
+                              <FileText size={10} />
+                              회의록
+                            </button>
+                          </div>
+                          {showingNote && (
+                            <div className="px-2.5 pb-2.5 border-t border-bg-border pt-2">
+                              {meetingNote ? (
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[9px] text-clover-blue font-semibold">AI 회의록 템플릿</span>
+                                    <div className="flex items-center gap-1">
+                                      <button onClick={copyNote}
+                                        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover">
+                                        {copied ? <Check size={9} /> : <Copy size={9} />}
+                                        {copied ? '복사됨' : '복사'}
+                                      </button>
+                                      <button onClick={() => setMeetingNoteForId(null)}
+                                        className="text-text-tertiary hover:text-text-secondary px-1">
+                                        <span className="text-[9px]">닫기</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <pre className="text-[10px] text-text-primary whitespace-pre-wrap font-mono bg-bg-primary rounded p-2 max-h-48 overflow-y-auto">{meetingNote}</pre>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 text-[10px] text-text-tertiary">
+                                  <Loader2 size={10} className="animate-spin" /> AI 회의록 생성 중...
                                 </div>
                               )}
                             </div>
-                          </div>
+                          )}
                         </div>
                       )
                     })}
