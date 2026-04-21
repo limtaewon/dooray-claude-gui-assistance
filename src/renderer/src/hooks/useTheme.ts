@@ -38,21 +38,41 @@ function readStored(): Theme {
   return v === 'dark' ? 'dark' : 'light'
 }
 
+/** 공유 테마 상태.
+ * useTheme은 여러 컴포넌트에서 호출되기 때문에 각자 독립 state를 가지면
+ * stale 값이 localStorage로 덮어써지는 race 조건이 생김. 모듈 레벨 단일
+ * source of truth + pub/sub로 모든 인스턴스가 같은 값을 보도록 함. */
+let sharedTheme: Theme = readStored()
+const listeners = new Set<(t: Theme) => void>()
+
+function setSharedTheme(next: Theme): void {
+  if (sharedTheme === next) return
+  sharedTheme = next
+  localStorage.setItem(STORAGE_KEY, next)
+  applyTheme(next)
+  for (const fn of listeners) fn(next)
+}
+
 export function useTheme(): { theme: Theme; setTheme: (t: Theme) => void; toggle: () => void } {
-  const [theme, setThemeState] = useState<Theme>(() => readStored())
+  const [theme, setLocal] = useState<Theme>(sharedTheme)
 
   useEffect(() => {
-    applyTheme(theme)
-    localStorage.setItem(STORAGE_KEY, theme)
-  }, [theme])
+    // 초기 구독 시점에 shared와 local이 다르면 동기화 (StrictMode 더블 마운트 대비)
+    if (sharedTheme !== theme) setLocal(sharedTheme)
+    const listener = (t: Theme): void => setLocal(t)
+    listeners.add(listener)
+    return () => { listeners.delete(listener) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  const setTheme = useCallback((t: Theme) => setThemeState(t), [])
-  const toggle = useCallback(() => setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark')), [])
+  const setTheme = useCallback((t: Theme) => setSharedTheme(t), [])
+  const toggle = useCallback(() => setSharedTheme(sharedTheme === 'dark' ? 'light' : 'dark'), [])
 
   return { theme, setTheme, toggle }
 }
 
 // App 부트스트랩에서 한번 호출하여 FOUC 방지
 export function initTheme(): void {
-  applyTheme(readStored())
+  sharedTheme = readStored()
+  applyTheme(sharedTheme)
 }

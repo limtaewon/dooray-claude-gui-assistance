@@ -426,11 +426,12 @@ export class TaskService {
   }
 
   /** 프로젝트 태스크 템플릿 목록 조회.
-   * Dooray 엔드포인트 후보를 순차 시도 (조직/버전별 path 차이 대응). */
+   * Dooray 정식 엔드포인트는 /project/v1/projects/{id}/templates.
+   * 일부 조직/버전에서 다를 수 있어 fallback 유지. */
   async listProjectTemplates(projectId: string): Promise<Array<{ id: string; name: string }>> {
     const endpoints = [
-      `/project/v1/projects/${projectId}/post-templates?size=100`,
       `/project/v1/projects/${projectId}/templates?size=100`,
+      `/project/v1/projects/${projectId}/post-templates?size=100`,
       `/project/v1/projects/${projectId}/posts/templates?size=100`
     ]
     let lastError: unknown = null
@@ -452,8 +453,8 @@ export class TaskService {
   /** 프로젝트 태스크 템플릿 상세 (제목/본문) */
   async getProjectTemplate(projectId: string, templateId: string): Promise<{ id: string; name: string; subject: string; body: string } | null> {
     const endpoints = [
-      `/project/v1/projects/${projectId}/post-templates/${templateId}`,
       `/project/v1/projects/${projectId}/templates/${templateId}`,
+      `/project/v1/projects/${projectId}/post-templates/${templateId}`,
       `/project/v1/projects/${projectId}/posts/templates/${templateId}`
     ]
     for (const path of endpoints) {
