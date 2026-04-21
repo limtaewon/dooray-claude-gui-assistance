@@ -117,6 +117,12 @@ const api = {
       /** 태스크 생성 (커뮤니티 글쓰기) */
       create: (params: { projectId: string; subject: string; body: string; assigneeIds?: string[] }): Promise<{ id: string }> =>
         ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_CREATE, params),
+      /** 프로젝트 태스크 템플릿 목록 */
+      templates: (projectId: string): Promise<Array<{ id: string; name: string }>> =>
+        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_TEMPLATES_LIST, projectId),
+      /** 프로젝트 태스크 템플릿 상세 (제목/본문) */
+      templateDetail: (projectId: string, templateId: string): Promise<{ id: string; name: string; subject: string; body: string } | null> =>
+        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_TEMPLATE_DETAIL, { projectId, templateId }),
       /** 태스크 댓글 생성 */
       createComment: (params: { projectId: string; postId: string; content: string }): Promise<{ id: string }> =>
         ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_COMMENT_CREATE, params),

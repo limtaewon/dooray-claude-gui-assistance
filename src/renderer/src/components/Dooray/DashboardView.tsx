@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   LayoutDashboard, Plus, Sparkles, Loader2, CheckCircle2, Clock, Target,
-  AlertCircle, ArrowRight, Send, X
+  AlertCircle, ArrowRight, Send, X, FileText, ChevronDown
 } from 'lucide-react'
 import type { DoorayTask, DoorayProject } from '../../../../shared/types/dooray'
+import SkillQuickToggle from './SkillQuickToggle'
 
 /**
  * Phase 1: AI 업무 대시보드
@@ -23,6 +24,11 @@ function DashboardView(): JSX.Element {
   const [preview, setPreview] = useState<{ subject: string; body: string } | null>(null)
   const [creating, setCreating] = useState(false)
   const [result, setResult] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+
+  // 두레이 템플릿
+  const [templates, setTemplates] = useState<Array<{ id: string; name: string }>>([])
+  const [templatesLoading, setTemplatesLoading] = useState(false)
+  const [templateMenuOpen, setTemplateMenuOpen] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -44,6 +50,32 @@ function DashboardView(): JSX.Element {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // 선택한 프로젝트의 두레이 템플릿 목록 로드
+  useEffect(() => {
+    if (!nlProject) { setTemplates([]); return }
+    let cancelled = false
+    setTemplatesLoading(true)
+    window.api.dooray.tasks.templates(nlProject)
+      .then((list) => { if (!cancelled) setTemplates(list || []) })
+      .catch(() => { if (!cancelled) setTemplates([]) })
+      .finally(() => { if (!cancelled) setTemplatesLoading(false) })
+    return () => { cancelled = true }
+  }, [nlProject])
+
+  const pickTemplate = async (templateId: string): Promise<void> => {
+    setTemplateMenuOpen(false)
+    if (!nlProject) return
+    try {
+      const detail = await window.api.dooray.tasks.templateDetail(nlProject, templateId)
+      if (!detail) throw new Error('템플릿을 불러오지 못했습니다')
+      // 템플릿 본문을 미리보기로 바로 채움 (AI 거치지 않음)
+      setPreview({ subject: detail.subject || detail.name, body: detail.body })
+      setResult(null)
+    } catch (err) {
+      setResult({ type: 'err', text: err instanceof Error ? err.message : '템플릿 로드 실패' })
+    }
+  }
 
   const stats = useMemo(() => {
     const byClass: Record<'backlog' | 'registered' | 'working' | 'closed', number> =
@@ -132,6 +164,46 @@ JSON 형태로만 응답하세요 (설명/머리말 없이):
             <Sparkles size={14} className="text-clover-orange" />
             <h3 className="text-sm font-semibold text-text-primary">자연어로 태스크 생성</h3>
             <span className="text-[10px] text-text-tertiary">AI가 제목과 본문을 구조화해서 두레이에 생성합니다</span>
+            <div className="ml-auto flex items-center gap-1">
+              {/* 두레이 템플릿 드롭다운 */}
+              <div className="relative">
+                <button
+                  onClick={() => setTemplateMenuOpen(!templateMenuOpen)}
+                  disabled={!nlProject || templatesLoading}
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] bg-bg-primary border border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light disabled:opacity-40"
+                  title={nlProject ? '두레이 프로젝트 템플릿에서 불러오기' : '프로젝트를 먼저 선택하세요'}
+                >
+                  {templatesLoading ? <Loader2 size={10} className="animate-spin" /> : <FileText size={10} />}
+                  템플릿 {templates.length > 0 && <span className="text-text-tertiary">({templates.length})</span>}
+                  <ChevronDown size={9} />
+                </button>
+                {templateMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setTemplateMenuOpen(false)} />
+                    <div className="absolute right-0 top-full mt-1 w-64 bg-bg-surface border border-bg-border rounded-lg shadow-2xl z-40 py-1 max-h-72 overflow-y-auto">
+                      {templates.length === 0 ? (
+                        <div className="px-3 py-2 text-[10px] text-text-tertiary">
+                          이 프로젝트에 저장된 템플릿이 없습니다
+                        </div>
+                      ) : (
+                        templates.map((t) => (
+                          <button
+                            key={t.id}
+                            onClick={() => pickTemplate(t.id)}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-text-primary hover:bg-bg-surface-hover text-left"
+                          >
+                            <FileText size={10} className="text-text-tertiary flex-shrink-0" />
+                            <span className="truncate">{t.name}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+              {/* 스킬 토글 */}
+              <SkillQuickToggle target="task" />
+            </div>
           </div>
           <div className="space-y-2">
             <textarea

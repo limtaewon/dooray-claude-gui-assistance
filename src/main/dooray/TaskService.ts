@@ -425,6 +425,37 @@ export class TaskService {
     )
   }
 
+  /** 프로젝트 태스크 템플릿 목록 조회 */
+  async listProjectTemplates(projectId: string): Promise<Array<{ id: string; name: string }>> {
+    try {
+      const res = await this.client.request<DoorayListResponse<{ id: string; name: string }>>(
+        `/project/v1/projects/${projectId}/post-templates?size=100`
+      )
+      return (res.result || []).map((t) => ({ id: t.id, name: t.name }))
+    } catch {
+      return []
+    }
+  }
+
+  /** 프로젝트 태스크 템플릿 상세 (제목/본문) */
+  async getProjectTemplate(projectId: string, templateId: string): Promise<{ id: string; name: string; subject: string; body: string } | null> {
+    try {
+      const res = await this.client.request<DoorayItemResponse<{
+        id: string
+        name: string
+        subject?: string
+        body?: { mimeType?: string; content?: string } | string
+      }>>(
+        `/project/v1/projects/${projectId}/post-templates/${templateId}`
+      )
+      const t = res.result
+      const body = typeof t.body === 'string' ? t.body : (t.body?.content || '')
+      return { id: t.id, name: t.name, subject: t.subject || '', body }
+    } catch {
+      return null
+    }
+  }
+
   /** 태스크(커뮤니티 게시글) 생성 */
   async createTask(params: {
     projectId: string

@@ -37,6 +37,8 @@ export const IPC_CHANNELS = {
   DOORAY_TASK_UPLOAD_FILE: 'dooray:task:upload-file',
   DOORAY_TASK_UPDATE_BODY: 'dooray:task:update-body',
   DOORAY_TASK_COMMENT_UPDATE: 'dooray:task:comment:update',
+  DOORAY_TASK_TEMPLATES_LIST: 'dooray:task:templates:list',
+  DOORAY_TASK_TEMPLATE_DETAIL: 'dooray:task:templates:detail',
   DOORAY_COMMUNITY_POSTS: 'dooray:community:posts',
   DOORAY_MESSENGER_CHANNELS: 'dooray:messenger:channels',
   DOORAY_MESSENGER_SEND: 'dooray:messenger:send',

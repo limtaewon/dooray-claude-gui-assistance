@@ -148,6 +148,15 @@ function registerIpcHandlers(): void {
   )
   // 커뮤니티: 게시글(=태스크) 생성
   ipcMain.handle(
+    IPC_CHANNELS.DOORAY_TASK_TEMPLATES_LIST,
+    (_, projectId: string) => taskService.listProjectTemplates(projectId)
+  )
+  ipcMain.handle(
+    IPC_CHANNELS.DOORAY_TASK_TEMPLATE_DETAIL,
+    (_, { projectId, templateId }: { projectId: string; templateId: string }) =>
+      taskService.getProjectTemplate(projectId, templateId)
+  )
+  ipcMain.handle(
     IPC_CHANNELS.DOORAY_TASK_CREATE,
     (_, params: { projectId: string; subject: string; body: string; assigneeIds?: string[] }) =>
       taskService.createTask(params)
