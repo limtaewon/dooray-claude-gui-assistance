@@ -48,18 +48,25 @@ function DashboardView(): JSX.Element {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [allProjects, pinnedIds, taskList] = await Promise.all([
+      // 1단계: 프로젝트 목록과 pin 설정을 먼저 가져옴
+      const [allProjects, pinnedIds] = await Promise.all([
         window.api.dooray.projects.list(),
-        window.api.settings.getProjects(),
-        window.api.dooray.tasks.list()
+        window.api.settings.getProjects()
       ])
       const pinnedSet = new Set(pinnedIds)
       const visibleProjects = pinnedIds.length > 0
         ? allProjects.filter((p) => pinnedSet.has(p.id))
         : allProjects
       setProjects(visibleProjects)
-      setTasks(taskList)
       if (!nlProject && visibleProjects.length > 0) setNlProject(visibleProjects[0].id)
+
+      // 2단계: 표시 대상 프로젝트의 태스크만 조회
+      // pinned가 있으면 그것만, 없으면 전체 (기존 동작 유지)
+      const targetProjectIds = visibleProjects.map((p) => p.id)
+      const taskList = targetProjectIds.length > 0
+        ? await window.api.dooray.tasks.list(targetProjectIds)
+        : []
+      setTasks(taskList)
     } catch { /* ok */ }
     finally { setLoading(false) }
   }, [])
@@ -186,7 +193,11 @@ function DashboardView(): JSX.Element {
         <div className="flex items-center gap-2">
           <LayoutDashboard size={18} className="text-clover-blue" />
           <h2 className="text-lg font-semibold text-text-primary">대시보드</h2>
-          <span className="text-[10px] text-text-tertiary">오늘의 업무 현황</span>
+          <span className="text-[10px] text-text-tertiary">
+            {projects.length > 0
+              ? `${projects.length}개 프로젝트 기준 · 태스크 탭 사이드바에서 변경`
+              : '오늘의 업무 현황'}
+          </span>
         </div>
 
         {/* 상태별 집계 */}
