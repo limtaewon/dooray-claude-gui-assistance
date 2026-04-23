@@ -3,6 +3,7 @@ import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { McpConfigManager } from './config/McpConfigManager'
 import { SkillsManager } from './config/SkillsManager'
+import { SharedSkillsService } from './skills/SharedSkillsService'
 import { ConfigWatcher } from './config/ConfigWatcher'
 import { UsageParser } from './usage/UsageParser'
 import { DoorayClient } from './dooray/DoorayClient'
@@ -11,7 +12,8 @@ import { WikiService } from './dooray/WikiService'
 import { CalendarService } from './dooray/CalendarService'
 import { MessengerService } from './dooray/MessengerService'
 import { WatcherService } from './watcher/WatcherService'
-import { AIService, setUserAnthropicApiKey } from './ai/AIService'
+import { AIService, setUserAnthropicApiKey, getClaudeBin } from './ai/AIService'
+import { ClaudeChatService } from './claude/ClaudeChatService'
 import Store from 'electron-store'
 import { TerminalManager } from './terminal/TerminalManager'
 import { SkillStore } from './skills/SkillStore'
@@ -28,15 +30,28 @@ import type { GitWorktreeCreateParams, GitWorktreeRemoveParams } from '../shared
 // Managers
 const mcpConfigManager = new McpConfigManager()
 const skillsManager = new SkillsManager()
+
+/** Claude Code 스킬 공유소 (두레이 위키 하위 페이지) */
+const SHARED_SKILL_WIKI_ID = '4312559241344624232'
+const SHARED_SKILL_PARENT_PAGE_ID = '4315675585495536255'
 const configWatcher = new ConfigWatcher()
 const usageParser = new UsageParser()
 const doorayClient = new DoorayClient()
 const taskService = new TaskService(doorayClient)
 const wikiService = new WikiService(doorayClient)
+const sharedSkills = new SharedSkillsService(wikiService, skillsManager, {
+  wikiId: SHARED_SKILL_WIKI_ID,
+  parentPageId: SHARED_SKILL_PARENT_PAGE_ID
+})
+sharedSkills.setMyMemberIdResolver(() =>
+  taskService.getMyMemberIdPublic().catch(() => null)
+)
 const calendarService = new CalendarService(doorayClient)
 const messengerService = new MessengerService(doorayClient)
+sharedSkills.setMemberNameResolver((id) => messengerService.getMemberName(id))
 const watcherService = new WatcherService(messengerService)
 const aiService = new AIService()
+const claudeChat = new ClaudeChatService(getClaudeBin())
 const store = new Store({ name: 'clauday-data' })
 const terminalManager = new TerminalManager()
 const skillStore = new SkillStore()
@@ -118,6 +133,14 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.SKILLS_LIST, () => skillsManager.list())
   ipcMain.handle(IPC_CHANNELS.SKILLS_READ, (_, filename: string) => skillsManager.read(filename))
   ipcMain.handle(IPC_CHANNELS.SKILLS_SAVE, (_, req: SkillSaveRequest) => skillsManager.save(req))
+  ipcMain.handle(IPC_CHANNELS.SHARED_SKILLS_LIST, () => sharedSkills.list())
+  ipcMain.handle(IPC_CHANNELS.SHARED_SKILLS_GET, (_, postId: string) => sharedSkills.get(postId))
+  ipcMain.handle(
+    IPC_CHANNELS.SHARED_SKILLS_UPLOAD,
+    (_, req: import('../shared/types/shared-skills').SharedSkillUploadRequest) => sharedSkills.upload(req)
+  )
+  ipcMain.handle(IPC_CHANNELS.SHARED_SKILLS_DOWNLOAD, (_, postId: string) => sharedSkills.download(postId))
+  ipcMain.handle(IPC_CHANNELS.SHARED_SKILLS_DELETE, (_, postId: string) => sharedSkills.delete(postId))
   ipcMain.handle(IPC_CHANNELS.SKILLS_DELETE, (_, filename: string) =>
     skillsManager.delete(filename)
   )
@@ -348,21 +371,36 @@ function registerIpcHandlers(): void {
       taskService.getTaskComments(projectId, taskId)
   )
 
+  // Claude Code Chat (interactive transcript)
+  ipcMain.handle(IPC_CHANNELS.CLAUDE_CHAT_SEND, async (
+    _,
+    req: import('../shared/types/claude-chat').ClaudeChatSendRequest
+  ) => {
+    const { sessionIdPromise } = claudeChat.send(req)
+    return sessionIdPromise
+  })
+  ipcMain.handle(IPC_CHANNELS.CLAUDE_CHAT_CANCEL, async (_, chatId: string) => {
+    claudeChat.cancel(chatId)
+    return true
+  })
+
   // AI
   ipcMain.handle(IPC_CHANNELS.AI_AVAILABLE, () => aiService.isAvailable())
   ipcMain.handle(
     IPC_CHANNELS.AI_ASK,
-    async (_, { prompt, systemPrompt, model, maxBudget, requestId, feature }: {
+    async (_, { prompt, systemPrompt, model, maxBudget, requestId, feature, mcpServers }: {
       prompt: string
       systemPrompt?: string
       model?: import('../shared/types/ai').AIModelName
       maxBudget?: string
       requestId?: string
       feature?: keyof import('../shared/types/ai').AIModelConfig
-    }) => aiService.ask(prompt, { systemPrompt, model, maxBudget, requestId, feature })
+      mcpServers?: string[]
+    }) => aiService.ask(prompt, { systemPrompt, model, maxBudget, requestId, feature, mcpServers })
   )
-  ipcMain.handle(IPC_CHANNELS.AI_BRIEFING, async (_, opts?: { requestId?: string }) => {
+  ipcMain.handle(IPC_CHANNELS.AI_BRIEFING, async (_, opts?: { requestId?: string; mcpServers?: string[] }) => {
     const requestId = opts?.requestId
+    const mcpServers = opts?.mcpServers
     const started = Date.now()
     const emit = (message: string): void => {
       if (!requestId) return
@@ -380,39 +418,56 @@ function registerIpcHandlers(): void {
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
       const endOfWeek = new Date(startOfDay.getTime() + 7 * 24 * 60 * 60 * 1000)
 
-      // 각 Dooray 호출을 병렬 실행하되, 진행상황은 개별 emit
-      emit('📋 담당 태스크 조회 중...')
-      const tasksP = taskService.listMyTasks().then((r) => {
-        emit(`✓ 담당 태스크 ${r.length}개`)
-        return r
-      })
+      // 스킬 + MCP가 활성화되면 AI가 모든 데이터 수집을 MCP로 직접 처리한다.
+      const briefingSkills = skillStore.forTarget('briefing')
+      const hasActiveSkill = briefingSkills.length > 0
+      const hasMcp = (mcpServers || []).length > 0
+      const delegateAll = hasActiveSkill && hasMcp
 
-      emit('👥 CC/멘션 태스크 조회 중...')
-      const ccP = taskService.listMyCcTasks().then((r) => {
-        emit(`✓ CC 태스크 ${r.length}개`)
-        return r
-      })
+      let tasks: import('../shared/types/dooray').DoorayTask[] = []
+      let ccTasks: import('../shared/types/dooray').DoorayTask[] = []
+      let dueTodayTasks: import('../shared/types/dooray').DoorayTask[] = []
+      let events: import('../shared/types/dooray').DoorayCalendarEvent[] = []
 
-      emit('⏰ 오늘 마감 태스크 조회 중...')
-      const dueP = taskService.listDueTodayTasks().then((r) => {
-        emit(`✓ 오늘 마감 ${r.length}개`)
-        return r
-      })
-
-      emit('📅 이번주 일정 조회 중...')
-      const eventsP = calendarService
-        .getEvents({ from: startOfDay.toISOString(), to: endOfWeek.toISOString() })
-        .then((r) => {
-          emit(`✓ 일정 ${r.length}개`)
+      if (delegateAll) {
+        emit(`🧠 스킬 ${briefingSkills.length}개 + MCP ${mcpServers?.length || 0}개 → AI가 직접 데이터 수집`)
+      } else {
+        // 각 Dooray 호출을 병렬 실행하되, 진행상황은 개별 emit
+        emit('📋 담당 태스크 조회 중...')
+        const tasksP = taskService.listMyTasks().then((r) => {
+          emit(`✓ 담당 태스크 ${r.length}개`)
           return r
         })
 
-      const [tasks, ccTasks, dueTodayTasks, events] = await Promise.all([tasksP, ccP, dueP, eventsP])
-      cachedTasks = tasks
+        emit('👥 CC/멘션 태스크 조회 중...')
+        const ccP = taskService.listMyCcTasks().then((r) => {
+          emit(`✓ CC 태스크 ${r.length}개`)
+          return r
+        })
 
-      // 스킬은 AIService.skillLoader에서 자동 적용됨 (system prompt에 merge)
-      const briefingSkills = skillStore.forTarget('briefing')
-      if (briefingSkills.length > 0) emit(`🔍 스킬 ${briefingSkills.length}개 자동 적용`)
+        emit('⏰ 오늘 마감 태스크 조회 중...')
+        const dueP = taskService.listDueTodayTasks().then((r) => {
+          emit(`✓ 오늘 마감 ${r.length}개`)
+          return r
+        })
+
+        const pinnedCalendars = (store.get('pinnedCalendars', []) as string[]) || []
+        emit('📅 이번주 일정 조회 중...')
+        const eventsP = calendarService
+          .getEvents({ from: startOfDay.toISOString(), to: endOfWeek.toISOString() })
+          .then((r) => {
+            const filtered = pinnedCalendars.length > 0
+              ? r.filter((e) => e.calendar?.id && pinnedCalendars.includes(e.calendar.id))
+              : r
+            emit(`✓ 일정 ${filtered.length}개${pinnedCalendars.length > 0 ? ` (필터 적용 / 전체 ${r.length})` : ''}`)
+            return filtered
+          })
+
+        ;[tasks, ccTasks, dueTodayTasks, events] = await Promise.all([tasksP, ccP, dueP, eventsP])
+        cachedTasks = tasks
+      }
+
+      if (hasActiveSkill) emit(`🔍 스킬 ${briefingSkills.length}개 자동 적용`)
 
       return aiService.generateBriefing(
         tasks,
@@ -420,7 +475,8 @@ function registerIpcHandlers(): void {
         undefined,
         ccTasks,
         dueTodayTasks,
-        requestId
+        requestId,
+        mcpServers
       )
     } catch (err) {
       return {
@@ -435,17 +491,26 @@ function registerIpcHandlers(): void {
     async (_, { task, body, requestId }: { task: DoorayTask; body?: string; requestId?: string }) =>
       aiService.summarizeTask(task, body, requestId)
   )
-  ipcMain.handle(IPC_CHANNELS.AI_GENERATE_REPORT, async (_, { type, requestId }: { type: 'daily' | 'weekly'; requestId?: string }) => {
+  ipcMain.handle(IPC_CHANNELS.AI_GENERATE_REPORT, async (_, { type, requestId, mcpServers }: { type: 'daily' | 'weekly'; requestId?: string; mcpServers?: string[] }) => {
     try {
       const tasks = cachedTasks.length > 0 ? cachedTasks : await taskService.listMyTasks()
       const now = new Date()
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
       const endOfWeek = new Date(startOfDay.getTime() + 7 * 24 * 60 * 60 * 1000)
-      const events = await calendarService.getEvents({
-        from: startOfDay.toISOString(),
-        to: endOfWeek.toISOString()
-      })
-      return aiService.generateReport(type, tasks, events, requestId)
+      const reportSkills = skillStore.forTarget('report')
+      const delegateEventsToAi = reportSkills.length > 0 && (mcpServers || []).length > 0
+      const pinnedCalendars = (store.get('pinnedCalendars', []) as string[]) || []
+      let events: import('../shared/types/dooray').DoorayCalendarEvent[] = []
+      if (!delegateEventsToAi) {
+        const allEvents = await calendarService.getEvents({
+          from: startOfDay.toISOString(),
+          to: endOfWeek.toISOString()
+        })
+        events = pinnedCalendars.length > 0
+          ? allEvents.filter((e) => e.calendar?.id && pinnedCalendars.includes(e.calendar.id))
+          : allEvents
+      }
+      return aiService.generateReport(type, tasks, events, requestId, mcpServers)
     } catch (err) {
       return { title: '오류', content: err instanceof Error ? err.message : '보고서 생성 실패', generatedAt: new Date().toISOString() }
     }
@@ -528,6 +593,34 @@ function registerIpcHandlers(): void {
     IPC_CHANNELS.AI_GENERATE_SKILL,
     async (_, { request, target, requestId, mcpServers }: { request: string; target: string; requestId?: string; mcpServers?: string[] }) =>
       aiService.generateSkill(request, target, requestId, mcpServers)
+  )
+
+  // AI 활용 사례 추천 — 개인 Claude Code setup(skills + MCP)을 프롬프트에 주입하고
+  // dooray-mcp로 공유 프로젝트 task를 claude -p가 직접 조회·분류하게 함.
+  const AI_SHARING_PROJECT_ID = '4138743749699736544'
+  ipcMain.handle(IPC_CHANNELS.AI_RECOMMEND_CACHE_GET, () => aiService.getLastAIRecommendation())
+
+  ipcMain.handle(
+    IPC_CHANNELS.AI_RECOMMEND_ANALYZE,
+    async (_, opts?: { requestId?: string; limit?: number; mcpServers?: string[] }) => {
+      const [skillList, mcpMap] = await Promise.all([
+        skillsManager.list(),
+        mcpConfigManager.list()
+      ])
+      // 스킬 frontmatter description 간단 추출 (YAML의 description: 값)
+      const skills = skillList.map((s) => {
+        const m = s.content.match(/^---[\s\S]*?\ndescription:\s*(.+?)\n[\s\S]*?---/i)
+        const desc = m ? m[1].replace(/^["']|["']$/g, '').trim() : undefined
+        return { name: s.name, description: desc }
+      })
+      const mcpNames = Object.keys(mcpMap || {})
+      return aiService.analyzeAISharing(skills, mcpNames, {
+        projectId: AI_SHARING_PROJECT_ID,
+        limit: opts?.limit ?? 60,
+        requestId: opts?.requestId,
+        mcpServers: opts?.mcpServers
+      })
+    }
   )
 
   // Wiki domains

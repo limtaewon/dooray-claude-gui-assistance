@@ -58,22 +58,32 @@ function MCPManager(): JSX.Element {
   }
 
   const entries = useMemo(() => Object.entries(servers), [servers])
+  const activeCount = useMemo(() => entries.filter(([, c]) => !c.disabled).length, [entries])
+
+  const handleToggle = async (name: string, config: McpServerConfig): Promise<void> => {
+    try {
+      await window.api.mcp.update(name, { ...config, disabled: !config.disabled })
+      await loadServers()
+    } catch (err) {
+      console.error('MCP 서버 토글 실패:', err)
+    }
+  }
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="px-5 py-4 max-w-6xl mx-auto space-y-4">
+      <div className="px-5 py-4 space-y-4">
         {/* DS PageHeader */}
         <div className="flex items-center gap-3">
           <Server size={18} className="text-clover-blue" />
           <h2 className="text-[14px] font-semibold text-text-primary">MCP 서버</h2>
           <span className="text-[11px] text-text-tertiary">
-            · {entries.length}개 등록
+            · {entries.length}개 · 활성 {activeCount}
           </span>
           <div className="flex-1" />
-          <Button variant="ghost" size="sm" onClick={loadServers} leftIcon={<RefreshCw size={11} />} title="새로 고침">
-            새로 고침
+          <Button variant="primary" onClick={loadServers} leftIcon={<RefreshCw size={12} />} title="새로고침">
+            새로고침
           </Button>
-          <Button variant="primary" size="sm" onClick={() => setFormState({ mode: 'add' })} leftIcon={<Plus size={11} />}>
+          <Button variant="primary" onClick={() => setFormState({ mode: 'add' })} leftIcon={<Plus size={12} />}>
             서버 추가
           </Button>
         </div>
@@ -104,13 +114,17 @@ function MCPManager(): JSX.Element {
                 config={config}
                 onEdit={() => setFormState({ mode: 'edit', name, config })}
                 onDelete={() => handleDelete(name)}
+                onToggle={() => handleToggle(name, config)}
               />
             ))}
           </div>
         )}
 
-        <div className="text-[10px] text-text-tertiary">
-          💡 설정은 <span className="font-mono text-text-secondary">~/.claude.json</span>에 저장됩니다.
+        <div className="flex items-center gap-2 text-[11px] text-text-tertiary pt-1">
+          <span>💡</span>
+          <span>
+            설정은 <span className="font-mono text-text-secondary">~/.claude.json</span>에 저장됩니다. 새로고침으로 외부 변경 반영.
+          </span>
         </div>
       </div>
     </div>

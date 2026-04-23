@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   LayoutDashboard, Plus, Loader2, RotateCcw, Target, ArrowRight, FileText,
-  Wand2, ChevronRight, ChevronDown, Send, Filter
+  Wand2, ChevronRight, ChevronDown, Send
 } from 'lucide-react'
 import type { DoorayTask, DoorayProject } from '../../../../shared/types/dooray'
 import SkillQuickToggle from './SkillQuickToggle'
@@ -239,10 +239,7 @@ JSON 형태로만 응답:
           <span className="text-[14px] font-semibold text-text-primary">대시보드</span>
           {projectCodes && <Chip tone="neutral">{projectCodes}</Chip>}
           <div className="flex-1" />
-          <Button variant="icon" size="sm" title="필터" aria-label="필터">
-            <Filter size={12} />
-          </Button>
-          <Button variant="secondary" size="sm" onClick={load} leftIcon={<RotateCcw size={11} />}>
+          <Button variant="secondary" onClick={load} leftIcon={<RotateCcw size={12} />}>
             새로고침
           </Button>
         </div>
@@ -309,10 +306,10 @@ JSON 형태로만 응답:
                   {/* 템플릿 드롭다운 */}
                   <div className="relative">
                     <Button
-                      variant="ghost" size="xs"
+                      variant="secondary"
                       onClick={() => setTemplateMenuOpen((o) => !o)}
                       disabled={!nlProject || templatesLoading}
-                      leftIcon={templatesLoading ? <Loader2 size={10} className="animate-spin" /> : <FileText size={10} />}
+                      leftIcon={templatesLoading ? <Loader2 size={12} className="animate-spin" /> : <FileText size={12} />}
                     >
                       템플릿{templates.length > 0 ? ` ${templates.length}` : ''}
                     </Button>
@@ -338,10 +335,10 @@ JSON 형태로만 응답:
                     )}
                   </div>
 
-                  <SkillQuickToggle target="task" size="xs" />
-                  <Button variant="ai" size="xs" onClick={composeWithAI}
+                  <SkillQuickToggle target="task" />
+                  <Button variant="ai" onClick={composeWithAI}
                     disabled={composing}
-                    leftIcon={composing ? <Loader2 size={10} className="animate-spin" /> : <Wand2 size={10} />}>
+                    leftIcon={composing ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}>
                     {composing ? 'AI 작업 중...' : 'AI로 채우기'}
                   </Button>
                 </div>
@@ -370,8 +367,8 @@ JSON 형태로만 응답:
               {/* 하단 액션 */}
               <div className="flex items-center gap-2">
                 <div className="flex-1" />
-                <Button variant="ghost" size="sm" onClick={reset}>취소</Button>
-                <Button variant="success" size="sm"
+                <Button variant="ghost" onClick={reset}>취소</Button>
+                <Button variant="success"
                   onClick={createOnDooray}
                   disabled={creating || !subject.trim()}
                   leftIcon={creating ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}>

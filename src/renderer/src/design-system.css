@@ -26,10 +26,10 @@
 
 /* ---------- Buttons ---------- */
 .ds-btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-  height: 26px; padding: 0 10px;
-  border-radius: 6px;
-  font-size: 11px; font-weight: 500;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 32px; padding: 0 12px;
+  border-radius: 7px;
+  font-size: 12.5px; font-weight: 500;
   border: 1px solid transparent;
   transition: background .12s, border-color .12s, color .12s, opacity .12s;
   white-space: nowrap; flex: none;
@@ -37,10 +37,33 @@
   font-family: inherit;
 }
 .ds-btn:disabled, .ds-btn[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
-.ds-btn.primary   { background: var(--clover-blue); color: #fff; }
-.ds-btn.primary:hover   { background: rgba(37,99,235,0.88); }
-.ds-btn.ai        { background: linear-gradient(90deg, var(--clover-orange), var(--clover-blue)); color: #fff; }
-.ds-btn.ai:hover        { opacity: .88; }
+.ds-btn.primary {
+  background: linear-gradient(180deg, #3B5BA5 0%, #1E3A7F 100%);
+  color: #E2E8F0;
+  border: 1px solid rgba(148, 175, 230, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.ds-btn.primary:hover {
+  background: linear-gradient(180deg, #4868B8 0%, #264897 100%);
+  border-color: rgba(148, 175, 230, 0.32);
+}
+.ds-btn.primary:active {
+  background: linear-gradient(180deg, #1E3A7F 0%, #1E3A7F 100%);
+}
+.ds-btn.ai {
+  background-image: linear-gradient(135deg, var(--clover-orange-light) 0%, var(--clover-blue-light) 100%);
+  background-color: transparent;
+  color: #fff;
+  border: 0;
+  box-shadow: none;
+  filter: none;
+}
+.ds-btn.ai:hover {
+  opacity: .92;
+  box-shadow: none;
+  filter: none;
+}
+.ds-btn.ai:focus, .ds-btn.ai:focus-visible { outline: none; }
 .ds-btn.success   { background: #10B981; color: #fff; }
 .ds-btn.success:hover   { background: rgba(16,185,129,.88); }
 .ds-btn.secondary { background: var(--bg-surface); color: var(--text-primary); border-color: var(--bg-border); }
@@ -51,12 +74,36 @@
 .ds-btn.danger:hover    { background: rgba(239,68,68,0.10); }
 .ds-btn.orange    { background: var(--clover-orange); color: #fff; }
 .ds-btn.orange:hover    { background: rgba(234,88,12,0.88); }
-.ds-btn.sm  { height: 22px; padding: 0 8px; font-size: 10px; border-radius: 5px; }
-.ds-btn.xs  { height: 18px; padding: 0 6px; font-size: 10px; border-radius: 4px; }
-.ds-btn.lg  { height: 30px; padding: 0 12px; font-size: 12px; border-radius: 7px; }
-.ds-btn.icon     { width: 24px; height: 24px; padding: 0; color: var(--text-secondary); border-radius: 5px; }
+/* skill-active: AI 설정 버튼 활성 상태 (테마별 amber 톤) */
+.ds-btn.skill-active {
+  background: rgba(245, 158, 11, 0.15);
+  color: #FCD34D;
+  border: 1px solid rgba(251, 191, 36, 0.40);
+  font-weight: 600;
+}
+.ds-btn.skill-active:hover {
+  background: rgba(245, 158, 11, 0.22);
+  border-color: rgba(251, 191, 36, 0.55);
+}
+.ds-btn.skill-active .skill-active-icon { color: #FCD34D; }
+/* 라이트 모드: 흰 바탕에서 amber-300 은 보이지 않으므로 진한 앰버로 */
+[data-theme='light'] .ds-btn.skill-active {
+  background: rgba(217, 119, 6, 0.12);
+  color: #B45309;
+  border-color: rgba(217, 119, 6, 0.45);
+}
+[data-theme='light'] .ds-btn.skill-active:hover {
+  background: rgba(217, 119, 6, 0.20);
+  border-color: rgba(217, 119, 6, 0.60);
+}
+[data-theme='light'] .ds-btn.skill-active .skill-active-icon { color: #B45309; }
+.ds-btn.sm  { height: 26px; padding: 0 10px; font-size: 11px; border-radius: 6px; }
+.ds-btn.xs  { height: 22px; padding: 0 8px; font-size: 10.5px; border-radius: 5px; }
+.ds-btn.lg  { height: 36px; padding: 0 14px; font-size: 13px; border-radius: 8px; }
+.ds-btn.icon     { width: 32px; height: 32px; padding: 0; color: var(--text-secondary); border-radius: 7px; }
 .ds-btn.icon:hover     { background: var(--bg-surface-hover); color: var(--text-primary); }
-.ds-btn.icon.sm  { width: 20px; height: 20px; border-radius: 4px; }
+.ds-btn.icon.sm  { width: 26px; height: 26px; border-radius: 6px; }
+.ds-btn.icon.xs  { width: 22px; height: 22px; border-radius: 5px; }
 
 /* ---------- Card ---------- */
 .ds-card {
@@ -123,31 +170,38 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
   background: var(--clover-orange); color: #fff;
 }
 
-/* ---------- Segmented Tabs ---------- */
+/* ---------- Segmented Tabs (ds-btn 기본 32px와 동일 높이로 정렬) ---------- */
 .ds-seg {
   display: inline-flex;
-  height: 26px; padding: 2px;
+  height: 32px; padding: 3px;
   background: var(--bg-surface);
   border: 1px solid var(--bg-border);
-  border-radius: 6px;
-  gap: 1px;
+  border-radius: 7px;
+  gap: 0;
 }
 .ds-seg .seg-item {
-  height: 20px;
-  padding: 0 10px;
-  border-radius: 4px;
+  height: 24px;
+  padding: 0 12px;
+  border-radius: 5px;
   display: inline-flex; align-items: center; gap: 5px;
-  font-size: 11px; font-weight: 500;
+  font-size: 12px; font-weight: 600;
   color: var(--text-secondary);
   cursor: pointer;
-  background: none; border: 0;
+  background: none;
+  border: 0;
   font-family: inherit;
+  transition: background 120ms ease, color 120ms ease;
 }
-.ds-seg .seg-item:hover { color: var(--text-primary); }
+.ds-seg .seg-item:hover {
+  color: var(--clover-orange, #fb923c);
+  background: rgba(251, 146, 60, 0.08);
+}
 .ds-seg .seg-item.active {
-  background: var(--bg-surface-raised);
-  color: var(--text-primary);
-  box-shadow: var(--shadow-sm);
+  background: rgba(251, 146, 60, 0.16);
+  color: var(--clover-orange, #fb923c);
+}
+.ds-seg .seg-item.active:hover {
+  background: rgba(251, 146, 60, 0.22);
 }
 
 /* ---------- Modal / Dialog ---------- */
@@ -375,20 +429,20 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
 }
 
 .ds-tabbar {
-  height: 32px;
-  display: flex; align-items: center; gap: 1px;
-  padding: 0 8px;
+  height: 40px;
+  display: flex; align-items: center; gap: 2px;
+  padding: 0 10px;
   border-bottom: 1px solid var(--bg-border);
   background: var(--bg-surface);
   flex: none;
   overflow-x: auto;
 }
 .ds-tab {
-  display: flex; align-items: center; gap: 5px;
-  font-size: 11px; font-weight: 500;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 5px;
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 500;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 6px;
   color: var(--text-secondary);
   white-space: nowrap;
   flex: none;

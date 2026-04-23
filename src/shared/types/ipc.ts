@@ -79,6 +79,11 @@ export const IPC_CHANNELS = {
   // Claude Code Task Bridge
   CLAUDE_START_TASK: 'claude:start-task',
 
+  // Claude Code Chat (interactive transcript UI)
+  CLAUDE_CHAT_SEND: 'claude:chat:send',
+  CLAUDE_CHAT_EVENT: 'claude:chat:event',
+  CLAUDE_CHAT_CANCEL: 'claude:chat:cancel',
+
   // AI
   AI_AVAILABLE: 'ai:available',
   AI_ASK: 'ai:ask',
@@ -109,10 +114,21 @@ export const IPC_CHANNELS = {
   CLOVER_SKILLS_DELETE: 'clover-skills:delete',
   CLOVER_SKILLS_FOR_TARGET: 'clover-skills:for-target',
 
+  // Shared Skills (Dooray 공개 프로젝트 기반 공유소)
+  SHARED_SKILLS_LIST: 'shared-skills:list',
+  SHARED_SKILLS_GET: 'shared-skills:get',
+  SHARED_SKILLS_UPLOAD: 'shared-skills:upload',
+  SHARED_SKILLS_DOWNLOAD: 'shared-skills:download',
+  SHARED_SKILLS_DELETE: 'shared-skills:delete',
+
   // AI Skill Generator
   AI_WIKI_PROOFREAD: 'ai:wiki-proofread',
   AI_WIKI_IMPROVE: 'ai:wiki-improve',
   AI_GENERATE_SKILL: 'ai:generate-skill',
+
+  // AI 활용 사례 추천 (개인 Claude Code 설정 기반)
+  AI_RECOMMEND_ANALYZE: 'ai:recommend:analyze',
+  AI_RECOMMEND_CACHE_GET: 'ai:recommend:cache:get',
 
   // Briefing Store
   BRIEFING_SAVE: 'briefing:save',

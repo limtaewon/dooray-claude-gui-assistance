@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import {
   Calendar as CalendarIcon, Terminal as TerminalIcon, GitBranch, Users, Server, Sparkles,
-  MessageSquare, BarChart3, BookOpen, Settings as SettingsIcon, Radar, Moon, Sun
+  MessageSquare, BarChart3, BookOpen, Settings as SettingsIcon, Radar, Moon, Sun, Lightbulb
 } from 'lucide-react'
 import Sidebar from './components/Layout/Sidebar'
 import TitleBar from './components/Layout/TitleBar'
 import MCPManager from './components/MCP/MCPManager'
 import SkillsManager from './components/Skills/SkillsManager'
+import ErrorBoundary from './components/common/ErrorBoundary'
 import UsageDashboard from './components/Usage/UsageDashboard'
 import DooraySetup from './components/Dooray/DooraySetup'
 import DoorayAssistant from './components/Dooray/DoorayAssistant'
@@ -18,10 +19,11 @@ import SettingsView from './components/Settings/SettingsView'
 import ImageLightbox from './components/common/ImageLightbox'
 import CommunityView from './components/Community/CommunityView'
 import MonitoringView from './components/Monitoring/MonitoringView'
+import AIRecommendView from './components/AIRecommend/AIRecommendView'
 import { ToastHost, CommandPalette, type CommandGroup, type CommandItem } from './components/common/ds'
 import { useTheme } from './hooks/useTheme'
 
-type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring'
+type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend'
 
 function App(): JSX.Element {
   const [activeView, setActiveView] = useState<View>('dooray')
@@ -82,6 +84,7 @@ function App(): JSX.Element {
         { id: 'go-community', label: '커뮤니티', icon: <Users size={13} /> },
         { id: 'go-mcp', label: 'MCP 서버', icon: <Server size={13} /> },
         { id: 'go-skills', label: 'Claude 스킬', icon: <Sparkles size={13} /> },
+        { id: 'go-ai-recommend', label: 'AI 추천', icon: <Lightbulb size={13} /> },
         { id: 'go-sessions', label: '세션', icon: <MessageSquare size={13} /> },
         { id: 'go-usage', label: '사용량', icon: <BarChart3 size={13} /> },
         { id: 'go-manual', label: '매뉴얼', icon: <BookOpen size={13} /> },
@@ -139,7 +142,12 @@ function App(): JSX.Element {
               <BranchWorkspace onOpenTerminal={() => setActiveView('terminal')} />
             </div>
             <div className={`absolute inset-0 ${vis('mcp')}`}><MCPManager /></div>
-            <div className={`absolute inset-0 ${vis('skills')}`}><SkillsManager /></div>
+            <div className={`absolute inset-0 ${vis('skills')}`}>
+              <ErrorBoundary label="Skills"><SkillsManager /></ErrorBoundary>
+            </div>
+            <div className={`absolute inset-0 ${vis('ai-recommend')}`}>
+              <ErrorBoundary label="AI Recommend"><AIRecommendView /></ErrorBoundary>
+            </div>
             <div className={`absolute inset-0 ${vis('community')}`}><CommunityView /></div>
             <div className={`absolute inset-0 ${vis('monitoring')}`}><MonitoringView /></div>
             <div className={`absolute inset-0 ${vis('sessions')}`}><SessionExplorer /></div>

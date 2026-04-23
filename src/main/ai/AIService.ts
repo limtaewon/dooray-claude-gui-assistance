@@ -1,5 +1,5 @@
 import { execFile, execFileSync, spawn } from 'child_process'
-import { existsSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, delimiter as pathDelimiter } from 'path'
 import { homedir } from 'os'
 import { BrowserWindow } from 'electron'
@@ -98,6 +98,8 @@ function resolveClaudePath(): string {
 }
 
 const CLAUDE_CLI = resolveClaudePath()
+
+export function getClaudeBin(): string { return CLAUDE_CLI }
 
 /**
  * Claude CLI 오류를 사용자 친화적 메시지로 변환.
@@ -304,7 +306,8 @@ ${skillBlock}`
    */
   private runClaudeStream(
     args: string[],
-    onChunk: (text: string) => void
+    onChunk: (text: string) => void,
+    options: { timeoutMs?: number | null } = {}
   ): Promise<ClaudeCliResult> {
     return new Promise((resolve, reject) => {
       // --output-format {json} 제거 후 stream-json 옵션 추가
@@ -325,10 +328,12 @@ ${skillBlock}`
       let accumulated = ''
       let stderrBuf = ''
 
-      const timeout = setTimeout(() => {
+      // timeoutMs === null이면 타임아웃 없음(장시간 MCP 작업용). 미지정이면 120초.
+      const timeoutMs = options.timeoutMs === undefined ? 120000 : options.timeoutMs
+      const timeout = timeoutMs !== null ? setTimeout(() => {
         proc.kill()
-        reject(new Error('Claude CLI 타임아웃 (120초)'))
-      }, 120000)
+        reject(new Error(`Claude CLI 타임아웃 (${Math.round(timeoutMs / 1000)}초)`))
+      }, timeoutMs) : null
 
       proc.stdout.on('data', (data: Buffer) => {
         buffer += data.toString('utf-8')
@@ -364,7 +369,7 @@ ${skillBlock}`
               continue
             }
 
-            // assistant 메시지 (전체 블록 완료 시)
+            // assistant 메시지 (전체 블록 완료 시) — text + tool_use 노출
             if (obj.type === 'assistant' && obj.message?.content) {
               const content = obj.message.content
               if (Array.isArray(content)) {
@@ -381,6 +386,35 @@ ${skillBlock}`
                       }
                     }
                   }
+                  // MCP 도구 호출 가시화: "🔧 tool(input요약)" 라인으로 스트림에 기록
+                  if (block.type === 'tool_use' && typeof block.name === 'string') {
+                    const inputStr = (() => {
+                      try {
+                        const s = JSON.stringify(block.input || {})
+                        return s.length > 180 ? s.slice(0, 177) + '...' : s
+                      } catch { return '{}' }
+                    })()
+                    const line = `\n🔧 ${block.name} ${inputStr}\n`
+                    onChunk(line)
+                  }
+                }
+              }
+            }
+
+            // user 메시지 안의 tool_result (MCP 응답) — 요약만 표시
+            if (obj.type === 'user' && obj.message?.content) {
+              const content = obj.message.content
+              if (Array.isArray(content)) {
+                for (const block of content) {
+                  if (block.type === 'tool_result') {
+                    const tr = typeof block.content === 'string'
+                      ? block.content
+                      : Array.isArray(block.content)
+                        ? block.content.map((c: { text?: string }) => c?.text || '').join('')
+                        : ''
+                    const brief = tr ? (tr.length > 120 ? tr.slice(0, 117) + '...' : tr).replace(/\n/g, ' ') : ''
+                    onChunk(`   ↳ ${block.is_error ? '❌ ' : '✓ '}${brief}\n`)
+                  }
                 }
               }
             }
@@ -395,12 +429,12 @@ ${skillBlock}`
       })
 
       proc.on('error', (err) => {
-        clearTimeout(timeout)
+        if (timeout) clearTimeout(timeout)
         reject(wrapClaudeError(err.message, stderrBuf))
       })
 
       proc.on('close', (code) => {
-        clearTimeout(timeout)
+        if (timeout) clearTimeout(timeout)
         if (finalResult) {
           if (!finalResult.result && accumulated) finalResult.result = accumulated
           resolve(finalResult)
@@ -435,7 +469,7 @@ ${skillBlock}`
    */
   async ask(
     prompt: string,
-    opts?: { systemPrompt?: string; model?: AIModelName; maxBudget?: string; requestId?: string; feature?: keyof AIModelConfig }
+    opts?: { systemPrompt?: string; model?: AIModelName; maxBudget?: string; requestId?: string; feature?: keyof AIModelConfig; mcpServers?: string[] }
   ): Promise<string> {
     const feature = opts?.feature
     const defaultModel = opts?.model || 'sonnet'
@@ -466,6 +500,7 @@ ${skillBlock}`
       model,
       systemPrompt: mergedSystem,
       maxBudget: opts?.maxBudget || '0.3',
+      mcpServers: opts?.mcpServers,
       allowMcp: false
     })
 
@@ -494,7 +529,8 @@ ${skillBlock}`
     _skillsUnused?: Array<{ name: string; content: string }>, // deprecated: skillLoader 사용
     ccTasks?: DoorayTask[],
     dueTodayTasks?: DoorayTask[],
-    requestId?: string
+    requestId?: string,
+    mcpServers?: string[]
   ): Promise<AIBriefing> {
     const started = Date.now()
     this.emitProgress(requestId, 'collecting', '브리핑 데이터 준비 중...', started)
@@ -528,7 +564,19 @@ ${skillBlock}`
       id: t.id, subject: t.subject, status: t.workflowClass, project: t.projectCode
     }))
 
-    const prompt = `오늘: ${today}
+    const allEmpty = taskData.length === 0 && dueTodayData.length === 0 && ccData.length === 0 && eventData.length === 0
+    const prompt = allEmpty
+      ? `오늘: ${today}
+
+데이터가 제공되지 않았습니다. 사용자가 설정한 스킬(system prompt에 포함됨) 의 "규칙"(데이터 수집 범위, 특정 ID 필터 등)만 따르고, 해당 스킬 내부의 "출력 형식" 섹션은 무시하세요.
+
+작업 순서:
+1. 스킬 규칙에 맞는 MCP 도구를 호출해서 필요한 태스크/일정을 수집
+2. 수집한 데이터를 분석
+3. **반드시 본 system prompt의 JSON 스키마(greeting/urgent/focus/mentioned/stale/todayEvents/recommendations)로만 최종 응답**
+
+주의: 데이터가 적더라도 JSON 스키마는 반드시 유지 (빈 배열 허용). 텍스트 서술이나 마크다운 형식으로 답하지 마세요.`
+      : `오늘: ${today}
 
 [내 담당 태스크 ${taskData.length}개]
 ${JSON.stringify(taskData)}
@@ -543,35 +591,40 @@ ${JSON.stringify(ccData)}
 ${JSON.stringify(eventData)}`
 
     const args = buildArgs(prompt, {
-      model: this.pickModel('briefing', 'sonnet'),
+      model: this.pickModel('briefing', 'opus'),
       systemPrompt: this.buildSystemPrompt(BRIEFING_SYSTEM_PROMPT, 'briefing'),
-      maxBudget: '0.3',
-      allowMcp: false // 데이터가 이미 프롬프트에 있음, MCP 로딩 skip으로 속도 개선
+      // 위임 모드는 MCP 다중 호출 → 토큰 소비 ↑, 여유있게 설정
+      maxBudget: allEmpty ? '2.0' : '0.3',
+      effort: allEmpty ? 'medium' : 'low',
+      mcpServers,
+      allowMcp: false
     })
 
-    this.emitProgress(requestId, 'thinking', `🤖 Claude (${this.pickModel('briefing', 'sonnet')}) 시작 중...`, started)
-    let firstChunk = true
+    this.emitProgress(requestId, 'thinking', `🤖 Claude (${this.pickModel('briefing', 'opus')}) 시작 중...`, started)
     const result = await this.runClaudeStream(args, (chunk) => {
-      if (firstChunk) {
-        this.emitProgress(requestId, 'streaming', '✨ 응답 생성 중...', started, chunk)
-        firstChunk = false
-      } else {
-        this.emitProgress(requestId, 'streaming', '✨ 응답 생성 중...', started, chunk)
-      }
-    })
+      this.emitProgress(requestId, 'streaming', '✨ 응답 생성 중...', started, chunk)
+    }, allEmpty ? { timeoutMs: null } : {})
     this.emitProgress(requestId, 'parsing', '결과 정리 중...', started)
 
     // JSON 추출 — 마크다운 코드블록(```json ... ```) 처리 및 에러 명확화
     const raw = (result.result || '').trim()
     const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim()
     const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
+    // 위임 모드에서 AI가 스킬 출력 형식(텍스트/마크다운)을 그대로 준 경우 폴백
+    const textFallback = (msg: string): AIBriefing => {
+      this.emitProgress(requestId, 'done', '완료', started)
+      return {
+        greeting: msg.slice(0, 3000) || '브리핑 결과가 비어있습니다.',
+        urgent: [], focus: [], mentioned: [], stale: [], todayEvents: [], recommendations: []
+      }
+    }
     if (!jsonMatch) {
+      if (allEmpty) return textFallback(raw)
       this.emitProgress(requestId, 'done', '완료', started)
       throw new Error(`AI 응답에서 JSON을 찾지 못했습니다.\n\n응답: ${raw.substring(0, 400)}`)
     }
     try {
       const briefing = JSON.parse(jsonMatch[0]) as AIBriefing
-      // 필수 배열 필드 기본값 보정 (일부 누락된 경우)
       const safe: AIBriefing = {
         greeting: briefing.greeting || '오늘도 좋은 하루 보내세요!',
         urgent: Array.isArray(briefing.urgent) ? briefing.urgent : [],
@@ -584,6 +637,7 @@ ${JSON.stringify(eventData)}`
       this.emitProgress(requestId, 'done', '완료', started)
       return safe
     } catch (err) {
+      if (allEmpty) return textFallback(raw)
       this.emitProgress(requestId, 'done', '완료', started)
       throw new Error(`AI JSON 파싱 실패: ${err instanceof Error ? err.message : String(err)}\n\n응답: ${jsonMatch[0].substring(0, 400)}`)
     }
@@ -605,7 +659,8 @@ ${JSON.stringify(eventData)}`
     type: 'daily' | 'weekly',
     tasks: DoorayTask[],
     events: DoorayCalendarEvent[],
-    requestId?: string
+    requestId?: string,
+    mcpServers?: string[]
   ): Promise<AIReport> {
     const started = Date.now()
     this.emitProgress(requestId, 'collecting', '업무 데이터 집계 중...', started)
@@ -616,18 +671,23 @@ ${JSON.stringify(eventData)}`
     const working = tasks.filter((t) => t.workflowClass === 'working')
     const registered = tasks.filter((t) => t.workflowClass === 'registered')
 
-    const prompt = `${period} 업무 보고서를 마크다운으로 작성.\n오늘: ${today}\n\n완료(${done.length}개):\n${done.slice(0, 20).map((t) => `- [${t.projectCode}] ${t.subject}`).join('\n') || '없음'}\n\n진행중(${working.length}개):\n${working.slice(0, 20).map((t) => `- [${t.projectCode}] ${t.subject}`).join('\n') || '없음'}\n\n예정(${registered.length}개):\n${registered.slice(0, 10).map((t) => `- [${t.projectCode}] ${t.subject}`).join('\n') || '없음'}\n\n일정(${events.length}개):\n${events.slice(0, 10).map((e) => `- ${e.subject} (${e.startAt})`).join('\n') || '없음'}`
+    const allEmpty = tasks.length === 0 && events.length === 0
+    const prompt = allEmpty
+      ? `${period} 업무 보고서를 마크다운으로 작성.\n오늘: ${today}\n\n데이터가 제공되지 않았습니다. 사용자가 설정한 스킬(system prompt에 포함됨) 지시에 따라 MCP 도구로 필요한 태스크·일정을 직접 조회한 뒤 보고서를 작성하세요.`
+      : `${period} 업무 보고서를 마크다운으로 작성.\n오늘: ${today}\n\n완료(${done.length}개):\n${done.slice(0, 20).map((t) => `- [${t.projectCode}] ${t.subject}`).join('\n') || '없음'}\n\n진행중(${working.length}개):\n${working.slice(0, 20).map((t) => `- [${t.projectCode}] ${t.subject}`).join('\n') || '없음'}\n\n예정(${registered.length}개):\n${registered.slice(0, 10).map((t) => `- [${t.projectCode}] ${t.subject}`).join('\n') || '없음'}\n\n일정(${events.length}개):\n${events.slice(0, 10).map((e) => `- ${e.subject} (${e.startAt})`).join('\n') || '없음'}`
 
     const args = buildArgs(prompt, {
-      model: this.pickModel('report', 'sonnet'),
+      model: this.pickModel('report', 'opus'),
       systemPrompt: this.buildSystemPrompt('업무 보고서 전문 작성 AI. 간결하고 명확한 마크다운 보고서를 생성합니다. 한국어로 작성.', 'report'),
-      maxBudget: '0.3'
+      maxBudget: allEmpty ? '2.0' : '0.3',
+      effort: allEmpty ? 'medium' : 'low',
+      mcpServers
     })
 
     this.emitProgress(requestId, 'thinking', `${period} 보고서 작성 중...`, started)
     const result = await this.runClaudeStream(args, (chunk) => {
       this.emitProgress(requestId, 'streaming', `${period} 보고서 작성 중...`, started, chunk)
-    })
+    }, allEmpty ? { timeoutMs: null } : {})
     this.emitProgress(requestId, 'done', '완료', started)
 
     return { title: `${period} 업무 보고서 - ${today}`, content: result.result, generatedAt: new Date().toISOString() }
@@ -828,6 +888,157 @@ ${useMcp ? `
       description: request.substring(0, 50),
       content: `## 규칙\n${request}\n\n## 출력 형식\n- 분석 결과를 목록으로 표시`
     }
+  }
+
+  /** AI 추천 결과 캐시 파일 경로 */
+  private aiRecommendCachePath(): string {
+    const dir = join(homedir(), '.clauday')
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    return join(dir, 'ai-recommend-cache.json')
+  }
+
+  /** 저장된 마지막 AI 추천 결과 (없으면 null) */
+  getLastAIRecommendation(): import('../../shared/types/ai-recommend').AIRecommendResult | null {
+    try {
+      const path = this.aiRecommendCachePath()
+      if (!existsSync(path)) return null
+      const raw = readFileSync(path, 'utf-8')
+      return JSON.parse(raw) as import('../../shared/types/ai-recommend').AIRecommendResult
+    } catch {
+      return null
+    }
+  }
+
+  private saveAIRecommendation(result: import('../../shared/types/ai-recommend').AIRecommendResult): void {
+    try {
+      writeFileSync(this.aiRecommendCachePath(), JSON.stringify(result, null, 2), 'utf-8')
+    } catch (err) {
+      console.warn('[AIService] AI 추천 결과 캐시 저장 실패:', err)
+    }
+  }
+
+  /**
+   * AI 활용 사례 공유 프로젝트의 task들을 개인 Claude Code setup과 비교 분석.
+   * - dooray-mcp로 task 조회 (claude -p가 tool call로 수행)
+   * - 스킬/MCP 목록은 프롬프트에 미리 주입
+   * - 결과는 3 카테고리(immediate/reference/covered) JSON
+   */
+  async analyzeAISharing(
+    skills: Array<{ name: string; description?: string }>,
+    mcpServerNames: string[],
+    options: { projectId: string; limit?: number; requestId?: string; mcpServers?: string[] }
+  ): Promise<import('../../shared/types/ai-recommend').AIRecommendResult> {
+    const started = Date.now()
+    const { projectId, limit = 60, requestId, mcpServers: overrideMcp } = options
+    this.emitProgress(requestId, 'collecting', '사례 조회 준비 중...', started)
+
+    const skillsBlock = skills.length > 0
+      ? skills.map((s) => `- ${s.name}${s.description ? `: ${s.description}` : ''}`).join('\n')
+      : '(설치된 스킬 없음)'
+    const mcpBlock = mcpServerNames.length > 0 ? mcpServerNames.map((n) => `- ${n}`).join('\n') : '(설정된 MCP 없음)'
+
+    const prompt = `당신은 AI 활용 사례 추천 분석가입니다.
+
+## Step 1: Dooray task 조회
+dooray-mcp의 \`get_task_list_with_param\` tool을 호출하세요.
+- project_id: "${projectId}"
+- task_query: {"size": ${limit}, "order": "-createdAt"}
+
+## Step 2: 분류
+조회한 task들을 아래 사용자의 현재 setup과 비교해 3 카테고리로 분류하세요.
+
+### 사용자 현재 스킬 (~/.claude/skills/)
+${skillsBlock}
+
+### 사용자 현재 MCP 서버 (~/.claude.json)
+${mcpBlock}
+
+## 분류 기준
+- "immediate" (즉시 도입 가치): 사용자의 현재 스킬/MCP로 커버되지 않는 gap을 직접적으로 메우는 사례
+- "reference" (참고할만한 사례): 흥미롭지만 지금 당장 필요하진 않음 (분야가 다르거나 성숙도가 낮거나)
+- "covered" (이미 보유/유사): 이미 설치된 스킬/MCP로 동일/유사한 효과 달성 가능 (어떤 것으로 커버되는지 coveredBy에 명시)
+
+## 출력 형식 (JSON only, 마크다운 감싸지 말 것)
+\`\`\`json
+{
+  "summary": "총 N건 분석 완료 — X건 즉시 도입, Y건 참고, Z건 이미 보유",
+  "analyzedCount": 60,
+  "immediate": [
+    {"taskId": "4316525978676382391", "title": "task 제목", "reason": "왜 필요한지 1-2문장"}
+  ],
+  "reference": [
+    {"taskId": "...", "title": "...", "reason": "..."}
+  ],
+  "covered": [
+    {"taskId": "...", "title": "...", "reason": "...", "coveredBy": "bmad-architect"}
+  ]
+}
+\`\`\`
+
+규칙:
+- taskId는 get_task_list_with_param 결과의 각 task id 필드 그대로 사용
+- reason은 사용자의 실제 보유 스킬/MCP를 언급해 구체적으로 (예: "watcher와 dooray-mcp로 이미 가능" 대신 "monitoring 기능과 겹침")
+- title은 task의 subject 원문
+- JSON 외에 어떤 설명도 출력 금지`
+
+    const AI_RECOMMEND_SYSTEM = `당신은 Dooray "AI 활용 사례 공유 프로젝트"의 task들을 사용자의 개인 Claude Code setup(~/.claude/skills/, MCP 서버)과 비교하여 "즉시 도입 / 참고 / 이미 보유" 3 카테고리로 분류하는 전문가입니다.
+
+분류 원칙:
+- 사용자의 보유 스킬/MCP와 실제로 같은 문제를 푸는 task만 "covered"로 판정
+- 도메인이 다르거나 구현 수준이 큰 차이면 "reference"
+- 사용자의 setup에서 뚜렷한 gap을 메우는 task는 "immediate"
+- reason은 반드시 사용자의 구체적인 보유 자원을 언급
+- 출력은 항상 유효한 JSON 한 덩어리`
+
+    // 사용자가 도구 선택 UI에서 명시적으로 고른 게 있으면 그것만 사용, 아니면 기본값 (dooray-mcp)
+    const mcpForCall = overrideMcp && overrideMcp.length > 0 ? overrideMcp : ['dooray-mcp']
+    const args = buildArgs(prompt, {
+      model: this.pickModel('briefing', 'opus'),
+      systemPrompt: this.buildSystemPrompt(AI_RECOMMEND_SYSTEM, 'aiRecommend'),
+      mcpServers: mcpForCall,
+      maxBudget: '0.5',
+      effort: 'medium'
+    })
+
+    this.emitProgress(requestId, 'thinking', '분석 시작 중...', started)
+    // MCP tool call이 여러 번 일어날 수 있어 타임아웃 해제 (사용자가 재분석 버튼으로만 종료 의도 표현)
+    const result = await this.runClaudeStream(args, (chunk) => {
+      this.emitProgress(requestId, 'streaming', '분석 중...', started, chunk)
+    }, { timeoutMs: null })
+    this.emitProgress(requestId, 'parsing', '결과 정리 중...', started)
+
+    const raw = (result.result || '').trim()
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim()
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      this.emitProgress(requestId, 'done', '완료', started)
+      throw new Error(`AI 응답에서 JSON을 찾지 못했습니다.\n\n응답: ${raw.substring(0, 400)}`)
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]) as {
+      summary?: string
+      analyzedCount?: number
+      immediate?: Array<{ taskId: string; title: string; reason: string }>
+      reference?: Array<{ taskId: string; title: string; reason: string }>
+      covered?: Array<{ taskId: string; title: string; reason: string; coveredBy?: string }>
+    }
+
+    const attachUrl = <T extends { taskId: string }>(arr: T[] | undefined): Array<T & { url: string }> =>
+      (arr || []).map((item) => ({ ...item, url: `https://nhnent.dooray.com/task/${projectId}/${item.taskId}` }))
+
+    const final: import('../../shared/types/ai-recommend').AIRecommendResult = {
+      summary: parsed.summary || '분석 완료',
+      analyzedCount: parsed.analyzedCount || 0,
+      immediate: attachUrl(parsed.immediate),
+      reference: attachUrl(parsed.reference),
+      covered: attachUrl(parsed.covered).map((i) => ({ ...i, coveredBy: (i as { coveredBy?: string }).coveredBy })),
+      analyzedAt: Date.now(),
+      costUsd: result.total_cost_usd
+    }
+
+    this.saveAIRecommendation(final)
+    this.emitProgress(requestId, 'done', '완료', started)
+    return final
   }
 
   async generateMeetingNote(eventSubject: string, eventDescription?: string, attendees?: string[], requestId?: string): Promise<string> {

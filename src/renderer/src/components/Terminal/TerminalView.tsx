@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Plus, X, Terminal, Trash2, FolderOpen, ChevronDown, Sparkles } from 'lucide-react'
 import TerminalPane from './TerminalPane'
+import ClaudeChatPane from './ClaudeChatPane'
 import type { TerminalSession } from '../../../../shared/types/terminal'
 
 type ShellMode = 'default' | 'claude'
@@ -9,6 +10,8 @@ type ShellMode = 'default' | 'claude'
 interface SessionWithOutput {
   session: TerminalSession
   savedOutput?: string  // 복원된 출력
+  chatMode?: boolean    // true: ClaudeChatPane 사용, false: 기본 xterm
+  cwd?: string
 }
 
 function TerminalView(): JSX.Element {
@@ -40,16 +43,23 @@ function TerminalView(): JSX.Element {
   const createSession = useCallback(async (opts?: { cwd?: string; mode?: ShellMode }) => {
     const cwd = opts?.cwd
     const mode = opts?.mode || 'default'
+    // Claude Code 는 트랜스크립트 UI — terminal 세션 없이 가상 id 로만 관리
+    if (mode === 'claude') {
+      const virtualId = `claude-chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const base = cwd ? (cwd.split('/').pop() || '~') : '~'
+      setEntries((prev) => [...prev, {
+        session: { id: virtualId, name: `claude ${base}`, pid: 0, cwd: cwd || '', createdAt: Date.now() },
+        chatMode: true,
+        cwd
+      }])
+      setActiveId(virtualId)
+      return
+    }
     const createOpts: { cwd?: string; command?: string; args?: string[] } = {}
     if (cwd) createOpts.cwd = cwd
-    if (mode === 'claude') {
-      createOpts.command = 'claude'
-      createOpts.args = []
-    }
     const session = await window.api.terminal.create(createOpts)
     const base = cwd ? (cwd.split('/').pop() || '~') : '~'
-    const label = mode === 'claude' ? `claude ${base}` : base
-    setEntries((prev) => [...prev, { session: { ...session, name: label } }])
+    setEntries((prev) => [...prev, { session: { ...session, name: base } }])
     setActiveId(session.id)
   }, [])
 
@@ -61,7 +71,12 @@ function TerminalView(): JSX.Element {
 
   const closeSession = useCallback(
     async (id: string) => {
-      await window.api.terminal.kill(id)
+      const entry = entries.find((e) => e.session.id === id)
+      if (entry?.chatMode) {
+        try { await window.api.claude.chatCancel(id) } catch {}
+      } else {
+        await window.api.terminal.kill(id)
+      }
       setEntries((prev) => {
         const next = prev.filter((e) => e.session.id !== id)
         if (activeId === id && next.length > 0) {
@@ -72,7 +87,7 @@ function TerminalView(): JSX.Element {
         return next
       })
     },
-    [activeId]
+    [activeId, entries]
   )
 
   const closeAll = useCallback(async () => {
@@ -154,7 +169,7 @@ function TerminalView(): JSX.Element {
                 <Terminal size={14} /> 일반 터미널
               </button>
               <button onClick={() => createSession({ mode: 'claude' })}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-clover-orange to-clover-blue text-white text-sm hover:opacity-90">
+                className="ds-btn ai">
                 <Sparkles size={14} /> Claude Code
               </button>
               <button onClick={() => createSessionAtFolder('default')}
@@ -165,13 +180,22 @@ function TerminalView(): JSX.Element {
             <p className="text-[10px] text-text-tertiary">⌘T로 언제든 새 탭을 열 수 있습니다</p>
           </div>
         ) : (
-          entries.map(({ session, savedOutput }) => (
-            <TerminalPane
-              key={session.id}
-              sessionId={session.id}
-              isActive={session.id === activeId}
-              initialOutput={savedOutput}
-            />
+          entries.map(({ session, savedOutput, chatMode, cwd }) => (
+            chatMode ? (
+              <ClaudeChatPane
+                key={session.id}
+                chatId={session.id}
+                isActive={session.id === activeId}
+                cwd={cwd}
+              />
+            ) : (
+              <TerminalPane
+                key={session.id}
+                sessionId={session.id}
+                isActive={session.id === activeId}
+                initialOutput={savedOutput}
+              />
+            )
           ))
         )}
       </div>

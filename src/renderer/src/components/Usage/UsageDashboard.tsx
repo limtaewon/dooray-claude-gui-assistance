@@ -118,7 +118,10 @@ function UsageDashboard(): JSX.Element {
               {{ day: '24시간', week: '7일', month: '30일' }[p]}
             </button>
           ))}
-          <button onClick={load} className="p-2 rounded-lg hover:bg-bg-surface-hover text-text-secondary"><RefreshCw size={14} /></button>
+          <button onClick={load} className="ds-btn sm primary">
+            <RefreshCw size={12} />
+            새로고침
+          </button>
         </div>
       </div>
 

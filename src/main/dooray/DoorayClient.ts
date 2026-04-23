@@ -10,18 +10,33 @@ export class DoorayClient {
   private token: string | null = null
 
   async setToken(token: string): Promise<void> {
-    await keytar.setPassword(SERVICE_NAME, ACCOUNT_NAME, token)
+    try {
+      await keytar.setPassword(SERVICE_NAME, ACCOUNT_NAME, token)
+      console.log('[DoorayClient] keytar.setPassword OK (len=%d)', token.length)
+      // 바로 다시 읽어서 실제 저장됐는지 확인
+      const verify = await keytar.getPassword(SERVICE_NAME, ACCOUNT_NAME)
+      console.log('[DoorayClient] setToken verify readback:', verify ? `OK (len=${verify.length})` : 'NULL!')
+    } catch (err) {
+      console.error('[DoorayClient] keytar.setPassword FAILED:', err)
+      throw err
+    }
     this.token = token
   }
 
   async deleteToken(): Promise<void> {
+    console.log('[DoorayClient] deleteToken called — stack:', new Error().stack?.split('\n').slice(1, 6).join('\n'))
     await keytar.deletePassword(SERVICE_NAME, ACCOUNT_NAME)
     this.token = null
   }
 
   async getToken(): Promise<string | null> {
     if (!this.token) {
-      this.token = await keytar.getPassword(SERVICE_NAME, ACCOUNT_NAME)
+      try {
+        this.token = await keytar.getPassword(SERVICE_NAME, ACCOUNT_NAME)
+        console.log('[DoorayClient] keytar.getPassword =>', this.token ? `OK (len=${this.token.length})` : 'NULL')
+      } catch (err) {
+        console.error('[DoorayClient] keytar.getPassword FAILED:', err)
+      }
     }
     return this.token
   }

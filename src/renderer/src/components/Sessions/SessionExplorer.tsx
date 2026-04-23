@@ -112,8 +112,9 @@ function SessionExplorer(): JSX.Element {
               <h2 className="text-sm font-semibold text-text-primary">세션 탐색기</h2>
               <span className="text-[9px] text-text-tertiary">{filtered.length}/{sessions.length}</span>
             </div>
-            <button onClick={load} className="p-1 rounded hover:bg-bg-surface-hover text-text-tertiary">
-              <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+            <button onClick={load} className="ds-btn xs primary">
+              <RefreshCw size={11} className={loading ? 'animate-spin' : ''} />
+              새로고침
             </button>
           </div>
           {/* 검색 */}

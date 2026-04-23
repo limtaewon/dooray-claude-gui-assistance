@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Zap, ToggleLeft, ToggleRight, Plus, Trash2, Edit3, Save, Sparkles, Loader2,
-  FileText, Eye, Upload, Download, LayoutTemplate
+  FileText, Eye, Upload, Download, LayoutTemplate, Check
 } from 'lucide-react'
 import type { CloverSkill, SkillTarget } from '../../../../shared/types/skill'
 import { SKILL_TEMPLATES, type SkillTemplate } from '../../../../shared/types/skill-templates'
@@ -10,11 +10,32 @@ interface SkillQuickToggleProps {
   target: SkillTarget
   /** 트리거 버튼 크기. 기본 'md'. DS 툴바에서 쓸 땐 'xs' 권장 */
   size?: 'xs' | 'sm' | 'md'
+  /** AI 기능 식별자 — 이게 주어지면 popover 내부에 MCP 서버 선택 섹션이 표시됨 */
+  feature?: string
 }
 
 type Mode = 'list' | 'edit' | 'ai-generate' | 'template' | 'preview'
 
-function SkillQuickToggle({ target, size = 'md' }: SkillQuickToggleProps): JSX.Element {
+const MCP_SETTINGS_KEY = 'aiMcpSelection'
+
+async function readMcpSelectionMap(): Promise<Record<string, string[]>> {
+  const raw = await window.api.settings.get(MCP_SETTINGS_KEY)
+  const map: Record<string, string[]> = {}
+  if (raw && typeof raw === 'object') {
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      if (Array.isArray(v)) map[k] = v.filter((x): x is string => typeof x === 'string')
+    }
+  }
+  return map
+}
+
+async function writeMcpSelection(feature: string, selection: string[]): Promise<void> {
+  const map = await readMcpSelectionMap()
+  map[feature] = selection
+  await window.api.settings.set(MCP_SETTINGS_KEY, map)
+}
+
+function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProps): JSX.Element {
   const [open, setOpen] = useState(false)
   const [skills, setSkills] = useState<CloverSkill[]>([])
   const [mode, setMode] = useState<Mode>('list')
@@ -25,6 +46,34 @@ function SkillQuickToggle({ target, size = 'md' }: SkillQuickToggleProps): JSX.E
   const [aiLoading, setAiLoading] = useState(false)
   const [mcpServers, setMcpServers] = useState<string[]>([])
   const [selectedMcp, setSelectedMcp] = useState<Set<string>>(new Set())
+
+  // AI 호출 시 허용할 MCP (feature별) — popover 내부 설정 섹션
+  const [allMcpServers, setAllMcpServers] = useState<string[]>([])
+  const [featureMcp, setFeatureMcp] = useState<Set<string>>(new Set())
+
+  // feature가 주어졌을 때 MCP 목록 + 저장된 선택 로드
+  useEffect(() => {
+    if (!feature) return
+    ;(async () => {
+      const [mcpMap, selMap] = await Promise.all([
+        window.api.mcp.list().catch(() => ({} as Record<string, unknown>)),
+        readMcpSelectionMap().catch(() => ({} as Record<string, string[]>))
+      ])
+      const names = Object.keys(mcpMap || {}).sort()
+      setAllMcpServers(names)
+      const stored = (selMap[feature] || []).filter((n) => names.includes(n))
+      setFeatureMcp(new Set(stored))
+    })()
+  }, [feature, open])
+
+  const toggleFeatureMcp = async (name: string): Promise<void> => {
+    if (!feature) return
+    const next = new Set(featureMcp)
+    if (next.has(name)) next.delete(name)
+    else next.add(name)
+    setFeatureMcp(next)
+    await writeMcpSelection(feature, Array.from(next))
+  }
 
   // MCP 서버 목록 로드 (AI 생성 모드 진입 시)
   useEffect(() => {
@@ -169,6 +218,8 @@ function SkillQuickToggle({ target, size = 'md' }: SkillQuickToggleProps): JSX.E
   }
 
   const activeCount = skills.filter((s) => s.enabled).length
+  const mcpCount = featureMcp.size
+  const totalActive = activeCount + mcpCount
   const templates = SKILL_TEMPLATES.filter((t) => t.target === target)
 
   const sizeCls = size === 'md' ? '' : ` ${size}`
@@ -177,14 +228,9 @@ function SkillQuickToggle({ target, size = 'md' }: SkillQuickToggleProps): JSX.E
   return (
     <div className="relative">
       <button onClick={() => open ? close() : setOpen(true)}
-        className={`ds-btn ${activeCount > 0 ? '' : 'secondary'}${sizeCls}`}
-        style={activeCount > 0 ? {
-          background: 'rgba(245, 158, 11, 0.15)',
-          color: '#FCD34D',
-          borderColor: 'rgba(251, 191, 36, 0.4)'
-        } : undefined}>
-        <Zap size={iconSize} className={activeCount > 0 ? 'text-amber-400' : ''} />
-        스킬{activeCount > 0 ? ` ${activeCount}` : ''}
+        className={`ds-btn ${totalActive > 0 ? 'skill-active' : 'secondary'}${sizeCls}`}>
+        <Zap size={iconSize} className={totalActive > 0 ? 'skill-active-icon' : ''} />
+        AI 설정{totalActive > 0 ? ` ${totalActive}` : ''}
       </button>
 
       {open && (
@@ -195,7 +241,7 @@ function SkillQuickToggle({ target, size = 'md' }: SkillQuickToggleProps): JSX.E
             {/* 헤더 */}
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-bg-border bg-bg-surface-hover">
               <span className="text-xs font-semibold text-text-primary flex items-center gap-1.5">
-                <Zap size={12} className="text-amber-400" /> AI 스킬 <span className="text-[10px] text-text-tertiary">· {target}</span>
+                <Zap size={12} className="text-amber-400" /> AI 설정 <span className="text-[10px] text-text-tertiary">· {target}</span>
               </span>
               <div className="flex gap-1">
                 {templates.length > 0 && (
@@ -238,6 +284,87 @@ function SkillQuickToggle({ target, size = 'md' }: SkillQuickToggleProps): JSX.E
               </label>
               <span className="ml-auto text-[9px] text-text-tertiary">총 {skills.length}개 · {activeCount} 활성</span>
             </div>
+
+            {/* MCP 서버 선택 섹션 (feature prop이 있을 때만 · list 모드에서만 표시) */}
+            {feature && mode === 'list' && (
+              <div
+                className="px-4 py-3 border-b border-bg-border"
+                style={{ background: 'var(--bg-surface-raised, rgba(255,255,255,0.02))' }}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1 h-3 rounded-full bg-clover-blue" />
+                    <span className="text-[11px] font-semibold text-text-primary">
+                      MCP 서버
+                    </span>
+                    <span className="text-[10px] text-text-tertiary">· 이 기능에 허용할 도구</span>
+                  </div>
+                  {mcpCount > 0 && (
+                    <span className="text-[9.5px] px-1.5 py-0.5 rounded-full font-bold"
+                      style={{ background: 'rgba(59,130,246,0.2)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.4)' }}>
+                      {mcpCount}개 선택됨
+                    </span>
+                  )}
+                </div>
+                {allMcpServers.length === 0 ? (
+                  <div
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] text-text-tertiary"
+                    style={{ background: 'var(--bg-primary)', border: '1px dashed var(--bg-border)' }}
+                  >
+                    <span>🔌</span>
+                    <span>설치된 MCP 서버가 없습니다</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {allMcpServers.map((name) => {
+                      const active = featureMcp.has(name)
+                      return (
+                        <button
+                          key={name}
+                          onClick={() => toggleFeatureMcp(name)}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all active:scale-95"
+                          style={active ? {
+                            background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
+                            color: '#fff',
+                            border: '1px solid #3B82F6',
+                            boxShadow: '0 1px 3px rgba(59,130,246,0.4)'
+                          } : {
+                            background: 'var(--bg-surface)',
+                            color: 'var(--text-primary)',
+                            border: '1px solid var(--bg-border)'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!active) {
+                              e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)'
+                              e.currentTarget.style.background = 'rgba(59,130,246,0.08)'
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!active) {
+                              e.currentTarget.style.borderColor = 'var(--bg-border)'
+                              e.currentTarget.style.background = 'var(--bg-surface)'
+                            }
+                          }}
+                        >
+                          <span
+                            className="w-3 h-3 rounded-[3px] flex items-center justify-center flex-none"
+                            style={active
+                              ? { background: 'rgba(255,255,255,0.25)' }
+                              : { background: 'var(--bg-border)' }}
+                          >
+                            {active && <Check size={9} strokeWidth={3} />}
+                          </span>
+                          {name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+                <p className="text-[9.5px] text-text-tertiary mt-2 leading-snug">
+                  선택된 MCP 도구만 AI가 이 기능에서 호출할 수 있습니다.
+                </p>
+              </div>
+            )}
 
             {/* 템플릿 모드 */}
             {mode === 'template' && (

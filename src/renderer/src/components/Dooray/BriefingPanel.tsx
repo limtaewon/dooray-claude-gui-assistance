@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Sparkles, AlertTriangle, Target, Clock, Calendar, Lightbulb, RefreshCw, Trash2, ChevronDown, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { Sparkles, AlertTriangle, Target, Clock, Calendar, Lightbulb, Trash2, ChevronDown, ThumbsUp, ThumbsDown, MessageSquare } from 'lucide-react'
 import type { AIBriefing } from '../../../../shared/types/ai'
 import SkillQuickToggle from './SkillQuickToggle'
+import AIToolsPopover from '../common/AIToolsPopover'
 import { useAIProgress } from '../../hooks/useAIProgress'
 import AIProgressIndicator from '../common/AIProgressIndicator'
 import { ErrorView, EmptyView } from '../common/StateViews'
+import { Button, Chip } from '../common/ds'
 
 type StoredBriefing = AIBriefing & { savedAt: string }
 
@@ -30,7 +32,8 @@ function BriefingPanel(): JSX.Element {
     const started = Date.now()
     window.api.analytics.track('ai.briefing.start')
     try {
-      const result = await window.api.ai.briefing(reqId)
+      const mcpServers = await AIToolsPopover.loadSelected('briefing')
+      const result = await window.api.ai.briefing(reqId, mcpServers)
       setBriefing(result)
       await window.api.briefingStore.save(result)
       const list = await window.api.briefingStore.list()
@@ -116,16 +119,30 @@ function BriefingPanel(): JSX.Element {
               <ChevronDown size={10} className={`transition-transform ${showHistory ? 'rotate-180' : ''}`} />
             </button>
           )}
+          {briefing && (
+            <span className="text-[10px] text-text-tertiary">
+              · {new Date((briefing as StoredBriefing).savedAt || Date.now()).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 생성
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
-          <SkillQuickToggle target="briefing" />
-          <button
+          {briefing && history.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              title="현재 브리핑 삭제"
+              onClick={() => deleteBriefing(0)}
+              leftIcon={<Trash2 size={12} />}
+            />
+          )}
+          <SkillQuickToggle target="briefing" feature="briefing" />
+          <Button
+            variant="ai"
             onClick={loadBriefing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-clover-orange to-clover-blue text-white text-xs font-medium hover:opacity-90 transition-opacity"
+            leftIcon={<Sparkles size={12} />}
           >
-            <Sparkles size={12} />
             새 브리핑 생성
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -170,53 +187,66 @@ function BriefingPanel(): JSX.Element {
         )}
 
         {briefing && (
-          <div className="p-4 space-y-4">
-            <p className="text-sm font-semibold text-text-primary">{briefing.greeting}</p>
+          <div className="px-6 py-4 space-y-3">
+            {/* Greeting card with orange→blue gradient + summary chips */}
+            <div
+              className="rounded-xl px-4 py-3.5"
+              style={{
+                background: 'linear-gradient(90deg, rgba(234,88,12,0.06), rgba(37,99,235,0.06))',
+                border: '1px solid transparent'
+              }}
+            >
+              <div className="text-[13px] leading-relaxed text-text-primary">{briefing.greeting}</div>
+              <div className="flex items-center gap-1.5 mt-2">
+                {briefing.urgent.length > 0 && <Chip tone="orange" dot>긴급 {briefing.urgent.length}</Chip>}
+                {briefing.focus.length > 0 && <Chip tone="blue" dot>집중 {briefing.focus.length}</Chip>}
+                {briefing.mentioned && briefing.mentioned.length > 0 && <Chip tone="violet" dot>멘션 {briefing.mentioned.length}</Chip>}
+                {briefing.todayEvents.length > 0 && <Chip tone="emerald" dot>회의 {briefing.todayEvents.length}</Chip>}
+              </div>
+            </div>
 
             {briefing.urgent.length > 0 && (
-              <Section icon={AlertTriangle} iconColor="text-red-400" title="긴급" bgColor="from-red-500/5 to-transparent border-red-500/20">
+              <Section icon={AlertTriangle} iconColor="text-red-400" title="긴급" count={briefing.urgent.length} bgColor="from-red-500/8 to-transparent border-red-500/22">
                 {briefing.urgent.map((item, i) => <TaskItem key={i} taskId={item.taskId} subject={item.subject} detail={item.reason} />)}
               </Section>
             )}
 
             {briefing.focus.length > 0 && (
-              <Section icon={Target} iconColor="text-clover-blue" title="오늘 집중" bgColor="from-clover-blue/5 to-transparent border-clover-blue/20">
+              <Section icon={Target} iconColor="text-clover-blue" title="오늘 집중" count={briefing.focus.length} bgColor="from-clover-blue/8 to-transparent border-clover-blue/22">
                 {briefing.focus.map((item, i) => <TaskItem key={i} taskId={item.taskId} subject={item.subject} detail={item.reason} />)}
               </Section>
             )}
 
             {briefing.mentioned && briefing.mentioned.length > 0 && (
-              <Section icon={AlertTriangle} iconColor="text-violet-400" title="멘션됨 (내가 알아야 할 것)" bgColor="from-violet-500/5 to-transparent border-violet-500/20">
+              <Section icon={MessageSquare} iconColor="text-violet-400" title="멘션/답장" count={briefing.mentioned.length} bgColor="from-violet-500/8 to-transparent border-violet-500/22">
                 {briefing.mentioned.map((item, i) => <TaskItem key={i} taskId={item.taskId} subject={item.subject} detail={item.reason} />)}
               </Section>
             )}
 
             {briefing.stale.length > 0 && (
-              <Section icon={Clock} iconColor="text-clover-orange" title="착수 필요" bgColor="from-clover-orange/5 to-transparent border-clover-orange/20">
+              <Section icon={Clock} iconColor="text-clover-orange" title="착수 필요" count={briefing.stale.length} bgColor="from-clover-orange/8 to-transparent border-clover-orange/22">
                 {briefing.stale.map((item, i) => <TaskItem key={i} taskId={item.taskId} subject={item.subject} detail={`${item.daysSinceCreated}일째`} />)}
               </Section>
             )}
 
             {briefing.todayEvents.length > 0 && (
-              <Section icon={Calendar} iconColor="text-emerald-400" title="오늘 일정" bgColor="from-emerald-400/5 to-transparent border-emerald-400/20">
+              <Section icon={Calendar} iconColor="text-emerald-400" title="오늘 회의" count={briefing.todayEvents.length} bgColor="from-emerald-400/8 to-transparent border-emerald-400/22">
                 {briefing.todayEvents.map((evt, i) => (
                   <div key={i} className="flex items-center gap-2 text-xs">
-                    <span className="text-text-secondary font-mono">{evt.time}</span>
-                    <span className="text-text-primary">{evt.subject}</span>
+                    <span className="text-emerald-400 font-mono">{evt.time}</span>
+                    <span className="text-text-primary flex-1">{evt.subject}</span>
                   </div>
                 ))}
               </Section>
             )}
 
             {briefing.recommendations.length > 0 && (
-              <Section icon={Lightbulb} iconColor="text-yellow-400" title="AI 추천" bgColor="from-yellow-400/5 to-transparent border-yellow-400/20">
-                <ol className="space-y-1.5">
+              <Section icon={Lightbulb} iconColor="text-yellow-400" title="AI 제안" count={briefing.recommendations.length} bgColor="from-yellow-400/8 to-transparent border-yellow-400/22">
+                <div className="space-y-1">
                   {briefing.recommendations.map((rec, i) => (
-                    <li key={i} className="flex gap-2 text-xs text-text-primary">
-                      <span className="text-text-tertiary font-mono flex-shrink-0">{i + 1}.</span>{rec}
-                    </li>
+                    <div key={i} className="text-xs text-text-primary leading-relaxed">{rec}</div>
                   ))}
-                </ol>
+                </div>
               </Section>
             )}
 
@@ -229,16 +259,17 @@ function BriefingPanel(): JSX.Element {
   )
 }
 
-function Section({ icon: Icon, iconColor, title, bgColor, children }: {
-  icon: typeof Sparkles; iconColor: string; title: string; bgColor: string; children: React.ReactNode
+function Section({ icon: Icon, iconColor, title, count, bgColor, children }: {
+  icon: typeof Sparkles; iconColor: string; title: string; count?: number; bgColor: string; children: React.ReactNode
 }): JSX.Element {
   return (
-    <div className={`rounded-lg bg-gradient-to-r ${bgColor} border p-3`}>
-      <div className="flex items-center gap-1.5 mb-2">
-        <Icon size={12} className={iconColor} />
-        <span className="text-[11px] font-semibold text-text-primary">{title}</span>
+    <div className={`rounded-xl bg-gradient-to-r ${bgColor} border px-3.5 py-3`}>
+      <div className="flex items-center gap-2 mb-2">
+        <Icon size={14} className={iconColor} />
+        <span className={`text-[12px] font-semibold ${iconColor}`}>{title}</span>
+        {count !== undefined && <span className="text-[10px] text-text-tertiary">· {count}</span>}
       </div>
-      <div className="space-y-1.5">{children}</div>
+      <div className="space-y-1">{children}</div>
     </div>
   )
 }
@@ -246,21 +277,21 @@ function Section({ icon: Icon, iconColor, title, bgColor, children }: {
 function TaskItem({ taskId, subject, detail }: { taskId?: string; subject: string; detail: string }): JSX.Element {
   const content = (
     <>
-      <span className="text-text-primary flex-1">{subject}</span>
-      <span className="text-text-secondary flex-shrink-0">{detail}</span>
+      <span className="text-text-primary block">{subject}</span>
+      {detail && <span className="text-text-secondary block text-[11px] leading-relaxed mt-0.5">{detail}</span>}
     </>
   )
   if (taskId) {
     return (
       <a href={`https://nhnent.dooray.com/project/posts/${taskId}`} target="_blank" rel="noopener noreferrer"
-        className="flex items-start gap-2 text-xs px-1.5 -mx-1.5 py-1 rounded hover:bg-bg-surface-hover transition-colors cursor-pointer"
+        className="block text-xs px-1.5 -mx-1.5 py-1 rounded hover:bg-bg-surface-hover transition-colors cursor-pointer"
         title="두레이에서 열기">
         {content}
       </a>
     )
   }
   return (
-    <div className="flex items-start gap-2 text-xs">
+    <div className="text-xs">
       {content}
     </div>
   )

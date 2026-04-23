@@ -115,14 +115,14 @@ function CommunityView(): JSX.Element {
           </div>
           <div className="flex items-center gap-1.5">
             <button onClick={() => setWriting(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-semibold transition-all hover:opacity-90 active:scale-95"
-              style={{ background: 'linear-gradient(135deg, #fb923c 0%, #3b82f6 100%)', boxShadow: '0 2px 8px rgba(251,146,60,0.25)' }}>
+              className="ds-btn ai sm">
               <Plus size={13} />
               새 글 쓰기
             </button>
             <button onClick={load} disabled={loading}
-              className="p-1.5 rounded-lg hover:bg-bg-surface text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-40">
-              <RefreshCw size={13} className={loading ? 'animate-spin text-clover-blue' : ''} />
+              className="ds-btn sm primary">
+              <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+              새로고침
             </button>
           </div>
         </div>

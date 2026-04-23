@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Server, Sparkles, BarChart3, Calendar, Terminal, BookOpen, MessageSquare, GitBranch, Settings, Users, Radar } from 'lucide-react'
+import { Server, Sparkles, BarChart3, Calendar, Terminal, BookOpen, MessageSquare, GitBranch, Settings, Users, Radar, Lightbulb } from 'lucide-react'
 
-type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring'
+type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend'
 
 interface SidebarProps {
   activeView: View
@@ -28,6 +28,7 @@ const NAV_GROUPS: { key: string; label: string; items: NavItem[] }[] = [
     items: [
       { view: 'mcp', icon: Server, label: 'MCP 서버' },
       { view: 'skills', icon: Sparkles, label: 'Claude 스킬' },
+      { view: 'ai-recommend', icon: Lightbulb, label: 'AI 추천' },
       { view: 'sessions', icon: MessageSquare, label: '세션' },
       { view: 'usage', icon: BarChart3, label: '사용량' }
     ]
@@ -42,8 +43,8 @@ const STANDALONE_ITEMS: NavItem[] = [
 /** Design System v1 Sidebar (56px). 36×36 버튼, 20px 아이콘, 활성 상태 blue 그라디언트.
  *  불투명도 낮은 분리선으로 그룹 구분. */
 function NavButton({
-  view, icon: Icon, label, active, onClick, badge
-}: NavItem & { active: boolean; onClick: () => void; badge?: number }): JSX.Element {
+  view, icon: Icon, label, active, onClick, badge, pulse
+}: NavItem & { active: boolean; onClick: () => void; badge?: number; pulse?: boolean }): JSX.Element {
   return (
     <button
       key={view}
@@ -62,12 +63,19 @@ function NavButton({
           {badge > 99 ? '99+' : badge}
         </span>
       )}
+      {pulse && (!badge || badge === 0) && (
+        <span className="absolute top-0.5 right-0.5 flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full rounded-full bg-clover-orange opacity-75 animate-ping" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-clover-orange" />
+        </span>
+      )}
     </button>
   )
 }
 
 function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
   const [monitoringUnread, setMonitoringUnread] = useState(0)
+  const [monitoringPulse, setMonitoringPulse] = useState(false)
 
   useEffect(() => {
     const refresh = async (): Promise<void> => {
@@ -78,10 +86,17 @@ function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
       } catch { /* ignore */ }
     }
     refresh()
-    const unsub = window.api.watcher.onNewMessages(() => refresh())
+    const unsub = window.api.watcher.onNewMessages(({ messages }) => {
+      refresh()
+      if (messages && messages.length > 0) setMonitoringPulse(true)
+    })
     const timer = setInterval(refresh, 10_000)
     return () => { unsub(); clearInterval(timer) }
   }, [])
+
+  useEffect(() => {
+    if (activeView === 'monitoring') setMonitoringPulse(false)
+  }, [activeView])
 
   return (
     <aside className="w-14 bg-bg-surface border-r border-bg-border flex flex-col items-center py-2 gap-0.5 flex-shrink-0">
@@ -94,6 +109,7 @@ function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
               active={activeView === item.view}
               onClick={() => onViewChange(item.view)}
               badge={item.view === 'monitoring' ? monitoringUnread : undefined}
+              pulse={item.view === 'monitoring' ? monitoringPulse : undefined}
             />
           ))}
           {i < NAV_GROUPS.length - 1 && (
