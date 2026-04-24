@@ -3,7 +3,7 @@ export interface CloverSkill {
   name: string
   description: string
   /** 적용 대상 탭 */
-  target: 'briefing' | 'report' | 'calendar' | 'wiki' | 'task' | 'messenger' | 'insights' | 'all'
+  target: 'briefing' | 'report' | 'calendar' | 'wiki' | 'task' | 'messenger' | 'insights' | 'aiRecommend' | 'all'
   /** 활성 여부 */
   enabled: boolean
   /** 스킬 본문 (마크다운 - AI에게 전달할 규칙/프롬프트) */
@@ -28,5 +28,6 @@ export const SKILL_TARGETS: { value: SkillTarget; label: string; description: st
   { value: 'task', label: '태스크', description: '태스크 요약' },
   { value: 'messenger', label: '메신저', description: '메시지 작성 말투/규칙' },
   { value: 'insights', label: '인사이트', description: 'Claude Code 세션 요약' },
+  { value: 'aiRecommend', label: 'AI 추천', description: 'AI 활용 사례 분류 기준 커스터마이즈' },
   { value: 'all', label: '전체', description: '모든 AI 기능에 항상 적용' }
 ]

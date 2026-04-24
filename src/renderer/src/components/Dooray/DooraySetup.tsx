@@ -16,18 +16,26 @@ function DooraySetup({ onConfigured }: DooraySetupProps): JSX.Element {
     const checkExisting = async (): Promise<void> => {
       try {
         const existing = await window.api.dooray.getToken()
-        if (existing) {
-          // 기존 토큰이 있으면 유효성 확인
-          const result = await window.api.dooray.validateToken()
-          if (result.valid) {
-            onConfigured()
-          } else {
-            // 토큰이 있지만 유효하지 않으면 삭제
-            await window.api.dooray.deleteToken()
-          }
+        if (!existing) return
+
+        const result = await window.api.dooray.validateToken()
+        if (result.valid) {
+          onConfigured()
+          return
         }
-      } catch {
-        // 토큰 없음
+
+        // 인증 실패(401/403)일 때만 토큰 폐기. 그 외(네트워크/타임아웃/429/5xx)는 유지 — 사용자가 다시 로그인할 필요 없게.
+        const msg = result.error || ''
+        const isAuthFailure = /\b(401|403)\b/.test(msg)
+        if (isAuthFailure) {
+          await window.api.dooray.deleteToken()
+        } else {
+          // 서버/네트워크 이슈로 추정 — 토큰은 키체인에 남기고, 일단 대시보드 진입. 이후 개별 API 호출이 실제 상태를 드러냄.
+          console.warn('[DooraySetup] validate failed but keeping token (non-auth error):', msg)
+          onConfigured()
+        }
+      } catch (err) {
+        console.warn('[DooraySetup] token check threw:', err)
       } finally {
         setChecking(false)
       }

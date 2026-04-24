@@ -59,6 +59,9 @@ export class TaskService {
     return this.myMemberId
   }
 
+  /** 외부에서 공용으로 쓰는 내 memberId getter */
+  async getMyMemberIdPublic(): Promise<string> { return this.getMyMemberId() }
+
   /** 수동 추가 프로젝트 ID 목록 (외부에서 주입) */
   private customProjectIds: string[] = []
   setCustomProjectIds(ids: string[]): void {

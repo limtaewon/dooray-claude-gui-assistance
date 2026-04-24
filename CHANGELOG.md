@@ -1,5 +1,71 @@
 # Changelog
 
+## [Unreleased] - Design System v1 (feat/design-system 브랜치)
+
+Claude Design이 생성한 디자인 시스템을 실제 코드베이스에 점진 이식.
+`handoff/` 폴더의 MIGRATION.md + bundle.md + screens/ 기반.
+
+### Phase 1 — 토큰 CSS
+- 브랜드 토큰 분리 (`:root`): clover-orange/blue, success/warning/danger/info/mention
+- spacing 스케일 (`--space-0-5`~`--space-12`, Tailwind 4px base)
+- radius 스케일 (`--radius-xs`~`--radius-xl`, `--radius-full`)
+- type 스케일 (`--t-9`~`--t-24`) + 시맨틱 클래스 (`.text-title`/`.text-section`/`.text-body`/`.text-meta`/`.text-caption`/`.text-mini`/`.text-label`)
+- `.num-xl`/`.num-lg` 대시보드 큰 숫자
+- `.ai-gradient-bg`/`.ai-gradient-text` (주황→파랑)
+- 라이트 팔레트 5종 (cool-minimal/crisp-white/soft-blue/graphite/paper) 전부 CSS에 선언
+- 팔레트 적용 방식: 인라인 CSS 변수 주입 → `<html data-theme="light" data-palette="<id>">` 속성 방식으로 전환
+- `useTheme` hook에 `palette` 필드 추가, setPalette/PALETTES/PALETTE_LABELS export
+- theme + palette 모두 localStorage + electron-store 이중 기록
+
+### Phase 2 — 공통 primitive 컴포넌트
+`design-system.css`에 utility 클래스(`ds-*` prefix) 추가:
+- `.ds-btn` (primary/secondary/ghost/danger/ai/success/orange/icon, xs/sm/md/lg)
+- `.ds-chip` (blue/orange/emerald/red/violet/yellow/neutral)
+- `.ds-card` (default/raised/flat), `.ds-input`, `.ds-avatar`, `.ds-badge-pill`
+- `.ds-modal`, `.ds-toast`, `.ds-cp-*` (command palette), `.ds-menu`, `.ds-seg`
+- `.ds-state-view` + `.ds-spinner`, `.ds-codeblock`, `.ds-kbd`
+- `.ds-titlebar`, `.ds-tabbar`, `.ds-tab`
+
+`src/renderer/src/components/common/ds/` 신설:
+- Button.tsx / Chip.tsx / Badge.tsx / Avatar.tsx / Card.tsx / Input.tsx (+ Textarea, FieldLabel)
+- Kbd.tsx / SegTabs.tsx / Modal.tsx (createPortal 기반)
+- Toast.tsx (ToastHost + useToast context)
+- CommandPalette.tsx (⌘K 스타일, 필터링 + 키보드 네비)
+- StateViews.tsx (EmptyView/LoadingView/ErrorView)
+- TimeAgo.tsx (상대시간 자동 업데이트)
+- index.ts re-export
+
+### Phase 3 — Shell (TitleBar + Sidebar)
+- **TitleBar**: 높이 40px → 36px (`.ds-titlebar`). 우측에 **⌘K 커맨드 팔레트** 버튼 + **Dark/Light 테마 토글** 추가. 신호등 자리 padding 82px로 고정.
+- **Sidebar**: 너비 64px → 56px (w-14). 네비 버튼 40×40 → 36×36 (w-9 h-9). radius 7px + gap 0.5 타이트.
+- **App.tsx**: ToastHost로 전체 트리 감싸기, CommandPalette 상시 마운트, ⌘K 글로벌 단축키. command groups: 이동(11 뷰) + 명령(테마 토글).
+
+### Phase 4-1 — MCP 화면
+- DS PageHeader 패턴 적용 (Server 아이콘 + 타이틀 + 등록 수 + 우측 액션 버튼)
+- Button / EmptyView / LoadingView 공통 컴포넌트로 교체
+- `.ds-titlebar` 스타일을 따르는 레이아웃
+
+### Phase 4-3 — Settings
+- '앱 동작' 탭 라벨을 '외관 & 동작'으로 명확화
+- 팔레트 선택 UI는 useTheme.setPalette와 연결되어 정상 작동 (Phase 1에서 완료)
+
+### Phase 4-4 — Terminal
+- 탭바를 `.ds-tabbar` + `.ds-tab` 클래스로 교체 (32px tabbar, 22px tab)
+
+### Phase 5 — Dooray 탭바
+- DoorayAssistant 상단 탭바를 `.ds-tabbar` + `.ds-tab`으로 교체
+- AI 탭(dashboard/briefing/report/messenger)에 `.ai` 변형 (gradient + 오렌지)
+- 전체 Dashboard/Briefing/Watcher 뷰 내부 리라이트는 향후 feature flag 기반 별도 작업
+
+### 후속 작업 (v1.2+)
+- Phase 4-2: Skills / Community / Monitoring / Usage 화면 세부 리라이트 (PageHeader/FilterBar 공통화)
+- Phase 5 full: Dooray Dashboard/Briefing/Watcher 내부를 DS Dashboard.jsx 구조로 전면 교체 (feature flag `ui.v2.dooray`)
+- Phase 6: Playwright 스냅샷 + 접근성(WCAG AA) 검증
+
+### 호환성
+- 기존 Tailwind 기반 컴포넌트 대부분 그대로 동작 (토큰 이름 1:1 호환)
+- 기본 팔레트 `cool-minimal`이 이전 `[data-theme='light']`와 완전 동일 → 시각 변화 최소
+
 ## [1.1.0] - 2026-04-21
 
 ### v1 피드백 반영 (버그 수정)

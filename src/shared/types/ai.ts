@@ -71,4 +71,5 @@ export interface AIModelConfig {
   sessionSummary?: AIModelName
   calendarAnalysis?: AIModelName
   messengerCompose?: AIModelName
+  aiRecommend?: AIModelName
 }

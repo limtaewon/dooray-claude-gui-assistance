@@ -88,6 +88,36 @@ export class WikiService {
     return res.result
   }
 
+  // 새 위키 페이지 생성 (parentPageId 아래 하위 페이지)
+  async create(params: { wikiId: string; parentPageId?: string; subject: string; body: string }): Promise<{ id: string }> {
+    const res = await this.client.request<DoorayItemResponse<{ id: string }>>(
+      `/wiki/v1/wikis/${params.wikiId}/pages`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          parentPageId: params.parentPageId,
+          subject: params.subject,
+          body: { mimeType: 'text/x-markdown', content: params.body }
+        })
+      }
+    )
+    // 목록 캐시 무효화
+    this.pageListCache.clear()
+    return { id: res.result.id }
+  }
+
+  // Dooray 위키는 페이지 DELETE가 불가 — 제목만 재설정(소프트 삭제용)
+  async renameTitle(wikiId: string, pageId: string, subject: string): Promise<void> {
+    await this.client.request(
+      `/wiki/v1/wikis/${wikiId}/pages/${pageId}/title`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ subject })
+      }
+    )
+    this.pageListCache.clear()
+  }
+
   // 페이지 수정 - dooray API는 제목/내용을 분리 업데이트
   async update(params: DoorayWikiUpdateParams): Promise<void> {
     // 제목 업데이트

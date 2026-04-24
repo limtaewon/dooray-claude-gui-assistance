@@ -15,7 +15,7 @@ function SettingsView(): JSX.Element {
     { id: 'models', icon: Cpu, label: 'AI 모델' },
     { id: 'insights', icon: BarChart2, label: '사용 인사이트' },
     { id: 'dooray', icon: Key, label: '두레이 연결' },
-    { id: 'app', icon: SlidersHorizontal, label: '앱 동작' }
+    { id: 'app', icon: SlidersHorizontal, label: '외관 & 동작' }
   ]
 
   return (
@@ -49,8 +49,8 @@ interface ModelFeatureDef {
 }
 
 const MODEL_FEATURES: ModelFeatureDef[] = [
-  { key: 'briefing', label: 'AI 브리핑', description: '매일 업무 분석 및 추천', defaultModel: 'sonnet' },
-  { key: 'report', label: '일간/주간 보고서', description: '마크다운 업무 보고서 생성', defaultModel: 'sonnet' },
+  { key: 'briefing', label: 'AI 브리핑', description: '매일 업무 분석 및 추천', defaultModel: 'opus' },
+  { key: 'report', label: '일간/주간 보고서', description: '마크다운 업무 보고서 생성', defaultModel: 'opus' },
   { key: 'wikiProofread', label: '위키 교정', description: '맞춤법/문법 교정', defaultModel: 'opus' },
   { key: 'wikiImprove', label: '위키 개선', description: '가독성/구조 개선', defaultModel: 'opus' },
   { key: 'wikiDraft', label: '위키 초안 작성', description: '태스크 기반 문서 초안', defaultModel: 'sonnet' },

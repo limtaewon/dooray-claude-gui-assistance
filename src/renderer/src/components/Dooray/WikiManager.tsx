@@ -45,14 +45,20 @@ function WikiManager(): JSX.Element {
   const loadDomains = useCallback(async () => {
     setLoadingDomains(true)
     try {
-      const [list, pinnedWikis, customOrder] = await Promise.all([
+      const [list, pinnedWikis, customOrder, customWikis] = await Promise.all([
         window.api.dooray.wiki.domains(),
         window.api.settings.get('pinnedWikis') as Promise<string[] | null>,
-        window.api.settings.get('wikiDomainOrder') as Promise<string[] | null>
+        window.api.settings.get('wikiDomainOrder') as Promise<string[] | null>,
+        window.api.settings.get('customWikis') as Promise<Array<{ id: string; code: string }> | null>
       ])
+      // API + 수동 추가 병합
+      const merged: WikiDomain[] = [...list]
+      for (const cw of customWikis || []) {
+        if (!merged.some((d) => d.id === cw.id)) merged.push({ id: cw.id, name: cw.code, type: 'custom' })
+      }
       const pinnedIds = pinnedWikis || []
-      const filtered = pinnedIds.length > 0 ? list.filter((d) => pinnedIds.includes(d.id)) : list
-      const base = filtered.length > 0 ? filtered : list
+      const filtered = pinnedIds.length > 0 ? merged.filter((d) => pinnedIds.includes(d.id)) : merged
+      const base = filtered.length > 0 ? filtered : merged
       // 사용자 정의 순서 적용 (커스텀 순서에 있는 것 먼저, 나머지는 기본 순서)
       const order = customOrder || []
       const byId = new Map(base.map((d) => [d.id, d]))
@@ -231,10 +237,10 @@ function WikiManager(): JSX.Element {
         <div className="w-44 flex-shrink-0 bg-bg-surface border-r border-bg-border flex flex-col">
           <div className="flex items-center justify-between px-3 py-2 border-b border-bg-border">
             <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-wide">위키</span>
-            <div className="flex items-center gap-0.5">
+            <div className="flex items-center gap-1">
               <ProjectFilter settingsKey="pinnedWikis" useWikiDomains onChanged={loadDomains} />
-              <button onClick={loadDomains} className="p-1 rounded hover:bg-bg-surface-hover text-text-tertiary"><RefreshCw size={11} className={loadingDomains ? 'animate-spin' : ''} /></button>
-              <button onClick={() => setDomainCollapsed(true)} className="p-1 rounded hover:bg-bg-surface-hover text-text-tertiary"><PanelLeftClose size={11} /></button>
+              <button onClick={loadDomains} className="ds-btn icon sm" title="새로고침"><RefreshCw size={14} className={loadingDomains ? 'animate-spin' : ''} /></button>
+              <button onClick={() => setDomainCollapsed(true)} className="ds-btn icon sm" title="접기"><PanelLeftClose size={14} /></button>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto py-1">
@@ -271,8 +277,8 @@ function WikiManager(): JSX.Element {
       {/* 중앙: 페이지 트리 */}
       <div className="w-60 flex-shrink-0 border-r border-bg-border flex flex-col">
         {domainCollapsed && (
-          <button onClick={() => setDomainCollapsed(false)} className="px-2 py-1 border-b border-bg-border text-text-tertiary hover:text-text-primary hover:bg-bg-surface-hover flex items-center gap-1 text-[10px]">
-            <PanelLeftOpen size={11} /> 위키 목록
+          <button onClick={() => setDomainCollapsed(false)} className="px-3 py-2 border-b border-bg-border text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover flex items-center gap-1.5 text-[12px] font-medium">
+            <PanelLeftOpen size={14} /> 위키 목록
           </button>
         )}
         {selectedDomain && (
@@ -280,7 +286,7 @@ function WikiManager(): JSX.Element {
             <div className="px-2 py-2 border-b border-bg-border">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-semibold text-text-primary truncate">{selectedDomain.name}</span>
-                <button onClick={() => loadRootPages(selectedDomain.id)} className="p-1 rounded hover:bg-bg-surface-hover text-text-tertiary"><RefreshCw size={10} className={loadingPages ? 'animate-spin' : ''} /></button>
+                <button onClick={() => loadRootPages(selectedDomain.id)} className="ds-btn icon sm" title="새로고침"><RefreshCw size={13} className={loadingPages ? 'animate-spin' : ''} /></button>
               </div>
               <div className="relative">
                 <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary" />

@@ -198,8 +198,8 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
         <div key={g.label} className="mb-6">
           {/* 날짜 구분자 */}
           <div className="sticky top-0 z-10 flex items-center gap-2 mb-3 py-1 bg-bg-primary">
-            <div className="px-2 py-0.5 rounded-full bg-bg-surface border border-bg-border">
-              <span className="text-[10px] font-bold text-text-secondary">{g.label}</span>
+            <div className="inline-flex items-center justify-center h-5 px-2 rounded-full bg-bg-surface border border-bg-border leading-none">
+              <span className="text-[10px] font-bold text-text-secondary leading-none">{g.label}</span>
             </div>
             <div className="flex-1 h-px bg-bg-border/60" />
             <span className="text-[10px] text-text-tertiary">{g.items.length}건</span>
@@ -243,13 +243,25 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
                       {renderContent(cleanText(m.text), m.matchedTerms)}
                     </div>
 
+                    {/* 원문 열기 (채널 타임라인 이동) */}
+                    <a
+                      href={`https://nhnent.dooray.com/messenger/channels/${m.channelId}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="이 채널을 두레이 메신저에서 열기"
+                      className="absolute bottom-2 right-3 inline-flex items-center gap-1 text-[10px] text-text-tertiary hover:text-clover-blue opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <ExternalLink size={10} />
+                      채널 열기
+                    </a>
+
                     {/* Matched terms chips */}
                     {m.matchedTerms.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-bg-border/40">
-                        <span className="text-[9px] text-text-tertiary">매치:</span>
+                      <div className="flex flex-wrap items-center gap-1 mt-2 pt-2 border-t border-bg-border/40">
+                        <span className="text-[9px] text-text-tertiary leading-none">매치:</span>
                         {m.matchedTerms.slice(0, 6).map((t, i) => (
                           <span key={i}
-                            className="text-[9px] px-1.5 py-0.5 rounded-full bg-clover-orange/15 text-clover-orange font-medium">
+                            className="inline-flex items-center h-[14px] px-1.5 rounded-full bg-clover-orange/15 text-clover-orange font-medium text-[9px] leading-none">
                             {t}
                           </span>
                         ))}

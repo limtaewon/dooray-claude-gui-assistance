@@ -36,30 +36,28 @@ function DoorayAssistant({ onDisconnect }: DoorayAssistantProps): JSX.Element {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center h-10 bg-bg-surface border-b border-bg-border px-3 gap-0.5 flex-shrink-0">
-        {tabs.map(({ id, icon: Icon, label }) => (
-          <button
-            key={id}
-            onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md transition-all ${
-              activeTab === id
-                ? AI_TABS.has(id)
-                  ? 'bg-gradient-to-r from-clover-orange/20 to-clover-blue/20 text-text-primary'
-                  : 'bg-clover-blue/10 text-clover-blue'
-                : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
-            }`}
-          >
-            <Icon size={13} className={activeTab === id && AI_TABS.has(id) ? 'text-clover-orange' : ''} />
-            {label}
-          </button>
-        ))}
-        <div className="ml-auto">
+      <div className="ds-tabbar">
+        {tabs.map(({ id, icon: Icon, label }) => {
+          const active = activeTab === id
+          const aiActive = active && AI_TABS.has(id)
+          return (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className={`ds-tab ${aiActive ? 'ai' : ''} ${active ? 'active' : ''}`}
+            >
+              <Icon size={12} className={aiActive ? 'text-clover-orange' : ''} />
+              {label}
+            </button>
+          )
+        })}
+        <div className="ml-auto flex items-center gap-1 pr-1">
           {onDisconnect && (
             <button
               onClick={onDisconnect}
               className="flex items-center gap-1 text-[10px] text-text-secondary hover:text-red-400 transition-colors"
             >
-              <LogOut size={12} />
+              <LogOut size={11} />
               연결 해제
             </button>
           )}

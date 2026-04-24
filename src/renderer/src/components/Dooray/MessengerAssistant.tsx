@@ -5,6 +5,8 @@ import {
 import type { DoorayChannel } from '../../../../shared/types/messenger'
 import { LoadingView, ErrorView, EmptyView } from '../common/StateViews'
 import SkillQuickToggle from './SkillQuickToggle'
+import AIProgressIndicator from '../common/AIProgressIndicator'
+import { useAIProgress } from '../../hooks/useAIProgress'
 
 const CHANNEL_TYPE_ICON: Record<string, typeof Hash> = {
   private: Lock,
@@ -20,9 +22,9 @@ function MessengerAssistant(): JSX.Element {
 
   const [instruction, setInstruction] = useState('')
   const [composed, setComposed] = useState('')
-  const [composing, setComposing] = useState(false)
   const [sending, setSending] = useState(false)
   const [status, setStatus] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const { progress, start, done, isActive: composing } = useAIProgress()
 
   const load = useCallback(async (force = false) => {
     setLoading(true); setError(null)
@@ -48,14 +50,15 @@ function MessengerAssistant(): JSX.Element {
 
   const handleCompose = async (): Promise<void> => {
     if (!instruction.trim()) return
-    setComposing(true); setStatus(null)
+    setStatus(null)
+    const reqId = start()
     try {
-      const text = await window.api.messenger.composeWithAI(instruction, selected?.displayName)
+      const text = await window.api.messenger.composeWithAI(instruction, selected?.displayName, reqId)
       setComposed(text.trim())
     } catch (err) {
       setStatus({ type: 'err', text: err instanceof Error ? err.message : 'AI 작성 실패' })
     } finally {
-      setComposing(false)
+      done()
     }
   }
 
@@ -176,12 +179,24 @@ function MessengerAssistant(): JSX.Element {
                 <div className="flex items-center gap-2 mb-2 flex-shrink-0">
                   <div className="w-5 h-5 rounded-full bg-clover-blue/15 text-clover-blue text-[10px] font-bold flex items-center justify-center">2</div>
                   <label className="text-xs font-semibold text-text-primary">발송할 메시지</label>
-                  <span className="text-[10px] text-text-tertiary">(검토 후 수정 가능)</span>
+                  <span className="text-[10px] text-text-tertiary">
+                    {composing ? '(AI 작업 중 — 필요시 웹 조사)' : '(검토 후 수정 가능)'}
+                  </span>
                 </div>
-                <textarea value={composed} onChange={(e) => setComposed(e.target.value)}
-                  placeholder="AI가 정리한 메시지가 여기에 표시됩니다. 직접 작성도 가능합니다."
-                  className="w-full flex-1 min-h-0 px-3 py-2.5 rounded-xl bg-bg-surface border border-bg-border text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue resize-none font-mono leading-relaxed"
-                />
+                {composing ? (
+                  <div className="flex-1 min-h-0 overflow-y-auto rounded-xl bg-bg-surface border border-bg-border p-3">
+                    <AIProgressIndicator
+                      progress={progress}
+                      showStreamPreview
+                      expectedTime="요청에 웹 조사가 포함되면 1~3분 걸릴 수 있어요."
+                    />
+                  </div>
+                ) : (
+                  <textarea value={composed} onChange={(e) => setComposed(e.target.value)}
+                    placeholder="AI가 정리한 메시지가 여기에 표시됩니다. 직접 작성도 가능합니다."
+                    className="w-full flex-1 min-h-0 px-3 py-2.5 rounded-xl bg-bg-surface border border-bg-border text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue resize-none font-mono leading-relaxed"
+                  />
+                )}
               </div>
 
               {status && (

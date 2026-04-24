@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  Radar, Plus, RefreshCw, Trash2, Edit3, Power, CheckCheck, Loader2, Bell, BellOff
+  Radar, Plus, RefreshCw, Trash2, Edit3, Power, CheckCheck, Bell, BellOff, Pause, Play, Search, Download, Calendar, X
 } from 'lucide-react'
 import type { Watcher, CollectedMessage } from '../../../../shared/types/watcher'
 import { LoadingView, EmptyView } from '../common/StateViews'
 import WatcherEditModal from './WatcherEditModal'
 import MessageTimeline from './MessageTimeline'
+import { Button } from '../common/ds'
 
 function MonitoringView(): JSX.Element {
   const [watchers, setWatchers] = useState<Watcher[]>([])
@@ -15,6 +16,24 @@ function MonitoringView(): JSX.Element {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [editing, setEditing] = useState<Watcher | null | 'new'>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  // 필터바 상태 (클라이언트 사이드 임시 필터 — 와처 자체 규칙은 건드리지 않음)
+  const [extraKeywords, setExtraKeywords] = useState<string[]>([])
+  const [kwDraft, setKwDraft] = useState('')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+
+  const totalUnread = useMemo(() => Object.values(unread).reduce((a, b) => a + b, 0), [unread])
+  const filteredWatchers = useMemo(() => {
+    if (!searchQuery.trim()) return watchers
+    const q = searchQuery.toLowerCase()
+    return watchers.filter((w) =>
+      w.name.toLowerCase().includes(q) ||
+      w.channelNames.some((n) => n.toLowerCase().includes(q)) ||
+      (w.filter.description || '').toLowerCase().includes(q)
+    )
+  }, [watchers, searchQuery])
 
   const loadWatchers = useCallback(async () => {
     setLoading(true)
@@ -53,6 +72,70 @@ function MonitoringView(): JSX.Element {
 
   const selected = useMemo(() => watchers.find((w) => w.id === selectedId) || null, [watchers, selectedId])
 
+  // 선택 와처의 저장된 키워드 + 사용자가 임시로 추가한 키워드
+  const savedKeywords = useMemo(() => {
+    if (!selected) return []
+    const any = selected.filter.anyOf || []
+    const all = selected.filter.allOf || []
+    return Array.from(new Set([...any, ...all]))
+  }, [selected])
+
+  const activeKeywords = useMemo(
+    () => Array.from(new Set([...savedKeywords, ...extraKeywords])),
+    [savedKeywords, extraKeywords]
+  )
+
+  // 와처 변경 시 필터 상태 초기화
+  useEffect(() => {
+    setExtraKeywords([])
+    setKwDraft('')
+    setFromDate('')
+    setToDate('')
+  }, [selectedId])
+
+  // 필터 적용된 메시지
+  const filteredMessages = useMemo(() => {
+    let list = messages
+    // 날짜 범위 필터
+    if (fromDate) {
+      const fromTs = new Date(fromDate + 'T00:00:00').getTime()
+      list = list.filter((m) => new Date(m.createdAt).getTime() >= fromTs)
+    }
+    if (toDate) {
+      const toTs = new Date(toDate + 'T23:59:59').getTime()
+      list = list.filter((m) => new Date(m.createdAt).getTime() <= toTs)
+    }
+    // 추가 키워드 필터 (클라이언트 사이드 AND 필터)
+    if (extraKeywords.length > 0) {
+      const lowers = extraKeywords.map((k) => k.toLowerCase())
+      list = list.filter((m) => {
+        const text = m.text.toLowerCase()
+        return lowers.some((k) => text.includes(k))
+      })
+    }
+    return list
+  }, [messages, fromDate, toDate, extraKeywords])
+
+  const addKeyword = (): void => {
+    const k = kwDraft.trim()
+    if (!k) return
+    if (activeKeywords.includes(k)) { setKwDraft(''); return }
+    setExtraKeywords((xs) => [...xs, k])
+    setKwDraft('')
+  }
+  const removeKeyword = (k: string): void => {
+    // saved 키워드는 못 지움 (필터 규칙에 저장된 것) — UI로만 제거는 제공 안 함
+    setExtraKeywords((xs) => xs.filter((x) => x !== k))
+  }
+  const applyQuickRange = (days: number): void => {
+    const now = new Date()
+    const to = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const from = new Date(to.getTime() - (days - 1) * 86400000)
+    const fmt = (d: Date): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    setFromDate(fmt(from))
+    setToDate(fmt(to))
+  }
+
   const handleRefresh = async (): Promise<void> => {
     setRefreshing(true)
     try {
@@ -88,6 +171,39 @@ function MonitoringView(): JSX.Element {
     loadWatchers()
   }
 
+  const handleExportCsv = (): void => {
+    if (!selected || filteredMessages.length === 0) return
+    const esc = (s: string): string => `"${(s || '').replace(/"/g, '""')}"`
+    const header = ['시각', '채널', '작성자', '본문', '매치 키워드'].join(',')
+    const rows = filteredMessages.map((m) => [
+      new Date(m.createdAt).toLocaleString('ko-KR'),
+      m.channelName,
+      m.authorName,
+      m.text.replace(/\n/g, ' '),
+      m.matchedTerms.join(' ')
+    ].map(esc).join(','))
+    const csv = '\uFEFF' + [header, ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${selected.name}-${new Date().toISOString().substring(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const newCount = useMemo(() => filteredMessages.filter((m) => !m.read).length, [filteredMessages])
+  const lastScanText = useMemo(() => {
+    if (!selected?.lastCheckedAt) return '아직 스캔 전'
+    const diff = Date.now() - new Date(selected.lastCheckedAt).getTime()
+    const m = Math.floor(diff / 60000)
+    if (m < 1) return '방금 전'
+    if (m < 60) return `${m}분 전`
+    const h = Math.floor(m / 60)
+    if (h < 24) return `${h}시간 전`
+    return new Date(selected.lastCheckedAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  }, [selected])
+
   return (
     <div className="h-full flex bg-bg-primary">
       {/* 와처 목록 */}
@@ -112,6 +228,17 @@ function MonitoringView(): JSX.Element {
             <Plus size={12} />
             새 와처
           </button>
+          <div className="mt-2 relative">
+            <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="와처 검색..."
+              className="ds-input sm"
+              style={{ paddingLeft: 26 }}
+            />
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto py-1">
@@ -121,7 +248,10 @@ function MonitoringView(): JSX.Element {
                 description="특정 채널의 특정 키워드만 모아보려면 '새 와처'를 만드세요"
                 actionLabel="새 와처 만들기" onAction={() => setEditing('new')} />
             )
-            : watchers.map((w) => {
+            : filteredWatchers.length === 0 ? (
+              <div className="px-4 py-6 text-center text-[11px] text-text-tertiary">검색 결과 없음</div>
+            )
+            : filteredWatchers.map((w) => {
                 const active = w.id === selectedId
                 const count = unread[w.id] || 0
                 return (
@@ -163,6 +293,12 @@ function MonitoringView(): JSX.Element {
               })
           }
         </div>
+
+        {watchers.length > 0 && (
+          <div className="px-4 py-2 border-t border-bg-border text-[10px] text-text-tertiary flex-shrink-0">
+            총 와처 {watchers.length} · 신규 {totalUnread}
+          </div>
+        )}
       </div>
 
       {/* 타임라인 */}
@@ -171,28 +307,100 @@ function MonitoringView(): JSX.Element {
           <EmptyView icon={Radar} title="와처를 선택하세요" description="왼쪽에서 와처를 선택하거나 새로 만드세요" />
         ) : (
           <>
-            <div className="px-5 py-3 border-b border-bg-border flex items-center gap-3 flex-shrink-0">
-              <Power size={13} className={selected.enabled ? 'text-emerald-400' : 'text-text-tertiary'} />
+            <div className="px-5 py-2.5 border-b border-bg-border flex items-center gap-2 flex-shrink-0">
+              <Power size={14} className={selected.enabled ? 'text-emerald-400' : 'text-text-tertiary'} />
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-text-primary truncate">{selected.name}</h3>
+                <h3 className="text-[13px] font-semibold text-text-primary truncate leading-tight">{selected.name}</h3>
                 <p className="text-[10px] text-text-tertiary truncate">
-                  {selected.filter.description} · {selected.channelNames.join(', ')}
+                  {selected.filter.description || '규칙 없음'} · 채널 {selected.channelNames.length}
                 </p>
               </div>
-              <button onClick={handleRefresh} disabled={refreshing}
-                className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover disabled:opacity-50">
-                <RefreshCw size={11} className={refreshing ? 'animate-spin' : ''} />
-                {refreshing ? '수집 중...' : '지금 수집'}
-              </button>
+              <Button variant="ghost" size="sm" onClick={() => handleToggle(selected)}
+                leftIcon={selected.enabled ? <Pause size={12} /> : <Play size={12} />}>
+                {selected.enabled ? '일시정지' : '활성화'}
+              </Button>
               {(unread[selected.id] || 0) > 0 && (
-                <button onClick={handleMarkAllRead}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover">
-                  <CheckCheck size={11} /> 모두 읽음
-                </button>
+                <Button variant="ghost" size="sm" onClick={handleMarkAllRead}
+                  leftIcon={<CheckCheck size={12} />}>
+                  모두 읽음
+                </Button>
               )}
+              <Button variant="secondary" size="sm" onClick={handleRefresh} disabled={refreshing}
+                leftIcon={<RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />}>
+                {refreshing ? '수집 중...' : '지금 수집'}
+              </Button>
             </div>
 
-            <MessageTimeline messages={messages} onRefresh={handleRefresh} refreshing={refreshing} />
+            {/* Filter bar — keywords + date range + quick picks + 재검색 */}
+            <div className="px-5 py-2 border-b border-bg-border flex items-center gap-2 flex-wrap flex-shrink-0">
+              {/* 키워드 칩 + 입력 */}
+              <div className="flex items-center gap-1 flex-wrap px-1.5 py-1 rounded-md bg-bg-surface border border-bg-border" style={{ minWidth: 260, flex: 1 }}>
+                <Search size={12} className="text-text-tertiary flex-none mx-1" />
+                {activeKeywords.map((k) => {
+                  const saved = savedKeywords.includes(k)
+                  return (
+                    <span key={k} className="inline-flex items-center gap-1 h-5 px-1.5 rounded-[4px] font-mono text-[10.5px] font-semibold"
+                      style={{ background: 'rgba(234,88,12,0.14)', color: '#FB923C' }}>
+                      {k}
+                      {!saved && (
+                        <button onClick={() => removeKeyword(k)} className="opacity-70 hover:opacity-100" aria-label="키워드 제거">
+                          <X size={10} />
+                        </button>
+                      )}
+                    </span>
+                  )
+                })}
+                <input
+                  value={kwDraft}
+                  onChange={(e) => setKwDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addKeyword() } }}
+                  placeholder="키워드 추가…"
+                  className="bg-transparent border-0 outline-none text-[11.5px] text-text-primary placeholder-text-tertiary"
+                  style={{ minWidth: 80, height: 20, flex: 1 }}
+                />
+              </div>
+
+              {/* 날짜 범위 */}
+              <div className="flex items-center gap-1 px-2 h-7 rounded-md bg-bg-surface border border-bg-border text-text-secondary">
+                <Calendar size={12} />
+                <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
+                  className="bg-transparent border-0 outline-none text-[11px] font-mono text-text-primary"
+                  style={{ width: 108 }} />
+                <span className="text-text-tertiary text-[11px]">→</span>
+                <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
+                  className="bg-transparent border-0 outline-none text-[11px] font-mono text-text-primary"
+                  style={{ width: 108 }} />
+              </div>
+
+              {/* 퀵픽 */}
+              <div className="ds-seg" style={{ height: 28 }}>
+                <button className="seg-item" onClick={() => applyQuickRange(7)} title="최근 7일">7일</button>
+                <button className="seg-item" onClick={() => applyQuickRange(30)} title="최근 30일">30일</button>
+              </div>
+
+              <Button variant="primary" size="sm" onClick={handleRefresh} disabled={refreshing}
+                leftIcon={<RefreshCw size={11} className={refreshing ? 'animate-spin' : ''} />}>
+                재검색
+              </Button>
+            </div>
+
+            {/* Stats row */}
+            <div className="px-5 py-1.5 border-b border-bg-border flex items-center gap-2 flex-shrink-0 text-[10px] text-text-tertiary">
+              <span>매치된 메시지 <span className="text-text-secondary font-semibold">{filteredMessages.length}</span>{messages.length !== filteredMessages.length && <span className="text-text-tertiary"> / {messages.length}</span>}</span>
+              {newCount > 0 && <span>· 신규 <span className="text-clover-orange font-semibold">{newCount}</span></span>}
+              <span>· 마지막 스캔: {lastScanText}</span>
+              <div className="flex-1" />
+              <button
+                onClick={handleExportCsv}
+                disabled={filteredMessages.length === 0}
+                className="flex items-center gap-1 text-text-tertiary hover:text-text-secondary disabled:opacity-40 disabled:hover:text-text-tertiary"
+              >
+                <Download size={11} />
+                CSV 내보내기
+              </button>
+            </div>
+
+            <MessageTimeline messages={filteredMessages} onRefresh={handleRefresh} refreshing={refreshing} />
           </>
         )}
       </div>

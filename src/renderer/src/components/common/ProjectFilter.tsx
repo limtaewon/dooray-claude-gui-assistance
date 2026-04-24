@@ -25,6 +25,9 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
   const [addError, setAddError] = useState('')
   const [adding, setAdding] = useState(false)
 
+  // 위키/태스크 각각 별도 커스텀 저장소 사용
+  const customKey = useWikiDomains ? 'customWikis' : 'customProjects'
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -32,13 +35,19 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
         ? (await window.api.dooray.wiki.domains()).map((d) => ({ id: d.id, code: d.name } as DoorayProject))
         : await window.api.dooray.projects.list()
       const pinned = (await window.api.settings.get(settingsKey) as string[]) || []
-      const custom = (await window.api.settings.get('customProjects') as DoorayProject[]) || []
+      const custom = (await window.api.settings.get(customKey) as DoorayProject[]) || []
       setAllProjects(items)
       setCustomProjects(custom)
-      setPinnedIds(pinned)
+      // 현재 목록에 없는 stale pinned 는 자동 제거
+      const validIds = new Set<string>([...items.map((i) => i.id), ...custom.map((c) => c.id)])
+      const cleaned = pinned.filter((id) => validIds.has(id))
+      setPinnedIds(cleaned)
+      if (cleaned.length !== pinned.length) {
+        await window.api.settings.set(settingsKey, cleaned)
+      }
     } catch { /* ok */ }
     finally { setLoading(false) }
-  }, [settingsKey, useWikiDomains])
+  }, [settingsKey, useWikiDomains, customKey])
 
   useEffect(() => {
     if (open) {
@@ -82,7 +91,7 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
       const project = await window.api.dooray.projects.info(projectId)
       const nextCustom = [...customProjects, { id: project.id, code: project.code } as DoorayProject]
       setCustomProjects(nextCustom)
-      await window.api.settings.set('customProjects', nextCustom)
+      await window.api.settings.set(customKey, nextCustom)
       setAddInput('')
       setShowAddForm(false)
       onChanged?.()
@@ -96,7 +105,7 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
   const removeCustomProject = async (id: string): Promise<void> => {
     const nextCustom = customProjects.filter((p) => p.id !== id)
     setCustomProjects(nextCustom)
-    await window.api.settings.set('customProjects', nextCustom)
+    await window.api.settings.set(customKey, nextCustom)
     if (pinnedIds.includes(id)) {
       const nextPinned = pinnedIds.filter((p) => p !== id)
       setPinnedIds(nextPinned)
@@ -119,9 +128,14 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
   return (
     <div className="relative">
       <button onClick={() => setOpen(!open)}
-        className={`p-1 rounded hover:bg-bg-surface-hover transition-colors ${pinnedCount > 0 ? 'text-clover-blue' : 'text-text-tertiary'}`}
+        className={`ds-btn icon sm relative ${pinnedCount > 0 ? 'text-clover-blue' : ''}`}
         title="표시할 프로젝트 설정">
-        <Settings size={12} />
+        <Settings size={14} />
+        {pinnedCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-clover-blue text-[8px] text-white flex items-center justify-center font-bold">
+            {pinnedCount}
+          </span>
+        )}
       </button>
 
       {open && (

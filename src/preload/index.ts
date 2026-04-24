@@ -70,6 +70,20 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.SKILLS_DELETE, filename)
   },
 
+  // Shared Skills (Dooray 위키 하위 페이지 기반 공유소)
+  sharedSkills: {
+    list: (): Promise<import('../shared/types/shared-skills').SharedSkill[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SHARED_SKILLS_LIST),
+    get: (postId: string): Promise<import('../shared/types/shared-skills').SharedSkill> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SHARED_SKILLS_GET, postId),
+    upload: (req: import('../shared/types/shared-skills').SharedSkillUploadRequest): Promise<{ postId: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SHARED_SKILLS_UPLOAD, req),
+    download: (postId: string): Promise<{ filename: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SHARED_SKILLS_DOWNLOAD, postId),
+    delete: (postId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SHARED_SKILLS_DELETE, postId)
+  },
+
   // Usage
   usage: {
     query: (params: UsageQueryParams): Promise<UsageSummary> =>
@@ -179,21 +193,30 @@ const api = {
   // Claude Code Bridge
   claude: {
     startTask: (params: { subject: string; body?: string; projectCode?: string }): Promise<TerminalSession> =>
-      ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_START_TASK, params)
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_START_TASK, params),
+    chatSend: (req: import('../shared/types/claude-chat').ClaudeChatSendRequest): Promise<string | undefined> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_CHAT_SEND, req),
+    chatCancel: (chatId: string): Promise<boolean> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_CHAT_CANCEL, chatId),
+    onChatEvent: (cb: (ev: import('../shared/types/claude-chat').ClaudeChatEvent) => void): (() => void) => {
+      const handler = (_: unknown, ev: import('../shared/types/claude-chat').ClaudeChatEvent): void => cb(ev)
+      ipcRenderer.on(IPC_CHANNELS.CLAUDE_CHAT_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.CLAUDE_CHAT_EVENT, handler)
+    }
   },
 
   // AI
   ai: {
     available: (): Promise<boolean> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_AVAILABLE),
-    ask: (params: { prompt: string; systemPrompt?: string; model?: AIModelName; maxBudget?: string; requestId?: string; feature?: keyof AIModelConfig }): Promise<string> =>
+    ask: (params: { prompt: string; systemPrompt?: string; model?: AIModelName; maxBudget?: string; requestId?: string; feature?: keyof AIModelConfig; mcpServers?: string[] }): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_ASK, params),
-    briefing: (requestId?: string): Promise<AIBriefing> =>
-      ipcRenderer.invoke(IPC_CHANNELS.AI_BRIEFING, { requestId }),
+    briefing: (requestId?: string, mcpServers?: string[]): Promise<AIBriefing> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_BRIEFING, { requestId, mcpServers }),
     summarizeTask: (task: DoorayTask, body?: string, requestId?: string): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_SUMMARIZE_TASK, { task, body, requestId }),
-    generateReport: (type: 'daily' | 'weekly', requestId?: string): Promise<AIReport> =>
-      ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_REPORT, { type, requestId }),
+    generateReport: (type: 'daily' | 'weekly', requestId?: string, mcpServers?: string[]): Promise<AIReport> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_REPORT, { type, requestId, mcpServers }),
     generateWiki: (taskSubject: string, taskBody?: string, projectCode?: string, requestId?: string): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_WIKI, { taskSubject, taskBody, projectCode, requestId }),
     generateMeetingNote: (eventSubject: string, eventDescription?: string, attendees?: string[], requestId?: string): Promise<string> =>
@@ -204,6 +227,10 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.AI_WIKI_IMPROVE, { title, content, requestId }),
     generateSkill: (request: string, target: string, requestId?: string, mcpServers?: string[]): Promise<{ name: string; description: string; content: string }> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_SKILL, { request, target, requestId, mcpServers }),
+    recommendAnalyze: (opts?: { requestId?: string; limit?: number; mcpServers?: string[] }): Promise<import('../shared/types/ai-recommend').AIRecommendResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_RECOMMEND_ANALYZE, opts),
+    recommendCacheGet: (): Promise<import('../shared/types/ai-recommend').AIRecommendResult | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_RECOMMEND_CACHE_GET),
     /** 진행상황 이벤트 구독 */
     onProgress: (callback: (event: AIProgressEvent) => void): (() => void) => {
       const handler = (_: IpcRendererEvent, event: AIProgressEvent): void => callback(event)

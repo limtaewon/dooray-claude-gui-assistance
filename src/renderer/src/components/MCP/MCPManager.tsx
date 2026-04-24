@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Plus, RefreshCw } from 'lucide-react'
+import { Plus, RefreshCw, Server } from 'lucide-react'
 import MCPCard from './MCPCard'
 import MCPForm from './MCPForm'
 import type { McpServerConfig } from '../../../../shared/types/mcp'
+import { Button, EmptyView, LoadingView } from '../common/ds'
 
 type FormState =
   | { mode: 'closed' }
@@ -57,67 +58,75 @@ function MCPManager(): JSX.Element {
   }
 
   const entries = useMemo(() => Object.entries(servers), [servers])
+  const activeCount = useMemo(() => entries.filter(([, c]) => !c.disabled).length, [entries])
+
+  const handleToggle = async (name: string, config: McpServerConfig): Promise<void> => {
+    try {
+      await window.api.mcp.update(name, { ...config, disabled: !config.disabled })
+      await loadServers()
+    } catch (err) {
+      console.error('MCP 서버 토글 실패:', err)
+    }
+  }
 
   return (
-    <div className="h-full overflow-y-auto p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-lg font-semibold text-text-primary">MCP 서버</h2>
-          <p className="text-xs text-text-secondary mt-1">
-            Model Context Protocol 서버 설정 관리
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={loadServers}
-            className="p-2 rounded-lg hover:bg-bg-border text-text-secondary hover:text-text-primary transition-colors"
-            title="새로 고침"
-          >
-            <RefreshCw size={16} />
-          </button>
-          <button
-            onClick={() => setFormState({ mode: 'add' })}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-clover-blue text-white text-sm hover:bg-clover-blue/80 transition-colors"
-          >
-            <Plus size={14} />
+    <div className="h-full overflow-y-auto">
+      <div className="px-5 py-4 space-y-4">
+        {/* DS PageHeader */}
+        <div className="flex items-center gap-3">
+          <Server size={18} className="text-clover-blue" />
+          <h2 className="text-[14px] font-semibold text-text-primary">MCP 서버</h2>
+          <span className="text-[11px] text-text-tertiary">
+            · {entries.length}개 · 활성 {activeCount}
+          </span>
+          <div className="flex-1" />
+          <Button variant="primary" onClick={loadServers} leftIcon={<RefreshCw size={12} />} title="새로고침">
+            새로고침
+          </Button>
+          <Button variant="primary" onClick={() => setFormState({ mode: 'add' })} leftIcon={<Plus size={12} />}>
             서버 추가
-          </button>
+          </Button>
         </div>
-      </div>
 
-      {formState.mode !== 'closed' && (
-        <div className="mb-4">
+        {formState.mode !== 'closed' && (
           <MCPForm
             editName={formState.mode === 'edit' ? formState.name : undefined}
             editConfig={formState.mode === 'edit' ? formState.config : undefined}
             onSave={handleSave}
             onCancel={() => setFormState({ mode: 'closed' })}
           />
-        </div>
-      )}
+        )}
 
-      {loading ? (
-        <div className="flex items-center justify-center h-40 text-text-secondary text-sm">
-          불러오는 중...
+        {loading ? (
+          <LoadingView label="MCP 서버 목록을 불러오는 중..." />
+        ) : entries.length === 0 ? (
+          <EmptyView
+            icon={Server}
+            title="등록된 MCP 서버가 없습니다"
+            body="'서버 추가' 버튼을 눌러 시작하세요"
+          />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {entries.map(([name, config]) => (
+              <MCPCard
+                key={name}
+                name={name}
+                config={config}
+                onEdit={() => setFormState({ mode: 'edit', name, config })}
+                onDelete={() => handleDelete(name)}
+                onToggle={() => handleToggle(name, config)}
+              />
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 text-[11px] text-text-tertiary pt-1">
+          <span>💡</span>
+          <span>
+            설정은 <span className="font-mono text-text-secondary">~/.claude.json</span>에 저장됩니다. 새로고침으로 외부 변경 반영.
+          </span>
         </div>
-      ) : entries.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-40 text-text-secondary text-sm">
-          <p>등록된 MCP 서버가 없습니다.</p>
-          <p className="text-xs mt-1">&apos;서버 추가&apos; 버튼을 눌러 시작하세요.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {entries.map(([name, config]) => (
-            <MCPCard
-              key={name}
-              name={name}
-              config={config}
-              onEdit={() => setFormState({ mode: 'edit', name, config })}
-              onDelete={() => handleDelete(name)}
-            />
-          ))}
-        </div>
-      )}
+      </div>
     </div>
   )
 }
