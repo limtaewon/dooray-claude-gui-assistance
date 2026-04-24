@@ -1,6 +1,6 @@
 {
   "name": "clauday",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "Claude Code CLI GUI wrapper with Dooray integration",
   "main": "./out/main/index.js",
   "author": "",
@@ -34,7 +34,7 @@
       "target": ["dmg"],
       "icon": "build/icon.icns",
       "category": "public.app-category.developer-tools",
-      "identity": null
+      "identity": "-"
     },
     "win": {
       "target": ["nsis"],
