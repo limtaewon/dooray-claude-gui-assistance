@@ -1,6 +1,6 @@
 {
   "name": "clauday",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Claude Code CLI GUI wrapper with Dooray integration",
   "main": "./out/main/index.js",
   "author": "",
@@ -11,9 +11,9 @@
     "preview": "electron-vite preview",
     "postinstall": "electron-rebuild -f -w node-pty,keytar",
     "icons": "node scripts/generate-icons.mjs",
-    "dist": "npm run icons && electron-vite build && electron-builder --mac",
+    "dist": "electron-vite build && electron-builder --mac",
     "dist:win": "electron-vite build && electron-builder --win",
-    "dist:all": "npm run icons && electron-vite build && electron-builder --mac --win"
+    "dist:all": "electron-vite build && electron-builder --mac --win"
   },
   "build": {
     "appId": "com.clauday.app",
