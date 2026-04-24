@@ -133,6 +133,10 @@ function buildArgs(prompt: string, opts: {
   allowMcp?: boolean
   /** 특정 MCP 서버만 선택적으로 허용. 지정되면 allowMcp 설정과 무관하게 이 목록만 허용 */
   mcpServers?: string[]
+  /** 모든 도구 차단 (프롬프트만으로 응답) */
+  noTools?: boolean
+  /** 웹 조사만 허용 (WebSearch + WebFetch). MCP/파일/Bash 등은 차단. 에이전틱 정리 용도 */
+  webOnly?: boolean
 }): string[] {
   const args = [
     '-p', prompt,
@@ -143,12 +147,15 @@ function buildArgs(prompt: string, opts: {
   ]
   if (opts.systemPrompt) args.push('--append-system-prompt', opts.systemPrompt)
   if (opts.maxBudget) args.push('--max-budget-usd', opts.maxBudget)
-  // 사용자가 선택한 MCP 서버만 허용
-  if (opts.mcpServers && opts.mcpServers.length > 0) {
+  if (opts.noTools) {
+    args.push('--disallowedTools', 'mcp__*,Bash,Edit,Write,Read,TodoWrite,WebFetch,WebSearch,Task')
+  } else if (opts.webOnly) {
+    // 웹 조사만 허용 — MCP/파일/터미널 등은 차단
+    args.push('--allowedTools', 'WebSearch,WebFetch')
+  } else if (opts.mcpServers && opts.mcpServers.length > 0) {
     const patterns = opts.mcpServers.map((name) => `mcp__${name}__*`).join(',')
     args.push('--allowedTools', patterns)
   } else if (opts.allowMcp) {
-    // 레거시 호환: allowMcp:true일 때는 기본 몇 개 허용
     args.push('--allowedTools', 'mcp__dooray-mcp__*,mcp__mcp-clickhouse__*,mcp__mysql-nfi__*')
   }
   return args
@@ -512,13 +519,14 @@ ${skillBlock}`
   private async runWithProgress(
     requestId: string | undefined,
     stageMessage: string,
-    args: string[]
+    args: string[],
+    options: { timeoutMs?: number | null } = {}
   ): Promise<ClaudeCliResult> {
     const started = Date.now()
     this.emitProgress(requestId, 'thinking', stageMessage, started)
     const result = await this.runClaudeStream(args, (chunk) => {
       this.emitProgress(requestId, 'streaming', stageMessage, started, chunk)
-    })
+    }, options)
     this.emitProgress(requestId, 'done', '완료', started)
     return result
   }
@@ -728,23 +736,44 @@ ${JSON.stringify(eventData)}`
    * 메신저 메시지 정리/생성.
    * 사용자가 말한 내용을 두레이 메신저에 보낼 수 있도록 깔끔하게 정리.
    */
+  /**
+   * 메신저 메시지 정리 — 에이전틱 모드.
+   * - 채널 ID/내부 채널 조회는 불필요(호출부가 API로 발송) → MCP/Bash/파일 차단
+   * - 사용자 요청이 외부 사실을 필요로 하면(여행지, 가게, 일정 등) WebSearch/WebFetch 로 스스로 조사
+   * - 최종 출력은 메시지 본문 한 덩어리
+   */
   async composeMessengerMessage(instruction: string, channelName?: string, requestId?: string): Promise<string> {
-    const channelHint = channelName ? `\n대상 채널: ${channelName}` : ''
-    const prompt = `다음 내용을 두레이 메신저로 보낼 메시지로 정리하세요.${channelHint}\n\n내용:\n${instruction}`
+    const prompt = `${channelName ? `"${channelName}" 채널` : '선택된 채널'}에 보낼 메신저 메시지를 작성해줘.
 
-    const result = await this.runWithProgress(requestId, '메시지 작성 중...', buildArgs(prompt, {
+사용자 요청:
+${instruction}
+
+작성 가이드:
+- 요청에 외부 정보(가게, 장소, 일정, 날씨, 최신 뉴스 등)가 필요하면 WebSearch / WebFetch 로 직접 조사해서 반영할 것
+- 여러 선택지/계획이 필요하면 스스로 정리해서 최종 메시지에 녹여낼 것
+- 대상 채널 이름("${channelName || ''}")의 분위기(팀/공지/개인 등)를 감안한 말투
+- 내부 도구(MCP/파일/터미널)는 사용하지 말 것 — 채널 상세 같은 걸 조회할 필요 없음
+- 최종 응답은 메신저에 **바로 붙여넣을 메시지 본문 하나**만 (머리말/설명/코드블록 금지)`
+
+    const result = await this.runWithProgress(requestId, '메시지 작성 중... (필요시 웹 조사)', buildArgs(prompt, {
       model: this.pickModel('messengerCompose', 'sonnet'),
-      systemPrompt: this.buildSystemPrompt(`두레이 메신저 메시지 작성 전문가.
+      systemPrompt: this.buildSystemPrompt(`두레이 메신저 메시지 작성 에이전트.
 
-규칙:
-- 메신저에 바로 붙여넣을 수 있는 자연스러운 메시지 본문만 출력 (설명/머리말 금지)
-- 업무적 신뢰감을 주되 과하게 딱딱하지 않은 한국어
-- 핵심을 먼저, 불필요한 수식어 제거
-- 여러 건이면 번호나 불릿으로 정리
-- 마크다운 일부 지원(**, \`code\`, 목록) — 과도한 마크업은 피함
-- 메시지 길이는 보내려는 내용에 맞춰 간결하게`, 'messenger'),
-      maxBudget: '0.2'
-    }))
+역할:
+- 사용자의 의도를 파악하고, 외부 사실 확인이 필요하면 WebSearch/WebFetch 로 조사한 뒤 메시지에 자연스럽게 녹여냄
+- 조사 결과는 메시지 본문에 통합 (링크는 꼭 필요할 때만 포함)
+- 채널 성격(팀방/공지/1:1)에 맞는 톤으로 자동 조절
+
+출력 규칙:
+- 메신저에 바로 붙여넣을 **메시지 본문만** 출력 — 설명/머리말/사고과정 금지
+- 핵심부터, 불필요한 수식어 제거, 업무적이면서 자연스러운 한국어
+- 여러 건은 번호/불릿으로 정리
+- 마크다운은 최소한(**, \`code\`, 목록)만
+- 적절한 길이 (짧은 공지는 짧게, 계획서는 필요한 만큼)`, 'messenger'),
+      maxBudget: '0.5',
+      effort: 'medium',
+      webOnly: true
+    }), { timeoutMs: 180000 })
     return result.result
   }
 
@@ -993,10 +1022,10 @@ ${mcpBlock}
     // 사용자가 도구 선택 UI에서 명시적으로 고른 게 있으면 그것만 사용, 아니면 기본값 (dooray-mcp)
     const mcpForCall = overrideMcp && overrideMcp.length > 0 ? overrideMcp : ['dooray-mcp']
     const args = buildArgs(prompt, {
-      model: this.pickModel('briefing', 'opus'),
+      model: this.pickModel('aiRecommend', 'opus'),
       systemPrompt: this.buildSystemPrompt(AI_RECOMMEND_SYSTEM, 'aiRecommend'),
       mcpServers: mcpForCall,
-      maxBudget: '0.5',
+      maxBudget: '3.0',
       effort: 'medium'
     })
 
@@ -1012,7 +1041,10 @@ ${mcpBlock}
     const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
       this.emitProgress(requestId, 'done', '완료', started)
-      throw new Error(`AI 응답에서 JSON을 찾지 못했습니다.\n\n응답: ${raw.substring(0, 400)}`)
+      const hint = !raw
+        ? '응답이 비어있습니다. MCP 호출 중 한도 초과 또는 오류일 수 있습니다. 스킬에서 조회 범위를 줄여보세요.'
+        : `응답에 JSON 형식이 없습니다.\n\n원본:\n${raw.substring(0, 800)}`
+      throw new Error(`AI 응답에서 JSON을 찾지 못했습니다.\n\n${hint}`)
     }
 
     const parsed = JSON.parse(jsonMatch[0]) as {
