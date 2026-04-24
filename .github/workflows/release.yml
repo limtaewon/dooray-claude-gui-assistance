@@ -82,7 +82,8 @@ jobs:
       - name: Build macOS dmg (signed if secrets provided)
         run: npm run dist -- --publish never
         env:
-          # Apple Developer 인증서가 있으면 자동 서명. 없으면 unsigned dmg로 빌드.
+          # Apple Developer 인증서가 없을 때는 서명 자동탐색 끄기 (빈 CSC_LINK로 인한 실패 방지)
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.MAC_CSC_LINK != '' && 'true' || 'false' }}
           CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
