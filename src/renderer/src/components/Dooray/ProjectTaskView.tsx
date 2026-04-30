@@ -216,13 +216,13 @@ function ProjectTaskView(): JSX.Element {
     }
   }, [])
 
-  const loadTasks = useCallback(async (projectId: string) => {
+  const loadTasks = useCallback(async (projectId: string, force = false) => {
     setLoadingTasks(true)
     setError(null)
     setTasks([])
     const t0 = performance.now()
     try {
-      const list = await window.api.dooray.tasks.list([projectId])
+      const list = await window.api.dooray.tasks.list([projectId], force)
       const t1 = performance.now()
       console.log(`[TaskLoad] API ${(t1 - t0).toFixed(0)}ms · ${list.length}개 (final)`)
       // partial로 이미 채워졌어도 최종 리스트로 대체 (정합성)
@@ -438,7 +438,7 @@ function ProjectTaskView(): JSX.Element {
               {/* 프로젝트 제목 */}
               <div className="flex items-center justify-between px-4 py-2 border-b border-bg-border">
                 <h2 className="text-sm font-semibold text-text-primary">{selectedProject.code}</h2>
-                <button onClick={() => loadTasks(selectedProject.id)} className="p-1.5 rounded-lg hover:bg-bg-surface-hover text-text-secondary">
+                <button onClick={() => loadTasks(selectedProject.id, true)} className="p-1.5 rounded-lg hover:bg-bg-surface-hover text-text-secondary">
                   <RefreshCw size={13} className={loadingTasks ? 'animate-spin' : ''} />
                 </button>
               </div>

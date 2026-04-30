@@ -25,6 +25,9 @@ export class TaskService {
   private projectCache: Map<string, DoorayProject> = new Map()
   private projectListCache: { data: DoorayProject[]; timestamp: number } | null = null
   private tagCache: Map<string, Map<string, { name: string; color: string }>> = new Map()
+  /** 프로젝트별 workflow id → {name, class} 매핑.
+   * 두레이의 task 응답이 workflow를 id 위주로 주는 경우(name 누락) 매핑하기 위함. */
+  private workflowCache: Map<string, Map<string, { name: string; class: string }>> = new Map()
   private taskCache: Map<string, { tasks: DoorayTask[]; timestamp: number }> = new Map()
   private memberNameCache: Map<string, string> = new Map()
   private myMemberId: string | null = null
@@ -152,13 +155,45 @@ export class TaskService {
     }
   }
 
+  /** 프로젝트의 워크플로우(상태) 매핑 캐시 로드.
+   * task.workflow.name이 응답에 없거나 ID만 들어오는 경우 매핑하기 위함.
+   * 변경 빈도가 낮아 한 번 받아두면 됨. */
+  private async loadWorkflows(projectId: string): Promise<Map<string, { name: string; class: string }>> {
+    if (this.workflowCache.has(projectId)) return this.workflowCache.get(projectId)!
+    try {
+      const res = await this.client.request<DoorayListResponse<{ id: string; name: string; class?: string; type?: string }>>(
+        `/project/v1/projects/${projectId}/workflows`
+      )
+      const map = new Map<string, { name: string; class: string }>()
+      for (const wf of res.result || []) {
+        map.set(wf.id, { name: wf.name, class: wf.class || wf.type || '' })
+      }
+      this.workflowCache.set(projectId, map)
+      return map
+    } catch (err) {
+      console.warn(`[Tasks] workflows 로드 실패 ${projectId.slice(-4)}:`, err instanceof Error ? err.message : err)
+      this.workflowCache.set(projectId, new Map()) // 실패도 캐시 (재시도 방지)
+      return new Map()
+    }
+  }
+
   private async fetchTasksForProject(projectId: string, memberId: string, skipCache = false): Promise<DoorayTask[]> {
+    const tag = projectId.slice(-4)
     // 캐시 확인
     const cached = this.taskCache.get(projectId)
     if (!skipCache && cached && Date.now() - cached.timestamp < TaskService.CACHE_TTL) {
+      const ageMs = Date.now() - cached.timestamp
+      console.log(`[Tasks] ${tag} 캐시 HIT (age=${Math.round(ageMs / 1000)}s, ${cached.tasks.length}개)`)
       // 캐시 히트도 partial emit (UI가 일관되게 이벤트 기반으로 동작)
       this.emitPartial(projectId, cached.tasks, true)
       return cached.tasks
+    }
+    if (skipCache) {
+      console.log(`[Tasks] ${tag} 캐시 BYPASS (force refresh)`)
+    } else if (cached) {
+      console.log(`[Tasks] ${tag} 캐시 EXPIRED (age=${Math.round((Date.now() - cached.timestamp) / 1000)}s)`)
+    } else {
+      console.log(`[Tasks] ${tag} 캐시 MISS (첫 조회)`)
     }
 
     const size = 100
@@ -167,15 +202,16 @@ export class TaskService {
     const project = this.projectCache.get(projectId)
     const tStart = Date.now()
 
-    // 태그 정보 로드 + 첫 페이지 동시 호출 (병렬)
-    const [tagInfo, firstRes] = await Promise.all([
+    // 태그/워크플로우 정보 + 첫 페이지 동시 호출 (병렬)
+    const [tagInfo, workflowInfo, firstRes] = await Promise.all([
       this.loadTagInfo(projectId),
+      this.loadWorkflows(projectId),
       this.client.request<DoorayListResponse<DoorayTask>>(
         `/project/v1/projects/${projectId}/posts?toMemberIds=${memberId}&size=${size}&page=0&order=-createdAt`
       ).catch(() => ({ header: { resultCode: 0, isSuccessful: false }, result: [], totalCount: 0 }))
     ])
     const tFirst = Date.now()
-    console.log(`[Tasks] ${projectId.slice(-4)} firstPage+tags: ${tFirst - tStart}ms`)
+    console.log(`[Tasks] ${projectId.slice(-4)} firstPage+tags+workflows: ${tFirst - tStart}ms`)
 
     const firstPageTasks = firstRes.result || []
     const totalCount = firstRes.totalCount || firstPageTasks.length
@@ -189,6 +225,20 @@ export class TaskService {
           if (info) {
             if (!tag.name) tag.name = info.name
             ;(tag as Record<string, unknown>).color = info.color
+          }
+        }
+      }
+      // workflow 이름 보강: task 응답이 workflow.id만 주는 경우 cache에서 매핑
+      const wfRaw = (task as DoorayTask & { workflowId?: string; workflow?: { id?: string; name?: string } }).workflow
+      const wfId = (task as DoorayTask & { workflowId?: string }).workflowId || wfRaw?.id
+      if (wfId) {
+        const matched = workflowInfo.get(wfId)
+        if (matched) {
+          if (!task.workflow || !task.workflow.name) task.workflow = { name: matched.name }
+          if (!task.workflowName) task.workflowName = matched.name
+          // workflowClass도 비어있으면 보강
+          if (!task.workflowClass && matched.class) {
+            task.workflowClass = matched.class as DoorayTask['workflowClass']
           }
         }
       }
@@ -231,20 +281,32 @@ export class TaskService {
     return allTasks
   }
 
-  async listMyTasks(projectIds?: string[]): Promise<DoorayTask[]> {
+  async listMyTasks(projectIds?: string[], force = false): Promise<DoorayTask[]> {
+    const scope = projectIds && projectIds.length > 0 ? `projects=${projectIds.length}` : 'all'
+    console.log(`[Tasks] listMyTasks 호출 force=${force} ${scope}`)
+
+    // force=true는 사용자가 명시적으로 새로고침을 요청한 케이스이므로 dedup도 우회한다.
+    if (force) {
+      // 진행 중이던 stale 요청과 별개로 강제 fetch
+      return this.runListMyTasks(projectIds, true)
+    }
+
     // in-flight dedupe: 대시보드/다른 탭이 동시에 호출해도 실제 요청은 한 번만
     const key = projectIds?.join(',') || '__ALL__'
     const existing = this.inFlightListMyTasks.get(key)
-    if (existing) return existing
+    if (existing) {
+      console.log(`[Tasks] in-flight 요청 재사용 key=${key.slice(-12)}`)
+      return existing
+    }
 
-    const promise = this.runListMyTasks(projectIds).finally(() => {
+    const promise = this.runListMyTasks(projectIds, false).finally(() => {
       this.inFlightListMyTasks.delete(key)
     })
     this.inFlightListMyTasks.set(key, promise)
     return promise
   }
 
-  private async runListMyTasks(projectIds?: string[]): Promise<DoorayTask[]> {
+  private async runListMyTasks(projectIds?: string[], force = false): Promise<DoorayTask[]> {
     const memberId = await this.getMyMemberId()
 
     let ids: string[]
@@ -262,7 +324,7 @@ export class TaskService {
     const results = await mapWithConcurrency(
       ids.slice(0, 20),
       TaskService.MAX_CONCURRENT,
-      (projectId) => this.fetchTasksForProject(projectId, memberId)
+      (projectId) => this.fetchTasksForProject(projectId, memberId, force)
     )
 
     for (const result of results) {
@@ -451,6 +513,26 @@ export class TaskService {
         body: JSON.stringify({ workflowId: params.status })
       }
     )
+    // 자체 변경 직후 stale 캐시가 남아 다른 화면(브리핑/보고서/대시보드)에 옛 상태가
+    // 노출되는 것을 방지한다.
+    this.invalidateTaskCache(params.projectId)
+  }
+
+  /**
+   * 태스크 목록 캐시를 무효화한다.
+   * - projectId가 주어지면 해당 프로젝트 캐시만 비운다.
+   * - 생략 시 전체 비움.
+   * 외부(브리핑/보고서/IPC 핸들러)에서 강제 새로고침 직전에 호출.
+   */
+  invalidateTaskCache(projectId?: string): void {
+    if (projectId) {
+      const had = this.taskCache.delete(projectId)
+      console.log(`[Tasks] 캐시 무효화 ${projectId.slice(-4)} (${had ? '비움' : '없었음'})`)
+    } else {
+      const size = this.taskCache.size
+      this.taskCache.clear()
+      console.log(`[Tasks] 전체 캐시 무효화 (${size}개 비움)`)
+    }
   }
 
   /** 프로젝트 태스크 템플릿 목록 조회.
@@ -593,6 +675,22 @@ export class TaskService {
           body: { mimeType: 'text/x-markdown', content: params.content }
         })
       }
+    )
+  }
+
+  /** 태스크(커뮤니티 글) 삭제. 두레이 권한상 본인이 작성한 것만 삭제 가능 — 호출 측에서 사전 검증. */
+  async deleteTask(params: { projectId: string; postId: string }): Promise<void> {
+    await this.client.request(
+      `/project/v1/projects/${params.projectId}/posts/${params.postId}`,
+      { method: 'DELETE' }
+    )
+  }
+
+  /** 댓글 삭제. 본인이 작성한 댓글만 — 호출 측에서 사전 검증. */
+  async deleteTaskComment(params: { projectId: string; postId: string; logId: string }): Promise<void> {
+    await this.client.request(
+      `/project/v1/projects/${params.projectId}/posts/${params.postId}/logs/${params.logId}`,
+      { method: 'DELETE' }
     )
   }
 

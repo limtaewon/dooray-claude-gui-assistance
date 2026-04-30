@@ -54,11 +54,11 @@ function TaskAssistant({ onDisconnect }: TaskAssistantProps): JSX.Element {
     new Set(['registered', 'working'])
   )
 
-  const loadTasks = useCallback(async () => {
+  const loadTasks = useCallback(async (force = false) => {
     setLoading(true)
     setError(null)
     try {
-      const list = await window.api.dooray.tasks.list()
+      const list = await window.api.dooray.tasks.list(undefined, force)
       setTasks(list)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -126,7 +126,7 @@ function TaskAssistant({ onDisconnect }: TaskAssistantProps): JSX.Element {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-text-primary">내 태스크</h2>
               <button
-                onClick={loadTasks}
+                onClick={() => loadTasks(true)}
                 className="p-2 rounded-lg hover:bg-bg-surface-hover text-text-secondary hover:text-text-primary transition-colors"
                 title="새로 고침"
               >

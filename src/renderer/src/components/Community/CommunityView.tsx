@@ -57,13 +57,19 @@ function avatarColor(name: string): { bg: string; text: string; ring: string } {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
 }
 
-function CommunityView(): JSX.Element {
+function CommunityView({ active = true }: { active?: boolean } = {}): JSX.Element {
   const [posts, setPosts] = useState<DoorayTask[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<DoorayTask | null>(null)
   const [writing, setWriting] = useState(false)
+  const [myMemberId, setMyMemberId] = useState<string | null>(null)
+
+  // 본인 memberId는 컴포넌트 mount 시 1회 캐시 (작성자 본인 검증용)
+  useEffect(() => {
+    void window.api.dooray.myMemberId().then(setMyMemberId).catch(() => setMyMemberId(null))
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
@@ -77,6 +83,33 @@ function CommunityView(): JSX.Element {
     }
   }, [])
 
+  const handleDeletePost = useCallback(async (post: DoorayTask): Promise<void> => {
+    if (!window.confirm(`"${post.subject}" 글을 삭제하시겠습니까? 되돌릴 수 없습니다.`)) return
+    try {
+      await window.api.dooray.tasks.delete({
+        projectId: COMMUNITY_PROJECT_ID,
+        postId: post.id
+      })
+      // 목록에서 제거
+      setPosts((prev) => prev.filter((p) => p.id !== post.id))
+      // 상세화면이 그 글이면 닫기
+      if (selected?.id === post.id) setSelected(null)
+    } catch (err) {
+      alert(`삭제 실패: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }, [selected])
+
+  // App에서 visibility만 토글하기 때문에 컴포넌트가 unmount 되지 않는다.
+  // 탭에 진입할 때마다(=active가 false→true로 전환될 때) 항상 새 글을 로드한다.
+  const wasActiveRef = useRef(active)
+  useEffect(() => {
+    if (active && !wasActiveRef.current) {
+      load()
+    }
+    wasActiveRef.current = active
+  }, [active, load])
+
+  // 첫 mount 시 1회 로드
   useEffect(() => { load() }, [load])
 
   const filtered = useMemo(() => {
@@ -88,7 +121,13 @@ function CommunityView(): JSX.Element {
   if (selected) {
     return (
       <DoorayFileContext.Provider value={{ projectId: COMMUNITY_PROJECT_ID, postId: selected.id }}>
-        <PostDetail post={selected} onBack={() => setSelected(null)} onRefresh={load} />
+        <PostDetail
+          post={selected}
+          onBack={() => setSelected(null)}
+          onRefresh={load}
+          myMemberId={myMemberId}
+          onDeletePost={() => handleDeletePost(selected)}
+        />
       </DoorayFileContext.Provider>
     )
   }
@@ -167,7 +206,13 @@ function CommunityView(): JSX.Element {
         ) : (
           <div className="p-4 space-y-2">
             {filtered.map((p) => (
-              <PostCard key={p.id} post={p} onSelect={() => setSelected(p)} />
+              <PostCard
+                key={p.id}
+                post={p}
+                onSelect={() => setSelected(p)}
+                myMemberId={myMemberId}
+                onDelete={() => handleDeletePost(p)}
+              />
             ))}
           </div>
         )}
@@ -180,17 +225,33 @@ function CommunityView(): JSX.Element {
   )
 }
 
-function PostCard({ post, onSelect }: { post: DoorayTask; onSelect: () => void }): JSX.Element {
+function PostCard({
+  post,
+  onSelect,
+  myMemberId,
+  onDelete
+}: {
+  post: DoorayTask
+  onSelect: () => void
+  myMemberId: string | null
+  onDelete: () => void
+}): JSX.Element {
   const timeAgo = formatTimeAgo(post.createdAt)
   const preview = extractPreview((post as DoorayTask & { body?: { content?: string } }).body?.content || '')
+  const authorMemberId = (post as DoorayTask & { users?: { from?: { member?: { organizationMemberId?: string } } } })
+    .users?.from?.member?.organizationMemberId
   const authorName = (post as DoorayTask & { users?: { from?: { member?: { name?: string } } } }).users?.from?.member?.name || ''
   const colors = avatarColor(authorName)
   const initials = getInitials(authorName)
+  const isMine = !!myMemberId && !!authorMemberId && myMemberId === authorMemberId
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
-      className="w-full text-left px-4 py-3 rounded-xl transition-all group hover:-translate-y-0.5"
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
+      className="relative w-full text-left px-4 py-3 rounded-xl transition-all group hover:-translate-y-0.5 cursor-pointer"
       style={{
         background: 'var(--bg-surface)',
         border: '1px solid var(--bg-border)',
@@ -205,6 +266,16 @@ function PostCard({ post, onSelect }: { post: DoorayTask; onSelect: () => void }
         e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)'
       }}
     >
+      {isMine && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete() }}
+          title="삭제"
+          aria-label="글 삭제"
+          className="absolute right-2 top-2 z-10 p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/15 text-text-tertiary hover:text-red-400"
+        >
+          <Trash2 size={12} />
+        </button>
+      )}
       <div className="flex gap-3">
         {/* Left: Dooray task number */}
         <div className="flex-shrink-0 flex flex-col items-center pt-0.5">
@@ -253,12 +324,23 @@ function PostCard({ post, onSelect }: { post: DoorayTask; onSelect: () => void }
           <ChevronLeft size={14} className="rotate-180 text-clover-blue" />
         </div>
       </div>
-    </button>
+    </div>
   )
 }
 
 /** 상세 화면 */
-function PostDetail({ post, onBack }: { post: DoorayTask; onBack: () => void; onRefresh: () => void }): JSX.Element {
+function PostDetail({
+  post,
+  onBack,
+  myMemberId,
+  onDeletePost
+}: {
+  post: DoorayTask
+  onBack: () => void
+  onRefresh: () => void
+  myMemberId: string | null
+  onDeletePost: () => void
+}): JSX.Element {
   const [detail, setDetail] = useState<DoorayTaskDetail | null>(null)
   const [comments, setComments] = useState<DoorayTaskComment[]>([])
   const [loadingDetail, setLoadingDetail] = useState(true)
@@ -284,7 +366,25 @@ function PostDetail({ post, onBack }: { post: DoorayTask; onBack: () => void; on
     finally { setLoadingComments(false) }
   }
 
+  const handleDeleteComment = async (comment: DoorayTaskComment): Promise<void> => {
+    if (!window.confirm('이 댓글을 삭제하시겠습니까?')) return
+    try {
+      await window.api.dooray.tasks.deleteComment({
+        projectId: COMMUNITY_PROJECT_ID,
+        postId: post.id,
+        logId: comment.id
+      })
+      setComments((prev) => prev.filter((c) => c.id !== comment.id))
+    } catch (err) {
+      alert(`댓글 삭제 실패: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
   const body = detail?.body?.content || ''
+  // 글 작성자 ID — community post는 users.from.member.organizationMemberId
+  const postAuthorMemberId = ((detail || post) as DoorayTask & { users?: { from?: { member?: { organizationMemberId?: string } } } })
+    .users?.from?.member?.organizationMemberId
+  const isMyPost = !!myMemberId && !!postAuthorMemberId && myMemberId === postAuthorMemberId
   const authorName = detail?.users?.to?.[0]?.member?.name || ''
   const authorColors = avatarColor(authorName)
   const authorInitials = getInitials(authorName)
@@ -306,6 +406,16 @@ function PostDetail({ post, onBack }: { post: DoorayTask; onBack: () => void; on
           <h2 className="text-xs font-semibold text-text-secondary truncate">{post.subject}</h2>
         </div>
         <span className="text-[10px] text-text-tertiary flex-shrink-0">{formatTimeAgo(post.createdAt)}</span>
+        {isMyPost && (
+          <button
+            onClick={onDeletePost}
+            title="글 삭제"
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-text-tertiary hover:text-red-400 hover:bg-red-500/10 transition-colors"
+          >
+            <Trash2 size={11} />
+            글 삭제
+          </button>
+        )}
       </div>
 
       {/* Scrollable body */}
@@ -395,8 +505,10 @@ function PostDetail({ post, onBack }: { post: DoorayTask; onBack: () => void; on
                 const commenterName = c.creator?.member?.name || '알 수 없음'
                 const commenterColors = avatarColor(commenterName)
                 const commenterInitials = getInitials(commenterName)
+                const commenterMemberId = c.creator?.member?.id
+                const isMyComment = !!myMemberId && !!commenterMemberId && myMemberId === commenterMemberId
                 return (
-                  <div key={c.id} className="flex gap-2.5">
+                  <div key={c.id} className="flex gap-2.5 group">
                     {/* Thread line */}
                     <div className="flex flex-col items-center flex-shrink-0">
                       <span className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold"
@@ -415,6 +527,16 @@ function PostDetail({ post, onBack }: { post: DoorayTask; onBack: () => void; on
                           <span className="text-[11px] font-semibold text-text-primary">{commenterName}</span>
                           {c.createdAt && (
                             <span className="text-[9px] text-text-tertiary ml-auto">{formatTimeAgo(c.createdAt)}</span>
+                          )}
+                          {isMyComment && (
+                            <button
+                              onClick={() => handleDeleteComment(c)}
+                              title="댓글 삭제"
+                              aria-label="댓글 삭제"
+                              className="opacity-0 group-hover:opacity-100 p-1 rounded text-text-tertiary hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                            >
+                              <Trash2 size={10} />
+                            </button>
                           )}
                         </div>
                         {c.body?.content && (

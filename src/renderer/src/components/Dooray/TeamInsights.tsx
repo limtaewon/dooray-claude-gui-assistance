@@ -16,10 +16,10 @@ function TeamInsights(): JSX.Element {
   const [tasks, setTasks] = useState<DoorayTask[]>([])
   const [loading, setLoading] = useState(true)
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (force = false) => {
     setLoading(true)
     try {
-      const list = await window.api.dooray.tasks.list()
+      const list = await window.api.dooray.tasks.list(undefined, force)
       setTasks(list)
     } catch (err) {
       console.error('태스크 로드 실패:', err)
@@ -83,7 +83,7 @@ function TeamInsights(): JSX.Element {
           <p className="text-xs text-text-secondary mt-0.5">프로젝트별 태스크 현황 분석</p>
         </div>
         <button
-          onClick={loadData}
+          onClick={() => loadData(true)}
           className="p-2 rounded-lg hover:bg-bg-surface-hover text-text-secondary hover:text-text-primary transition-colors"
         >
           <RefreshCw size={14} />

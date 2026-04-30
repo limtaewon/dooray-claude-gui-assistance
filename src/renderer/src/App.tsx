@@ -13,7 +13,7 @@ import DooraySetup from './components/Dooray/DooraySetup'
 import DoorayAssistant from './components/Dooray/DoorayAssistant'
 import TerminalView from './components/Terminal/TerminalView'
 import ClaudeManual from './components/ClaudeManual/ClaudeManual'
-import SessionExplorer from './components/Sessions/SessionExplorer'
+import ClaudeCodeSessionsView from './components/Sessions/ClaudeCodeSessionsView'
 import BranchWorkspace from './components/Git/BranchWorkspace'
 import SettingsView from './components/Settings/SettingsView'
 import ImageLightbox from './components/common/ImageLightbox'
@@ -70,6 +70,13 @@ function App(): JSX.Element {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // 다른 화면(Claude 채팅 등)에서 인앱 터미널로 이동 요청
+  useEffect(() => {
+    const onGoto = (): void => setActiveView('terminal')
+    window.addEventListener('goto-terminal', onGoto)
+    return () => window.removeEventListener('goto-terminal', onGoto)
   }, [])
 
   // 커맨드 팔레트 그룹 구성
@@ -148,9 +155,17 @@ function App(): JSX.Element {
             <div className={`absolute inset-0 ${vis('ai-recommend')}`}>
               <ErrorBoundary label="AI Recommend"><AIRecommendView /></ErrorBoundary>
             </div>
-            <div className={`absolute inset-0 ${vis('community')}`}><CommunityView /></div>
-            <div className={`absolute inset-0 ${vis('monitoring')}`}><MonitoringView /></div>
-            <div className={`absolute inset-0 ${vis('sessions')}`}><SessionExplorer /></div>
+            <div className={`absolute inset-0 ${vis('community')}`}><CommunityView active={activeView === 'community'} /></div>
+            <div className={`absolute inset-0 ${vis('monitoring')}`}>
+              <ErrorBoundary label="Monitoring">
+                <MonitoringView active={activeView === 'monitoring'} />
+              </ErrorBoundary>
+            </div>
+            <div className={`absolute inset-0 ${vis('sessions')}`}>
+              <ErrorBoundary label="Claude Code">
+                <ClaudeCodeSessionsView active={activeView === 'sessions'} />
+              </ErrorBoundary>
+            </div>
             <div className={`absolute inset-0 ${vis('usage')}`}><UsageDashboard /></div>
             <div className={`absolute inset-0 ${vis('manual')}`}><ClaudeManual /></div>
             <div className={`absolute inset-0 ${vis('settings')}`}><SettingsView /></div>

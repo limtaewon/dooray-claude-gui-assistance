@@ -1,14 +1,15 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
-  Radar, Plus, RefreshCw, Trash2, Edit3, Power, CheckCheck, Bell, BellOff, Pause, Play, Search, Download, Calendar, X
+  Radar, Plus, RefreshCw, Trash2, Edit3, Power, CheckCheck, Bell, BellOff, Pause, Play, Search, Download, X
 } from 'lucide-react'
 import type { Watcher, CollectedMessage } from '../../../../shared/types/watcher'
 import { LoadingView, EmptyView } from '../common/StateViews'
 import WatcherEditModal from './WatcherEditModal'
 import MessageTimeline from './MessageTimeline'
+import SocketModeBadge from './SocketModeBadge'
 import { Button } from '../common/ds'
 
-function MonitoringView(): JSX.Element {
+function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Element {
   const [watchers, setWatchers] = useState<Watcher[]>([])
   const [unread, setUnread] = useState<Record<string, number>>({})
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -19,10 +20,9 @@ function MonitoringView(): JSX.Element {
   const [searchQuery, setSearchQuery] = useState('')
 
   // 필터바 상태 (클라이언트 사이드 임시 필터 — 와처 자체 규칙은 건드리지 않음)
+  // 와처는 RETENTION_MS=3일치 데이터만 보유하므로 날짜 범위 필터는 제공하지 않는다.
   const [extraKeywords, setExtraKeywords] = useState<string[]>([])
   const [kwDraft, setKwDraft] = useState('')
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
 
   const totalUnread = useMemo(() => Object.values(unread).reduce((a, b) => a + b, 0), [unread])
   const filteredWatchers = useMemo(() => {
@@ -62,6 +62,22 @@ function MonitoringView(): JSX.Element {
     loadMessages(selectedId)
   }, [selectedId, loadMessages])
 
+  // 모니터링 탭은 App에서 visibility만 토글되어 unmount되지 않는다.
+  // 탭 진입 시(false→true) 백그라운드 폴링이 누락한 메시지를 즉시 catch-up.
+  const wasActiveRef = useRef(active)
+  useEffect(() => {
+    if (active && !wasActiveRef.current) {
+      void (async () => {
+        try {
+          await window.api.watcher.refresh(selectedId || undefined)
+        } catch { /* ok */ }
+        await loadWatchers()
+        if (selectedId) await loadMessages(selectedId)
+      })()
+    }
+    wasActiveRef.current = active
+  }, [active, selectedId, loadWatchers, loadMessages])
+
   // 새 메시지 실시간 수신
   useEffect(() => {
     return window.api.watcher.onNewMessages(({ watcherId }) => {
@@ -89,32 +105,19 @@ function MonitoringView(): JSX.Element {
   useEffect(() => {
     setExtraKeywords([])
     setKwDraft('')
-    setFromDate('')
-    setToDate('')
   }, [selectedId])
 
-  // 필터 적용된 메시지
+  // 필터 적용된 메시지.
+  // 추가 키워드끼리는 AND — 결과를 점점 좁히는 일관된 모델.
+  // (저장 키워드 vs 추가 키워드도 암묵적 AND: 메시지는 이미 와처 규칙으로 필터된 상태)
   const filteredMessages = useMemo(() => {
-    let list = messages
-    // 날짜 범위 필터
-    if (fromDate) {
-      const fromTs = new Date(fromDate + 'T00:00:00').getTime()
-      list = list.filter((m) => new Date(m.createdAt).getTime() >= fromTs)
-    }
-    if (toDate) {
-      const toTs = new Date(toDate + 'T23:59:59').getTime()
-      list = list.filter((m) => new Date(m.createdAt).getTime() <= toTs)
-    }
-    // 추가 키워드 필터 (클라이언트 사이드 AND 필터)
-    if (extraKeywords.length > 0) {
-      const lowers = extraKeywords.map((k) => k.toLowerCase())
-      list = list.filter((m) => {
-        const text = m.text.toLowerCase()
-        return lowers.some((k) => text.includes(k))
-      })
-    }
-    return list
-  }, [messages, fromDate, toDate, extraKeywords])
+    if (extraKeywords.length === 0) return messages
+    const lowers = extraKeywords.map((k) => k.toLowerCase())
+    return messages.filter((m) => {
+      const text = m.text.toLowerCase()
+      return lowers.every((k) => text.includes(k))
+    })
+  }, [messages, extraKeywords])
 
   const addKeyword = (): void => {
     const k = kwDraft.trim()
@@ -127,21 +130,16 @@ function MonitoringView(): JSX.Element {
     // saved 키워드는 못 지움 (필터 규칙에 저장된 것) — UI로만 제거는 제공 안 함
     setExtraKeywords((xs) => xs.filter((x) => x !== k))
   }
-  const applyQuickRange = (days: number): void => {
-    const now = new Date()
-    const to = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const from = new Date(to.getTime() - (days - 1) * 86400000)
-    const fmt = (d: Date): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    setFromDate(fmt(from))
-    setToDate(fmt(to))
-  }
 
   const handleRefresh = async (): Promise<void> => {
+    console.log(`[Monitoring] 새로고침 클릭 watcherId=${selectedId || '(전체)'}`)
+    const t0 = performance.now()
     setRefreshing(true)
     try {
       await window.api.watcher.refresh(selectedId || undefined)
       if (selectedId) await loadMessages(selectedId)
       setUnread(await window.api.watcher.unreadCounts())
+      console.log(`[Monitoring] 새로고침 완료 (${(performance.now() - t0).toFixed(0)}ms)`)
     } finally {
       setRefreshing(false)
     }
@@ -215,7 +213,7 @@ function MonitoringView(): JSX.Element {
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-sm font-bold text-text-primary leading-tight">모니터링</h2>
-              <p className="text-[10px] text-text-tertiary leading-tight">2분마다 자동 수집 · 3일 보관</p>
+              <p className="text-[10px] text-text-tertiary leading-tight">실시간 수신 · 3일 보관</p>
             </div>
             <button onClick={handleRefresh} disabled={refreshing}
               className="p-1.5 rounded-lg hover:bg-bg-surface text-text-tertiary hover:text-text-secondary disabled:opacity-40"
@@ -228,6 +226,10 @@ function MonitoringView(): JSX.Element {
             <Plus size={12} />
             새 와처
           </button>
+          {/* Socket Mode (실시간 push) — 도메인 입력 + 상태 표시 */}
+          <div className="mt-2">
+            <SocketModeBadge />
+          </div>
           <div className="mt-2 relative">
             <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" />
             <input
@@ -331,9 +333,8 @@ function MonitoringView(): JSX.Element {
               </Button>
             </div>
 
-            {/* Filter bar — keywords + date range + quick picks + 재검색 */}
+            {/* Filter bar — 키워드만 (날짜 범위는 보관 기한이 3일이라 제공 안 함) */}
             <div className="px-5 py-2 border-b border-bg-border flex items-center gap-2 flex-wrap flex-shrink-0">
-              {/* 키워드 칩 + 입력 */}
               <div className="flex items-center gap-1 flex-wrap px-1.5 py-1 rounded-md bg-bg-surface border border-bg-border" style={{ minWidth: 260, flex: 1 }}>
                 <Search size={12} className="text-text-tertiary flex-none mx-1" />
                 {activeKeywords.map((k) => {
@@ -353,35 +354,19 @@ function MonitoringView(): JSX.Element {
                 <input
                   value={kwDraft}
                   onChange={(e) => setKwDraft(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addKeyword() } }}
-                  placeholder="키워드 추가…"
+                  onKeyDown={(e) => {
+                    // 한글 IME 조합 중에는 Enter가 조합 확정으로 취급되어
+                    // 두 번 트리거된다. composition 중이면 무시.
+                    // (e.g. "배포" 입력 후 Enter → "배포" + "포" 두 번 add 되던 버그)
+                    if (e.nativeEvent.isComposing || e.keyCode === 229) return
+                    if (e.key === 'Enter') { e.preventDefault(); addKeyword() }
+                  }}
+                  placeholder="결과 좁히기 (AND)… 키워드 입력 후 Enter"
+                  title="여기에 추가한 키워드는 이미 수집된 결과를 더 좁힙니다 (AND 필터)"
                   className="bg-transparent border-0 outline-none text-[11.5px] text-text-primary placeholder-text-tertiary"
                   style={{ minWidth: 80, height: 20, flex: 1 }}
                 />
               </div>
-
-              {/* 날짜 범위 */}
-              <div className="flex items-center gap-1 px-2 h-7 rounded-md bg-bg-surface border border-bg-border text-text-secondary">
-                <Calendar size={12} />
-                <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
-                  className="bg-transparent border-0 outline-none text-[11px] font-mono text-text-primary"
-                  style={{ width: 108 }} />
-                <span className="text-text-tertiary text-[11px]">→</span>
-                <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
-                  className="bg-transparent border-0 outline-none text-[11px] font-mono text-text-primary"
-                  style={{ width: 108 }} />
-              </div>
-
-              {/* 퀵픽 */}
-              <div className="ds-seg" style={{ height: 28 }}>
-                <button className="seg-item" onClick={() => applyQuickRange(7)} title="최근 7일">7일</button>
-                <button className="seg-item" onClick={() => applyQuickRange(30)} title="최근 30일">30일</button>
-              </div>
-
-              <Button variant="primary" size="sm" onClick={handleRefresh} disabled={refreshing}
-                leftIcon={<RefreshCw size={11} className={refreshing ? 'animate-spin' : ''} />}>
-                재검색
-              </Button>
             </div>
 
             {/* Stats row */}
