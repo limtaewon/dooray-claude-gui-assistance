@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Sparkles, History, PanelLeftClose, PanelLeftOpen, Edit3, Check, X, FolderOpen, RotateCcw, Star } from 'lucide-react'
+import { Plus, Sparkles, History, PanelLeftClose, PanelLeftOpen, Edit3, Check, X, FolderOpen, RotateCcw, Star, Search } from 'lucide-react'
 import ClaudeChatPane from '../Terminal/ClaudeChatPane'
 
 interface SessionMeta {
@@ -39,6 +39,9 @@ export default function ClaudeCodeSessionsView({ active = true }: { active?: boo
   /** 세션 rename 진행 상태 */
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
+
+  /** 세션 검색어 (title/customTitle/cwd/sessionId 매칭) */
+  const [search, setSearch] = useState('')
 
   const loadSessions = useCallback(async (): Promise<SessionMeta[]> => {
     setLoading(true)
@@ -107,8 +110,17 @@ export default function ClaudeCodeSessionsView({ active = true }: { active?: boo
     }
   }
 
-  const starredSessions = sessions.filter((s) => s.starred)
-  const unstarredSessions = sessions.filter((s) => !s.starred)
+  const q = search.trim().toLowerCase()
+  const filteredSessions = q
+    ? sessions.filter((s) => {
+        const title = (s.customTitle || s.title || '').toLowerCase()
+        return title.includes(q)
+          || s.cwd.toLowerCase().includes(q)
+          || s.sessionId.toLowerCase().includes(q)
+      })
+    : sessions
+  const starredSessions = filteredSessions.filter((s) => s.starred)
+  const unstarredSessions = filteredSessions.filter((s) => !s.starred)
 
   return (
     <div className="h-full flex bg-bg-primary relative">
@@ -144,9 +156,28 @@ export default function ClaudeCodeSessionsView({ active = true }: { active?: boo
             <Plus size={13} />
             새 채팅
           </button>
-          <div className="px-3 mt-3 mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-tertiary">
+          <div className="px-3 mt-3 relative">
+            <Search size={11} className="absolute left-5 top-1/2 -translate-y-1/2 text-text-tertiary" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="세션 검색 (제목, 폴더, ID)..."
+              className="w-full pl-7 pr-7 py-1.5 rounded text-[11px] bg-bg-primary border border-bg-border text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-clover-orange"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                title="검색 초기화"
+                className="absolute right-5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary"
+              >
+                <X size={11} />
+              </button>
+            )}
+          </div>
+          <div className="px-3 mt-2 mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-tertiary">
             <History size={10} />
-            이전 세션 {sessions.length > 0 && `(${sessions.length})`}
+            이전 세션 {sessions.length > 0 && (q ? `(${filteredSessions.length}/${sessions.length})` : `(${sessions.length})`)}
             <div className="flex-1" />
             <button onClick={loadSessions} title="새로고침"
               className="hover:text-text-secondary">
@@ -158,6 +189,8 @@ export default function ClaudeCodeSessionsView({ active = true }: { active?: boo
               <div className="px-3 py-4 text-[11px] text-text-tertiary text-center">로딩...</div>
             ) : sessions.length === 0 ? (
               <div className="px-3 py-4 text-[11px] text-text-tertiary text-center">저장된 세션 없음</div>
+            ) : filteredSessions.length === 0 ? (
+              <div className="px-3 py-4 text-[11px] text-text-tertiary text-center">검색 결과 없음</div>
             ) : (
               <>
                 {starredSessions.length > 0 && (
