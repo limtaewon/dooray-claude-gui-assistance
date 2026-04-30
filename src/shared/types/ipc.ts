@@ -99,6 +99,12 @@ export const IPC_CHANNELS = {
   TERMINAL_SAVE_OUTPUT: 'terminal:save-output',
   TERMINAL_RESTORE: 'terminal:restore',
   TERMINAL_RENAME: 'terminal:rename',
+  /** v1.4: 두레이 멘션이 새 터미널을 열었음을 렌더러에 알림 (entries 추가/활성화 요청) */
+  MENTION_TERMINAL_OPENED: 'mention:terminal:opened',
+  /** v1.4: 기존 채널 탭을 재사용 — 렌더러에 활성화만 요청 (id 페이로드) */
+  MENTION_TERMINAL_FOCUS: 'mention:terminal:focus',
+  /** v1.4: 멘션이 수신됐음을 사이드바/알림 UI에 push (배지/pulse 트리거) */
+  MENTION_RECEIVED: 'mention:received',
 
   // Claude Code Task Bridge
   CLAUDE_START_TASK: 'claude:start-task',

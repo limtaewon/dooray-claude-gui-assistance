@@ -12,6 +12,17 @@ import { WikiService } from './dooray/WikiService'
 import { CalendarService } from './dooray/CalendarService'
 import { MessengerService } from './dooray/MessengerService'
 import { BotService } from './dooray/socket-mode/BotService'
+import { MentionDispatcher } from './dooray/mention/MentionDispatcher'
+import { ContextCollector } from './dooray/mention/ContextCollector'
+import { buildPromptFromContext, extractUserRequest } from './dooray/mention/promptBuilder'
+import { MentionTerminalSpawner } from './dooray/mention/MentionTerminalSpawner'
+import { notifyMention } from './dooray/mention/MentionNotifier'
+import { AgentWorkspaceManager } from './dooray/mention/AgentWorkspaceManager'
+import { ChannelSessionStore } from './dooray/mention/ChannelSessionStore'
+import { ClaudayResponder, extractOrgId } from './dooray/mention/ClaudayResponder'
+import { HookServer, type HookEventPayload } from './dooray/mention/HookServer'
+import { readLastAssistantText, truncateForMessenger } from './dooray/mention/transcriptReader'
+import { relative as pathRelative, sep as pathSep, basename as pathBasename } from 'path'
 import { WatcherService } from './watcher/WatcherService'
 import { AIService, setUserAnthropicApiKey, getClaudeBin } from './ai/AIService'
 import { ClaudeChatService } from './claude/ClaudeChatService'
@@ -53,6 +64,8 @@ const calendarService = new CalendarService(doorayClient)
 const messengerService = new MessengerService(doorayClient)
 sharedSkills.setMemberNameResolver((id) => messengerService.getMemberName(id))
 const botService = new BotService(doorayClient)
+const mentionDispatcher = new MentionDispatcher(botService, taskService)
+const mentionContextCollector = new ContextCollector(messengerService)
 const watcherService = new WatcherService(messengerService)
 const aiService = new AIService()
 const claudeChat = new ClaudeChatService(getClaudeBin())
@@ -60,6 +73,127 @@ const claudeSessions = new ClaudeSessionService()
 const claudeAttachments = new AttachmentService()
 const store = new Store({ name: 'clauday-data' })
 const terminalManager = new TerminalManager()
+const agentWorkspace = new AgentWorkspaceManager()
+const channelSessionStore = new ChannelSessionStore()
+const mentionTerminalSpawner = new MentionTerminalSpawner(terminalManager, channelSessionStore)
+const claudayResponder = new ClaudayResponder(messengerService)
+const hookServer = new HookServer()
+/** turn 단위 도구 사용 누적 (channelId → list) — Stop hook에서 비우면서 요약 송신 */
+const turnBuffers = new Map<string, Array<{ tool: string; detail: string }>>()
+
+/** claude code hook → 두레이 알림 라우터.
+ *  - cwd로 channelId 추출 (~/Clauday-Workspaces/agent/{channelId}/...)
+ *  - PostToolUse: turnBuffers에 누적
+ *  - Stop: 누적 요약을 [Clauday] 메시지로 송신 + markIdle */
+async function handleClaudeHook(ev: HookEventPayload): Promise<void> {
+  const channelId = extractChannelIdFromCwd(ev.cwd)
+  if (!channelId) return
+
+  if (ev.event === 'post_tool_use') {
+    const detail = formatToolDetail(ev.tool_name, ev.tool_input)
+    const buf = turnBuffers.get(channelId) || []
+    buf.push({ tool: ev.tool_name || '?', detail })
+    turnBuffers.set(channelId, buf)
+    return
+  }
+
+  if (ev.event === 'stop') {
+    const buf = turnBuffers.get(channelId) || []
+    turnBuffers.delete(channelId)
+    const session = channelSessionStore.get(channelId)
+    const orgId = session?.organizationId
+
+    // claude code가 hook payload에 last_assistant_message를 직접 넣어준다 (raw keys 확인됨).
+    // transcript 파일을 읽는 것보다 단순하고 정확.
+    let assistantText = extractAssistantMessage(ev.raw.last_assistant_message)
+
+    const transcriptPath = (ev.raw.transcript_path as string | undefined) || ''
+    // last_assistant_message가 비어있으면 transcript 파일에서 fallback 추출
+    if (!assistantText && transcriptPath) {
+      assistantText = readLastAssistantText(transcriptPath)
+    }
+
+    // transcript 파일명이 곧 claude session id (xxx.jsonl) — 다음 spawn 시 --resume에 사용
+    if (transcriptPath) {
+      const sid = pathBasename(transcriptPath).replace(/\.jsonl$/, '')
+      if (sid) channelSessionStore.setClaudeSessionId(channelId, sid)
+    }
+
+    const body = composeStopMessage(assistantText, buf)
+    await claudayResponder.send(channelId, body, orgId)
+    channelSessionStore.markIdle(channelId)
+  }
+}
+
+/** Stop 시 두레이로 보낼 메시지 본문 구성.
+ *  주: claude의 응답 텍스트 (사용자에게 보여진 그 글). 없으면 "응답 완료" 폴백.
+ *  부: 사용한 도구 짧은 목록 (turn 안에서 큰 변화가 있었는지 한눈에 보이게). */
+function composeStopMessage(assistantText: string, buf: Array<{ tool: string; detail: string }>): string {
+  const main = assistantText.trim()
+    ? truncateForMessenger(assistantText.trim())
+    : '응답 완료.'
+
+  if (buf.length === 0) return main
+  const items = buf.slice(0, 8).map((b) => b.detail ? `${b.tool}(${b.detail})` : b.tool)
+  const more = buf.length > 8 ? ` 외 ${buf.length - 8}건` : ''
+  return `${main}\n\n— 사용 도구: ${items.join(', ')}${more}`
+}
+
+function extractChannelIdFromCwd(cwd: string): string | null {
+  if (!cwd) return null
+  const agentRoot = agentWorkspace.getAgentRoot()
+  if (!cwd.startsWith(agentRoot)) return null
+  const rel = pathRelative(agentRoot, cwd)
+  const seg = rel.split(pathSep)[0]
+  return seg || null
+}
+
+/** claude code가 hook payload에 넣어주는 last_assistant_message → 평문 텍스트.
+ *  형식 후보: string / { content: [{type:'text', text}] } / { text: string } */
+function extractAssistantMessage(raw: unknown): string {
+  if (!raw) return ''
+  if (typeof raw === 'string') return raw.trim()
+  if (typeof raw !== 'object') return ''
+  const m = raw as { content?: unknown; text?: unknown; message?: unknown }
+  if (typeof m.text === 'string') return m.text.trim()
+  if (m.message && typeof m.message === 'object') {
+    return extractAssistantMessage(m.message)
+  }
+  if (Array.isArray(m.content)) {
+    const parts: string[] = []
+    for (const b of m.content) {
+      if (b && typeof b === 'object') {
+        const blk = b as { type?: string; text?: unknown }
+        if (blk.type === 'text' && typeof blk.text === 'string') parts.push(blk.text)
+      } else if (typeof b === 'string') {
+        parts.push(b)
+      }
+    }
+    return parts.join('\n').trim()
+  }
+  if (typeof m.content === 'string') return m.content.trim()
+  return ''
+}
+
+function formatToolDetail(tool: string | undefined, input: Record<string, unknown> | undefined): string {
+  if (!tool || !input) return ''
+  const filePath = (input.file_path as string | undefined) || ''
+  switch (tool) {
+    case 'Edit':
+    case 'Write':
+    case 'Read':
+      return filePath ? pathBasename(filePath) : ''
+    case 'Bash': {
+      const cmd = (input.command as string | undefined) || ''
+      return cmd.length > 60 ? cmd.slice(0, 57) + '...' : cmd
+    }
+    case 'Glob':
+    case 'Grep':
+      return ((input.pattern as string | undefined) || '').slice(0, 40)
+    default:
+      return ''
+  }
+}
 const skillStore = new SkillStore()
 const gitService = new GitService()
 const analyticsService = new AnalyticsService()
@@ -105,6 +239,95 @@ function createWindow(): BrowserWindow {
       console.error('[WatcherService] handleSocketEvent 실패:', err)
     )
   })
+  // v1.4: @clauday 멘션 디스패처 — 와처와 독립. 토큰 주인의 멘션만 트리거.
+  mentionDispatcher.setEnabled(
+    (store.get('doorayMentionTrigger.enabled', true) as boolean) ?? true
+  )
+  mentionDispatcher.setTrigger(
+    (store.get('doorayMentionTrigger.keyword', 'clauday') as string) || 'clauday'
+  )
+  mentionTerminalSpawner.setMainWindow(mainWindow)
+  // 사용자가 store에 customRoot 저장한 게 있으면 적용 (없으면 ~/Clauday-Workspaces/ default)
+  const customWorkspaceRoot = store.get('agentWorkspaceRoot', '') as string
+  if (customWorkspaceRoot) agentWorkspace.setRoot(customWorkspaceRoot)
+  // Hook 서버 시작 — claude code의 PostToolUse/Stop hook이 여기로 POST됨
+  void hookServer.start().then(({ port, secret }) => {
+    agentWorkspace.setHookConfig({ port, secret })
+    hookServer.setHandler((ev) => handleClaudeHook(ev))
+  }).catch((err) => console.error('[HookServer] start 실패:', err))
+  mentionDispatcher.onMention(async (ctx) => {
+    try {
+      const orgId = extractOrgId(ctx)
+      // 동시 작업 차단 — 같은 채널에서 진행 중이면 거부 + 두레이 채널로 안내
+      const busyState = mentionTerminalSpawner.checkBusy(ctx.channelId)
+      if (busyState.busy) {
+        const minutes = Math.max(1, Math.floor(busyState.sinceMs / 60000))
+        await claudayResponder.send(
+          ctx.channelId,
+          `이전 작업이 아직 진행 중입니다 (시작 ${minutes}분 전). 끝나면 다시 호출해주세요.`,
+          orgId
+        )
+        console.log(`[Mention] busy 거부 channelId=${ctx.channelId} since=${minutes}m`)
+        return
+      }
+      const windowSize =
+        (store.get('doorayMentionTrigger.windowSize', 50) as number) || 50
+      const collected = await mentionContextCollector.collect(
+        ctx.channelId,
+        ctx.logId,
+        windowSize,
+        ctx.channelDisplayName
+      )
+      const prompt = buildPromptFromContext(collected)
+      const ws = agentWorkspace.ensureChannel(ctx.channelId, collected.channelName)
+      const promptRelPath = agentWorkspace.writeTaskPrompt(
+        ctx.channelId,
+        ctx.logId,
+        prompt
+      )
+      // 알림은 사용자 인지를 위해 dispatch 전에 즉시
+      notifyMention(mainWindow, {
+        channelName: collected.channelName,
+        preview: ctx.text
+      })
+      // 사이드바 배지/pulse 트리거용 IPC push
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(IPC_CHANNELS.MENTION_RECEIVED, {
+          channelId: ctx.channelId,
+          channelName: collected.channelName,
+          text: ctx.text,
+          logId: ctx.logId,
+          sentAt: ctx.sentAt
+        })
+      }
+      // 시작 알림 — 두레이 채널로 즉시 통보
+      await claudayResponder.send(ctx.channelId, '작업을 시작합니다.', orgId)
+      // organizationId를 세션에 저장 (Stop hook에서 종료 알림 송신 시 재사용)
+      channelSessionStore.set(ctx.channelId, channelSessionStore.get(ctx.channelId)?.tabId || '', collected.channelName, orgId)
+
+      // 멘션에서 @clauday 떼낸 실제 요청을 한 줄 입력에 직접 박는다 (md 파일과 분리)
+      const userRequest = extractUserRequest(ctx.text, mentionDispatcher.getTrigger())
+      const result = await mentionTerminalSpawner.dispatch({
+        channelId: ctx.channelId,
+        channelName: collected.channelName,
+        channelDir: ws.channelDir,
+        promptRelPath,
+        userRequest
+      })
+      // dispatch가 set을 또 호출하니 orgId가 누락되지 않게 한 번 더 보강
+      const cur = channelSessionStore.get(ctx.channelId)
+      if (cur && !cur.organizationId && orgId) {
+        channelSessionStore.set(ctx.channelId, cur.tabId, cur.channelName, orgId)
+      }
+      console.log(
+        `[Mention] dispatch 완료 tabId=${result.tabId} reused=${result.reused} ` +
+        `messages=${collected.messages.length} prompt=${promptRelPath}`
+      )
+    } catch (err) {
+      console.error('[Mention] 파이프라인 실패:', err)
+    }
+  })
+  mentionDispatcher.start()
   void botService.start().catch((err) => console.error('[BotService] start 실패:', err))
   // AI가 스킬을 system prompt에 자동으로 합치도록 연결 (enabled && autoApply 스킬만)
   aiService.setSkillLoader((target) => {

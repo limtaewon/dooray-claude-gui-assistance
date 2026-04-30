@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Server, Sparkles, BarChart3, Calendar, Terminal, BookOpen, MessageSquare, GitBranch, Settings, Users, Radar, Lightbulb } from 'lucide-react'
+import { Server, Sparkles, BarChart3, Calendar, Terminal, BookOpen, MessageSquare, GitBranch, Settings, Users, Radar, Lightbulb, Bot } from 'lucide-react'
 
-type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend'
+type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent'
 
 interface SidebarProps {
   activeView: View
@@ -17,6 +17,7 @@ const NAV_GROUPS: { key: string; label: string; items: NavItem[] }[] = [
     items: [
       { view: 'dooray', icon: Calendar, label: '두레이' },
       { view: 'monitoring', icon: Radar, label: '모니터링' },
+      { view: 'agent', icon: Bot, label: '에이전트' },
       { view: 'terminal', icon: Terminal, label: '터미널' },
       { view: 'git', icon: GitBranch, label: '브랜치 작업' },
       { view: 'community', icon: Users, label: '커뮤니티' }
@@ -76,6 +77,8 @@ function NavButton({
 function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
   const [monitoringUnread, setMonitoringUnread] = useState(0)
   const [monitoringPulse, setMonitoringPulse] = useState(false)
+  const [agentUnread, setAgentUnread] = useState(0)
+  const [agentPulse, setAgentPulse] = useState(false)
 
   useEffect(() => {
     const refresh = async (): Promise<void> => {
@@ -94,8 +97,21 @@ function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
     return () => { unsub(); clearInterval(timer) }
   }, [])
 
+  // v1.4: 에이전트 멘션 알림 — 와처와 동일 패턴
+  useEffect(() => {
+    const off = window.api.mention.onReceived(() => {
+      setAgentUnread((n) => n + 1)
+      setAgentPulse(true)
+    })
+    return off
+  }, [])
+
   useEffect(() => {
     if (activeView === 'monitoring') setMonitoringPulse(false)
+    if (activeView === 'agent') {
+      setAgentUnread(0)
+      setAgentPulse(false)
+    }
   }, [activeView])
 
   return (
@@ -108,8 +124,14 @@ function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
               {...item}
               active={activeView === item.view}
               onClick={() => onViewChange(item.view)}
-              badge={item.view === 'monitoring' ? monitoringUnread : undefined}
-              pulse={item.view === 'monitoring' ? monitoringPulse : undefined}
+              badge={
+                item.view === 'monitoring' ? monitoringUnread :
+                item.view === 'agent' ? agentUnread : undefined
+              }
+              pulse={
+                item.view === 'monitoring' ? monitoringPulse :
+                item.view === 'agent' ? agentPulse : undefined
+              }
             />
           ))}
           {i < NAV_GROUPS.length - 1 && (

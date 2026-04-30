@@ -48,9 +48,17 @@ function enrichedTerminalPath(): string {
 export class TerminalManager {
   private sessions: Map<string, PtySession> = new Map()
   private mainWindow: BrowserWindow | null = null
+  /** 외부 output listener — 멘션 작업 종료 마커 감지 등에 사용 */
+  private outputListeners: Set<(id: string, data: string) => void> = new Set()
 
   setMainWindow(win: BrowserWindow): void {
     this.mainWindow = win
+  }
+
+  /** PTY 출력 listener 등록. unsubscribe 함수 반환. */
+  addOutputListener(cb: (id: string, data: string) => void): () => void {
+    this.outputListeners.add(cb)
+    return () => { this.outputListeners.delete(cb) }
   }
 
   create(options: TerminalCreateOptions = {}): TerminalSession {

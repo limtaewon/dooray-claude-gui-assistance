@@ -22,8 +22,16 @@ export interface DoorayChannelLog {
   /** 두레이 메신저 실제 필드명 */
   sentAt?: string
   createdAt?: string
-  /** 보낸 사람 (두레이 메신저 실제 필드) */
-  sender?: { organizationMemberId?: string; name?: string }
+  /** 보낸 사람 (두레이 메신저 실제 필드)
+   *  HTTP logs API: { type:'member', member: { organizationMemberId } } 형태
+   *  socket-mode/일부 응답: { organizationMemberId, name } 평면 형태
+   *  둘 다 대응. */
+  sender?: {
+    organizationMemberId?: string
+    name?: string
+    type?: string
+    member?: { organizationMemberId?: string; name?: string }
+  }
   creator?: {
     type?: string
     member?: { organizationMemberId?: string; name?: string }

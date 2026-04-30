@@ -12,6 +12,7 @@ import UsageDashboard from './components/Usage/UsageDashboard'
 import DooraySetup from './components/Dooray/DooraySetup'
 import DoorayAssistant from './components/Dooray/DoorayAssistant'
 import TerminalView from './components/Terminal/TerminalView'
+import MentionAgentView from './components/MentionAgent/MentionAgentView'
 import ClaudeManual from './components/ClaudeManual/ClaudeManual'
 import ClaudeCodeSessionsView from './components/Sessions/ClaudeCodeSessionsView'
 import BranchWorkspace from './components/Git/BranchWorkspace'
@@ -23,7 +24,7 @@ import AIRecommendView from './components/AIRecommend/AIRecommendView'
 import { ToastHost, CommandPalette, type CommandGroup, type CommandItem } from './components/common/ds'
 import { useTheme } from './hooks/useTheme'
 
-type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend'
+type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent'
 
 function App(): JSX.Element {
   const [activeView, setActiveView] = useState<View>('dooray')
@@ -144,6 +145,9 @@ function App(): JSX.Element {
             </div>
             <div className={`absolute inset-0 ${vis('terminal')}`}>
               <TerminalView />
+            </div>
+            <div className={`absolute inset-0 ${vis('agent')}`}>
+              <MentionAgentView />
             </div>
             <div className={`absolute inset-0 ${vis('git')}`}>
               <BranchWorkspace onOpenTerminal={() => setActiveView('terminal')} />

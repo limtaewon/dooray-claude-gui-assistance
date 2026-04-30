@@ -533,7 +533,7 @@ function hashId(watcherId: string, channelId: string, messageId: string): string
   return createHash('md5').update(`${watcherId}|${channelId}|${messageId}`).digest('hex')
 }
 
-function extractText(log: DoorayChannelLog): string {
+export function extractText(log: DoorayChannelLog): string {
   // 가능한 본문 필드를 순서대로 시도 (두레이 메신저 로그 필드명 변동 대응)
   const candidates: string[] = []
   if (typeof log.text === 'string' && log.text.trim()) candidates.push(log.text)

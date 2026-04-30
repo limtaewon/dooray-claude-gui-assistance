@@ -201,7 +201,19 @@ const api = {
     rename: (id: string, name: string): Promise<boolean> =>
       ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_RENAME, { id, name }),
     onOutput: (callback: (payload: { id: string; data: string }) => void): (() => void) =>
-      subscribeTerminalOutput(callback)
+      subscribeTerminalOutput(callback),
+    /** v1.4: 두레이 멘션이 main에서 새 터미널을 열었을 때 렌더러로 푸시되는 메타 */
+    onMentionOpened: (callback: (meta: TerminalSession) => void): (() => void) => {
+      const handler = (_: unknown, meta: TerminalSession): void => callback(meta)
+      ipcRenderer.on(IPC_CHANNELS.MENTION_TERMINAL_OPENED, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.MENTION_TERMINAL_OPENED, handler)
+    },
+    /** v1.4: 기존 채널 탭 재사용 — 활성화만 요청 */
+    onMentionFocus: (callback: (payload: { id: string }) => void): (() => void) => {
+      const handler = (_: unknown, payload: { id: string }): void => callback(payload)
+      ipcRenderer.on(IPC_CHANNELS.MENTION_TERMINAL_FOCUS, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.MENTION_TERMINAL_FOCUS, handler)
+    }
   },
 
   // Claude Code Bridge
@@ -440,6 +452,15 @@ const api = {
       const handler = (_: IpcRendererEvent, payload: { watcherId: string; messages: import('../shared/types/watcher').CollectedMessage[] }): void => cb(payload)
       ipcRenderer.on(IPC_CHANNELS.WATCHER_NEW_MESSAGES, handler)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.WATCHER_NEW_MESSAGES, handler)
+    }
+  },
+
+  // v1.4: 두레이 멘션 알림 (와처 패턴과 동일)
+  mention: {
+    onReceived: (cb: (payload: { channelId: string; channelName: string; text: string; logId: string; sentAt?: string }) => void): (() => void) => {
+      const handler = (_: IpcRendererEvent, payload: { channelId: string; channelName: string; text: string; logId: string; sentAt?: string }): void => cb(payload)
+      ipcRenderer.on(IPC_CHANNELS.MENTION_RECEIVED, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.MENTION_RECEIVED, handler)
     }
   },
 
