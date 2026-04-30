@@ -67,6 +67,30 @@
 .ds-btn.success   { background: #10B981; color: #fff; }
 .ds-btn.success:hover   { background: rgba(16,185,129,.88); }
 .ds-btn.secondary { background: var(--bg-surface); color: var(--text-primary); border-color: var(--bg-border); }
+
+/* ---------- Toolbar Buttons (compact, header bar) ----------
+ * 채팅 헤더의 /mcp · 이전 대화 · 터미널 · 새 대화 등 작은 액션 버튼.
+ * ds-btn 보다 한 단계 컴팩트하지만 충분히 보이도록.
+ */
+.ds-toolbar-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--bg-border);
+  transition: background .12s, color .12s, border-color .12s;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ds-toolbar-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.10);
+  color: var(--text-primary);
+  border-color: rgba(148, 175, 230, 0.28);
+}
+.ds-toolbar-btn:disabled { cursor: not-allowed; }
 .ds-btn.secondary:hover { background: var(--bg-surface-hover); }
 .ds-btn.ghost     { color: var(--text-secondary); }
 .ds-btn.ghost:hover     { background: var(--bg-surface-hover); color: var(--text-primary); }

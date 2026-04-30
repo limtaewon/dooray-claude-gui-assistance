@@ -1,6 +1,8 @@
 import * as pty from 'node-pty'
 import { BrowserWindow } from 'electron'
 import { randomUUID } from 'crypto'
+import { homedir } from 'os'
+import { join, delimiter as pathDelimiter } from 'path'
 import { IPC_CHANNELS } from '../../shared/types/ipc'
 import type { TerminalSession, TerminalCreateOptions, TerminalResizeOptions } from '../../shared/types/terminal'
 
@@ -11,6 +13,37 @@ interface PtySession {
 }
 
 const MAX_BUFFER_LINES = 5000
+
+/**
+ * PTY에 전달할 PATH 보강.
+ * Electron 패키징 앱은 GUI에서 실행되기 때문에 부모 프로세스의 PATH가
+ * 로그인 셸 환경과 다르다. .zshrc/.zprofile이 정상적으로 실행되지 않을 때를
+ * 대비해 homebrew, .claude/local, npm-global 등을 미리 끼워둔다.
+ */
+function enrichedTerminalPath(): string {
+  const home = homedir()
+  const isWindows = process.platform === 'win32'
+  const extraPaths = isWindows
+    ? [
+        join(home, '.claude', 'local'),
+        join(home, '.claude', 'bin'),
+        join(home, 'AppData', 'Roaming', 'npm'),
+        join(home, 'AppData', 'Local', 'npm'),
+      ]
+    : [
+        join(home, '.claude', 'local'),
+        join(home, '.claude', 'bin'),
+        '/usr/local/bin',
+        '/opt/homebrew/bin',
+        '/opt/homebrew/sbin',
+        join(home, '.local', 'bin'),
+        join(home, '.npm-global', 'bin'),
+        // nvm 기본 경로 (버전별 심볼릭이 깔리지 않은 경우 대비)
+        join(home, '.nvm', 'versions', 'node', 'current', 'bin'),
+      ]
+  const currentPath = process.env.PATH || (isWindows ? '' : '/usr/bin:/bin')
+  return [...extraPaths, currentPath].join(pathDelimiter)
+}
 
 export class TerminalManager {
   private sessions: Map<string, PtySession> = new Map()
@@ -27,8 +60,12 @@ export class TerminalManager {
       ? (process.env.COMSPEC || 'cmd.exe')
       : (process.env.SHELL || '/bin/zsh')
     const command = options.command || defaultShell
-    const args = options.args || []
-    const cwd = options.cwd || require('os').homedir()
+    // 사용자가 명시적 command를 주지 않은 경우, 로그인 셸로 띄워서
+    // .zprofile/.bash_profile(NVM_DIR, homebrew shellenv 등)이 실행되도록 한다.
+    // 이게 빠지면 .zshrc의 nvm.sh 로드가 실패해 hook/MCP에서 node를 못 찾는다.
+    const isDefaultUnixShell = !options.command && !isWindows
+    const args = options.args || (isDefaultUnixShell ? ['-l'] : [])
+    const cwd = options.cwd || homedir()
 
     const ptyProcess = pty.spawn(command, args, {
       name: 'xterm-256color',
@@ -43,6 +80,7 @@ export class TerminalManager {
           LC_ALL: process.env.LC_ALL || process.env.LANG || 'ko_KR.UTF-8',
           LC_CTYPE: process.env.LC_CTYPE || process.env.LANG || 'ko_KR.UTF-8',
         }),
+        PATH: enrichedTerminalPath(),
         TERM: 'xterm-256color',
       } as Record<string, string>
     })
@@ -115,6 +153,14 @@ export class TerminalManager {
       meta: s.meta,
       output: s.outputBuffer.join('')
     }))
+  }
+
+  // 탭 이름 변경 (UI 표시용 — 출력에는 영향 없음)
+  setName(id: string, name: string): boolean {
+    const session = this.sessions.get(id)
+    if (!session) return false
+    session.meta.name = name
+    return true
   }
 
   dispose(): void {

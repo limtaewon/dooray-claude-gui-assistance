@@ -19,6 +19,8 @@ export const IPC_CHANNELS = {
   DOORAY_TOKEN_GET: 'dooray:token:get',
   DOORAY_TOKEN_DELETE: 'dooray:token:delete',
   DOORAY_TOKEN_VALIDATE: 'dooray:token:validate',
+  /** 내 organizationMemberId 조회 (본인 작성자 검증용) */
+  DOORAY_MY_MEMBER_ID: 'dooray:my-member-id',
   DOORAY_PROJECTS_LIST: 'dooray:projects:list',
   DOORAY_TASKS_LIST: 'dooray:tasks:list',
   DOORAY_TASKS_CC: 'dooray:tasks:cc',
@@ -37,6 +39,10 @@ export const IPC_CHANNELS = {
   DOORAY_TASK_UPLOAD_FILE: 'dooray:task:upload-file',
   DOORAY_TASK_UPDATE_BODY: 'dooray:task:update-body',
   DOORAY_TASK_COMMENT_UPDATE: 'dooray:task:comment:update',
+  /** 태스크(커뮤니티 글) 삭제 — 본인 글만 (호출 측에서 검증) */
+  DOORAY_TASK_DELETE: 'dooray:task:delete',
+  /** 댓글 삭제 — 본인 댓글만 */
+  DOORAY_TASK_COMMENT_DELETE: 'dooray:task:comment:delete',
   DOORAY_TASK_TEMPLATES_LIST: 'dooray:task:templates:list',
   DOORAY_TASK_TEMPLATE_DETAIL: 'dooray:task:templates:detail',
   DOORAY_COMMUNITY_POSTS: 'dooray:community:posts',
@@ -58,6 +64,23 @@ export const IPC_CHANNELS = {
   WATCHER_UNREAD_COUNT: 'watcher:unread-count',
   /** 새 메시지 도착 이벤트 (main → renderer) */
   WATCHER_NEW_MESSAGES: 'watcher:new-messages',
+  /** OS 알림 클릭 이벤트 (main → renderer) — 모니터링 탭으로 이동 + 해당 와처 선택 */
+  WATCHER_NOTIFICATION_CLICK: 'watcher:notification-click',
+
+  // Dooray Bot (Socket Mode WebSocket 통합)
+  /** 봇 설정 조회 (도메인/enabled — 토큰은 두레이 API 토큰 재사용) */
+  BOT_GET_CONFIG: 'bot:get-config',
+  /** 봇 설정 저장 (도메인/enabled). 저장 후 자동 재시작. */
+  BOT_SET_CONFIG: 'bot:set-config',
+  /** 현재 연결 상태 조회 */
+  BOT_GET_STATUS: 'bot:get-status',
+  /** 수동 시작/중지 */
+  BOT_START: 'bot:start',
+  BOT_STOP: 'bot:stop',
+  /** 상태 변화 이벤트 (main → renderer) */
+  BOT_STATE_UPDATE: 'bot:state-update',
+  /** 이벤트 도착 (메시지 등, main → renderer — 모니터링/디버깅용) */
+  BOT_EVENT: 'bot:event',
 
   // AI - 필터 규칙 생성
   AI_GENERATE_FILTER: 'ai:generate-filter',
@@ -75,6 +98,7 @@ export const IPC_CHANNELS = {
   TERMINAL_OUTPUT: 'terminal:output',
   TERMINAL_SAVE_OUTPUT: 'terminal:save-output',
   TERMINAL_RESTORE: 'terminal:restore',
+  TERMINAL_RENAME: 'terminal:rename',
 
   // Claude Code Task Bridge
   CLAUDE_START_TASK: 'claude:start-task',
@@ -83,6 +107,16 @@ export const IPC_CHANNELS = {
   CLAUDE_CHAT_SEND: 'claude:chat:send',
   CLAUDE_CHAT_EVENT: 'claude:chat:event',
   CLAUDE_CHAT_CANCEL: 'claude:chat:cancel',
+  /** ~/.claude/projects 안 jsonl 들을 파싱한 세션 목록 (cwd 필터 가능) */
+  CLAUDE_SESSION_LIST: 'claude:session:list',
+  /** 특정 세션의 user/assistant 메시지 목록 */
+  CLAUDE_SESSION_LOAD: 'claude:session:load',
+  /** 세션 사용자 정의 이름 변경 */
+  CLAUDE_SESSION_RENAME: 'claude:session:rename',
+  /** 세션 즐겨찾기 토글 */
+  CLAUDE_SESSION_STAR: 'claude:session:star',
+  /** 채팅 첨부 파일 저장 (clipboard 이미지/임시 파일 등) → 절대 경로 반환 */
+  CLAUDE_ATTACHMENT_SAVE: 'claude:attachment:save',
 
   // AI
   AI_AVAILABLE: 'ai:available',

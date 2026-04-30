@@ -43,18 +43,22 @@ const AVATAR_COLORS = [
   { bg: 'rgba(132,204,22,0.15)', text: '#65a30d' }
 ]
 
-function avatarColor(name: string): { bg: string; text: string } {
-  if (!name) return AVATAR_COLORS[0]
+function avatarColor(name: unknown): { bg: string; text: string } {
+  if (typeof name !== 'string' || !name) return AVATAR_COLORS[0]
   let hash = 0
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
 }
 
-function getInitials(name: string): string {
-  if (!name) return '?'
+function getInitials(name: unknown): string {
+  // 방어적: store에 저장된 메시지 중 authorName이 string이 아닌 케이스 대비
+  if (typeof name !== 'string' || !name) return '?'
   const clean = name.replace(/\[[^\]]*\]/g, '').trim()
+  if (!clean) return '?'
   const parts = clean.split(/\s+/)
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+  if (parts.length >= 2 && parts[0][0] && parts[1][0]) {
+    return (parts[0][0] + parts[1][0]).toUpperCase()
+  }
   return clean.slice(0, 2).toUpperCase()
 }
 
@@ -177,8 +181,8 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
         <div className="text-center">
           <p className="text-sm font-medium text-text-primary">수집된 메시지가 없습니다</p>
           <p className="text-[11px] text-text-tertiary mt-1 leading-relaxed">
-            2분 간격 자동 수집 · 최근 3일 보관<br/>
-            규칙과 매치되는 메시지가 없거나 아직 첫 수집 전일 수 있습니다
+            실시간 수신 · 최근 3일 보관<br/>
+            규칙과 매치되는 메시지가 없거나 아직 첫 수신 전일 수 있습니다
           </p>
         </div>
         {onRefresh && (

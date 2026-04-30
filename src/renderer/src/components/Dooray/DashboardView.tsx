@@ -82,7 +82,8 @@ function DashboardView(): JSX.Element {
     localStorage.setItem(CREATE_EXPANDED_KEY, createExpanded ? '1' : '0')
   }, [createExpanded])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
+    console.log(`[Dashboard] 새로고침 force=${force}`)
     setLoading(true)
     try {
       const [allProjects, pinnedIds] = await Promise.all([
@@ -97,7 +98,7 @@ function DashboardView(): JSX.Element {
       if (!nlProject && visible.length > 0) setNlProject(visible[0].id)
 
       const targetIds = visible.map((p) => p.id)
-      const taskList = targetIds.length > 0 ? await window.api.dooray.tasks.list(targetIds) : []
+      const taskList = targetIds.length > 0 ? await window.api.dooray.tasks.list(targetIds, force) : []
       setTasks(taskList)
     } catch { /* ok */ }
     finally { setLoading(false) }
@@ -215,7 +216,8 @@ JSON 형태로만 응답:
       const proj = projects.find((p) => p.id === nlProject)
       toast.success(`${proj?.code || '프로젝트'}에 생성됨`, `"${subject.trim()}" 태스크가 두레이에 등록됐어요`)
       setSubject(''); setBody(''); setAiHint(''); setActiveTemplateName(null)
-      await load()
+      // 방금 생성한 태스크가 즉시 보이도록 캐시 우회
+      await load(true)
     } catch (err) {
       toast.error('태스크 생성 실패', err instanceof Error ? err.message : String(err))
     } finally {
@@ -228,7 +230,17 @@ JSON 형태로만 응답:
     setSubject(''); setBody(''); setAiHint(''); setActiveTemplateName(null)
   }
 
-  const projectCodes = useMemo(() => projects.map((p) => p.code).join(' · '), [projects])
+  // 프로젝트 설정이 비어있으면 전체 프로젝트가 그대로 깔리기 때문에 헤더 칩이 가로로 넘쳐 깨진다.
+  // 가시 개수를 제한하고 나머지는 "+N" 으로 요약. 칩 자체에도 max-width + truncate 적용.
+  const MAX_VISIBLE_PROJECT_CODES = 5
+  const projectCodesLabel = useMemo(() => {
+    if (projects.length === 0) return ''
+    const codes = projects.map((p) => p.code)
+    if (codes.length <= MAX_VISIBLE_PROJECT_CODES) return codes.join(' · ')
+    const head = codes.slice(0, MAX_VISIBLE_PROJECT_CODES).join(' · ')
+    return `${head} · 외 ${codes.length - MAX_VISIBLE_PROJECT_CODES}개`
+  }, [projects])
+  const allProjectCodes = useMemo(() => projects.map((p) => p.code).join(' · '), [projects])
 
   return (
     <div className="h-full overflow-y-auto">
@@ -237,9 +249,13 @@ JSON 형태로만 응답:
         <div className="flex items-center gap-2">
           <LayoutDashboard size={15} className="text-text-primary" />
           <span className="text-[14px] font-semibold text-text-primary">대시보드</span>
-          {projectCodes && <Chip tone="neutral">{projectCodes}</Chip>}
+          {projectCodesLabel && (
+            <span title={allProjectCodes} className="inline-flex max-w-[480px]">
+              <Chip tone="neutral" className="truncate max-w-full">{projectCodesLabel}</Chip>
+            </span>
+          )}
           <div className="flex-1" />
-          <Button variant="secondary" onClick={load} leftIcon={<RotateCcw size={12} />}>
+          <Button variant="secondary" onClick={() => load(true)} leftIcon={<RotateCcw size={12} />}>
             새로고침
           </Button>
         </div>
@@ -399,6 +415,10 @@ JSON 형태로만 응답:
             <Card className="!p-[3px]">
               {focus.map((t) => {
                 const chip = CLS_CHIP[t.workflowClass] || CLS_CHIP.registered
+                // 색상(tone)은 workflowClass 기반, 라벨은 실제 워크플로우 이름 우선.
+                // 두레이는 working class 안에 "진행 중", "리뷰 중", "QA", "PM 검토" 등 다양한
+                // 워크플로우가 매핑돼있어서 class만으로는 모두 "진행 중"으로 보이는 문제.
+                const workflowLabel = t.workflow?.name?.trim() || t.workflowName?.trim() || chip.label
                 const assigneeName = '' // 현재 task에 assignee 정보 없음 — 향후 detail에서 가져올 수 있음
                 const dueStr = formatDue(t.dueDateAt)
                 const isDueToday = dueStr === '오늘'
@@ -410,7 +430,9 @@ JSON 형태로만 응답:
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 px-2 py-[5px] rounded-[5px] cursor-pointer hover:bg-bg-surface-hover transition-colors"
                   >
-                    <Chip tone={chip.tone}>{chip.label}</Chip>
+                    <span title={`workflowClass: ${t.workflowClass}`} className="inline-flex">
+                      <Chip tone={chip.tone}>{workflowLabel}</Chip>
+                    </span>
                     <span className="flex-1 text-[12px] text-text-primary truncate">{t.subject}</span>
                     {assigneeName && <Avatar name={assigneeName} size="sm" />}
                     {t.projectCode && (

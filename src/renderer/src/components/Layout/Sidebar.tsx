@@ -29,7 +29,7 @@ const NAV_GROUPS: { key: string; label: string; items: NavItem[] }[] = [
       { view: 'mcp', icon: Server, label: 'MCP 서버' },
       { view: 'skills', icon: Sparkles, label: 'Claude 스킬' },
       { view: 'ai-recommend', icon: Lightbulb, label: 'AI 추천' },
-      { view: 'sessions', icon: MessageSquare, label: '세션' },
+      { view: 'sessions', icon: MessageSquare, label: 'Claude 채팅' },
       { view: 'usage', icon: BarChart3, label: '사용량' }
     ]
   }

@@ -100,6 +100,9 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TOKEN_DELETE),
     validateToken: (): Promise<{ valid: boolean; name?: string; error?: string }> =>
       ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TOKEN_VALIDATE),
+    /** 내 organizationMemberId — 작성자 본인 검증용 */
+    myMemberId: (): Promise<string | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.DOORAY_MY_MEMBER_ID),
     projects: {
       list: (): Promise<DoorayProject[]> =>
         ipcRenderer.invoke(IPC_CHANNELS.DOORAY_PROJECTS_LIST),
@@ -113,8 +116,11 @@ const api = {
     ): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.DOORAY_FILE_FETCH, { path, context }),
     tasks: {
-      list: (projectIds?: string[]): Promise<DoorayTask[]> =>
-        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASKS_LIST, projectIds),
+      list: (projectIds?: string[], force?: boolean): Promise<DoorayTask[]> =>
+        ipcRenderer.invoke(
+          IPC_CHANNELS.DOORAY_TASKS_LIST,
+          force ? { projectIds, force: true } : projectIds
+        ),
       detail: (projectId: string, taskId: string): Promise<DoorayTaskDetail> =>
         ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_DETAIL, { projectId, taskId }),
       update: (params: DoorayTaskUpdateParams): Promise<void> =>
@@ -148,7 +154,13 @@ const api = {
         ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_UPDATE_BODY, params),
       /** 댓글 본문 수정 */
       updateComment: (params: { projectId: string; postId: string; logId: string; content: string }): Promise<void> =>
-        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_COMMENT_UPDATE, params)
+        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_COMMENT_UPDATE, params),
+      /** 태스크(커뮤니티 글) 삭제 — 본인 글만 */
+      delete: (params: { projectId: string; postId: string }): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_DELETE, params),
+      /** 댓글 삭제 — 본인 댓글만 */
+      deleteComment: (params: { projectId: string; postId: string; logId: string }): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_COMMENT_DELETE, params)
     },
     wiki: {
       domains: (): Promise<Array<{ id: string; name: string; type: string }>> =>
@@ -186,6 +198,8 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_SAVE_OUTPUT, id),
     restoreSaved: (): Promise<Array<{ meta: { id: string; name: string; cwd: string }; output: string }>> =>
       ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_RESTORE),
+    rename: (id: string, name: string): Promise<boolean> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_RENAME, { id, name }),
     onOutput: (callback: (payload: { id: string; data: string }) => void): (() => void) =>
       subscribeTerminalOutput(callback)
   },
@@ -202,7 +216,22 @@ const api = {
       const handler = (_: unknown, ev: import('../shared/types/claude-chat').ClaudeChatEvent): void => cb(ev)
       ipcRenderer.on(IPC_CHANNELS.CLAUDE_CHAT_EVENT, handler)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.CLAUDE_CHAT_EVENT, handler)
-    }
+    },
+    /** 디스크에 남은 Claude Code 세션 목록 (cwd 미지정 시 전 프로젝트) */
+    sessionList: (cwd?: string): Promise<import('../main/claude/ClaudeSessionService').ClaudeSessionMeta[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_SESSION_LIST, cwd),
+    /** 특정 세션의 user/assistant 메시지 시간순 로드 */
+    sessionLoad: (sessionId: string, cwd: string): Promise<import('../main/claude/ClaudeSessionService').ClaudeSessionMessage[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_SESSION_LOAD, { sessionId, cwd }),
+    /** 세션 사용자 정의 이름 변경 (빈 문자열이면 제거) */
+    sessionRename: (sessionId: string, title: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_SESSION_RENAME, { sessionId, title }),
+    /** 세션 즐겨찾기 토글 */
+    sessionStar: (sessionId: string, starred: boolean): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_SESSION_STAR, { sessionId, starred }),
+    /** 채팅 첨부 파일 저장 → 절대 경로 반환 (drag-drop 시 path 가 이미 있으면 호출 불필요, paste 이미지에 사용) */
+    saveAttachment: (name: string, data: ArrayBuffer | Uint8Array): Promise<string> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_ATTACHMENT_SAVE, { name, data })
   },
 
   // AI
@@ -355,6 +384,34 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.DOORAY_MESSENGER_SEND, { channelId, text, organizationId }),
     composeWithAI: (instruction: string, channelName?: string, requestId?: string): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_COMPOSE_MESSAGE, { instruction, channelName, requestId })
+  },
+
+  // Dooray Bot (Socket Mode WebSocket) — 두레이 API 토큰을 그대로 재사용. 도메인만 별도 입력.
+  bot: {
+    getConfig: (): Promise<{ domain: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOT_GET_CONFIG),
+    setConfig: (
+      payload: { domain?: string }
+    ): Promise<{ state: string; lastError: string | null; ready: boolean }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOT_SET_CONFIG, payload),
+    getStatus: (): Promise<{ state: string; lastError: string | null; ready: boolean }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOT_GET_STATUS),
+    start: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.BOT_START),
+    stop: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.BOT_STOP),
+    onStateUpdate: (callback: (status: { state: string; lastError: string | null; ready: boolean }) => void): (() => void) => {
+      const handler = (_: IpcRendererEvent, status: { state: string; lastError: string | null; ready: boolean }): void =>
+        callback(status)
+      ipcRenderer.on(IPC_CHANNELS.BOT_STATE_UPDATE, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.BOT_STATE_UPDATE, handler)
+    },
+    onEvent: (
+      callback: (ev: { type: string; service: string; action: string; text?: string; channelId?: string; senderId?: string; logId?: string; sentAt?: string; content?: Record<string, unknown> }) => void
+    ): (() => void) => {
+      const handler = (_: IpcRendererEvent, ev: { type: string; service: string; action: string; text?: string; channelId?: string; senderId?: string; logId?: string; sentAt?: string; content?: Record<string, unknown> }): void =>
+        callback(ev)
+      ipcRenderer.on(IPC_CHANNELS.BOT_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.BOT_EVENT, handler)
+    }
   },
 
   // Watcher (채널 모니터링)

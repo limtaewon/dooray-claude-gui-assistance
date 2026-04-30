@@ -11,9 +11,12 @@ import { TaskService } from './dooray/TaskService'
 import { WikiService } from './dooray/WikiService'
 import { CalendarService } from './dooray/CalendarService'
 import { MessengerService } from './dooray/MessengerService'
+import { BotService } from './dooray/socket-mode/BotService'
 import { WatcherService } from './watcher/WatcherService'
 import { AIService, setUserAnthropicApiKey, getClaudeBin } from './ai/AIService'
 import { ClaudeChatService } from './claude/ClaudeChatService'
+import { ClaudeSessionService } from './claude/ClaudeSessionService'
+import { AttachmentService } from './claude/AttachmentService'
 import Store from 'electron-store'
 import { TerminalManager } from './terminal/TerminalManager'
 import { SkillStore } from './skills/SkillStore'
@@ -49,17 +52,21 @@ sharedSkills.setMyMemberIdResolver(() =>
 const calendarService = new CalendarService(doorayClient)
 const messengerService = new MessengerService(doorayClient)
 sharedSkills.setMemberNameResolver((id) => messengerService.getMemberName(id))
+const botService = new BotService(doorayClient)
 const watcherService = new WatcherService(messengerService)
 const aiService = new AIService()
 const claudeChat = new ClaudeChatService(getClaudeBin())
+const claudeSessions = new ClaudeSessionService()
+const claudeAttachments = new AttachmentService()
 const store = new Store({ name: 'clauday-data' })
 const terminalManager = new TerminalManager()
 const skillStore = new SkillStore()
 const gitService = new GitService()
 const analyticsService = new AnalyticsService()
 
-// AI에 Dooray 컨텍스트를 제공하기 위한 캐시
-let cachedTasks: DoorayTask[] = []
+// (이전에는 브리핑/보고서 사이에 cachedTasks를 공유했지만, 두레이 측에서 상태가
+// 바뀐 뒤에도 stale 데이터가 남아 보고서가 옛 상태를 출력하는 버그가 있었다.
+// 이제 매 호출 시 항상 fresh fetch한다 — 이슈 #5)
 
 function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
@@ -90,6 +97,15 @@ function createWindow(): BrowserWindow {
   taskService.setCustomProjectIds(customIds)
   watcherService.setMainWindow(mainWindow)
   watcherService.start()
+  // 두레이 봇 (Socket Mode WebSocket) — 토큰/도메인이 설정돼있고 enabled면 부팅 시 자동 시작
+  botService.setMainWindow(mainWindow)
+  // 들어오는 메시지를 와처에 실시간 전달 (폴링과 공존, dedup 자동)
+  botService.addEventListener((ev) => {
+    void watcherService.handleSocketEvent(ev).catch((err) =>
+      console.error('[WatcherService] handleSocketEvent 실패:', err)
+    )
+  })
+  void botService.start().catch((err) => console.error('[BotService] start 실패:', err))
   // AI가 스킬을 system prompt에 자동으로 합치도록 연결 (enabled && autoApply 스킬만)
   aiService.setSkillLoader((target) => {
     const skills = skillStore.forTarget(target)
@@ -163,6 +179,9 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.DOORAY_TOKEN_GET, () => doorayClient.getToken())
   ipcMain.handle(IPC_CHANNELS.DOORAY_TOKEN_DELETE, () => doorayClient.deleteToken())
   ipcMain.handle(IPC_CHANNELS.DOORAY_TOKEN_VALIDATE, () => doorayClient.validateToken())
+  ipcMain.handle(IPC_CHANNELS.DOORAY_MY_MEMBER_ID, () =>
+    taskService.getMyMemberIdPublic().catch(() => null)
+  )
   ipcMain.handle(IPC_CHANNELS.DOORAY_PROJECTS_LIST, () =>
     taskService.listMyProjects()
   )
@@ -208,6 +227,18 @@ function registerIpcHandlers(): void {
     (_, params: { projectId: string; postId: string; logId: string; content: string }) =>
       taskService.updateTaskComment(params)
   )
+  // 태스크(커뮤니티 글) 삭제 — 본인 글만. 호출 측(renderer)이 senderId 비교로 사전 검증.
+  ipcMain.handle(
+    IPC_CHANNELS.DOORAY_TASK_DELETE,
+    (_, params: { projectId: string; postId: string }) =>
+      taskService.deleteTask(params)
+  )
+  // 댓글 삭제 — 본인 댓글만.
+  ipcMain.handle(
+    IPC_CHANNELS.DOORAY_TASK_COMMENT_DELETE,
+    (_, params: { projectId: string; postId: string; logId: string }) =>
+      taskService.deleteTaskComment(params)
+  )
   // 커뮤니티: 게시글 목록
   ipcMain.handle(
     IPC_CHANNELS.DOORAY_COMMUNITY_POSTS,
@@ -225,6 +256,24 @@ function registerIpcHandlers(): void {
     (_, { channelId, text, organizationId }: { channelId: string; text: string; organizationId?: string }) =>
       messengerService.sendMessage(channelId, text, organizationId)
   )
+
+  // 두레이 봇 (Socket Mode WebSocket) — 도메인 입력만으로 자동 활성
+  ipcMain.handle(IPC_CHANNELS.BOT_GET_CONFIG, () => ({
+    domain: botService.getDomain()
+  }))
+  ipcMain.handle(
+    IPC_CHANNELS.BOT_SET_CONFIG,
+    async (_, payload: { domain?: string }) => {
+      if (typeof payload.domain === 'string') {
+        botService.setDomain(payload.domain)
+      }
+      await botService.restart()
+      return botService.getStatus()
+    }
+  )
+  ipcMain.handle(IPC_CHANNELS.BOT_GET_STATUS, () => botService.getStatus())
+  ipcMain.handle(IPC_CHANNELS.BOT_START, () => botService.start())
+  ipcMain.handle(IPC_CHANNELS.BOT_STOP, () => botService.stop())
   // AI: 메신저 메시지 정리/생성
   ipcMain.handle(
     IPC_CHANNELS.AI_COMPOSE_MESSAGE,
@@ -289,8 +338,15 @@ function registerIpcHandlers(): void {
     }
     return dataUrl
   })
-  ipcMain.handle(IPC_CHANNELS.DOORAY_TASKS_LIST, (_, projectIds?: string[]) =>
-    taskService.listMyTasks(projectIds)
+  ipcMain.handle(
+    IPC_CHANNELS.DOORAY_TASKS_LIST,
+    (_, payload?: string[] | { projectIds?: string[]; force?: boolean }) => {
+      // 구버전 호환: payload가 string[]이면 캐시 사용. 객체면 force 옵션 적용.
+      if (Array.isArray(payload) || payload === undefined) {
+        return taskService.listMyTasks(payload)
+      }
+      return taskService.listMyTasks(payload.projectIds, payload.force === true)
+    }
   )
   ipcMain.handle(IPC_CHANNELS.DOORAY_TASKS_CC, (_, projectIds?: string[]) =>
     taskService.listMyCcTasks(projectIds)
@@ -334,6 +390,17 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.TERMINAL_SAVE_OUTPUT, (_, id: string) => terminalManager.getOutput(id))
   ipcMain.handle(IPC_CHANNELS.TERMINAL_RESTORE, () => {
     return store.get('terminalSessions', []) as Array<{ meta: { id: string; name: string; cwd: string }; output: string }>
+  })
+  ipcMain.handle(IPC_CHANNELS.TERMINAL_RENAME, (_, { id, name }: { id: string; name: string }) => {
+    const ok = terminalManager.setName(id, name)
+    // 즉시 자동 저장 한 번 더 (다음 30초 폴링 전에 종료돼도 이름 보존되게)
+    if (ok) {
+      try {
+        const sessions = terminalManager.exportSessions()
+        if (sessions.length > 0) store.set('terminalSessions', sessions)
+      } catch { /* ok */ }
+    }
+    return ok
   })
 
   // Claude Code Task Bridge - 태스크 컨텍스트로 Claude Code 세션 시작
@@ -383,6 +450,31 @@ function registerIpcHandlers(): void {
     claudeChat.cancel(chatId)
     return true
   })
+  ipcMain.handle(IPC_CHANNELS.CLAUDE_SESSION_LIST, async (_, cwd?: string) =>
+    claudeSessions.listSessions(cwd)
+  )
+  ipcMain.handle(
+    IPC_CHANNELS.CLAUDE_SESSION_LOAD,
+    async (_, { sessionId, cwd }: { sessionId: string; cwd: string }) =>
+      claudeSessions.loadSession(sessionId, cwd)
+  )
+  ipcMain.handle(
+    IPC_CHANNELS.CLAUDE_SESSION_RENAME,
+    async (_, { sessionId, title }: { sessionId: string; title: string }) => {
+      claudeSessions.setCustomTitle(sessionId, title)
+    }
+  )
+  ipcMain.handle(
+    IPC_CHANNELS.CLAUDE_SESSION_STAR,
+    async (_, { sessionId, starred }: { sessionId: string; starred: boolean }) => {
+      claudeSessions.setStarred(sessionId, starred)
+    }
+  )
+  ipcMain.handle(
+    IPC_CHANNELS.CLAUDE_ATTACHMENT_SAVE,
+    async (_, { name, data }: { name: string; data: ArrayBuffer | Uint8Array }) =>
+      claudeAttachments.save(name, data)
+  )
 
   // AI
   ipcMain.handle(IPC_CHANNELS.AI_AVAILABLE, () => aiService.isAvailable())
@@ -433,8 +525,9 @@ function registerIpcHandlers(): void {
         emit(`🧠 스킬 ${briefingSkills.length}개 + MCP ${mcpServers?.length || 0}개 → AI가 직접 데이터 수집`)
       } else {
         // 각 Dooray 호출을 병렬 실행하되, 진행상황은 개별 emit
+        // 브리핑은 "지금 시점"의 상태를 보여줘야 하므로 항상 force=true
         emit('📋 담당 태스크 조회 중...')
-        const tasksP = taskService.listMyTasks().then((r) => {
+        const tasksP = taskService.listMyTasks(undefined, true).then((r) => {
           emit(`✓ 담당 태스크 ${r.length}개`)
           return r
         })
@@ -464,7 +557,6 @@ function registerIpcHandlers(): void {
           })
 
         ;[tasks, ccTasks, dueTodayTasks, events] = await Promise.all([tasksP, ccP, dueP, eventsP])
-        cachedTasks = tasks
       }
 
       if (hasActiveSkill) emit(`🔍 스킬 ${briefingSkills.length}개 자동 적용`)
@@ -493,7 +585,8 @@ function registerIpcHandlers(): void {
   )
   ipcMain.handle(IPC_CHANNELS.AI_GENERATE_REPORT, async (_, { type, requestId, mcpServers }: { type: 'daily' | 'weekly'; requestId?: string; mcpServers?: string[] }) => {
     try {
-      const tasks = cachedTasks.length > 0 ? cachedTasks : await taskService.listMyTasks()
+      // 보고서는 두레이에서 변경된 최신 상태를 즉시 반영해야 한다 (이슈 #5)
+      const tasks = await taskService.listMyTasks(undefined, true)
       const now = new Date()
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
       const endOfWeek = new Date(startOfDay.getTime() + 7 * 24 * 60 * 60 * 1000)
@@ -1047,6 +1140,8 @@ app.on('before-quit', () => {
 app.on('window-all-closed', () => {
   configWatcher.stop()
   terminalManager.dispose()
+  claudeChat.dispose()
+  void botService.stop()
   if (process.platform !== 'darwin') {
     app.quit()
   }
