@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, dialog, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, dialog, Menu, powerMonitor } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { McpConfigManager } from './config/McpConfigManager'
@@ -1382,6 +1382,14 @@ app.whenReady().then(() => {
   registerIpcHandlers()
   configWatcher.start()
   createWindow()
+
+  // 시스템 스립 → 깨어남 시 renderer 에 알려 자동 동기화 즉시 catch-up.
+  // setInterval 은 스립 동안 멈추므로, 깨어난 직후 한 번 트리거해 다음 인터벌까지 안 기다리게 함.
+  powerMonitor.on('resume', () => {
+    BrowserWindow.getAllWindows().forEach((w) => {
+      if (!w.isDestroyed()) w.webContents.send(IPC_CHANNELS.SYSTEM_RESUME)
+    })
+  })
 
   // 터미널 세션 30초마다 자동 저장
   setInterval(() => {

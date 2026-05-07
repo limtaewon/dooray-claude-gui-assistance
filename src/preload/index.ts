@@ -499,6 +499,13 @@ const api = {
       callback(payload)
     ipcRenderer.on(IPC_CHANNELS.CONFIG_CHANGED, handler)
     return () => ipcRenderer.removeListener(IPC_CHANNELS.CONFIG_CHANGED, handler)
+  },
+
+  /** 시스템 스립 → 깨어남 이벤트 — 자동 동기화/와처 catch-up 용 */
+  onSystemResume: (callback: () => void): (() => void) => {
+    const handler = (): void => callback()
+    ipcRenderer.on(IPC_CHANNELS.SYSTEM_RESUME, handler)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.SYSTEM_RESUME, handler)
   }
 }
 

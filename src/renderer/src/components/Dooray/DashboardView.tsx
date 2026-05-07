@@ -119,10 +119,12 @@ function DashboardView(): JSX.Element {
   useEffect(() => { load() }, [load])
 
   // 자동 동기화 인터벌 — autoSyncMin > 0 일 때만 활성. force=true 로 캐시 우회.
+  // 시스템 스립 동안 setInterval 이 멈추므로, powerMonitor.resume 이벤트로 깨어난 직후 1회 catch-up.
   useEffect(() => {
     if (autoSyncMin <= 0) return
     const id = setInterval(() => { void load(true) }, autoSyncMin * 60_000)
-    return () => clearInterval(id)
+    const offResume = window.api.onSystemResume(() => { void load(true) })
+    return () => { clearInterval(id); offResume() }
   }, [autoSyncMin, load])
 
   const setAndSaveAutoSync = (min: number): void => {
@@ -299,7 +301,7 @@ JSON 형태로만 응답:
               leftIcon={<Timer size={12} />}
               title="자동 동기화 주기"
             >
-              {autoSyncMin > 0 ? `${autoSyncMin}분마다` : '자동 동기화'}
+              {autoSyncMin > 0 ? (autoSyncMin >= 60 ? `${autoSyncMin / 60}시간마다` : `${autoSyncMin}분마다`) : '자동 동기화'}
             </Button>
             {autoSyncMenuOpen && (
               <>
@@ -307,10 +309,11 @@ JSON 형태로만 응답:
                 <div className="ds-menu" style={{ top: 'calc(100% + 4px)', right: 0, minWidth: 140, zIndex: 40 }}>
                   {[
                     { v: 0, label: '끔' },
-                    { v: 1, label: '1분' },
                     { v: 5, label: '5분' },
                     { v: 15, label: '15분' },
-                    { v: 30, label: '30분' }
+                    { v: 30, label: '30분' },
+                    { v: 60, label: '1시간' },
+                    { v: 180, label: '3시간' }
                   ].map((opt) => (
                     <div
                       key={opt.v}

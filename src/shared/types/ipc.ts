@@ -31,6 +31,8 @@ export const IPC_CHANNELS = {
   DOORAY_TASKS_LIST: 'dooray:tasks:list',
   DOORAY_TASKS_CC: 'dooray:tasks:cc',
   DOORAY_TASKS_UPDATE: 'dooray:tasks:update',
+  /** 스립 → 깨어남 이벤트 — 자동 동기화/와처 등이 즉시 1회 catch-up 하기 위함 */
+  SYSTEM_RESUME: 'system:resume',
   /** 사용자 지정 위키 페이지를 parent 로 쓰는 채널 */
   DOORAY_WIKI_STORAGE_LIST: 'dooray:wiki:storage:list',
   DOORAY_WIKI_STORAGE_GET: 'dooray:wiki:storage:get',
