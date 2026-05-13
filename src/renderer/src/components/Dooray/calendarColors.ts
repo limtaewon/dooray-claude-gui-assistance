@@ -65,13 +65,21 @@ export function resolveCalendarHex(
   return COLOR_PALETTE[hashIndex(calId)]
 }
 
+/**
+ * 외부에서 들어온 hex(CalDAV calendar-color, 사용자 override)는 hue로만 사용.
+ * surface/text 토큰과 color-mix로 섞어 라이트/다크 모두 가독성 확보.
+ *  - barBg: 채워진 단색 배경(이벤트 막대) — 흰 글씨가 올라가므로 hex 그대로
+ *  - softBg: 옅은 tint 배경 — surface와 14% 섞어 자동 모드 대응
+ *  - softText: 항상 var(--text-primary) — hex를 글자색으로 박지 않음
+ *  - dotBg: 살짝 진하게 — text-secondary와 75% 섞어 안정감
+ */
 export function styleFromHex(hex: string): ColorStyle {
   return {
     barBg: hex,
     barText: '#ffffff',
-    softBg: `${hex}26`, // ~15% alpha
-    softText: hex,
-    dotBg: hex
+    softBg: `color-mix(in oklab, ${hex} 14%, var(--bg-surface))`,
+    softText: 'var(--text-primary)',
+    dotBg: `color-mix(in oklab, ${hex} 75%, var(--text-secondary))`
   }
 }
 

@@ -635,17 +635,24 @@ function TagPickerSection({ tags, selectedIds, onChange, onAiSuggest }: TagPicke
             <div className="flex flex-wrap gap-1 flex-1">
               {items.map((tag) => {
                 const selected = selectedIds.includes(tag.id)
+                // 외부에서 들어온 hex는 hue로만 사용 — color-mix로 surface와 섞고
+                // 글자색은 var(--text-primary)로 가독성 보장 (라이트/다크 둘 다 자동)
+                const hex = `#${tag.color}`
                 return (
                   <button
                     key={tag.id}
                     type="button"
                     onClick={() => toggle(tag.id)}
-                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
-                      selected
-                        ? 'border-clover-orange bg-clover-orange/15 text-text-primary'
-                        : 'border-bg-border text-text-secondary hover:border-clover-orange/50'
-                    }`}
-                    style={selected ? undefined : { color: `#${tag.color}` }}
+                    className="text-[10px] px-2 py-0.5 rounded-full border transition-colors"
+                    style={{
+                      background: selected
+                        ? `color-mix(in oklab, ${hex} 35%, var(--bg-surface))`
+                        : `color-mix(in oklab, ${hex} 14%, var(--bg-surface))`,
+                      borderColor: selected
+                        ? `color-mix(in oklab, ${hex} 80%, var(--text-secondary))`
+                        : `color-mix(in oklab, ${hex} 55%, var(--bg-border))`,
+                      color: 'var(--text-primary)'
+                    }}
                   >
                     {tag.label}
                   </button>
