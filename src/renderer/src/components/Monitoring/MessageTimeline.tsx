@@ -31,16 +31,16 @@ function groupByDay(messages: CollectedMessage[]): { label: string; items: Colle
   return Object.entries(groups).map(([label, items]) => ({ label, items }))
 }
 
-/** 이름 기반 결정론적 아바타 색상 */
+/** 이름 기반 결정론적 아바타 색상 — v2 avatar 페어 토큰. 라이트/다크 자동 전환 */
 const AVATAR_COLORS = [
-  { bg: 'rgba(59,130,246,0.15)', text: '#2563eb' },
-  { bg: 'rgba(239,68,68,0.15)',  text: '#dc2626' },
-  { bg: 'rgba(34,197,94,0.15)',  text: '#16a34a' },
-  { bg: 'rgba(245,158,11,0.15)', text: '#d97706' },
-  { bg: 'rgba(168,85,247,0.15)', text: '#9333ea' },
-  { bg: 'rgba(6,182,212,0.15)',  text: '#0891b2' },
-  { bg: 'rgba(249,115,22,0.15)', text: '#ea580c' },
-  { bg: 'rgba(132,204,22,0.15)', text: '#65a30d' }
+  { bg: 'var(--avatar-1-bg)', text: 'var(--avatar-1-fg)' },
+  { bg: 'var(--avatar-2-bg)', text: 'var(--avatar-2-fg)' },
+  { bg: 'var(--avatar-3-bg)', text: 'var(--avatar-3-fg)' },
+  { bg: 'var(--avatar-4-bg)', text: 'var(--avatar-4-fg)' },
+  { bg: 'var(--avatar-5-bg)', text: 'var(--avatar-5-fg)' },
+  { bg: 'var(--avatar-6-bg)', text: 'var(--avatar-6-fg)' },
+  { bg: 'var(--avatar-7-bg)', text: 'var(--avatar-7-fg)' },
+  { bg: 'var(--avatar-8-bg)', text: 'var(--avatar-8-fg)' }
 ]
 
 function avatarColor(name: unknown): { bg: string; text: string } {

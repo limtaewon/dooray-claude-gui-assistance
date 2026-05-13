@@ -64,6 +64,10 @@
   /* app font scaling hook (useFontSettings에서 덮어씀) */
   --app-font-scale: 1;
   --app-font-family: var(--font-ui);
+
+  /* AI gradient — 모드 무관 single source of truth (v2) */
+  --ai-gradient:            linear-gradient(135deg, var(--clover-orange-light) 0%, var(--clover-blue-light) 100%);
+  --ai-gradient-horizontal: linear-gradient(90deg, var(--clover-orange) 0%, var(--clover-blue) 100%);
 }
 
 /* ============================================================
@@ -83,7 +87,7 @@
   --bg-active:         #DDE0E6;
   --bg-border:         #DDE0E6;
   --bg-border-light:   #C5C9D2;
-  --bg-border-strong:  #C5C9D2;
+  --bg-border-strong:  #A4ABB8;
 
   /* 텍스트 (3단) */
   --text-primary:      #161A22;
@@ -119,6 +123,9 @@
   --c-yellow-bg:     #FEF3C7;
   --c-yellow-fg:     #92400E;
   --c-yellow-solid:  #CA8A04;
+  --c-neutral-bg:    #EEF0F4;
+  --c-neutral-fg:    #525A6B;
+  --c-neutral-solid: #8A91A0;
 
   /* 기타 */
   --link:                var(--c-blue-fg);
@@ -135,6 +142,60 @@
   --shadow-md:      0 4px 14px rgba(17,24,39,0.07);
   --shadow-lg:      0 12px 40px rgba(17,24,39,0.10), 0 4px 12px rgba(17,24,39,0.06);
   --shadow-raised:  var(--shadow-md);
+
+  /* ---------- v2 신규 ---------- */
+
+  /* Elevation 시맨틱 별칭 */
+  --elev-0: none;
+  --elev-1: var(--shadow-sm);     /* card, raised tile */
+  --elev-2: var(--shadow-md);     /* dropdown, popover, sticky bar */
+  --elev-3: var(--shadow-lg);     /* modal, command palette */
+
+  /* Focus / selection rings */
+  --ring-focus-color:    rgba(37,99,235,0.30);
+  --ring-focus:          0 0 0 3px var(--ring-focus-color);
+  --ring-error-color:    rgba(220,38,38,0.25);
+  --ring-error:          0 0 0 3px var(--ring-error-color);
+  --ring-selected-color: rgba(234,88,12,0.65);
+  --ring-selected:       0 0 0 2px var(--ring-selected-color);
+
+  /* Disabled */
+  --bg-disabled:     #EEF0F4;
+  --text-disabled:   #B0B6C2;
+  --border-disabled: #DDE0E6;
+
+  /* Workflow status — 두레이 워크플로 색상 매핑 */
+  --wf-backlog-bg:    var(--c-neutral-bg); --wf-backlog-fg:    var(--c-neutral-fg);  --wf-backlog-dot:    #8A91A0;
+  --wf-registered-bg: var(--c-orange-bg);  --wf-registered-fg: var(--c-orange-fg);   --wf-registered-dot: #EA580C;
+  --wf-working-bg:    var(--c-blue-bg);    --wf-working-fg:    var(--c-blue-fg);     --wf-working-dot:    #2563EB;
+  --wf-resolved-bg:   var(--c-emerald-bg); --wf-resolved-fg:   var(--c-emerald-fg);  --wf-resolved-dot:   #16A34A;
+  --wf-closed-bg:     #E5E7EB;             --wf-closed-fg:     #6B7280;              --wf-closed-dot:     #9CA3AF;
+  --wf-overdue-bg:    var(--c-red-bg);     --wf-overdue-fg:    var(--c-red-fg);      --wf-overdue-dot:    #DC2626;
+
+  /* Chart — series & chrome */
+  --chart-1: #2563EB;
+  --chart-2: #EA580C;
+  --chart-3: #16A34A;
+  --chart-4: #7C3AED;
+  --chart-5: #DC2626;
+  --chart-6: #CA8A04;
+  --chart-grid:           #E2E8F0;
+  --chart-tick:           #64748B;
+  --chart-axis:           #CBD5E1;
+  --chart-tooltip-bg:     #FFFFFF;
+  --chart-tooltip-border: #DCE3ED;
+  --chart-tooltip-text:   #0F172A;
+  --chart-area-opacity:   0.12;
+
+  /* Avatar 8색 페어 — bg/fg 모두 AA 보장 */
+  --avatar-1-bg: #E1EBFC; --avatar-1-fg: #1D4ED8;
+  --avatar-2-bg: #FCE5E5; --avatar-2-fg: #B91C1C;
+  --avatar-3-bg: #DCFCE7; --avatar-3-fg: #15803D;
+  --avatar-4-bg: #FEF3C7; --avatar-4-fg: #92400E;
+  --avatar-5-bg: #EDE9FE; --avatar-5-fg: #5B21B6;
+  --avatar-6-bg: #CFFAFE; --avatar-6-fg: #0E7490;
+  --avatar-7-bg: #FCEADA; --avatar-7-fg: #9A3412;
+  --avatar-8-bg: #ECFCCB; --avatar-8-fg: #4D7C0F;
 }
 
 /* ============================================================
@@ -152,7 +213,7 @@
   --bg-active:         #2E343F;
   --bg-border:         #2E343F;
   --bg-border-light:   #3A4150;
-  --bg-border-strong:  #3A4150;
+  --bg-border-strong:  #4A5160;
 
   /* 순백 대신 한 단계 낮춰 눈 피로 감소 */
   --text-primary:      #ECEEF2;
@@ -186,6 +247,9 @@
   --c-yellow-bg:     rgba(250,204,21,0.16);
   --c-yellow-fg:     #FDE68A;
   --c-yellow-solid:  #EAB308;
+  --c-neutral-bg:    rgba(148,163,184,0.14);
+  --c-neutral-fg:    #CBD5E1;
+  --c-neutral-solid: #94A3B8;
 
   --link:              var(--c-blue-fg);
   --code-bg:           #1C2027;
@@ -201,6 +265,53 @@
   --shadow-md:      0 4px 14px rgba(0,0,0,0.36);
   --shadow-lg:      0 10px 24px rgba(0,0,0,0.45);
   --shadow-raised:  0 4px 16px rgba(0,0,0,0.40);
+
+  /* ---------- v2 신규 ---------- */
+  --elev-0: none;
+  --elev-1: var(--shadow-sm);
+  --elev-2: var(--shadow-md);
+  --elev-3: var(--shadow-lg);
+
+  --ring-focus-color:    rgba(96,165,250,0.40);
+  --ring-focus:          0 0 0 3px var(--ring-focus-color);
+  --ring-error-color:    rgba(248,113,113,0.35);
+  --ring-error:          0 0 0 3px var(--ring-error-color);
+  --ring-selected-color: rgba(251,146,60,0.75);
+  --ring-selected:       0 0 0 2px var(--ring-selected-color);
+
+  --bg-disabled:     #1A1D24;
+  --text-disabled:   #4A5160;
+  --border-disabled: #2E343F;
+
+  --wf-backlog-bg:    var(--c-neutral-bg);      --wf-backlog-fg:    var(--c-neutral-fg);  --wf-backlog-dot:    #94A3B8;
+  --wf-registered-bg: var(--c-orange-bg);       --wf-registered-fg: var(--c-orange-fg);   --wf-registered-dot: #FB923C;
+  --wf-working-bg:    var(--c-blue-bg);         --wf-working-fg:    var(--c-blue-fg);     --wf-working-dot:    #60A5FA;
+  --wf-resolved-bg:   var(--c-emerald-bg);      --wf-resolved-fg:   var(--c-emerald-fg);  --wf-resolved-dot:   #4ADE80;
+  --wf-closed-bg:     rgba(148,163,184,0.10);   --wf-closed-fg:     #6B7180;              --wf-closed-dot:     #6B7180;
+  --wf-overdue-bg:    var(--c-red-bg);          --wf-overdue-fg:    var(--c-red-fg);      --wf-overdue-dot:    #F87171;
+
+  --chart-1: #60A5FA;
+  --chart-2: #FB923C;
+  --chart-3: #4ADE80;
+  --chart-4: #C4B5FD;
+  --chart-5: #FCA5A5;
+  --chart-6: #FDE68A;
+  --chart-grid:           #2D3148;
+  --chart-tick:           #94A3B8;
+  --chart-axis:           #3A4150;
+  --chart-tooltip-bg:     #1C1F2E;
+  --chart-tooltip-border: #2D3148;
+  --chart-tooltip-text:   #F1F5F9;
+  --chart-area-opacity:   0.20;
+
+  --avatar-1-bg: rgba(96,165,250,0.18);  --avatar-1-fg: #93C5FD;
+  --avatar-2-bg: rgba(248,113,113,0.18); --avatar-2-fg: #FCA5A5;
+  --avatar-3-bg: rgba(74,222,128,0.18);  --avatar-3-fg: #86EFAC;
+  --avatar-4-bg: rgba(253,224,71,0.18);  --avatar-4-fg: #FDE68A;
+  --avatar-5-bg: rgba(196,181,253,0.18); --avatar-5-fg: #C4B5FD;
+  --avatar-6-bg: rgba(103,232,249,0.18); --avatar-6-fg: #67E8F9;
+  --avatar-7-bg: rgba(253,186,116,0.18); --avatar-7-fg: #FDBA74;
+  --avatar-8-bg: rgba(190,242,100,0.18); --avatar-8-fg: #BEF264;
 }
 
 /* ============================================================
@@ -259,10 +370,19 @@
 .num-xl { font-size: var(--t-24); font-weight: 700; color: var(--text-primary); line-height: 1.1; }
 .num-lg { font-size: var(--t-20); font-weight: 700; color: var(--text-primary); line-height: 1.1; }
 
-/* AI gradient text/BG (강조 스팟) */
-.ai-gradient-bg   { background: linear-gradient(90deg, var(--clover-orange), var(--clover-blue)); color:#fff; }
-.ai-gradient-text { background: linear-gradient(90deg, var(--clover-orange), var(--clover-blue));
+/* AI gradient text/BG (강조 스팟) — v2 토큰 사용 */
+.ai-gradient-bg   { background: var(--ai-gradient-horizontal); color:#fff; }
+.ai-gradient-text { background: var(--ai-gradient-horizontal);
                     -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* v2 가이드 호환 utility 클래스 (.text-* 별칭 — 점진적 마이그레이션용) */
+.t-title   { font-size: var(--t-18); font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; }
+.t-section { font-size: var(--t-14); font-weight: 600; color: var(--text-primary); }
+.t-body    { font-size: var(--t-12); font-weight: 400; color: var(--text-primary); }
+.t-meta    { font-size: var(--t-11); font-weight: 400; color: var(--text-secondary); }
+.t-caption { font-size: var(--t-10); font-weight: 400; color: var(--text-tertiary); }
+.t-label   { font-size: var(--t-10); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); }
+.t-mono    { font-family: var(--font-mono); }
 
 /* ============================================================
    xterm.js base styles

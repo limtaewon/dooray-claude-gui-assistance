@@ -51,7 +51,7 @@
   background: linear-gradient(180deg, #1E3A7F 0%, #1E3A7F 100%);
 }
 .ds-btn.ai {
-  background-image: linear-gradient(135deg, var(--clover-orange-light) 0%, var(--clover-blue-light) 100%);
+  background-image: var(--ai-gradient);
   background-color: transparent;
   color: #fff;
   border: 0;
@@ -126,7 +126,7 @@
   border-radius: 8px;
   padding: 10px;
 }
-.ds-card.raised { background: var(--bg-surface-raised); box-shadow: var(--shadow-sm); }
+.ds-card.raised { background: var(--bg-surface-raised); box-shadow: var(--elev-1); }
 .ds-card.flat   { background: transparent; border-color: var(--bg-border); }
 
 /* ---------- Inputs ---------- */
@@ -143,7 +143,7 @@
   font-family: inherit;
 }
 .ds-input::placeholder { color: var(--text-tertiary); }
-.ds-input:focus { outline: none; border-color: var(--c-blue-solid); box-shadow: 0 0 0 3px var(--c-blue-bg); }
+.ds-input:focus { outline: none; border-color: var(--c-blue-solid); box-shadow: var(--ring-focus); }
 .ds-input.sm { height: 24px; font-size: 11px; padding: 0 8px; border-radius: 5px; }
 textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-height: 1.5; }
 
@@ -231,7 +231,7 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
   background: var(--bg-surface-raised);
   border: 1px solid var(--bg-border);
   border-radius: 10px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--elev-3);
   overflow: hidden;
   animation: ds-modalIn .18s cubic-bezier(.2,.9,.2,1);
 }
@@ -285,7 +285,7 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
   border-radius: 7px;
   padding: 8px 10px 8px 12px;
   display: flex; align-items: flex-start; gap: 8px;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--elev-2);
   animation: ds-toastIn .22s cubic-bezier(.2,.8,.2,1);
 }
 .ds-toast.success { border-left-color: var(--c-emerald-solid); }
@@ -315,7 +315,7 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
   background: var(--bg-surface-raised);
   border: 1px solid var(--bg-border);
   border-radius: 10px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--elev-3);
   overflow: hidden;
   animation: ds-modalIn .18s cubic-bezier(.2,.9,.2,1);
 }
@@ -363,7 +363,7 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
   background: var(--bg-surface-raised);
   border: 1px solid var(--bg-border);
   border-radius: 7px;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--elev-2);
   padding: 4px;
   z-index: 50;
   animation: ds-modalIn .14s cubic-bezier(.2,.9,.2,1);

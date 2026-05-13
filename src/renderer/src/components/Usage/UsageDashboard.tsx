@@ -18,7 +18,19 @@ function fmt(n: number): string {
   return n.toString()
 }
 
-const COLORS = ['#3B82F6', '#FB923C', '#22C55E', '#A78BFA', '#F472B6', '#FBBF24']
+// v2 --chart-* 토큰과 동일한 값. recharts SVG props 호환 위해 hex 유지.
+const CHART_PALETTE = {
+  dark: {
+    grid: '#2D3148', tick: '#94A3B8',
+    tooltipBg: '#1C1F2E', tooltipBorder: '#2D3148', tooltipText: '#F1F5F9',
+    series: ['#60A5FA', '#FB923C', '#4ADE80', '#C4B5FD', '#FCA5A5', '#FDE68A']
+  },
+  light: {
+    grid: '#E2E8F0', tick: '#64748B',
+    tooltipBg: '#FFFFFF', tooltipBorder: '#DCE3ED', tooltipText: '#0F172A',
+    series: ['#2563EB', '#EA580C', '#16A34A', '#7C3AED', '#DC2626', '#CA8A04']
+  }
+}
 
 function UsageDashboard(): JSX.Element {
   const { theme } = useTheme()
@@ -28,14 +40,9 @@ function UsageDashboard(): JSX.Element {
   const [insightReport, setInsightReport] = useState<string | null>(null)
   const [insightLoading, setInsightLoading] = useState(false)
 
-  // 차트 축/그리드/툴팁 색상 — 테마별
-  const chart = useMemo(() => theme === 'dark' ? {
-    grid: '#374151', tick: '#9CA3AF',
-    tooltipBg: '#1F2937', tooltipBorder: '#374151', tooltipText: '#F9FAFB'
-  } : {
-    grid: '#E2E8F0', tick: '#64748B',
-    tooltipBg: '#FFFFFF', tooltipBorder: '#DCE3ED', tooltipText: '#0F172A'
-  }, [theme])
+  // 차트 색상 — v2 chart 토큰과 일치, 테마별 자동 전환
+  const chart = useMemo(() => theme === 'dark' ? CHART_PALETTE.dark : CHART_PALETTE.light, [theme])
+  const COLORS = chart.series
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -162,9 +169,9 @@ function UsageDashboard(): JSX.Element {
               <YAxis tick={{ fill: chart.tick, fontSize: 10 }} tickFormatter={fmt} />
               <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => fmt(v)} />
               <Legend wrapperStyle={{ fontSize: 10 }} />
-              <Bar dataKey="입력" fill="#3B82F6" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="출력" fill="#FB923C" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="캐시" fill="#22C55E" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="입력" fill={COLORS[0]} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="출력" fill={COLORS[1]} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="캐시" fill={COLORS[2]} radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -178,7 +185,7 @@ function UsageDashboard(): JSX.Element {
               <XAxis dataKey="date" tick={{ fill: chart.tick, fontSize: 10 }} />
               <YAxis tick={{ fill: chart.tick, fontSize: 10 }} tickFormatter={(v) => `$${v}`} />
               <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => `$${v}`} />
-              <Area type="monotone" dataKey="비용" stroke="#FB923C" fill="#FB923C" fillOpacity={0.15} strokeWidth={2} />
+              <Area type="monotone" dataKey="비용" stroke={COLORS[1]} fill={COLORS[1]} fillOpacity={theme === 'dark' ? 0.20 : 0.12} strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -208,7 +215,7 @@ function UsageDashboard(): JSX.Element {
               <XAxis dataKey="시간" tick={{ fill: chart.tick, fontSize: 9 }} interval={2} />
               <YAxis tick={{ fill: chart.tick, fontSize: 10 }} />
               <Tooltip contentStyle={tooltipStyle} />
-              <Bar dataKey="호출수" fill="#A78BFA" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="호출수" fill={COLORS[3]} radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

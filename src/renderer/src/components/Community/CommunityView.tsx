@@ -38,16 +38,16 @@ function getInitials(name: string): string {
   return name.slice(0, 2).toUpperCase()
 }
 
-/** 이름 기반 결정론적 색상 — rgba tint로 라이트/다크 모두 대응 */
+/** 이름 기반 결정론적 색상 — v2 avatar 페어 토큰. 라이트/다크 자동 전환 */
 const AVATAR_COLORS = [
-  { bg: 'rgba(59,130,246,0.15)', text: '#2563eb', ring: '#3b82f6' },
-  { bg: 'rgba(239,68,68,0.15)',  text: '#dc2626', ring: '#ef4444' },
-  { bg: 'rgba(34,197,94,0.15)',  text: '#16a34a', ring: '#22c55e' },
-  { bg: 'rgba(245,158,11,0.15)', text: '#d97706', ring: '#f59e0b' },
-  { bg: 'rgba(168,85,247,0.15)', text: '#9333ea', ring: '#a855f7' },
-  { bg: 'rgba(6,182,212,0.15)',  text: '#0891b2', ring: '#06b6d4' },
-  { bg: 'rgba(249,115,22,0.15)', text: '#ea580c', ring: '#f97316' },
-  { bg: 'rgba(132,204,22,0.15)', text: '#65a30d', ring: '#84cc16' }
+  { bg: 'var(--avatar-1-bg)', text: 'var(--avatar-1-fg)', ring: 'var(--avatar-1-fg)' },
+  { bg: 'var(--avatar-2-bg)', text: 'var(--avatar-2-fg)', ring: 'var(--avatar-2-fg)' },
+  { bg: 'var(--avatar-3-bg)', text: 'var(--avatar-3-fg)', ring: 'var(--avatar-3-fg)' },
+  { bg: 'var(--avatar-4-bg)', text: 'var(--avatar-4-fg)', ring: 'var(--avatar-4-fg)' },
+  { bg: 'var(--avatar-5-bg)', text: 'var(--avatar-5-fg)', ring: 'var(--avatar-5-fg)' },
+  { bg: 'var(--avatar-6-bg)', text: 'var(--avatar-6-fg)', ring: 'var(--avatar-6-fg)' },
+  { bg: 'var(--avatar-7-bg)', text: 'var(--avatar-7-fg)', ring: 'var(--avatar-7-fg)' },
+  { bg: 'var(--avatar-8-bg)', text: 'var(--avatar-8-fg)', ring: 'var(--avatar-8-fg)' }
 ]
 
 function avatarColor(name: string): { bg: string; text: string; ring: string } {
