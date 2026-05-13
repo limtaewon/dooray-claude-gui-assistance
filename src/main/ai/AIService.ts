@@ -489,7 +489,6 @@ ${skillBlock}`
       summarizeTask: 'task',
       briefing: 'briefing',
       report: 'report',
-      meetingNote: 'calendar',
       calendarAnalysis: 'calendar',
       sessionSummary: 'insights',
       generateSkill: 'all',
@@ -1070,14 +1069,4 @@ ${mcpBlock}
     return final
   }
 
-  async generateMeetingNote(eventSubject: string, eventDescription?: string, attendees?: string[], requestId?: string): Promise<string> {
-    const prompt = `회의록 템플릿을 마크다운으로 생성.\n회의명: ${eventSubject}\n${eventDescription ? '설명: ' + eventDescription : ''}\n${attendees?.length ? '참석자: ' + attendees.join(', ') : ''}`
-
-    const result = await this.runWithProgress(requestId, '회의록 생성 중...', buildArgs(prompt, {
-      model: this.pickModel('meetingNote', 'haiku'),
-      systemPrompt: this.buildSystemPrompt('회의록 템플릿 생성 AI. 구조화된 회의록을 작성합니다.', 'calendar'),
-      maxBudget: '0.1'
-    }))
-    return result.result
-  }
 }

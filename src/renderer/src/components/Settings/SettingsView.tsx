@@ -1,20 +1,32 @@
 import { useState, useEffect } from 'react'
-import { Check, Cpu, Key, Eye, EyeOff, ExternalLink, SlidersHorizontal, LogOut, BarChart2, Moon, Sun, Type } from 'lucide-react'
+import { Check, Cpu, Key, Eye, EyeOff, ExternalLink, SlidersHorizontal, LogOut, BarChart2, Moon, Sun, Type, CalendarDays, Loader2, AlertCircle } from 'lucide-react'
 import type { AIModelConfig, AIModelName } from '../../../../shared/types/ai'
 import UsageInsights from './UsageInsights'
 import { useTheme } from '../../hooks/useTheme'
 import { useFontSettings, FONT_FAMILY_LABELS, type FontFamily } from '../../hooks/useFontSettings'
 import ThemePicker from './ThemePicker'
+import { Modal } from '../common/ds'
 
-type SettingsTab = 'models' | 'dooray' | 'app' | 'insights'
+type SettingsTab = 'models' | 'dooray' | 'caldav' | 'app' | 'insights'
 
 function SettingsView(): JSX.Element {
   const [activeTab, setActiveTab] = useState<SettingsTab>('models')
+
+  // 다른 화면에서 특정 탭을 지정해서 이동 요청 시 반영
+  useEffect(() => {
+    const onJump = (e: Event): void => {
+      const tab = (e as CustomEvent<{ tab?: SettingsTab }>).detail?.tab
+      if (tab) setActiveTab(tab)
+    }
+    window.addEventListener('goto-settings', onJump as EventListener)
+    return () => window.removeEventListener('goto-settings', onJump as EventListener)
+  }, [])
 
   const tabs: { id: SettingsTab; icon: typeof Cpu; label: string }[] = [
     { id: 'models', icon: Cpu, label: 'AI 모델' },
     { id: 'insights', icon: BarChart2, label: '사용 인사이트' },
     { id: 'dooray', icon: Key, label: '두레이 연결' },
+    { id: 'caldav', icon: CalendarDays, label: '캘린더 연결' },
     { id: 'app', icon: SlidersHorizontal, label: '외관 & 동작' }
   ]
 
@@ -34,6 +46,7 @@ function SettingsView(): JSX.Element {
         {activeTab === 'models' && <ModelSettings />}
         {activeTab === 'insights' && <UsageInsights />}
         {activeTab === 'dooray' && <DoorayTokenSettings />}
+        {activeTab === 'caldav' && <CalDAVSettings />}
         {activeTab === 'app' && <AppBehaviorSettings />}
       </div>
     </div>
@@ -58,7 +71,6 @@ const MODEL_FEATURES: ModelFeatureDef[] = [
   { key: 'wikiStructure', label: '위키 구조 분석', description: '구조 및 개선 방안 제안', defaultModel: 'sonnet' },
   { key: 'summarizeTask', label: '태스크 요약', description: '3줄 핵심 요약', defaultModel: 'haiku' },
   // AI 스킬 생성은 품질 우선 — 항상 Opus 고정 (SettingsView 노출 제거)
-  { key: 'meetingNote', label: '회의록 템플릿', description: '캘린더 이벤트 기반', defaultModel: 'haiku' },
   { key: 'sessionSummary', label: '세션 요약', description: 'Claude Code 세션 대화 요약', defaultModel: 'sonnet' },
   { key: 'calendarAnalysis', label: '캘린더 분석', description: '이번 주 일정 분석', defaultModel: 'sonnet' },
   { key: 'messengerCompose', label: '메신저 메시지 작성', description: '지시사항 → 정리된 메시지', defaultModel: 'sonnet' }
@@ -293,6 +305,259 @@ function DoorayTokenSettings(): JSX.Element {
           {saving ? '검증 중...' : '저장 및 검증'}
         </button>
       </div>
+    </div>
+  )
+}
+
+/** =========== 캘린더 연결 (CalDAV) =========== */
+function CalDAVSettings(): JSX.Element {
+  const [status, setStatus] = useState<{ connected: boolean; username: string | null } | null>(null)
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPw, setShowPw] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [saving, setSaving] = useState(false)
+  // 동기화 진행률
+  const [syncProgress, setSyncProgress] = useState<
+    | { stage: 'idle' }
+    | { stage: 'syncing'; current: number; total: number; calendarName: string }
+    | { stage: 'complete'; totalObjects: number }
+    | { stage: 'error'; message: string }
+  >({ stage: 'idle' })
+
+  useEffect(() => {
+    const off = window.api.caldav.onSyncProgress((p) => {
+      if ('stage' in p) {
+        if (p.stage === 'start') setSyncProgress({ stage: 'syncing', current: 0, total: 0, calendarName: '' })
+        else if (p.stage === 'error') setSyncProgress({ stage: 'error', message: p.message || '동기화 실패' })
+        // 'complete' 은 handleSave 안에서 처리
+      } else {
+        setSyncProgress({ stage: 'syncing', current: p.current, total: p.total, calendarName: p.calendarName })
+      }
+    })
+    return off
+  }, [])
+
+  const refreshStatus = async (): Promise<void> => {
+    const s = await window.api.caldav.status()
+    setStatus(s)
+    if (s.username) setUsername(s.username)
+  }
+
+  useEffect(() => { refreshStatus() }, [])
+
+  const handleTest = async (): Promise<void> => {
+    if (!username.trim() || !password) return
+    setTesting(true); setTestResult(null)
+    try {
+      const r = await window.api.caldav.testConnect({ username: username.trim(), password })
+      if (r.ok) {
+        setTestResult({ ok: true, message: `연결 성공 — 캘린더 ${r.calendarCount}개 발견` })
+      } else {
+        setTestResult({ ok: false, message: r.error || '연결 실패' })
+      }
+    } catch (e) {
+      setTestResult({ ok: false, message: e instanceof Error ? e.message : '연결 실패' })
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  const handleSave = async (): Promise<void> => {
+    if (!username.trim() || !password) return
+    setSaving(true); setTestResult(null)
+    try {
+      const r = await window.api.caldav.testConnect({ username: username.trim(), password })
+      if (!r.ok) {
+        setTestResult({ ok: false, message: r.error || '연결 실패 — 자격증명을 다시 확인해주세요.' })
+        return
+      }
+      await window.api.caldav.saveCredentials({ username: username.trim(), password })
+      setPassword('')
+      await refreshStatus()
+      window.dispatchEvent(new CustomEvent('caldav-status-changed'))
+      // 초기 전체 동기화 — 진행률은 onSyncProgress 로 받음
+      const syncResult = await window.api.caldav.fullSync()
+      setSyncProgress({ stage: 'complete', totalObjects: syncResult.totalObjects })
+      setTestResult({ ok: true, message: `연결 + 동기화 완료 — 일정 ${syncResult.totalObjects}건` })
+    } catch (e) {
+      setTestResult({ ok: false, message: e instanceof Error ? e.message : '저장 실패' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDisconnect = async (): Promise<void> => {
+    if (!window.confirm('CalDAV 연결을 해제할까요? 저장된 자격증명이 삭제됩니다.')) return
+    await window.api.caldav.disconnect()
+    setPassword('')
+    setTestResult(null)
+    await refreshStatus()
+    window.dispatchEvent(new CustomEvent('caldav-status-changed'))
+  }
+
+  return (
+    <div className="p-6 max-w-2xl mx-auto">
+      <div className="mb-4">
+        <h3 className="text-sm font-semibold text-text-primary">두레이 캘린더 (CalDAV)</h3>
+        <p className="text-[10px] text-text-tertiary mt-0.5">
+          두레이의 CalDAV 엔드포인트로 일정을 양방향 동기화합니다. 비밀번호는 두레이에서 별도 발급한 CalDAV 전용 비밀번호입니다.
+        </p>
+      </div>
+
+      {/* 상태 */}
+      <div className="p-4 rounded-xl bg-bg-surface border border-bg-border mb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-text-primary font-medium">현재 연결 상태</p>
+            {status === null ? (
+              <p className="text-[10px] text-text-tertiary mt-0.5">확인 중...</p>
+            ) : status.connected ? (
+              <p className="text-[10px] text-emerald-400 mt-0.5 flex items-center gap-1">
+                <Check size={10} /> 연결됨 · {status.username}
+              </p>
+            ) : (
+              <p className="text-[10px] text-text-tertiary mt-0.5">연결되지 않음</p>
+            )}
+          </div>
+          {status?.connected && (
+            <button onClick={handleDisconnect}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 text-[11px] hover:bg-red-500/20">
+              <LogOut size={11} /> 연결 해제
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 비번 발급 안내 */}
+      <div className="p-3 rounded-xl bg-clover-blue/5 border border-clover-blue/20 mb-3">
+        <p className="text-[11px] text-text-secondary mb-2">
+          <strong className="text-text-primary">CalDAV 비밀번호 발급:</strong>
+        </p>
+        <ol className="text-[10px] text-text-tertiary list-decimal list-inside space-y-0.5">
+          <li>아래 링크에서 두레이 CalDAV 설정 페이지 접속</li>
+          <li>"비밀번호" 필드 옆 <strong>새로받기</strong> 클릭 → 비밀번호 복사</li>
+          <li>아이디(이메일)와 복사한 비밀번호를 아래에 입력</li>
+        </ol>
+        <a href="https://nhnent.dooray.com/setting/calendar/caldav" target="_blank" rel="noreferrer"
+          className="inline-flex items-center gap-1 mt-2 text-[10px] text-clover-blue hover:underline">
+          <ExternalLink size={10} /> 두레이 CalDAV 설정 페이지 열기
+        </a>
+        <p className="text-[9px] text-text-tertiary mt-2">서버: <code className="font-mono text-text-secondary">caldav.dooray.com</code> (고정)</p>
+      </div>
+
+      {/* 입력 */}
+      <div className="space-y-3">
+        <div>
+          <label className="text-[11px] font-medium text-text-secondary block mb-1.5">아이디 (이메일)</label>
+          <input
+            type="email" autoComplete="username"
+            value={username} onChange={(e) => setUsername(e.target.value)}
+            placeholder="you@nhndooray.com"
+            className="w-full px-3 py-2 bg-bg-surface border border-bg-border rounded-lg text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue"
+          />
+        </div>
+
+        <div>
+          <label className="text-[11px] font-medium text-text-secondary block mb-1.5">CalDAV 비밀번호</label>
+          <div className="relative">
+            <input
+              type={showPw ? 'text' : 'password'} autoComplete="off"
+              value={password} onChange={(e) => setPassword(e.target.value)}
+              placeholder="두레이에서 발급된 CalDAV 비밀번호"
+              className="w-full pl-3 pr-9 py-2 bg-bg-surface border border-bg-border rounded-lg text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue font-mono"
+            />
+            <button onClick={() => setShowPw(!showPw)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary">
+              {showPw ? <EyeOff size={12} /> : <Eye size={12} />}
+            </button>
+          </div>
+        </div>
+
+        {/* 결과 */}
+        {testResult && (
+          <div className={`flex items-start gap-2 p-2.5 rounded-lg text-[11px] ${
+            testResult.ok ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+          }`}>
+            {testResult.ok ? <Check size={12} className="mt-0.5 flex-shrink-0" /> : <AlertCircle size={12} className="mt-0.5 flex-shrink-0" />}
+            <span>{testResult.message}</span>
+          </div>
+        )}
+
+        {/* 버튼 */}
+        <div className="flex items-center gap-2">
+          <button onClick={handleTest} disabled={testing || saving || !username.trim() || !password}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg border border-bg-border text-text-secondary text-xs hover:bg-bg-surface disabled:opacity-50">
+            {testing && <Loader2 size={12} className="animate-spin" />}
+            연결 테스트
+          </button>
+          <button onClick={handleSave} disabled={saving || testing || !username.trim() || !password}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-clover-blue text-white text-xs font-medium hover:bg-clover-blue/80 disabled:opacity-50">
+            {saving && <Loader2 size={12} className="animate-spin" />}
+            저장 및 연결
+          </button>
+        </div>
+
+        <p className="text-[9px] text-text-tertiary leading-relaxed">
+          비밀번호는 OS 키체인(macOS Keychain / Windows Credential Vault)에 암호화 저장됩니다. 평문으로 디스크에 남지 않습니다.
+        </p>
+      </div>
+
+      {/* 초기 동기화 진행률 다이얼로그 */}
+      <Modal open={syncProgress.stage === 'syncing' || syncProgress.stage === 'complete' || syncProgress.stage === 'error'}
+        onClose={() => setSyncProgress({ stage: 'idle' })}
+        width={420}
+        title="CalDAV 동기화"
+        icon={syncProgress.stage === 'syncing'
+          ? <Loader2 size={14} className="animate-spin text-clover-blue" />
+          : syncProgress.stage === 'complete'
+            ? <Check size={14} className="text-emerald-400" />
+            : <AlertCircle size={14} className="text-rose-400" />}
+        dismissable={syncProgress.stage !== 'syncing'}>
+        {syncProgress.stage === 'syncing' && (
+          <div className="space-y-3">
+            <p className="text-[11px] text-text-secondary">
+              두레이 캘린더의 모든 일정을 받아 로컬에 저장하는 중입니다. 첫 동기화 후엔 빠르게 표시됩니다.
+            </p>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-text-secondary truncate">{syncProgress.calendarName || '준비 중...'}</span>
+                <span className="text-text-tertiary tabular-nums flex-shrink-0">
+                  {syncProgress.current} / {syncProgress.total || '?'}
+                </span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-bg-surface overflow-hidden">
+                <div className="h-full bg-clover-blue transition-all duration-300"
+                  style={{ width: syncProgress.total > 0 ? `${(syncProgress.current / syncProgress.total) * 100}%` : '5%' }} />
+              </div>
+            </div>
+          </div>
+        )}
+        {syncProgress.stage === 'complete' && (
+          <div className="space-y-3">
+            <p className="text-[11px] text-text-primary">동기화 완료 — 일정 <strong>{syncProgress.totalObjects}건</strong> 저장됨</p>
+            <p className="text-[10px] text-text-tertiary">이후엔 45초 주기로 변경분만 자동 동기화됩니다.</p>
+            <div className="flex justify-end">
+              <button onClick={() => setSyncProgress({ stage: 'idle' })}
+                className="px-4 py-1.5 rounded-lg bg-clover-blue text-white text-[11px] font-medium hover:bg-clover-blue/80">
+                확인
+              </button>
+            </div>
+          </div>
+        )}
+        {syncProgress.stage === 'error' && (
+          <div className="space-y-3">
+            <p className="text-[11px] text-rose-400">{syncProgress.message}</p>
+            <div className="flex justify-end">
+              <button onClick={() => setSyncProgress({ stage: 'idle' })}
+                className="px-4 py-1.5 rounded-lg bg-clover-blue text-white text-[11px] font-medium hover:bg-clover-blue/80">
+                닫기
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

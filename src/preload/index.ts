@@ -20,6 +20,34 @@ function subscribeTerminalOutput(cb: (payload: TerminalOutputPayload) => void): 
   return () => { terminalOutputHandlers.delete(cb) }
 }
 import { IPC_CHANNELS } from '../shared/types/ipc'
+
+// CalDAV 데이터 변경 알림 (sync 결과 → main → 여기 → renderer 구독자)
+const caldavUpdatedHandlers = new Set<() => void>()
+ipcRenderer.on('caldav-updated', () => {
+  console.log('[preload] caldav-updated received, handlers:', caldavUpdatedHandlers.size)
+  for (const h of caldavUpdatedHandlers) {
+    try { h() } catch { /* ignore */ }
+  }
+})
+function subscribeCaldavUpdated(cb: () => void): () => void {
+  caldavUpdatedHandlers.add(cb)
+  return () => { caldavUpdatedHandlers.delete(cb) }
+}
+
+// CalDAV 동기화 진행률 알림
+type SyncProgressPayload =
+  | { calendarUrl: string; calendarName: string; current: number; total: number; objectCount: number }
+  | { stage: 'start' | 'complete' | 'error'; message?: string }
+const caldavSyncHandlers = new Set<(p: SyncProgressPayload) => void>()
+ipcRenderer.on('caldav-sync-progress', (_: IpcRendererEvent, payload: SyncProgressPayload) => {
+  for (const h of caldavSyncHandlers) {
+    try { h(payload) } catch { /* ignore */ }
+  }
+})
+function subscribeCaldavSyncProgress(cb: (p: SyncProgressPayload) => void): () => void {
+  caldavSyncHandlers.add(cb)
+  return () => { caldavSyncHandlers.delete(cb) }
+}
 import type { McpServerConfig } from '../shared/types/mcp'
 import type { Skill, SkillSaveRequest } from '../shared/types/skills'
 import type { UsageQueryParams, UsageSummary } from '../shared/types/usage'
@@ -33,6 +61,24 @@ import type {
   DoorayCalendarEvent,
   DoorayCalendarQueryParams
 } from '../shared/types/dooray'
+import type {
+  CalDAVCalendar,
+  CalDAVCredentialStatus,
+  CalDAVEvent,
+  CalDAVEventCreate,
+  CalDAVEventQuery,
+  CalDAVSaveCredentialsInput,
+  CalDAVTestResult
+} from '../shared/types/caldav'
+import type {
+  UnifiedCalendar,
+  UnifiedEvent,
+  UnifiedEventCreate,
+  UnifiedEventQuery,
+  LocalCalendar,
+  LocalCalendarCreate,
+  LocalCalendarUpdate
+} from '../shared/types/calendar'
 import type { AIBriefing, AIReport, AIProgressEvent, AIModelConfig, AIModelName } from '../shared/types/ai'
 import type { TerminalSession, TerminalCreateOptions, TerminalResizeOptions } from '../shared/types/terminal'
 import type {
@@ -203,6 +249,57 @@ const api = {
     }
   },
 
+  // CalDAV (v1.5)
+  caldav: {
+    testConnect: (input: CalDAVSaveCredentialsInput): Promise<CalDAVTestResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALDAV_TEST_CONNECT, input),
+    saveCredentials: (input: CalDAVSaveCredentialsInput): Promise<{ ok: true }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALDAV_SAVE_CREDENTIALS, input),
+    status: (): Promise<CalDAVCredentialStatus> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALDAV_STATUS),
+    disconnect: (): Promise<{ ok: true }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALDAV_DISCONNECT),
+    listCalendars: (): Promise<CalDAVCalendar[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALDAV_LIST_CALENDARS),
+    listEvents: (query: CalDAVEventQuery): Promise<CalDAVEvent[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALDAV_LIST_EVENTS, query),
+    createEvent: (input: CalDAVEventCreate): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALDAV_CREATE_EVENT, input),
+    deleteEvent: (p: { url: string; etag?: string }): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALDAV_DELETE_EVENT, p),
+    /** 전체 동기화 — 초기 연결 시 호출. 진행률은 onSyncProgress 로 구독 */
+    fullSync: (): Promise<{ totalObjects: number }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALDAV_FULL_SYNC),
+    /** 변경분만 동기화 — 수동 새로고침에 사용 */
+    incrementalSync: (): Promise<{ anyChange: boolean }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALDAV_INCREMENTAL_SYNC),
+    /** CalDAV 데이터 변경(sync 결과) 시 호출됨. cleanup 함수 반환 */
+    onUpdated: (cb: () => void): (() => void) => subscribeCaldavUpdated(cb),
+    /** 동기화 진행률 구독 */
+    onSyncProgress: (cb: (p: SyncProgressPayload) => void): (() => void) =>
+      subscribeCaldavSyncProgress(cb)
+  },
+
+  // Calendar (통합 — CalDAV + 로컬)
+  calendar: {
+    listCalendars: (): Promise<UnifiedCalendar[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_LIST_CALENDARS),
+    listEvents: (q: UnifiedEventQuery): Promise<UnifiedEvent[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_LIST_EVENTS, q),
+    createEvent: (input: UnifiedEventCreate): Promise<UnifiedEvent> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_CREATE_EVENT, input),
+    deleteEvent: (p: { source: 'local' | 'caldav'; id: string; calendarId?: string; caldavUrl?: string; etag?: string }): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_DELETE_EVENT, p)
+  },
+  localCalendar: {
+    create: (input: LocalCalendarCreate): Promise<LocalCalendar> =>
+      ipcRenderer.invoke(IPC_CHANNELS.LOCAL_CALENDAR_CREATE, input),
+    update: (input: LocalCalendarUpdate): Promise<{ ok: true }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.LOCAL_CALENDAR_UPDATE, input),
+    delete: (id: string): Promise<{ ok: true }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.LOCAL_CALENDAR_DELETE, id)
+  },
+
   // Terminal
   terminal: {
     create: (opts?: TerminalCreateOptions): Promise<TerminalSession> =>
@@ -281,8 +378,6 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_REPORT, { type, requestId, mcpServers }),
     generateWiki: (taskSubject: string, taskBody?: string, projectCode?: string, requestId?: string): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_WIKI, { taskSubject, taskBody, projectCode, requestId }),
-    generateMeetingNote: (eventSubject: string, eventDescription?: string, attendees?: string[], requestId?: string): Promise<string> =>
-      ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_MEETING_NOTE, { eventSubject, eventDescription, attendees, requestId }),
     wikiProofread: (title: string, content: string, requestId?: string): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_WIKI_PROOFREAD, { title, content, requestId }),
     wikiImprove: (title: string, content: string, requestId?: string): Promise<string> =>

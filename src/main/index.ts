@@ -11,7 +11,25 @@ import { TaskService } from './dooray/TaskService'
 import { WikiService } from './dooray/WikiService'
 import { WikiStorageService } from './dooray/WikiStorageService'
 import type { WikiStorageKind } from './dooray/WikiStorageService'
-import { CalendarService } from './dooray/CalendarService'
+// CalendarService(두레이 네이티브 calendar v1 API) — v1.5 에서 UnifiedCalendarService 로 대체됨
+import { CalDAVClient } from './caldav/CalDAVClient'
+import { CalDAVCredentialStore } from './caldav/CredentialStore'
+import { LocalEventStore } from './caldav/LocalEventStore'
+import { UnifiedCalendarService } from './caldav/UnifiedCalendarService'
+import { CTagPoller } from './caldav/CTagPoller'
+import { CalendarObjectsStore } from './caldav/CalendarObjectsStore'
+import { HolidayService } from './holiday/HolidayService'
+import type {
+  CalDAVEventCreate,
+  CalDAVEventQuery,
+  CalDAVSaveCredentialsInput
+} from '../shared/types/caldav'
+import type {
+  UnifiedEventCreate,
+  UnifiedEventQuery,
+  LocalCalendarCreate,
+  LocalCalendarUpdate
+} from '../shared/types/calendar'
 import { MessengerService } from './dooray/MessengerService'
 import { BotService } from './dooray/socket-mode/BotService'
 import { MentionDispatcher } from './dooray/mention/MentionDispatcher'
@@ -69,7 +87,64 @@ const sharedSkills = new SharedSkillsService(wikiService, skillsManager, {
 sharedSkills.setMyMemberIdResolver(() =>
   taskService.getMyMemberIdPublic().catch(() => null)
 )
-const calendarService = new CalendarService(doorayClient)
+const caldavClient = new CalDAVClient()
+const holidayService = new HolidayService()
+const unifiedCalendar = new UnifiedCalendarService(caldavClient, holidayService)
+// 시작 시 공휴일 백그라운드 refresh (캐시 7일 TTL 안이면 skip)
+holidayService.getHolidays().catch((e) => console.error('[main] 공휴일 refresh 실패:', e))
+const ctagPoller = new CTagPoller(unifiedCalendar)
+ctagPoller.start()
+
+// 자격증명만 있고 ICS 캐시가 비어있으면 시작 시 silent fullSync (앱 첫 부팅/캐시 클리어 후 등)
+const _hasCreds = CalDAVCredentialStore.has()
+const _cachedCalendars = CalendarObjectsStore.listCalendarUrls().length
+const _cachedObjects = CalendarObjectsStore.totalObjectCount()
+console.log('[main] CalDAV 부팅 상태:', { hasCredentials: _hasCreds, cachedCalendars: _cachedCalendars, cachedObjects: _cachedObjects })
+
+// 옛 sync 흔적(time-range 도입 전 무제한 받은 큰 캐시) 자동 정리 — 임계값 2000
+const STALE_CACHE_THRESHOLD = 2000
+if (_cachedObjects > STALE_CACHE_THRESHOLD) {
+  console.log(`[main] 큰 옛 캐시 감지 (${_cachedObjects} > ${STALE_CACHE_THRESHOLD}) → clearAll 후 새 fullSync`)
+  CalendarObjectsStore.clearAll()
+}
+
+const _needFullSync = _hasCreds && CalendarObjectsStore.totalObjectCount() === 0
+if (_needFullSync) {
+  console.log('[main] 자동 fullSync 시작 (자격증명 있음 + ICS 캐시 0건)')
+  unifiedCalendar.fullSync()
+    .then((r) => console.log('[main] 자동 fullSync 완료:', r))
+    .catch((e) => console.error('[main] 자동 fullSync 실패:', e))
+} else if (!_hasCreds) {
+  console.log('[main] 자동 fullSync skip: 자격증명 없음/손상')
+} else {
+  console.log('[main] 자동 fullSync skip: ICS 캐시 이미 존재 (' + CalendarObjectsStore.totalObjectCount() + '건)')
+}
+
+/**
+ * v1.5: UnifiedCalendarService 결과를 옛 DoorayCalendarEvent 형식으로 변환.
+ * 프론트의 BriefingPanel / list view / AI 분석이 점진적으로 새 인터페이스로
+ * 옮겨가는 동안 호환 어댑터로 사용.
+ */
+async function getEventsLegacy(params: { from: string; to: string }): Promise<import('../shared/types/dooray').DoorayCalendarEvent[]> {
+  const [evts, cals] = await Promise.all([
+    unifiedCalendar.listEvents({ from: params.from, to: params.to }),
+    unifiedCalendar.listCalendars()
+  ])
+  const calMap = new Map(cals.map((c) => [c.id, c]))
+  return evts.map((e) => {
+    const cal = calMap.get(e.calendarId)
+    return {
+      id: `${e.source}:${e.id}`,
+      subject: e.summary,
+      description: e.description,
+      location: e.location,
+      startedAt: e.start,
+      endedAt: e.end,
+      wholeDayFlag: e.allDay,
+      calendar: cal ? { id: cal.id, name: cal.name } : undefined
+    }
+  })
+}
 const messengerService = new MessengerService(doorayClient)
 sharedSkills.setMemberNameResolver((id) => messengerService.getMemberName(id))
 const botService = new BotService(doorayClient)
@@ -636,10 +711,70 @@ function registerIpcHandlers(): void {
     IPC_CHANNELS.DOORAY_WIKI_STORAGE_RESOLVE,
     (_, input: string) => wikiStorage.resolveWikiId(input)
   )
-  ipcMain.handle(IPC_CHANNELS.DOORAY_CALENDAR_LIST, () => calendarService.listCalendars())
+  // 옛 dooray.calendar.* IPC 는 v1.5 에서 UnifiedCalendarService 어댑터로 동작.
+  // 두레이 네이티브 calendar v1 API 직접 호출은 더 이상 하지 않음.
+  ipcMain.handle(IPC_CHANNELS.DOORAY_CALENDAR_LIST, async () => {
+    const cals = await unifiedCalendar.listCalendars()
+    return cals.map((c) => ({ id: c.id, name: c.name, type: c.source }))
+  })
   ipcMain.handle(IPC_CHANNELS.DOORAY_CALENDAR_EVENTS, (_, params: DoorayCalendarQueryParams) =>
-    calendarService.getEvents(params)
+    getEventsLegacy(params)
   )
+
+  // CalDAV (v1.5)
+  ipcMain.handle(IPC_CHANNELS.CALDAV_TEST_CONNECT, (_, input: CalDAVSaveCredentialsInput) =>
+    caldavClient.testConnection(input.username, input.password)
+  )
+  ipcMain.handle(IPC_CHANNELS.CALDAV_SAVE_CREDENTIALS, (_, input: CalDAVSaveCredentialsInput) => {
+    CalDAVCredentialStore.save(input.username, input.password)
+    caldavClient.invalidate()
+    unifiedCalendar.invalidateCache()
+    // 새 자격증명으로 polling 재가동 (이미 시작된 상태면 그대로 다음 tick 부터 새 자격증명 사용)
+    return { ok: true as const }
+  })
+  ipcMain.handle(IPC_CHANNELS.CALDAV_STATUS, () => ({
+    connected: CalDAVCredentialStore.has(),
+    username: CalDAVCredentialStore.getUsername()
+  }))
+  ipcMain.handle(IPC_CHANNELS.CALDAV_DISCONNECT, () => {
+    CalDAVCredentialStore.clear()
+    caldavClient.invalidate()
+    unifiedCalendar.invalidateCache()
+    return { ok: true as const }
+  })
+  ipcMain.handle(IPC_CHANNELS.CALDAV_LIST_CALENDARS, () => caldavClient.listCalendars())
+  ipcMain.handle(IPC_CHANNELS.CALDAV_LIST_EVENTS, (_, q: CalDAVEventQuery) => caldavClient.listEvents(q))
+  ipcMain.handle(IPC_CHANNELS.CALDAV_CREATE_EVENT, (_, input: CalDAVEventCreate) => caldavClient.createEvent(input))
+  ipcMain.handle(IPC_CHANNELS.CALDAV_DELETE_EVENT, (_, p: { url: string; etag?: string }) =>
+    caldavClient.deleteEvent(p.url, p.etag)
+  )
+  ipcMain.handle(IPC_CHANNELS.CALDAV_FULL_SYNC, () => unifiedCalendar.fullSync())
+  ipcMain.handle(IPC_CHANNELS.CALDAV_INCREMENTAL_SYNC, () => unifiedCalendar.incrementalSync())
+
+  // Calendar (통합)
+  ipcMain.handle(IPC_CHANNELS.CALENDAR_LIST_CALENDARS, () => unifiedCalendar.listCalendars())
+  ipcMain.handle(IPC_CHANNELS.CALENDAR_LIST_EVENTS, (_, q: UnifiedEventQuery) =>
+    unifiedCalendar.listEvents(q)
+  )
+  ipcMain.handle(IPC_CHANNELS.CALENDAR_CREATE_EVENT, (_, input: UnifiedEventCreate) =>
+    unifiedCalendar.createEvent(input)
+  )
+  ipcMain.handle(
+    IPC_CHANNELS.CALENDAR_DELETE_EVENT,
+    (_, p: { source: 'local' | 'caldav'; id: string; calendarId?: string; caldavUrl?: string; etag?: string }) =>
+      unifiedCalendar.deleteEvent(p)
+  )
+  ipcMain.handle(IPC_CHANNELS.LOCAL_CALENDAR_CREATE, (_, input: LocalCalendarCreate) =>
+    LocalEventStore.createCalendar(input.name, input.color)
+  )
+  ipcMain.handle(IPC_CHANNELS.LOCAL_CALENDAR_UPDATE, (_, input: LocalCalendarUpdate) => {
+    LocalEventStore.updateCalendar(input.id, { name: input.name, color: input.color })
+    return { ok: true as const }
+  })
+  ipcMain.handle(IPC_CHANNELS.LOCAL_CALENDAR_DELETE, (_, id: string) => {
+    LocalEventStore.deleteCalendar(id)
+    return { ok: true as const }
+  })
 
   // Terminal
   ipcMain.handle(IPC_CHANNELS.TERMINAL_CREATE, (_, opts?: TerminalCreateOptions) =>
@@ -814,8 +949,7 @@ function registerIpcHandlers(): void {
 
         const pinnedCalendars = (store.get('pinnedCalendars', []) as string[]) || []
         emit('📅 이번주 일정 조회 중...')
-        const eventsP = calendarService
-          .getEvents({ from: startOfDay.toISOString(), to: endOfWeek.toISOString() })
+        const eventsP = getEventsLegacy({ from: startOfDay.toISOString(), to: endOfWeek.toISOString() })
           .then((r) => {
             const filtered = pinnedCalendars.length > 0
               ? r.filter((e) => e.calendar?.id && pinnedCalendars.includes(e.calendar.id))
@@ -863,7 +997,7 @@ function registerIpcHandlers(): void {
       const pinnedCalendars = (store.get('pinnedCalendars', []) as string[]) || []
       let events: import('../shared/types/dooray').DoorayCalendarEvent[] = []
       if (!delegateEventsToAi) {
-        const allEvents = await calendarService.getEvents({
+        const allEvents = await getEventsLegacy({
           from: startOfDay.toISOString(),
           to: endOfWeek.toISOString()
         })
@@ -881,12 +1015,6 @@ function registerIpcHandlers(): void {
     async (_, { taskSubject, taskBody, projectCode, requestId }: { taskSubject: string; taskBody?: string; projectCode?: string; requestId?: string }) =>
       aiService.generateWikiDraft(taskSubject, taskBody, projectCode, requestId)
   )
-  ipcMain.handle(
-    IPC_CHANNELS.AI_GENERATE_MEETING_NOTE,
-    async (_, { eventSubject, eventDescription, attendees, requestId }: { eventSubject: string; eventDescription?: string; attendees?: string[]; requestId?: string }) =>
-      aiService.generateMeetingNote(eventSubject, eventDescription, attendees, requestId)
-  )
-
   // AI 모델 설정
   ipcMain.handle(IPC_CHANNELS.AI_MODEL_CONFIG_GET, () => aiService.getModelConfig())
   ipcMain.handle(IPC_CHANNELS.AI_MODEL_CONFIG_SET, (_, config: import('../shared/types/ai').AIModelConfig) => {

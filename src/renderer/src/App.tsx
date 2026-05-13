@@ -80,6 +80,13 @@ function App(): JSX.Element {
     return () => window.removeEventListener('goto-terminal', onGoto)
   }, [])
 
+  // 다른 화면에서 설정으로 이동 요청
+  useEffect(() => {
+    const onGoto = (): void => setActiveView('settings')
+    window.addEventListener('goto-settings', onGoto)
+    return () => window.removeEventListener('goto-settings', onGoto)
+  }, [])
+
   // 커맨드 팔레트 그룹 구성
   const commandGroups = useMemo<CommandGroup[]>(() => [
     {

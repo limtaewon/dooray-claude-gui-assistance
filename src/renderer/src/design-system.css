@@ -244,6 +244,21 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
   overflow: hidden;
   animation: ds-modalIn .18s cubic-bezier(.2,.9,.2,1);
 }
+/* 사용자 리사이즈 가능 — 우하단 모서리 드래그 */
+.ds-modal.ds-modal-resize {
+  resize: both;
+  min-width: 360px;
+  min-height: 140px;
+  max-width: 92vw;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  height: auto; /* 콘텐츠 fit — 사용자가 드래그할 때만 늘어남 */
+}
+.ds-modal.ds-modal-resize .m-body {
+  flex: 1 1 auto;
+  overflow: auto;
+}
 @keyframes ds-modalIn {
   from { opacity: 0; transform: translateY(8px) scale(.98); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
@@ -406,6 +421,25 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
   animation: ds-spin 0.8s linear infinite;
 }
 @keyframes ds-spin { to { transform: rotate(360deg); } }
+
+/* 캘린더 월 라벨 전환 */
+@keyframes ds-monthLabelIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+.ds-month-label-anim { animation: ds-monthLabelIn 260ms ease-out; }
+
+/* 캘린더 월 페이지 전환 (구글 캘린더 스타일) */
+@keyframes ds-monthInNext {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes ds-monthInPrev {
+  from { opacity: 0; transform: translateY(-14px); }
+  to   { opacity: 1; transform: none; }
+}
+.ds-month-in-next { animation: ds-monthInNext 280ms cubic-bezier(.2,.7,.2,1); }
+.ds-month-in-prev { animation: ds-monthInPrev 280ms cubic-bezier(.2,.7,.2,1); }
 
 /* ---------- Code block (design-system style) ---------- */
 .ds-codeblock {

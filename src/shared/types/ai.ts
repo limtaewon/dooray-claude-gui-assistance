@@ -67,7 +67,6 @@ export interface AIModelConfig {
   wikiStructure?: AIModelName
   summarizeTask?: AIModelName
   generateSkill?: AIModelName
-  meetingNote?: AIModelName
   sessionSummary?: AIModelName
   calendarAnalysis?: AIModelName
   messengerCompose?: AIModelName

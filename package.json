@@ -69,6 +69,7 @@
     "recharts": "^2.13.3",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
+    "tsdav": "^2.2.1",
     "ws": "^8.20.0"
   },
   "devDependencies": {

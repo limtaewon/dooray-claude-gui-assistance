@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react'
-import { RefreshCw, Clock, MapPin, AlertCircle, CalendarDays, Sparkles, Loader2, Settings, Check, FolderOpen, FileText, Copy } from 'lucide-react'
+import { RefreshCw, Clock, MapPin, AlertCircle, CalendarDays, Sparkles, Loader2, Settings, Check } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -7,27 +7,142 @@ import type { DoorayCalendarEvent } from '../../../../shared/types/dooray'
 import SkillQuickToggle from './SkillQuickToggle'
 import { LoadingView, ErrorView, EmptyView } from '../common/StateViews'
 import AIToolsPopover from '../common/AIToolsPopover'
-import { Button } from '../common/ds'
+import { Button, SegTabs } from '../common/ds'
+import CalendarMonthView from './CalendarMonthView'
+import { COLOR_PALETTE, resolveCalendarHex, normalizeHex } from './calendarColors'
+import type { UnifiedCalendar } from '../../../../shared/types/calendar'
 
-// API 캘린더 목록 + 이벤트에서 추출한 캘린더 합산
-function CalendarFilter({ events, filterIds, onFilter }: {
-  events: DoorayCalendarEvent[]; filterIds: string[]; onFilter: (ids: string[]) => void
+type CalendarViewMode = 'month' | 'list'
+
+// API 캘린더 목록 + 이벤트에서 추출한 캘린더 합산 (소스별 그룹)
+type CalSource = 'caldav' | 'local' | 'holiday'
+type CalEntry = { id: string; name: string; count: number; source: CalSource; color?: string }
+
+function inferSource(id: string, fallback?: string): CalSource {
+  if (id.startsWith('holiday-')) return 'holiday'
+  if (id.startsWith('http')) return 'caldav'
+  if (fallback === 'caldav' || fallback === 'local' || fallback === 'holiday') return fallback
+  return 'local'
+}
+
+function ColorPickerPopover({ currentHex, anchor, overridden, onPick, onReset, onClose }: {
+  currentHex: string
+  /** 픽커를 띄울 기준 요소의 viewport 좌표 (getBoundingClientRect) */
+  anchor: DOMRect
+  overridden: boolean
+  /** 실시간 미리보기 — 호출 즉시 캘린더 색이 바뀜. 팝오버는 닫지 않음. */
+  onPick: (hex: string) => void
+  onReset: () => void
+  onClose: () => void
+}): JSX.Element {
+  const [hexInput, setHexInput] = useState<string>(currentHex.toUpperCase())
+  const [invalid, setInvalid] = useState(false)
+
+  // currentHex (외부 상태) 가 바뀌면 텍스트 입력도 동기화
+  useEffect(() => { setHexInput(currentHex.toUpperCase()); setInvalid(false) }, [currentHex])
+
+  const commitHexInput = (): void => {
+    const norm = normalizeHex(hexInput)
+    if (!norm) { setInvalid(true); return }
+    setInvalid(false)
+    onPick(norm)
+  }
+
+  // viewport 안에 들어오도록 좌표 계산 (오른쪽이 잘리면 anchor 왼쪽에 정렬)
+  const WIDTH = 240
+  const left = Math.min(Math.max(8, anchor.right - WIDTH), window.innerWidth - WIDTH - 8)
+  const top = Math.min(anchor.bottom + 4, window.innerHeight - 280)
+
+  return (
+    <>
+      <div className="fixed inset-0 z-[60]" onClick={onClose} />
+      <div
+        style={{ position: 'fixed', top, left, width: WIDTH }}
+        className="z-[61] bg-bg-surface border border-bg-border rounded-lg shadow-2xl p-3"
+        onClick={(e) => e.stopPropagation()}>
+        <div className="text-[10px] font-semibold text-text-tertiary uppercase tracking-wide mb-1.5">인기 색상</div>
+        <div className="grid grid-cols-6 gap-1.5">
+          {COLOR_PALETTE.map((p) => {
+            const selected = currentHex.toLowerCase() === p.toLowerCase()
+            return (
+              <button
+                key={p}
+                onClick={() => { onPick(p); onClose() }}
+                className={`w-6 h-6 rounded-full transition-transform hover:scale-110 ${selected ? 'ring-2 ring-offset-1 ring-offset-bg-surface ring-text-primary' : ''}`}
+                style={{ backgroundColor: p }}
+                aria-label={`색상 ${p}`}
+              />
+            )
+          })}
+        </div>
+
+        <div className="mt-3 pt-2 border-t border-bg-border">
+          <div className="text-[10px] font-semibold text-text-tertiary uppercase tracking-wide mb-1.5">사용자 지정</div>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="color"
+              value={normalizeHex(hexInput) || currentHex}
+              onChange={(e) => { const v = e.target.value.toLowerCase(); setHexInput(v.toUpperCase()); setInvalid(false); onPick(v) }}
+              className="w-9 h-9 rounded cursor-pointer bg-transparent border border-bg-border p-0 flex-shrink-0"
+              aria-label="색상 선택기"
+              title="드래그해서 색상 선택 — 창을 닫으면 적용됨"
+            />
+            <input
+              type="text"
+              value={hexInput}
+              onChange={(e) => { setHexInput(e.target.value); setInvalid(false) }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { commitHexInput(); onClose() } }}
+              onBlur={commitHexInput}
+              placeholder="#RRGGBB"
+              spellCheck={false}
+              className={`flex-1 min-w-0 text-[11px] px-2 py-1 rounded bg-bg-surface-hover border ${invalid ? 'border-rose-500' : 'border-bg-border'} text-text-primary outline-none focus:border-clover-blue font-mono`}
+            />
+          </div>
+          {invalid && <div className="text-[9px] text-rose-400 mt-1">올바른 hex 값을 입력하세요 (예: #3b82f6)</div>}
+          <div className="mt-1.5 text-[9px] text-text-tertiary">창을 닫으면 자동 적용됩니다</div>
+        </div>
+
+        {overridden && (
+          <button
+            onClick={onReset}
+            className="mt-2 w-full text-[10px] text-text-tertiary hover:text-text-secondary border-t border-bg-border pt-1.5">
+            기본 색상으로 되돌리기
+          </button>
+        )}
+      </div>
+    </>
+  )
+}
+
+function CalendarFilter({ events, filterIds, onFilter, colorOverrides, onChangeColor }: {
+  events: DoorayCalendarEvent[]
+  filterIds: string[]
+  onFilter: (ids: string[]) => void
+  colorOverrides: Record<string, string>
+  onChangeColor: (id: string, hex: string | null) => void
 }): JSX.Element {
   const [open, setOpen] = useState(false)
-  const [apiCalendars, setApiCalendars] = useState<Array<{ id: string; name: string }>>([])
+  const [apiCalendars, setApiCalendars] = useState<Array<{ id: string; name: string; source: CalSource; color?: string }>>([])
+  const [picker, setPicker] = useState<{ id: string; anchor: DOMRect } | null>(null)
 
   useEffect(() => {
-    window.api.dooray.calendar.list()
-      .then((cals) => setApiCalendars(cals.map((c) => ({ id: c.id, name: c.name }))))
+    window.api.calendar.listCalendars()
+      .then((cals: UnifiedCalendar[]) => setApiCalendars(cals.map((c) => ({
+        id: c.id,
+        name: c.name,
+        source: inferSource(c.id, c.source),
+        color: c.color
+      }))))
       .catch((err) => { console.error('[calendar] list failed:', err); setApiCalendars([]) })
   }, [])
 
-  // API + 이벤트 파생 캘린더 합산 + 카운트 (events/apiCalendars가 바뀔 때만 재계산)
-  const calendars = useMemo(() => {
-    const allMap = new Map<string, string>()
-    for (const c of apiCalendars) allMap.set(c.id, c.name)
+  const calendars: CalEntry[] = useMemo(() => {
+    const allMap = new Map<string, { name: string; source: CalSource; color?: string }>()
+    for (const c of apiCalendars) allMap.set(c.id, { name: c.name, source: c.source, color: c.color })
     for (const e of events) {
-      if (e.calendar?.id) allMap.set(e.calendar.id, e.calendar.name)
+      if (e.calendar?.id && !allMap.has(e.calendar.id)) {
+        allMap.set(e.calendar.id, { name: e.calendar.name, source: inferSource(e.calendar.id) })
+      }
     }
     const countMap = new Map<string, number>()
     for (const e of events) {
@@ -35,12 +150,66 @@ function CalendarFilter({ events, filterIds, onFilter }: {
       if (cid) countMap.set(cid, (countMap.get(cid) || 0) + 1)
     }
     return Array.from(allMap.entries())
-      .map(([id, name]) => ({ id, name, count: countMap.get(id) || 0 }))
+      .map(([id, v]) => ({ id, name: v.name, source: v.source, color: v.color, count: countMap.get(id) || 0 }))
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
   }, [apiCalendars, events])
 
+  // colorStyleFor / resolveCalendarHex 가 기대하는 UnifiedCalendar 형태
+  const unified: UnifiedCalendar[] = useMemo(
+    () => calendars.map((c) => ({ id: c.id, name: c.name, source: c.source as 'caldav' | 'local' | 'holiday', color: c.color, writable: false })),
+    [calendars]
+  )
+
+  // 공휴일은 필터 UI 에서 제외 (항상 표시되므로 사용자가 끌 수 없음)
+  const groups = useMemo(() => ({
+    caldav: calendars.filter((c) => c.source === 'caldav'),
+    local: calendars.filter((c) => c.source === 'local')
+  }), [calendars])
+
   const toggle = (id: string): void => {
     onFilter(filterIds.includes(id) ? filterIds.filter((p) => p !== id) : [...filterIds, id])
+  }
+
+  const renderItem = (c: CalEntry): JSX.Element => {
+    const checked = filterIds.includes(c.id)
+    const hex = resolveCalendarHex(c.id, unified, colorOverrides)
+    const overridden = !!colorOverrides[c.id]
+    return (
+      <div key={c.id} className="relative w-full flex items-center gap-2 px-3 py-1.5 hover:bg-bg-surface-hover">
+        <button
+          onClick={() => toggle(c.id)}
+          aria-label={`${c.name} 표시 토글`}
+          className="w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 transition-colors"
+          style={{ backgroundColor: checked ? hex : 'transparent', borderColor: hex }}>
+          {checked && <Check size={9} className="text-white" />}
+        </button>
+        <button onClick={() => toggle(c.id)} className="text-left flex-1 min-w-0">
+          <span className={`text-[11px] truncate ${checked ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>{c.name}</span>
+        </button>
+        {c.count > 0 && <span className="text-[9px] text-text-tertiary flex-shrink-0">{c.count}</span>}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            if (picker?.id === c.id) { setPicker(null); return }
+            const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
+            setPicker({ id: c.id, anchor: rect })
+          }}
+          title={overridden ? '캘린더 색상 변경 (사용자 지정됨)' : '캘린더 색상 변경'}
+          className="w-3 h-3 rounded-full flex-shrink-0 ring-1 ring-bg-border hover:ring-text-tertiary transition-shadow"
+          style={{ backgroundColor: hex }}
+        />
+        {picker?.id === c.id && (
+          <ColorPickerPopover
+            currentHex={hex}
+            anchor={picker.anchor}
+            overridden={overridden}
+            onPick={(h) => onChangeColor(c.id, h)}
+            onReset={() => { onChangeColor(c.id, null); setPicker(null) }}
+            onClose={() => setPicker(null)}
+          />
+        )}
+      </div>
+    )
   }
 
   return (
@@ -63,16 +232,20 @@ function CalendarFilter({ events, filterIds, onFilter }: {
               <span className="text-[11px] font-semibold text-text-primary">표시할 캘린더 선택</span>
               <span className="text-[9px] text-text-tertiary ml-2">{filterIds.length > 0 ? `${filterIds.length}개` : '전체'}</span>
             </div>
-            <div className="max-h-60 overflow-y-auto py-1">
-              {calendars.map((c) => (
-                <button key={c.id} onClick={() => toggle(c.id)} className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-bg-surface-hover text-left">
-                  <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 ${filterIds.includes(c.id) ? 'bg-clover-blue border-clover-blue' : 'border-bg-border-light'}`}>
-                    {filterIds.includes(c.id) && <Check size={9} className="text-white" />}
-                  </div>
-                  <span className={`text-[11px] truncate flex-1 ${filterIds.includes(c.id) ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>{c.name}</span>
-                  {c.count > 0 && <span className="text-[9px] text-text-tertiary flex-shrink-0">{c.count}</span>}
-                </button>
-              ))}
+            <div className="max-h-72 overflow-y-auto py-1">
+              {groups.local.length > 0 && (
+                <>
+                  <div className="px-3 pt-2 pb-1 text-[9px] font-semibold text-text-tertiary uppercase tracking-wide">Clauday</div>
+                  {groups.local.map(renderItem)}
+                </>
+              )}
+              {groups.caldav.length > 0 && (
+                <>
+                  <div className="px-3 pt-2 pb-1 text-[9px] font-semibold text-text-tertiary uppercase tracking-wide">두레이</div>
+                  {groups.caldav.map(renderItem)}
+                </>
+              )}
+              {/* 공휴일은 필터로 끌 수 없음 — 항상 표시되므로 필터 UI 에서 제외 */}
             </div>
             <div className="px-3 py-1.5 border-t border-bg-border text-[9px] text-text-tertiary">선택 없으면 전체 표시</div>
           </div>
@@ -112,11 +285,60 @@ function CalendarAssistant(): JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [filterIds, setFilterIds] = useState<string[]>([])
   const [filterLoaded, setFilterLoaded] = useState(false)
+  const [colorOverrides, setColorOverrides] = useState<Record<string, string>>({})
+  const [colorsLoaded, setColorsLoaded] = useState(false)
+  const [viewMode, setViewMode] = useState<CalendarViewMode>('list')
+  const [viewModeLoaded, setViewModeLoaded] = useState(false)
+  const [caldavStatus, setCaldavStatus] = useState<{ connected: boolean; username: string | null } | null>(null)
 
-  // 저장된 필터 로드
+  // 뷰 모드 로드
   useEffect(() => {
-    window.api.settings.get('pinnedCalendars').then((saved) => {
-      setFilterIds((saved as string[]) || [])
+    window.api.settings.get('calendarViewMode').then((saved) => {
+      if (saved === 'month' || saved === 'list') setViewMode(saved)
+      setViewModeLoaded(true)
+    })
+  }, [])
+
+  // CalDAV 연결 상태 + 데이터 변경 감지 (CTag polling 결과)
+  useEffect(() => {
+    const loadStatus = (): void => {
+      window.api.caldav.status().then(setCaldavStatus).catch(() => setCaldavStatus({ connected: false, username: null }))
+    }
+    loadStatus()
+    const onChange = (): void => {
+      loadStatus()
+      loadEvents()
+    }
+    const offUpdated = window.api.caldav.onUpdated(() => { loadEvents() })
+    window.addEventListener('caldav-status-changed', onChange)
+    window.addEventListener('focus', onChange)
+    return () => {
+      offUpdated()
+      window.removeEventListener('caldav-status-changed', onChange)
+      window.removeEventListener('focus', onChange)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => {
+    if (viewModeLoaded) window.api.settings.set('calendarViewMode', viewMode)
+  }, [viewMode, viewModeLoaded])
+
+  // 저장된 필터 로드 + 옛 캘린더 ID 청소 (v1.5 이전 두레이 native ID 잔여 제거)
+  useEffect(() => {
+    window.api.settings.get('pinnedCalendars').then(async (saved) => {
+      const stored = (saved as string[]) || []
+      if (stored.length > 0) {
+        try {
+          const cals = await window.api.dooray.calendar.list()
+          const validIds = new Set(cals.map((c) => c.id))
+          const cleaned = stored.filter((id) => validIds.has(id))
+          setFilterIds(cleaned)
+        } catch {
+          setFilterIds(stored)
+        }
+      } else {
+        setFilterIds([])
+      }
       setFilterLoaded(true)
     })
   }, [])
@@ -127,30 +349,29 @@ function CalendarAssistant(): JSX.Element {
       window.api.settings.set('pinnedCalendars', filterIds)
     }
   }, [filterIds, filterLoaded])
-  // AI
+
+  // 캘린더별 사용자 지정 색상 로드/저장
+  useEffect(() => {
+    window.api.settings.get('calendarColors').then((saved) => {
+      if (saved && typeof saved === 'object') setColorOverrides(saved as Record<string, string>)
+      setColorsLoaded(true)
+    }).catch(() => setColorsLoaded(true))
+  }, [])
+  useEffect(() => {
+    if (colorsLoaded) window.api.settings.set('calendarColors', colorOverrides)
+  }, [colorOverrides, colorsLoaded])
+
+  const handleChangeColor = useCallback((id: string, hex: string | null): void => {
+    setColorOverrides((prev) => {
+      const next = { ...prev }
+      if (hex === null) delete next[id]
+      else next[id] = hex
+      return next
+    })
+  }, [])
+  // AI (캘린더 분석)
   const [aiResult, setAiResult] = useState<string | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
-  const [meetingNoteForId, setMeetingNoteForId] = useState<string | null>(null)
-  const [meetingNote, setMeetingNote] = useState<string>('')
-  const [copied, setCopied] = useState(false)
-
-  const generateMeetingNote = async (event: DoorayCalendarEvent): Promise<void> => {
-    setMeetingNoteForId(event.id)
-    setMeetingNote('')
-    try {
-      const note = await window.api.ai.generateMeetingNote(event.subject, event.description)
-      setMeetingNote(note)
-    } catch (err) {
-      setMeetingNote(`오류: ${err instanceof Error ? err.message : ''}`)
-    }
-  }
-
-  const copyNote = async (): Promise<void> => {
-    if (!meetingNote) return
-    await navigator.clipboard.writeText(meetingNote)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
-  }
 
   const loadEvents = useCallback(async () => {
     setLoading(true); setError(null)
@@ -251,7 +472,7 @@ function CalendarAssistant(): JSX.Element {
           <CalendarDays size={18} className="text-clover-blue" />
           <h2 className="text-lg font-semibold text-text-primary">이번 주 일정</h2>
           <span className="text-[10px] text-text-tertiary">{displayEvents.length}개{filterIds.length > 0 ? ` / ${events.length}` : ''}</span>
-          <CalendarFilter events={events} filterIds={filterIds} onFilter={setFilterIds} />
+          <CalendarFilter events={events} filterIds={filterIds} onFilter={setFilterIds} colorOverrides={colorOverrides} onChangeColor={handleChangeColor} />
           <button
             onClick={loadEvents}
             disabled={loading}
@@ -262,6 +483,14 @@ function CalendarAssistant(): JSX.Element {
           </button>
         </div>
         <div className="flex items-center gap-2">
+          <SegTabs<CalendarViewMode>
+            items={[
+              { key: 'month', label: '달력' },
+              { key: 'list', label: '목록' }
+            ]}
+            value={viewMode}
+            onChange={setViewMode}
+          />
           <SkillQuickToggle target="calendar" feature="calendarAnalysis" />
           <Button
             variant="ai"
@@ -289,7 +518,31 @@ function CalendarAssistant(): JSX.Element {
         </div>
       )}
 
-      {/* 일정 목록 */}
+      {/* CalDAV 미연결 안내 배너 */}
+      {caldavStatus && !caldavStatus.connected && (
+        <div className="mx-6 mt-3 p-3 rounded-xl bg-clover-orange/5 border border-clover-orange/20 flex items-center gap-3 flex-shrink-0">
+          <AlertCircle size={14} className="text-clover-orange flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] text-text-primary font-medium">두레이 CalDAV가 연결되지 않았습니다</p>
+            <p className="text-[10px] text-text-tertiary mt-0.5">
+              회사 일정을 동기화하려면 설정에서 CalDAV 자격증명을 입력해주세요. 지금은 로컬 캘린더만 표시됩니다.
+            </p>
+          </div>
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('goto-settings', { detail: { tab: 'caldav' } }))}
+            className="px-2.5 py-1 rounded-md bg-clover-blue text-white text-[10px] font-medium hover:bg-clover-blue/80 flex-shrink-0">
+            연결하러 가기
+          </button>
+        </div>
+      )}
+
+      {/* 콘텐츠 — 달력 모드 */}
+      {viewMode === 'month' && (
+        <CalendarMonthView today={new Date()} filterIds={filterIds} colorOverrides={colorOverrides} />
+      )}
+
+      {/* 콘텐츠 — 목록 모드 */}
+      {viewMode === 'list' && (
       <div className="flex-1 overflow-y-auto px-6 py-4">
         {loading ? (
           <LoadingView message="일정 불러오는 중..." />
@@ -363,10 +616,9 @@ function CalendarAssistant(): JSX.Element {
                   <div className="space-y-1.5">
                     {dayEvents.map((event, i) => {
                       const isAllDay = event.wholeDayFlag || (!safeTime(getStart(event)) && !safeTime(getEnd(event)))
-                      const showingNote = meetingNoteForId === event.id
                       return (
                         <div key={`${event.id || i}-${dateKey}`} className="bg-bg-surface border border-bg-border rounded-lg hover:border-bg-border-light transition-colors">
-                          <div className="flex items-start gap-3 p-2.5 group">
+                          <div className="flex items-start gap-3 p-2.5">
                             <div className={`w-1 min-h-[32px] rounded-full flex-shrink-0 ${isAllDay ? 'bg-clover-orange' : 'bg-clover-blue'}`} />
                             <div className="flex-1 min-w-0">
                               <p className="text-xs text-text-primary">{event.subject || '(제목 없음)'}</p>
@@ -382,42 +634,7 @@ function CalendarAssistant(): JSX.Element {
                                 )}
                               </div>
                             </div>
-                            <button
-                              onClick={() => showingNote ? setMeetingNoteForId(null) : generateMeetingNote(event)}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-clover-blue hover:bg-clover-blue/10 flex-shrink-0"
-                              title="AI 회의록 생성"
-                            >
-                              <FileText size={10} />
-                              회의록
-                            </button>
                           </div>
-                          {showingNote && (
-                            <div className="px-2.5 pb-2.5 border-t border-bg-border pt-2">
-                              {meetingNote ? (
-                                <div className="space-y-1.5">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[9px] text-clover-blue font-semibold">AI 회의록 템플릿</span>
-                                    <div className="flex items-center gap-1">
-                                      <button onClick={copyNote}
-                                        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover">
-                                        {copied ? <Check size={9} /> : <Copy size={9} />}
-                                        {copied ? '복사됨' : '복사'}
-                                      </button>
-                                      <button onClick={() => setMeetingNoteForId(null)}
-                                        className="text-text-tertiary hover:text-text-secondary px-1">
-                                        <span className="text-[9px]">닫기</span>
-                                      </button>
-                                    </div>
-                                  </div>
-                                  <pre className="text-[10px] text-text-primary whitespace-pre-wrap font-mono bg-bg-primary rounded p-2 max-h-48 overflow-y-auto">{meetingNote}</pre>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-2 text-[10px] text-text-tertiary">
-                                  <Loader2 size={10} className="animate-spin" /> AI 회의록 생성 중...
-                                </div>
-                              )}
-                            </div>
-                          )}
                         </div>
                       )
                     })}
@@ -428,6 +645,7 @@ function CalendarAssistant(): JSX.Element {
           </div>
         )}
       </div>
+      )}
     </div>
   )
 }

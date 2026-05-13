@@ -13,10 +13,12 @@ export interface ModalProps {
   footer?: ReactNode
   /** ESC/backdrop click 으로 닫기 비활성화 */
   dismissable?: boolean
+  /** 사용자가 우하단 모서리로 크기 조절 가능 */
+  resizable?: boolean
 }
 
 /** 포털 기반 모달. ESC로 닫기, backdrop 클릭으로 닫기 기본 활성 */
-function Modal({ open, onClose, title, icon, width, children, footer, dismissable = true }: ModalProps): JSX.Element | null {
+function Modal({ open, onClose, title, icon, width, children, footer, dismissable = true, resizable = false }: ModalProps): JSX.Element | null {
   useEffect(() => {
     if (!open || !dismissable) return
     const onKey = (e: KeyboardEvent): void => {
@@ -30,7 +32,9 @@ function Modal({ open, onClose, title, icon, width, children, footer, dismissabl
 
   return createPortal(
     <div className="ds-modal-backdrop" onClick={dismissable ? onClose : undefined}>
-      <div className="ds-modal" style={width ? { width } : undefined} onClick={(e) => e.stopPropagation()}>
+      <div className={`ds-modal ${resizable ? 'ds-modal-resize' : ''}`}
+        style={width ? { width } : undefined}
+        onClick={(e) => e.stopPropagation()}>
         {(title || icon) && (
           <div className="m-head">
             {icon}
