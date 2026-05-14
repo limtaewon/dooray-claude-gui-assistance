@@ -12,3 +12,4 @@ release
 .playwright-mcp
 .mockups
 .claude
+coverage

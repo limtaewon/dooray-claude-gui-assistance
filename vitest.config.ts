@@ -20,10 +20,19 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['src/**/*.{ts,tsx}'],
+      // 단위 테스트 커버리지 스코프: main 비즈니스 로직 + renderer hooks/ds 컴포넌트.
+      // renderer 의 view-level 컴포넌트(`components/<도메인>/*View.tsx` 등) 와 main/index.ts(IPC 라우터)는
+      // 통합/E2E 단계에서 검증해야 하므로 단위 게이트에서 제외.
+      include: [
+        'src/main/**/*.ts',
+        'src/renderer/src/hooks/**/*.ts',
+        'src/renderer/src/components/common/ds/**/*.{ts,tsx}',
+        'src/shared/**/*.ts'
+      ],
       exclude: [
         'src/**/*.{test,spec}.{ts,tsx}',
         'src/**/index.ts',
+        'src/main/index.ts',
         'src/preload/**',
         'src/shared/types/**'
       ]
