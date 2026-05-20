@@ -59,3 +59,43 @@ jobs:
           path: coverage/
           retention-days: 14
           if-no-files-found: ignore
+
+  # Windows 호환성 검증 — Mac 개발자가 놓치기 쉬운 OS-민감 코드 (spawn / path / fs / 인코딩) 를 PR 시점에 잡기.
+  # 빌드까지 검증해 Windows 전용 import 누락 / path 구분자 / native module rebuild 이슈 조기 감지.
+  verify-windows:
+    name: Windows — Typecheck & Test & Build
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11 (node-gyp 호환)
+        id: python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # postinstall 의 electron-rebuild 가 keytar/node-pty 의 Windows binding 빌드를 시도하나
+      # CI 단계에선 native 모듈 없이 typecheck + 단위 테스트 + 정적 빌드만 검증하면 충분.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+        env:
+          npm_config_python: ${{ steps.python.outputs.python-path }}
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run unit, component & integration tests
+        run: npm run test:run
+
+      # electron-vite 정적 빌드까지 — Windows path 처리 / import case-sensitivity / TS strict 모드에서
+      # mac 에서 모르고 지나간 OS 별 차이 발견. dist (dmg/exe 패키징) 까지 가지 않아 5분 이내.
+      - name: Build (electron-vite)
+        run: npm run build

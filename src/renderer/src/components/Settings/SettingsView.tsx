@@ -36,7 +36,7 @@ function SettingsView(): JSX.Element {
         {tabs.map(({ id, icon: Icon, label }) => (
           <button key={id} onClick={() => setActiveTab(id)}
             className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md transition-all ${
-              activeTab === id ? 'bg-clover-blue/10 text-clover-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
+              activeTab === id ? 'bg-clauday-blue/10 text-clauday-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
             }`}>
             <Icon size={13} /> {label}
           </button>
@@ -78,8 +78,8 @@ const MODEL_FEATURES: ModelFeatureDef[] = [
 
 const MODEL_INFO: Record<AIModelName, { label: string; speed: string; quality: string; cost: string; color: string }> = {
   haiku: { label: 'Haiku', speed: '매우 빠름', quality: '기본', cost: '$', color: 'text-emerald-400 bg-emerald-400/10' },
-  sonnet: { label: 'Sonnet', speed: '빠름', quality: '좋음', cost: '$$', color: 'text-clover-blue bg-clover-blue/10' },
-  opus: { label: 'Opus', speed: '느림', quality: '최상', cost: '$$$', color: 'text-clover-orange bg-clover-orange/10' }
+  sonnet: { label: 'Sonnet', speed: '빠름', quality: '좋음', cost: '$$', color: 'text-clauday-blue bg-clauday-blue/10' },
+  opus: { label: 'Opus', speed: '느림', quality: '최상', cost: '$$$', color: 'text-clauday-orange bg-clauday-orange/10' }
 }
 
 function ModelSettings(): JSX.Element {
@@ -180,7 +180,7 @@ function ModelSettings(): JSX.Element {
         <div className="flex items-center gap-3">
           {saved && <span className="flex items-center gap-1 text-xs text-emerald-400"><Check size={12} /> 저장됨</span>}
           <button onClick={handleSave} disabled={saving}
-            className="px-5 py-2 rounded-lg bg-clover-blue text-white text-sm font-medium hover:bg-clover-blue/80 disabled:opacity-50">
+            className="px-5 py-2 rounded-lg bg-clauday-blue text-white text-sm font-medium hover:bg-clauday-blue/80 disabled:opacity-50">
             {saving ? '저장 중...' : '저장'}
           </button>
         </div>
@@ -266,7 +266,7 @@ function DoorayTokenSettings(): JSX.Element {
       </div>
 
       {/* 토큰 발급 안내 */}
-      <div className="p-3 rounded-xl bg-clover-blue/5 border border-clover-blue/20 mb-3">
+      <div className="p-3 rounded-xl bg-clauday-blue/5 border border-clauday-blue/20 mb-3">
         <p className="text-[11px] text-text-secondary mb-2">
           <strong className="text-text-primary">토큰 발급 방법:</strong>
         </p>
@@ -276,9 +276,9 @@ function DoorayTokenSettings(): JSX.Element {
           <li>"새 토큰 발급" → 권한: 프로젝트/캘린더/위키 읽기·쓰기</li>
           <li>발급된 토큰을 아래 입력란에 붙여넣기</li>
         </ol>
-        <a href="https://helpdesk.dooray.com/en/kb/article/2021003040" target="_blank" rel="noreferrer"
-          className="inline-flex items-center gap-1 mt-2 text-[10px] text-clover-blue hover:underline">
-          <ExternalLink size={10} /> 두레이 공식 가이드
+        <a href="https://nhnent.dooray.com/setting/api/token" target="_blank" rel="noreferrer"
+          className="inline-flex items-center gap-1 mt-2 text-[10px] text-clauday-blue hover:underline">
+          <ExternalLink size={10} /> API 토큰 발급 페이지 열기
         </a>
       </div>
 
@@ -293,7 +293,7 @@ function DoorayTokenSettings(): JSX.Element {
             value={newToken}
             onChange={(e) => setNewToken(e.target.value)}
             placeholder="dooray:xxxxxxxxxxxxxxxxxxxxxxxxx"
-            className="w-full pl-3 pr-9 py-2 bg-bg-surface border border-bg-border rounded-lg text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue font-mono"
+            className="w-full pl-3 pr-9 py-2 bg-bg-surface border border-bg-border rounded-lg text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue font-mono"
           />
           <button onClick={() => setShowToken(!showToken)}
             className="absolute right-2 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary">
@@ -301,7 +301,7 @@ function DoorayTokenSettings(): JSX.Element {
           </button>
         </div>
         <button onClick={handleSave} disabled={saving || !newToken.trim()}
-          className="mt-2 px-4 py-1.5 rounded-lg bg-clover-blue text-white text-xs font-medium hover:bg-clover-blue/80 disabled:opacity-50">
+          className="mt-2 px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-xs font-medium hover:bg-clauday-blue/80 disabled:opacity-50">
           {saving ? '검증 중...' : '저장 및 검증'}
         </button>
       </div>
@@ -431,7 +431,7 @@ function CalDAVSettings(): JSX.Element {
       </div>
 
       {/* 비번 발급 안내 */}
-      <div className="p-3 rounded-xl bg-clover-blue/5 border border-clover-blue/20 mb-3">
+      <div className="p-3 rounded-xl bg-clauday-blue/5 border border-clauday-blue/20 mb-3">
         <p className="text-[11px] text-text-secondary mb-2">
           <strong className="text-text-primary">CalDAV 비밀번호 발급:</strong>
         </p>
@@ -441,7 +441,7 @@ function CalDAVSettings(): JSX.Element {
           <li>아이디(이메일)와 복사한 비밀번호를 아래에 입력</li>
         </ol>
         <a href="https://nhnent.dooray.com/setting/calendar/caldav" target="_blank" rel="noreferrer"
-          className="inline-flex items-center gap-1 mt-2 text-[10px] text-clover-blue hover:underline">
+          className="inline-flex items-center gap-1 mt-2 text-[10px] text-clauday-blue hover:underline">
           <ExternalLink size={10} /> 두레이 CalDAV 설정 페이지 열기
         </a>
         <p className="text-[9px] text-text-tertiary mt-2">서버: <code className="font-mono text-text-secondary">caldav.dooray.com</code> (고정)</p>
@@ -455,7 +455,7 @@ function CalDAVSettings(): JSX.Element {
             type="email" autoComplete="username"
             value={username} onChange={(e) => setUsername(e.target.value)}
             placeholder="you@nhndooray.com"
-            className="w-full px-3 py-2 bg-bg-surface border border-bg-border rounded-lg text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue"
+            className="w-full px-3 py-2 bg-bg-surface border border-bg-border rounded-lg text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
           />
         </div>
 
@@ -466,7 +466,7 @@ function CalDAVSettings(): JSX.Element {
               type={showPw ? 'text' : 'password'} autoComplete="off"
               value={password} onChange={(e) => setPassword(e.target.value)}
               placeholder="두레이에서 발급된 CalDAV 비밀번호"
-              className="w-full pl-3 pr-9 py-2 bg-bg-surface border border-bg-border rounded-lg text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue font-mono"
+              className="w-full pl-3 pr-9 py-2 bg-bg-surface border border-bg-border rounded-lg text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue font-mono"
             />
             <button onClick={() => setShowPw(!showPw)}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary">
@@ -493,7 +493,7 @@ function CalDAVSettings(): JSX.Element {
             연결 테스트
           </button>
           <button onClick={handleSave} disabled={saving || testing || !username.trim() || !password}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-clover-blue text-white text-xs font-medium hover:bg-clover-blue/80 disabled:opacity-50">
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-xs font-medium hover:bg-clauday-blue/80 disabled:opacity-50">
             {saving && <Loader2 size={12} className="animate-spin" />}
             저장 및 연결
           </button>
@@ -510,7 +510,7 @@ function CalDAVSettings(): JSX.Element {
         width={420}
         title="CalDAV 동기화"
         icon={syncProgress.stage === 'syncing'
-          ? <Loader2 size={14} className="animate-spin text-clover-blue" />
+          ? <Loader2 size={14} className="animate-spin text-clauday-blue" />
           : syncProgress.stage === 'complete'
             ? <Check size={14} className="text-emerald-400" />
             : <AlertCircle size={14} className="text-rose-400" />}
@@ -528,7 +528,7 @@ function CalDAVSettings(): JSX.Element {
                 </span>
               </div>
               <div className="w-full h-1.5 rounded-full bg-bg-surface overflow-hidden">
-                <div className="h-full bg-clover-blue transition-all duration-300"
+                <div className="h-full bg-clauday-blue transition-all duration-300"
                   style={{ width: syncProgress.total > 0 ? `${(syncProgress.current / syncProgress.total) * 100}%` : '5%' }} />
               </div>
             </div>
@@ -540,7 +540,7 @@ function CalDAVSettings(): JSX.Element {
             <p className="text-[10px] text-text-tertiary">이후엔 45초 주기로 변경분만 자동 동기화됩니다.</p>
             <div className="flex justify-end">
               <button onClick={() => setSyncProgress({ stage: 'idle' })}
-                className="px-4 py-1.5 rounded-lg bg-clover-blue text-white text-[11px] font-medium hover:bg-clover-blue/80">
+                className="px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-[11px] font-medium hover:bg-clauday-blue/80">
                 확인
               </button>
             </div>
@@ -551,7 +551,7 @@ function CalDAVSettings(): JSX.Element {
             <p className="text-[11px] text-rose-400">{syncProgress.message}</p>
             <div className="flex justify-end">
               <button onClick={() => setSyncProgress({ stage: 'idle' })}
-                className="px-4 py-1.5 rounded-lg bg-clover-blue text-white text-[11px] font-medium hover:bg-clover-blue/80">
+                className="px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-[11px] font-medium hover:bg-clauday-blue/80">
                 닫기
               </button>
             </div>
@@ -609,11 +609,11 @@ function AppBehaviorSettings(): JSX.Element {
           ]).map(({ value, label, icon: Icon, description }) => (
             <button key={value} onClick={() => setTheme(value)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left ${
-                theme === value ? 'bg-clover-blue/10 border border-clover-blue/40' : 'hover:bg-bg-surface-hover border border-transparent'
+                theme === value ? 'bg-clauday-blue/10 border border-clauday-blue/40' : 'hover:bg-bg-surface-hover border border-transparent'
               }`}>
-              <Icon size={16} className={theme === value ? 'text-clover-blue' : 'text-text-tertiary'} />
+              <Icon size={16} className={theme === value ? 'text-clauday-blue' : 'text-text-tertiary'} />
               <div className="flex-1 min-w-0">
-                <p className={`text-xs ${theme === value ? 'text-clover-blue font-medium' : 'text-text-primary'}`}>{label}</p>
+                <p className={`text-xs ${theme === value ? 'text-clauday-blue font-medium' : 'text-text-primary'}`}>{label}</p>
                 <p className="text-[10px] text-text-tertiary mt-0.5">{description}</p>
               </div>
             </button>
@@ -649,13 +649,13 @@ function AppBehaviorSettings(): JSX.Element {
           {STARTUP_OPTIONS.map((opt) => (
             <label key={opt.value}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-                startupView === opt.value ? 'bg-clover-blue/10' : 'hover:bg-bg-surface-hover'
+                startupView === opt.value ? 'bg-clauday-blue/10' : 'hover:bg-bg-surface-hover'
               }`}>
               <input type="radio" name="startup" checked={startupView === opt.value}
                 onChange={() => save(opt.value)}
-                className="accent-clover-blue" />
+                className="accent-clauday-blue" />
               <div className="flex-1 min-w-0">
-                <p className={`text-xs ${startupView === opt.value ? 'text-clover-blue font-medium' : 'text-text-primary'}`}>{opt.label}</p>
+                <p className={`text-xs ${startupView === opt.value ? 'text-clauday-blue font-medium' : 'text-text-primary'}`}>{opt.label}</p>
                 <p className="text-[10px] text-text-tertiary mt-0.5">{opt.description}</p>
               </div>
             </label>
@@ -663,10 +663,60 @@ function AppBehaviorSettings(): JSX.Element {
         </div>
       </div>
 
+      {/* 알림 */}
+      <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden mt-3">
+        <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30">
+          <span className="text-xs font-medium text-text-primary">알림</span>
+        </div>
+        <div className="p-2">
+          <AiRecommendNotifyToggle />
+        </div>
+      </div>
+
       <p className="text-[10px] text-text-tertiary mt-3">
         💡 <strong className="text-text-secondary">AI 스킬 관리</strong>는 각 AI 기능 화면 우측의 <span className="text-amber-400 font-medium">스킬</span> 버튼에서 바로 할 수 있습니다.
       </p>
     </div>
+  )
+}
+
+/**
+ * AI 추천 새 글 OS 알림 토글 — 1시간 폴링 + 22~9시 silent.
+ * 사용자 설정은 main 측 electron-store 에 저장. UI 는 단순 boolean.
+ */
+function AiRecommendNotifyToggle(): JSX.Element {
+  const [enabled, setEnabled] = useState<boolean>(true)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    window.api.aiRecommendNotify.getEnabled()
+      .then((v) => { if (!cancelled) setEnabled(!!v) })
+      .catch(() => { /* default true */ })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+  const toggle = async (): Promise<void> => {
+    setSaving(true)
+    const next = !enabled
+    try {
+      const r = await window.api.aiRecommendNotify.setEnabled(next)
+      setEnabled(r.enabled)
+    } finally {
+      setSaving(false)
+    }
+  }
+  return (
+    <label className="flex items-start gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-bg-surface-hover">
+      <input type="checkbox" checked={enabled} onChange={toggle} disabled={loading || saving}
+        className="accent-clauday-blue mt-0.5" />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-text-primary">AI 추천 새 글 알림</p>
+        <p className="text-[10px] text-text-tertiary mt-0.5">
+          두레이 "AI 활용 사례" 프로젝트에 새 글이 올라오면 데스크톱 알림 (1시간 주기, 22~9시 보류)
+        </p>
+      </div>
+    </label>
   )
 }
 
@@ -698,9 +748,9 @@ function FontSettingsSection(): JSX.Element {
             return (
               <button key={f} onClick={() => setFamily(f)}
                 className={`px-3 py-2 rounded-md text-left transition-colors border ${
-                  active ? 'bg-clover-blue/10 border-clover-blue/40' : 'bg-bg-primary border-bg-border hover:border-bg-border-light'
+                  active ? 'bg-clauday-blue/10 border-clauday-blue/40' : 'bg-bg-primary border-bg-border hover:border-bg-border-light'
                 }`}>
-                <span className={`block text-xs ${active ? 'text-clover-blue font-medium' : 'text-text-primary'}`}>
+                <span className={`block text-xs ${active ? 'text-clauday-blue font-medium' : 'text-text-primary'}`}>
                   {FONT_FAMILY_LABELS[f]}
                 </span>
                 <span className="block text-[10px] text-text-tertiary mt-0.5">안녕하세요 Abc 123</span>
@@ -723,14 +773,14 @@ function FontSettingsSection(): JSX.Element {
           step={5}
           value={pct}
           onChange={(e) => setScale(Number(e.target.value) / 100)}
-          className="w-full accent-clover-blue"
+          className="w-full accent-clauday-blue"
         />
         <div className="flex flex-wrap gap-1.5 mt-2">
           {SCALE_PRESETS.map((p) => (
             <button key={p.value} onClick={() => setScale(p.value)}
               className={`px-2.5 py-1 rounded-md text-[10px] border transition-colors ${
                 Math.abs(settings.scale - p.value) < 0.01
-                  ? 'bg-clover-blue/10 border-clover-blue/40 text-clover-blue font-medium'
+                  ? 'bg-clauday-blue/10 border-clauday-blue/40 text-clauday-blue font-medium'
                   : 'bg-bg-primary border-bg-border text-text-secondary hover:text-text-primary'
               }`}>
               {p.label} <span className="text-text-tertiary">{Math.round(p.value * 100)}%</span>

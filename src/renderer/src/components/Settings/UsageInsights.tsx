@@ -133,22 +133,22 @@ function UsageInsights(): JSX.Element {
 
       {/* 요약 카드 */}
       <div className="grid grid-cols-4 gap-2">
-        <SummaryCard icon={Activity} label="총 이벤트" value={`${summary.totalEvents}`} color="text-clover-blue" />
-        <SummaryCard icon={Zap} label="AI 호출" value={Object.values(summary.aiUsage).reduce((s, v) => s + v.count, 0).toString()} color="text-clover-orange" />
+        <SummaryCard icon={Activity} label="총 이벤트" value={`${summary.totalEvents}`} color="text-clauday-blue" />
+        <SummaryCard icon={Zap} label="AI 호출" value={Object.values(summary.aiUsage).reduce((s, v) => s + v.count, 0).toString()} color="text-clauday-orange" />
         <SummaryCard icon={ThumbsUp} label="만족도" value={feedbackTotal > 0 ? `${positiveRate}%` : '-'} color="text-emerald-400" />
         <SummaryCard icon={TrendingUp} label="스킬" value={`${summary.skills.totalCreated}`} color="text-violet-400" />
       </div>
 
       {/* 개인화 제안 */}
       {suggestions.length > 0 && (
-        <section className="p-4 rounded-xl bg-gradient-to-r from-clover-orange/5 to-clover-blue/5 border border-clover-orange/20">
-          <h4 className="text-[11px] font-semibold text-clover-orange flex items-center gap-1.5 mb-2">
+        <section className="p-4 rounded-xl bg-gradient-to-r from-clauday-orange/5 to-clauday-blue/5 border border-clauday-orange/20">
+          <h4 className="text-[11px] font-semibold text-clauday-orange flex items-center gap-1.5 mb-2">
             <Lightbulb size={11} /> 개선 제안
           </h4>
           <ul className="space-y-1">
             {suggestions.map((s, i) => (
               <li key={i} className="text-[11px] text-text-primary flex gap-2">
-                <span className="text-clover-orange flex-shrink-0">·</span>{s.text}
+                <span className="text-clauday-orange flex-shrink-0">·</span>{s.text}
               </li>
             ))}
           </ul>
@@ -170,7 +170,7 @@ function UsageInsights(): JSX.Element {
                   <span className="text-[10px] text-text-tertiary font-mono w-5">#{i + 1}</span>
                   <span className="text-xs text-text-primary w-28 flex-shrink-0">{label(item.feature)}</span>
                   <div className="flex-1 h-2 bg-bg-primary rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-clover-blue to-clover-orange" style={{ width: `${pct}%` }} />
+                    <div className="h-full bg-gradient-to-r from-clauday-blue to-clauday-orange" style={{ width: `${pct}%` }} />
                   </div>
                   <span className="text-[11px] text-text-secondary font-mono w-10 text-right">{item.count}</span>
                 </div>

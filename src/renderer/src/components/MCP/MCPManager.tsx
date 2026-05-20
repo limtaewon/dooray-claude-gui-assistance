@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Plus, RefreshCw, Server, Sparkles, Download, Trash2, Upload, X, CheckSquare, FolderOpen } from 'lucide-react'
+import { Plus, RefreshCw, Server, Sparkles, Download, Trash2, Upload, X, CheckSquare, FolderOpen, Globe } from 'lucide-react'
 import MCPCard from './MCPCard'
 import MCPForm from './MCPForm'
 import type { McpServerConfig } from '../../../../shared/types/mcp'
-import { Button, EmptyView, LoadingView, SegTabs, useToast } from '../common/ds'
+import { getMcpTransport } from '../../../../shared/types/mcp'
+import { Button, EmptyView, LoadingView, Modal, SegTabs, useToast } from '../common/ds'
 import { DEFAULT_WIKIS } from '../../../../shared/wiki-storage-defaults'
 import WikiStoragePicker from '../common/WikiStoragePicker'
 
@@ -43,6 +44,9 @@ function MCPManager(): JSX.Element {
   // 다중 선택 (로컬 탭 한정)
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+
+  // #1 공유 카드 클릭 시 상세 모달 (JSON config 본문 노출)
+  const [previewItem, setPreviewItem] = useState<WikiMcpEntry | null>(null)
 
   // 공유에 올릴 위키 타겟 선택 popup — 등록 위키 2개 이상일 때 노출.
   const [shareTargetPicker, setShareTargetPicker] = useState<{ names: string[] } | null>(null)
@@ -402,9 +406,9 @@ function MCPManager(): JSX.Element {
   return (
     <div className="h-full overflow-y-auto">
       {uploadProgress && (
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-2xl border border-clover-blue/40"
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-2xl border border-clauday-blue/40"
           style={{ background: 'var(--bg-surface-raised)' }}>
-          <RefreshCw size={14} className="animate-spin text-clover-blue" />
+          <RefreshCw size={14} className="animate-spin text-clauday-blue" />
           <div className="flex flex-col">
             <span className="text-[12px] text-text-primary font-medium">
               {uploadProgress.wikiName} 에 업로드 중 ({uploadProgress.current}/{uploadProgress.total})
@@ -416,7 +420,7 @@ function MCPManager(): JSX.Element {
       <div className="px-5 py-4 space-y-4">
         {/* DS PageHeader */}
         <div className="flex items-center gap-3 flex-wrap">
-          <Server size={18} className="text-clover-blue" />
+          <Server size={18} className="text-clauday-blue" />
           <h2 className="text-[14px] font-semibold text-text-primary">MCP 서버</h2>
           <span className="text-[11px] text-text-tertiary">
             · {entries.length}개 · 활성 {activeCount}
@@ -487,7 +491,7 @@ function MCPManager(): JSX.Element {
 
         {/* 다중 선택 액션바 — local + wiki 둘 다 */}
         {selectMode && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-clover-orange/8 border border-clover-orange/30">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-clauday-orange/8 border border-clauday-orange/30">
             <span className="text-xs text-text-primary font-medium">{selected.size}개 선택됨</span>
             <button
               type="button"
@@ -496,7 +500,7 @@ function MCPManager(): JSX.Element {
                 if (selected.size === all.length) setSelected(new Set())
                 else setSelected(new Set(all))
               }}
-              className="text-[11px] text-clover-orange hover:underline"
+              className="text-[11px] text-clauday-orange hover:underline"
             >
               {(() => {
                 const all = tab === 'local' ? entries.length : wikiItems.length
@@ -579,11 +583,16 @@ function MCPManager(): JSX.Element {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {wikiItems.map((item) => {
                 const isSelected = selectMode && selected.has(item.pageId)
+                // 공유 위키 본문(item.content)에서 config 파싱 — 로컬 카드와 동일한 정보 노출 (transport/url/args 등)
+                const config = parseMcpFromWiki(item.content)
+                const transport = config ? getMcpTransport(config) : null
+                const isRemote = transport === 'http' || transport === 'sse'
+                const headerCount = config?.headers ? Object.keys(config.headers).length : 0
                 return (
                   <div
                     key={item.pageId}
-                    onClick={selectMode ? () => toggleSelected(item.pageId) : undefined}
-                    className={`ds-card transition-all ${selectMode ? 'cursor-pointer' : ''}`}
+                    onClick={selectMode ? () => toggleSelected(item.pageId) : () => setPreviewItem(item)}
+                    className={`ds-card transition-all cursor-pointer hover:border-clauday-blue/40`}
                     style={{
                       padding: '12px 14px',
                       ...(isSelected
@@ -592,21 +601,76 @@ function MCPManager(): JSX.Element {
                     }}
                   >
                     <div className="flex items-start gap-2.5">
-                      <div className="w-7 h-7 rounded-[6px] flex-none flex items-center justify-center bg-clover-blue/10">
-                        <Server size={15} className="text-clover-blue" />
+                      <div className="w-8 h-8 rounded-[6px] flex-none flex items-center justify-center bg-clauday-blue/10">
+                        {isRemote
+                          ? <Globe size={16} className="text-clauday-blue" />
+                          : <Server size={16} className="text-clauday-blue" />}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-[13px] font-semibold text-text-primary truncate">{item.name}</div>
-                        <div className="text-[10px] text-text-tertiary mt-0.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h3 className="text-[13px] font-semibold text-text-primary truncate">{item.name}</h3>
+                          {transport && (
+                            <span
+                              className="px-1.5 py-0.5 rounded-[4px] text-[9px] font-mono uppercase bg-bg-surface-hover text-text-tertiary border border-bg-border"
+                              style={{ flex: 'none' }}
+                            >
+                              {transport}
+                            </span>
+                          )}
+                        </div>
+                        {config && (
+                          <p className="text-[11px] text-text-secondary font-mono mt-0.5 truncate">
+                            {isRemote ? (
+                              <>
+                                {config.url || <span className="text-text-tertiary">URL 없음</span>}
+                                {headerCount > 0 && (
+                                  <span className="text-text-tertiary"> · 헤더 {headerCount}개</span>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                {config.command || <span className="text-text-tertiary">커맨드 없음</span>}
+                                {config.args && config.args.length > 0 && (
+                                  <span className="text-text-tertiary"> · {config.args.length}개 인자</span>
+                                )}
+                              </>
+                            )}
+                          </p>
+                        )}
+                        <div className="text-[10px] text-text-tertiary mt-1">
                           {item.updatedAt ? new Date(item.updatedAt).toLocaleString('ko-KR') : '날짜 없음'}
                         </div>
                       </div>
                     </div>
+                    {config && !isRemote && config.args && config.args.length > 0 && (
+                      <div className="mt-2.5 flex flex-wrap gap-1">
+                        {config.args.map((arg, i) => (
+                          <span
+                            key={i}
+                            className="px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono bg-bg-surface-hover text-text-secondary border border-bg-border"
+                          >
+                            {arg}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {config && isRemote && headerCount > 0 && (
+                      <div className="mt-2.5 flex flex-wrap gap-1">
+                        {Object.keys(config.headers || {}).map((h) => (
+                          <span
+                            key={h}
+                            className="px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono bg-bg-surface-hover text-text-secondary border border-bg-border"
+                          >
+                            {h}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     {!selectMode && (
                       <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-bg-border/60">
                         <div className="flex-1" />
                         <button onClick={(e) => { e.stopPropagation(); handleDownloadFromWiki(item) }}
-                          className="flex items-center gap-1 text-[11px] text-text-secondary hover:text-clover-blue">
+                          className="flex items-center gap-1 text-[11px] text-text-secondary hover:text-clauday-blue">
                           <Download size={11} /> 적용
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); handleDeleteFromWiki(item) }}
@@ -629,6 +693,46 @@ function MCPManager(): JSX.Element {
           </span>
         </div>
       </div>
+
+      {/* #1 MCP 공유 카드 상세 모달 — 본문(JSON config) 렌더 + 적용/삭제 */}
+      <Modal
+        open={!!previewItem}
+        onClose={() => setPreviewItem(null)}
+        width="min(800px, 92vw)"
+        icon={<Server size={14} className="text-clauday-blue" />}
+        title={previewItem?.name}
+        footer={
+          <>
+            {previewItem && (
+              <span className="text-[11px] text-text-tertiary">
+                {previewItem.updatedAt ? new Date(previewItem.updatedAt).toLocaleString('ko-KR') : ''}
+              </span>
+            )}
+            <div style={{ flex: 1 }} />
+            <Button variant="ghost" onClick={() => setPreviewItem(null)}>닫기</Button>
+            {previewItem && (
+              <Button
+                variant="primary"
+                onClick={async () => {
+                  const it = previewItem
+                  setPreviewItem(null)
+                  await handleDownloadFromWiki(it)
+                }}
+                leftIcon={<Download size={12} />}
+              >
+                적용
+              </Button>
+            )}
+          </>
+        }
+      >
+        {previewItem && (
+          <pre className="font-mono text-[11.5px] leading-relaxed text-text-primary whitespace-pre-wrap break-words"
+            style={{ maxHeight: '60vh', overflow: 'auto' }}>
+            {previewItem.content || '(본문 없음)'}
+          </pre>
+        )}
+      </Modal>
 
       {/* 공유 위키 타겟 선택 — 등록 위키 2개 이상일 때 */}
       {shareTargetPicker && (
@@ -660,7 +764,7 @@ function MCPManager(): JSX.Element {
                   className="w-full flex items-center gap-2 px-4 py-2 text-left text-[12px] text-text-secondary hover:bg-bg-surface-hover transition-colors"
                   type="button"
                 >
-                  <FolderOpen size={12} className="text-clover-blue" />
+                  <FolderOpen size={12} className="text-clauday-blue" />
                   <span className="flex-1">{w.wikiName || w.wikiId}</span>
                 </button>
               ))}

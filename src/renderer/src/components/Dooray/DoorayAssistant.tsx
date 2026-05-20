@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   LogOut, Sparkles, ListTodo, BookOpen, Calendar as CalendarIcon, FileText, MessageCircle, LayoutDashboard
 } from 'lucide-react'
@@ -20,6 +20,19 @@ interface DoorayAssistantProps {
 
 function DoorayAssistant({ onDisconnect }: DoorayAssistantProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard')
+
+  // #4 Cmd+E 의 Recent Views 가 두레이 sub-tab 별로 분리되도록 변경 시 알림 + 외부 이동 명령 수신
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('dooray-subtab', { detail: { tab: activeTab } }))
+  }, [activeTab])
+  useEffect(() => {
+    const onGoto = (e: Event): void => {
+      const tab = (e as CustomEvent<{ tab?: Tab }>).detail?.tab
+      if (tab) setActiveTab(tab)
+    }
+    window.addEventListener('goto-dooray-subtab', onGoto as EventListener)
+    return () => window.removeEventListener('goto-dooray-subtab', onGoto as EventListener)
+  }, [])
 
   const tabs: { id: Tab; icon: typeof Sparkles; label: string }[] = [
     { id: 'dashboard', icon: LayoutDashboard, label: '대시보드' },
@@ -46,7 +59,7 @@ function DoorayAssistant({ onDisconnect }: DoorayAssistantProps): JSX.Element {
               onClick={() => setActiveTab(id)}
               className={`ds-tab ${aiActive ? 'ai' : ''} ${active ? 'active' : ''}`}
             >
-              <Icon size={12} className={aiActive ? 'text-clover-orange' : ''} />
+              <Icon size={12} className={aiActive ? 'text-clauday-orange' : ''} />
               {label}
             </button>
           )

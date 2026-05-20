@@ -12,6 +12,22 @@ export interface AIToolCall {
   result?: string
 }
 
+/** AI 분석에 실제로 들어간 원본 데이터 카운트 — 사용자가 "뭘 보고 만든 결과인지" 확인용.
+ *  delegateAll=true(위임 모드) 면 main 이 사전 fetch 한 것은 캘린더뿐이고 task 류는 AI 가 MCP 로 직접 수집.
+ */
+export interface AISourceMeta {
+  taskCount: number
+  ccTaskCount: number
+  dueTodayCount: number
+  eventCount: number
+  /** "5/20~5/27" 같은 일정 범위 라벨 */
+  eventRange?: string
+  /** 분석 기준 시각 — ISO */
+  collectedAt: string
+  /** 위임 모드 여부 — UI 에서 "+ AI 가 MCP 로 추가 수집" 안내 표시 */
+  delegated?: boolean
+}
+
 export interface AIBriefing {
   greeting: string
   urgent: Array<{ taskId: string; subject: string; reason: string }>
@@ -20,6 +36,7 @@ export interface AIBriefing {
   stale: Array<{ taskId: string; subject: string; daysSinceCreated: number }>
   todayEvents: Array<{ subject: string; time: string }>
   recommendations: string[]
+  sourceMeta?: AISourceMeta
 }
 
 export interface AIReportRequest {
@@ -30,6 +47,7 @@ export interface AIReport {
   title: string
   content: string
   generatedAt: string
+  sourceMeta?: AISourceMeta
 }
 
 export interface AIWikiRequest {

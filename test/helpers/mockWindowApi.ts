@@ -116,6 +116,20 @@ export function createMockWindowApi(): Record<string, unknown> {
       update: vi.fn().mockResolvedValue({ ok: true }),
       delete: vi.fn().mockResolvedValue({ ok: true })
     },
+    shell: {
+      openPath: vi.fn().mockResolvedValue({ ok: true }),
+      readImageDataUrl: vi.fn().mockResolvedValue({ ok: true, dataUrl: '' }),
+      showInFolder: vi.fn().mockResolvedValue({ ok: true })
+    },
+    claudeMdTemplates: {
+      list: vi.fn().mockResolvedValue([]),
+      apply: vi.fn().mockResolvedValue({ ok: true })
+    },
+    aiRecommendNotify: {
+      getEnabled: vi.fn().mockResolvedValue(true),
+      setEnabled: vi.fn().mockResolvedValue({ ok: true, enabled: true }),
+      onGoto: vi.fn().mockReturnValue(noopUnsub)
+    },
     terminal: {
       create: vi.fn().mockImplementation(async (_opts?: unknown) => ({
         id: `term-${Math.random().toString(36).slice(2, 8)}`,

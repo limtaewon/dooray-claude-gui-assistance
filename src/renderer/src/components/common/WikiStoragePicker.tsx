@@ -132,11 +132,11 @@ function WikiStoragePicker({
     <div className="relative inline-flex">
       <button
         onClick={() => setMode(mode === 'closed' ? 'switcher' : 'closed')}
-        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-bg-border bg-bg-surface hover:border-clover-blue/40 text-[11px] text-text-primary"
+        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-bg-border bg-bg-surface hover:border-clauday-blue/40 text-[11px] text-text-primary"
         type="button"
         title="위키 저장소 전환"
       >
-        <FolderOpen size={11} className="text-clover-blue" />
+        <FolderOpen size={11} className="text-clauday-blue" />
         <span className="font-medium max-w-[120px] truncate">{triggerLabel}</span>
         {registered.length > 1 && (
           <span className="text-[9px] text-text-tertiary">({registered.length})</span>
@@ -154,7 +154,7 @@ function WikiStoragePicker({
                 <span className="text-[11px] font-semibold text-text-primary">위키 저장소</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); setMode('manage') }}
-                  className="p-1 rounded hover:bg-bg-primary text-text-tertiary hover:text-clover-blue"
+                  className="p-1 rounded hover:bg-bg-primary text-text-tertiary hover:text-clauday-blue"
                   title="위키 추가/관리"
                   type="button"
                 >
@@ -166,7 +166,7 @@ function WikiStoragePicker({
                   <div className="px-3 py-6 text-[10px] text-text-tertiary text-center">
                     등록된 위키가 없습니다
                     <br/>
-                    <span className="text-clover-blue">우상단 + 로 추가</span>
+                    <span className="text-clauday-blue">우상단 + 로 추가</span>
                   </div>
                 ) : registered.map((w) => {
                   const isActive = w.wikiId === activeWikiId
@@ -177,12 +177,12 @@ function WikiStoragePicker({
                       onClick={() => handleSelectActive(w.wikiId)}
                       className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[11px] transition-colors ${
                         isActive
-                          ? 'bg-clover-blue/15 text-text-primary font-medium'
+                          ? 'bg-clauday-blue/15 text-text-primary font-medium'
                           : 'text-text-secondary hover:bg-bg-surface-hover'
                       }`}
                       type="button"
                     >
-                      <FolderOpen size={11} className={isActive ? 'text-clover-blue' : 'text-text-tertiary'} />
+                      <FolderOpen size={11} className={isActive ? 'text-clauday-blue' : 'text-text-tertiary'} />
                       <span className="truncate flex-1">{w.wikiName || w.wikiId}</span>
                       {isLocked && <Lock size={9} className="text-text-tertiary" />}
                     </button>
@@ -215,7 +215,7 @@ function WikiStoragePicker({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="위키 검색..."
-                    className="w-full pl-6 pr-6 py-1 bg-bg-primary border border-bg-border rounded text-[11px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue"
+                    className="w-full pl-6 pr-6 py-1 bg-bg-primary border border-bg-border rounded text-[11px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
                   />
                   {searchQuery && (
                     <button onClick={() => setSearchQuery('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary" type="button">
@@ -244,21 +244,21 @@ function WikiStoragePicker({
                         type="button"
                       >
                         <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 ${
-                          checked ? 'bg-clover-blue border-clover-blue' : 'border-bg-border-light'
+                          checked ? 'bg-clauday-blue border-clauday-blue' : 'border-bg-border-light'
                         }`}>
                           {checked && <Check size={9} className="text-white" />}
                         </div>
                         {w.isCustom ? (
-                          <Link size={11} className={`flex-shrink-0 ${checked ? 'text-clover-orange' : 'text-text-tertiary'}`} />
+                          <Link size={11} className={`flex-shrink-0 ${checked ? 'text-clauday-orange' : 'text-text-tertiary'}`} />
                         ) : (
-                          <FolderOpen size={11} className={`flex-shrink-0 ${checked ? 'text-clover-blue' : 'text-text-tertiary'}`} />
+                          <FolderOpen size={11} className={`flex-shrink-0 ${checked ? 'text-clauday-blue' : 'text-text-tertiary'}`} />
                         )}
                         <span className={`text-[11px] truncate min-w-0 flex-1 ${checked ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>
                           {w.wikiName || w.wikiId}
                         </span>
                         {isLocked && <Lock size={9} className="text-text-tertiary flex-shrink-0" />}
                         {isActive && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-clover-blue text-white">활성</span>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-clauday-blue text-white">활성</span>
                         )}
                       </button>
                       {w.isCustom && !isLocked && checked && (
@@ -286,7 +286,7 @@ function WikiStoragePicker({
                         onChange={(e) => { setAddInput(e.target.value); setAddError('') }}
                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleManualAdd() }}
                         placeholder="위키 URL 또는 wikiId"
-                        className="flex-1 px-2 py-1 bg-bg-primary border border-bg-border rounded text-[11px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue"
+                        className="flex-1 px-2 py-1 bg-bg-primary border border-bg-border rounded text-[11px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
                         autoFocus
                       />
                       <button

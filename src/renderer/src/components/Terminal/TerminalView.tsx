@@ -151,7 +151,7 @@ function TerminalView(): JSX.Element {
               <p className="text-xs text-text-secondary mb-4">셸 세션을 시작하세요</p>
             </div>
             <button onClick={() => createSession()}
-              className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-clover-blue text-white text-sm hover:bg-clover-blue/80 transition-colors">
+              className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-clauday-blue text-white text-sm hover:bg-clauday-blue/80 transition-colors">
               <Terminal size={14} /> 새 터미널
             </button>
             <p className="text-[10px] text-text-tertiary">⌘T로 언제든 새 탭을 열 수 있습니다</p>
@@ -229,7 +229,7 @@ function TabLabel({
           }}
           onBlur={commit}
           onClick={(e) => e.stopPropagation()}
-          className="font-mono text-[11px] bg-transparent border border-clover-blue/40 rounded px-1 outline-none focus:border-clover-blue"
+          className="font-mono text-[11px] bg-transparent border border-clauday-blue/40 rounded px-1 outline-none focus:border-clauday-blue"
           style={{ minWidth: 80, maxWidth: 200 }}
         />
       ) : (

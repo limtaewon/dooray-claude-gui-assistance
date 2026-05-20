@@ -102,7 +102,7 @@ function ReportGenerator(): JSX.Element {
       {/* 헤더 */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-bg-border flex-shrink-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <FileText size={16} className="text-clover-orange" />
+          <FileText size={16} className="text-clauday-orange" />
           <span className="text-sm font-semibold text-text-primary">AI 업무 보고서</span>
           {/* 세그먼트 유형 선택 */}
           <div className="ds-seg ml-1">
@@ -184,10 +184,10 @@ function ReportGenerator(): JSX.Element {
               }}
             >
               <div className="flex items-center gap-2 flex-wrap">
-                <FileText size={14} className="text-clover-orange" />
+                <FileText size={14} className="text-clauday-orange" />
                 <span className="text-[13px] font-semibold text-text-primary">{report.title}</span>
                 <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                  reportType === 'daily' ? 'bg-clover-blue/15 text-clover-blue' : 'bg-clover-orange/15 text-clover-orange'
+                  reportType === 'daily' ? 'bg-clauday-blue/15 text-clauday-blue' : 'bg-clauday-orange/15 text-clauday-orange'
                 }`}>
                   {reportType === 'daily' ? '일일' : '주간'}
                 </span>
@@ -195,6 +195,11 @@ function ReportGenerator(): JSX.Element {
                   {new Date(report.generatedAt).toLocaleString('ko-KR')}
                 </span>
               </div>
+              {report.sourceMeta && (
+                <div className="mt-1 text-[10px] text-text-tertiary">
+                  참고: 내 태스크 {report.sourceMeta.taskCount}개 · 일정 {report.sourceMeta.eventCount}개
+                </div>
+              )}
             </div>
 
             {/* 도구 바 */}
@@ -202,7 +207,7 @@ function ReportGenerator(): JSX.Element {
               <button onClick={() => editMode ? setEditMode(false) : startEdit()}
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] transition-colors border ${
                   editMode
-                    ? 'bg-clover-blue/10 border-clover-blue/30 text-clover-blue'
+                    ? 'bg-clauday-blue/10 border-clauday-blue/30 text-clauday-blue'
                     : 'bg-bg-surface border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light'
                 }`}>
                 {editMode ? '미리보기' : '편집'}
@@ -223,7 +228,7 @@ function ReportGenerator(): JSX.Element {
               <div className="p-5">
                 {editMode ? (
                   <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)}
-                    className="w-full min-h-[400px] bg-bg-primary border border-bg-border rounded-lg p-4 text-xs text-text-primary font-mono focus:outline-none focus:border-clover-blue resize-y" />
+                    className="w-full min-h-[400px] bg-bg-primary border border-bg-border rounded-lg p-4 text-xs text-text-primary font-mono focus:outline-none focus:border-clauday-blue resize-y" />
                 ) : (
                   <div className="markdown-body text-sm leading-relaxed">
                     <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
@@ -240,7 +245,7 @@ function ReportGenerator(): JSX.Element {
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
               style={{ background: 'linear-gradient(135deg, rgba(234,88,12,0.12), rgba(37,99,235,0.12))' }}>
-              <FileText size={26} className="text-clover-orange" />
+              <FileText size={26} className="text-clauday-orange" />
             </div>
             <p className="text-sm font-medium text-text-primary">AI 업무 보고서</p>
             <p className="text-xs text-text-secondary mt-1">{reportType === 'daily' ? '일일' : '주간'} 보고서 유형을 선택하고 생성 버튼을 누르세요</p>

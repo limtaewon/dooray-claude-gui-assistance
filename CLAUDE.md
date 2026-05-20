@@ -90,6 +90,21 @@ npm run icons        # scripts/generate-icons.mjs
 - 디자인 토큰 / 공용 컴포넌트는 `components/common/ds`. 새 UI는 가급적 디자인 시스템 컴포넌트를 재사용.
 - 한글 주석 OK. 사용자 문구는 자연스러운 한국어로.
 
+## 기능 추가 시 필수 작업 (Definition of Done)
+
+새 기능 / 새 모듈을 추가하거나 사용자 가시 동작을 변경할 때 아래 둘은 같은 PR 안에 반드시 포함한다.
+
+1. **테스트 코드 작성**
+   - 새 모듈(`src/main/**`, `src/shared/**` 의 유틸/서비스)은 vitest 단위 테스트 동봉. 회귀 방지 목적의 표본 케이스만이라도 1개 이상.
+   - 버그 수정은 그 버그를 재현하는 테스트를 먼저 (또는 같이) 추가 — off-by-one, 정규식, 시간대 등 회귀가 자주 나는 영역은 특히 필수.
+   - IPC 핸들러처럼 electron 의존이 큰 코드는 핵심 로직만 순수 함수로 분리해서 테스트.
+   - 단위 게이트는 70% 라인 커버리지 (`vitest.config.ts` 의 thresholds) — 신규 모듈로 떨어뜨리지 말 것.
+
+2. **매뉴얼 업데이트**
+   - 사용자 가시 기능이면 `src/renderer/src/components/ClaudeManual/ClaudeManual.tsx` 의 `SECTIONS` 배열 안 해당 영역(또는 새 섹션)에 한국어로 짧게 추가.
+   - 단축키/토글/새 패널 같이 발견이 어려운 기능은 반드시 매뉴얼에. 내부 구조 변경만은 매뉴얼 대상 X.
+   - 큰 사이클이 끝나면 `CHANGELOG.md` 에 항목 추가, 사용자에게 보이는 변경은 `README.md` 의 스크린샷/스펙도 점검.
+
 ## 릴리즈
 
 태그 푸시(`vX.Y.Z`)가 트리거. `.github/workflows/release.yml` 이 macOS(dmg/zip) + Windows(exe) 빌드 후 GitHub Release 자동 업로드. main 머지만으로는 배포되지 않음.

@@ -142,7 +142,7 @@ export default function ClaudeCodeSessionsView({ active = true }: { active?: boo
       ) : (
         <aside className="w-72 flex-shrink-0 border-r border-bg-border flex flex-col">
           <div className="px-3 py-2.5 border-b border-bg-border flex items-center gap-2">
-            <Sparkles size={14} className="text-clover-orange" />
+            <Sparkles size={14} className="text-clauday-orange" />
             <h2 className="text-xs font-bold text-text-primary flex-1">Claude Code</h2>
             <button onClick={() => setCollapsed(true)}
               className="p-1.5 rounded hover:bg-bg-surface-hover text-text-secondary hover:text-text-primary"
@@ -163,7 +163,7 @@ export default function ClaudeCodeSessionsView({ active = true }: { active?: boo
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="세션 검색 (제목, 폴더, ID)..."
-              className="w-full pl-7 pr-7 py-1.5 rounded text-[11px] bg-bg-primary border border-bg-border text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-clover-orange"
+              className="w-full pl-7 pr-7 py-1.5 rounded text-[11px] bg-bg-primary border border-bg-border text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-clauday-orange"
             />
             {search && (
               <button
@@ -195,7 +195,7 @@ export default function ClaudeCodeSessionsView({ active = true }: { active?: boo
               <>
                 {starredSessions.length > 0 && (
                   <>
-                    <div className="px-3 pt-1 pb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-clover-orange">
+                    <div className="px-3 pt-1 pb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-clauday-orange">
                       <Star size={10} className="fill-current" />
                       즐겨찾기 ({starredSessions.length})
                     </div>
@@ -252,7 +252,7 @@ export default function ClaudeCodeSessionsView({ active = true }: { active?: boo
       <div className="flex-1 relative">
         {!activeCwd ? (
           <div className="h-full flex flex-col items-center justify-center gap-3 text-text-tertiary">
-            <Sparkles size={36} className="text-clover-orange/60" />
+            <Sparkles size={36} className="text-clauday-orange/60" />
             <div className="text-center">
               <div className="text-sm font-medium text-text-primary">Claude Code</div>
               <div className="text-[11px] mt-1">왼쪽에서 이전 세션을 고르거나 "새 채팅"을 시작하세요</div>
@@ -306,7 +306,7 @@ function SessionRow({
 
   if (isRenaming) {
     return (
-      <div className={`px-3 py-2 border-l-2 ${isActive ? 'bg-clover-orange/10 border-clover-orange' : 'border-transparent'}`}>
+      <div className={`px-3 py-2 border-l-2 ${isActive ? 'bg-clauday-orange/10 border-clauday-orange' : 'border-transparent'}`}>
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <input
             autoFocus
@@ -318,7 +318,7 @@ function SessionRow({
               else if (e.key === 'Escape') { e.preventDefault(); onCancelRename() }
             }}
             placeholder={session.title || '세션 이름'}
-            className="flex-1 px-2 py-0.5 rounded text-[11px] bg-bg-primary border border-bg-border text-text-primary focus:outline-none focus:border-clover-orange"
+            className="flex-1 px-2 py-0.5 rounded text-[11px] bg-bg-primary border border-bg-border text-text-primary focus:outline-none focus:border-clauday-orange"
           />
           <button onClick={onCommitRename}
             className="p-1 rounded hover:bg-emerald-500/15 text-emerald-400">
@@ -338,7 +338,7 @@ function SessionRow({
       onClick={onOpen}
       className={`group cursor-pointer px-3 py-2 transition-colors border-l-2 ${
         isActive
-          ? 'bg-clover-orange/10 border-clover-orange'
+          ? 'bg-clauday-orange/10 border-clauday-orange'
           : 'border-transparent hover:bg-bg-surface-hover'
       }`}
     >
@@ -347,12 +347,12 @@ function SessionRow({
           onClick={(e) => { e.stopPropagation(); onToggleStar() }}
           title={session.starred ? '즐겨찾기 해제' : '즐겨찾기 추가'}
           className={`p-1 rounded hover:bg-bg-surface flex-none transition-colors ${
-            session.starred ? 'text-clover-orange' : 'text-text-tertiary hover:text-clover-orange'
+            session.starred ? 'text-clauday-orange' : 'text-text-tertiary hover:text-clauday-orange'
           }`}
         >
           <Star size={13} className={session.starred ? 'fill-current' : ''} />
         </button>
-        <div className={`flex-1 text-[12px] line-clamp-2 leading-tight ${isActive ? 'text-clover-orange font-medium' : 'text-text-primary'}`}>
+        <div className={`flex-1 text-[12px] line-clamp-2 leading-tight ${isActive ? 'text-clauday-orange font-medium' : 'text-text-primary'}`}>
           {displayTitle}
         </div>
         <button

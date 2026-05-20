@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseICal, buildICal, bundleICal } from './ical'
+import { parseICal, buildICal, bundleICal, patchDateTimeInIcs } from './ical'
 
 describe('parseICal — 기본 VEVENT', () => {
   it('UID/SUMMARY/DTSTART/DTEND 가 있으면 파싱한다', () => {
@@ -145,16 +145,35 @@ describe('buildICal / bundleICal', () => {
     expect(ev.location).toBe('회의실 A')
   })
 
-  it('allDay=true 이면 VALUE=DATE 형식으로 직렬화', () => {
+  it('allDay=true 이면 VALUE=DATE 형식으로 직렬화 (DTEND 는 RFC 5545 exclusive → +1일)', () => {
+    // 로컬 자정 ISO (Date(년, 월, 일) 의 동치). KST 든 UTC 든 로컬 일자가 5/13 으로 잡혀야 한다.
+    const startIso = new Date(2026, 4, 13).toISOString()
+    const endIso = new Date(2026, 4, 13).toISOString()
     const ics = buildICal({
       uid: 'a',
       summary: 'x',
-      start: '2026-05-13T00:00:00Z',
-      end: '2026-05-13T00:00:00Z',
+      start: startIso,
+      end: endIso,
       allDay: true
     })
     expect(ics).toContain('DTSTART;VALUE=DATE:20260513')
-    expect(ics).toContain('DTEND;VALUE=DATE:20260513')
+    // DTEND 는 exclusive — 같은 날(5/13) 종일 일정이면 5/14 로 직렬화
+    expect(ics).toContain('DTEND;VALUE=DATE:20260514')
+  })
+
+  it('allDay 라운드트립 — 로컬 자정 ISO 가 들어오면 같은 달력 일자로 복원된다 (off-by-one 회귀 방지)', () => {
+    // 5/10 ~ 5/11 종일 일정 (모달이 만드는 자정/23:59 ISO 시뮬레이션)
+    const startIso = new Date(2026, 4, 10, 0, 0, 0).toISOString()
+    const endIso = new Date(2026, 4, 11, 23, 59, 59).toISOString()
+    const ics = buildICal({ uid: 'r', summary: '회의', start: startIso, end: endIso, allDay: true })
+    expect(ics).toContain('DTSTART;VALUE=DATE:20260510')
+    // 5/11 inclusive → ICS DTEND 는 5/12 exclusive
+    expect(ics).toContain('DTEND;VALUE=DATE:20260512')
+    const ev = parseICal(ics)!
+    expect(ev.allDay).toBe(true)
+    // 파싱은 inclusive 로 되돌림 → start=5/10, end=5/11
+    expect(ev.start.startsWith('2026-05-10')).toBe(true)
+    expect(ev.end.startsWith('2026-05-11')).toBe(true)
   })
 
   it('escape: 콤마/세미콜론/백슬래시/개행', () => {
@@ -179,5 +198,68 @@ describe('buildICal / bundleICal', () => {
   it('bundleICal — VEVENT 없는 입력은 빈 캘린더', () => {
     const bundled = bundleICal('비어있음', ['BEGIN:VCALENDAR\r\nEND:VCALENDAR'])
     expect(bundled.match(/BEGIN:VEVENT/g)).toBeNull()
+  })
+})
+
+describe('patchDateTimeInIcs — 막대 드래그 갱신', () => {
+  const baseIcs = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'BEGIN:VEVENT',
+    'UID:keep-uid',
+    'DTSTAMP:20260101T000000Z',
+    'CREATED:20260101T000000Z',
+    'DTSTART:20260513T010000Z',
+    'DTEND:20260513T020000Z',
+    'SUMMARY:Sprint Review',
+    'ATTENDEE;CN=Alice:mailto:alice@example.com',
+    'BEGIN:VALARM',
+    'TRIGGER:-PT15M',
+    'ACTION:DISPLAY',
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\r\n')
+
+  it('DTSTART/DTEND/DTSTAMP 만 교체하고 다른 필드는 보존', () => {
+    const patched = patchDateTimeInIcs(baseIcs, {
+      start: '2026-05-15T03:00:00Z',
+      end: '2026-05-15T04:00:00Z',
+      allDay: false
+    })
+    expect(patched).toContain('DTSTART:20260515T030000Z')
+    expect(patched).toContain('DTEND:20260515T040000Z')
+    expect(patched).toContain('UID:keep-uid')
+    expect(patched).toContain('CREATED:20260101T000000Z') // 영구
+    expect(patched).toContain('SUMMARY:Sprint Review')
+    expect(patched).toContain('ATTENDEE;CN=Alice:mailto:alice@example.com')
+    expect(patched).toContain('BEGIN:VALARM')
+    // DTSTAMP 는 갱신됨 (이전 값은 사라짐)
+    expect(patched).not.toContain('DTSTAMP:20260101T000000Z')
+  })
+
+  it('allDay=true 면 VALUE=DATE 형식 + DTEND exclusive(+1)', () => {
+    const patched = patchDateTimeInIcs(baseIcs, {
+      start: new Date(2026, 4, 10).toISOString(),
+      end: new Date(2026, 4, 12).toISOString(),
+      allDay: true
+    })
+    expect(patched).toContain('DTSTART;VALUE=DATE:20260510')
+    expect(patched).toContain('DTEND;VALUE=DATE:20260513')
+  })
+
+  it('parseICal 라운드트립: 변경된 일자가 그대로 복원', () => {
+    const patched = patchDateTimeInIcs(baseIcs, {
+      start: new Date(2026, 4, 20).toISOString(),
+      end: new Date(2026, 4, 21).toISOString(),
+      allDay: true
+    })
+    const ev = parseICal(patched)!
+    expect(ev.allDay).toBe(true)
+    expect(ev.start.startsWith('2026-05-20')).toBe(true)
+    // DTEND exclusive 20260522 → 파서가 -1 해서 21 로 inclusive 저장
+    expect(ev.end.startsWith('2026-05-21')).toBe(true)
+    expect(ev.uid).toBe('keep-uid')
+    expect(ev.attendees?.[0].name).toBe('Alice')
   })
 })

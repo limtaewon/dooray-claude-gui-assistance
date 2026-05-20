@@ -29,6 +29,8 @@ export interface LocalEvent {
   start: string
   end: string
   allDay: boolean
+  /** ISO 8601, 영구 — 정렬 타이브레이커 & 상세 모달 표시 용 */
+  createdAt?: string
 }
 
 interface LocalDB {
@@ -71,7 +73,9 @@ function recordToEvent(r: LocalEventRecord): LocalEvent | null {
     location: parsed.location,
     start: parsed.start,
     end: parsed.end,
-    allDay: parsed.allDay
+    allDay: parsed.allDay,
+    // record 의 createdAt 이 권위적. ICS 의 CREATED 는 보조 (이후 외부 도구가 ICS 만 가져갈 수 있게 하기 위함).
+    createdAt: r.createdAt
   }
 }
 
@@ -121,6 +125,7 @@ export const LocalEventStore = {
 
   createEvent(input: Omit<LocalEvent, 'id'>): LocalEvent {
     const eventUid = uid('levt')
+    const now = new Date().toISOString()
     const ics = buildICal({
       uid: eventUid,
       summary: input.summary,
@@ -128,9 +133,9 @@ export const LocalEventStore = {
       location: input.location,
       start: input.start,
       end: input.end,
-      allDay: input.allDay
+      allDay: input.allDay,
+      createdAt: now
     })
-    const now = new Date().toISOString()
     const record: LocalEventRecord = {
       id: eventUid,
       calendarId: input.calendarId,
@@ -139,7 +144,7 @@ export const LocalEventStore = {
       updatedAt: now
     }
     store.set('events', [...store.get('events'), record])
-    return { ...input, id: eventUid }
+    return { ...input, id: eventUid, createdAt: now }
   },
 
   updateEvent(
@@ -159,7 +164,8 @@ export const LocalEventStore = {
       location: merged.location,
       start: merged.start,
       end: merged.end,
-      allDay: merged.allDay
+      allDay: merged.allDay,
+      createdAt: records[idx].createdAt
     })
     const next = [...records]
     next[idx] = { ...records[idx], ics: newIcs, updatedAt: new Date().toISOString() }

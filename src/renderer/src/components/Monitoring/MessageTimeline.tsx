@@ -80,7 +80,7 @@ function renderContent(text: string, terms: string[]): JSX.Element {
           URL_RE.lastIndex = 0
           return (
             <a key={i} href={p} target="_blank" rel="noreferrer"
-              className="text-clover-blue hover:underline break-all inline-flex items-center gap-0.5">
+              className="text-clauday-blue hover:underline break-all inline-flex items-center gap-0.5">
               {p}<ExternalLink size={9} className="opacity-60 flex-shrink-0" />
             </a>
           )
@@ -99,7 +99,7 @@ function renderMentions(text: string, terms: string[]): JSX.Element {
         if (MENTION_RE.test(p)) {
           MENTION_RE.lastIndex = 0
           return (
-            <span key={i} className="px-1 rounded bg-clover-blue/15 text-clover-blue font-medium text-[11.5px]">
+            <span key={i} className="px-1 rounded bg-clauday-blue/15 text-clauday-blue font-medium text-[11.5px]">
               {p}
             </span>
           )
@@ -123,7 +123,7 @@ function renderHighlight(text: string, terms: string[]): JSX.Element {
       <>
         {parts.map((p, i) =>
           re.test(p) ? (
-            <mark key={i} className="bg-clover-orange/30 text-clover-orange-light font-semibold px-0.5 rounded">{p}</mark>
+            <mark key={i} className="bg-clauday-orange/30 text-clauday-orange-light font-semibold px-0.5 rounded">{p}</mark>
           ) : (
             <span key={i}>{p}</span>
           )
@@ -187,7 +187,7 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
         </div>
         {onRefresh && (
           <button onClick={onRefresh} disabled={refreshing}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-clover-orange to-clover-blue disabled:opacity-40 hover:opacity-90">
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-clauday-orange to-clauday-blue disabled:opacity-40 hover:opacity-90">
             <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
             {refreshing ? '수집 중...' : '지금 바로 수집하기'}
           </button>
@@ -200,13 +200,14 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
     <div className="flex-1 overflow-y-auto px-5 py-4">
       {groups.map((g) => (
         <div key={g.label} className="mb-6">
-          {/* 날짜 구분자 */}
-          <div className="sticky top-0 z-10 flex items-center gap-2 mb-3 py-1 bg-bg-primary">
-            <div className="inline-flex items-center justify-center h-5 px-2 rounded-full bg-bg-surface border border-bg-border leading-none">
+          {/* 날짜 구분자 — sticky 유지하되 칩만 보이고 나머지는 투명/부재.
+              wrapper 의 배경/가로선/카운트 별개 element 가 카드 위에 떠 있으면서 가리는 이슈(#14) 대응:
+              칩 하나로 압축하고 wrapper 배경은 투명. 칩에 자체 배경+그림자만 부여. */}
+          <div className="sticky top-0 z-10 mb-3 py-1 pointer-events-none">
+            <div className="inline-flex items-center gap-1.5 h-5 px-2 rounded-full bg-bg-surface border border-bg-border shadow-sm">
               <span className="text-[10px] font-bold text-text-secondary leading-none">{g.label}</span>
+              <span className="text-[9px] text-text-tertiary leading-none">{g.items.length}건</span>
             </div>
-            <div className="flex-1 h-px bg-bg-border/60" />
-            <span className="text-[10px] text-text-tertiary">{g.items.length}건</span>
           </div>
 
           <div className="space-y-2">
@@ -218,10 +219,10 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
                   className={`group relative flex gap-3 px-4 py-3 rounded-xl border transition-all ${
                     m.read
                       ? 'bg-bg-surface/50 border-bg-border hover:border-bg-border-light'
-                      : 'bg-bg-surface border-clover-orange/50 shadow-[0_2px_8px_rgba(251,146,60,0.08)]'
+                      : 'bg-bg-surface border-clauday-orange/50 shadow-[0_2px_8px_rgba(251,146,60,0.08)]'
                   }`}>
                   {!m.read && (
-                    <Circle size={6} className="absolute top-3 left-1 text-clover-orange fill-clover-orange" />
+                    <Circle size={6} className="absolute top-3 left-1 text-clauday-orange fill-clauday-orange" />
                   )}
 
                   {/* Avatar */}
@@ -253,7 +254,7 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
                       target="_blank"
                       rel="noreferrer"
                       title="이 채널을 두레이 메신저에서 열기"
-                      className="absolute bottom-2 right-3 inline-flex items-center gap-1 text-[10px] text-text-tertiary hover:text-clover-blue opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute bottom-2 right-3 inline-flex items-center gap-1 text-[10px] text-text-tertiary hover:text-clauday-blue opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <ExternalLink size={10} />
                       채널 열기
@@ -265,7 +266,7 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
                         <span className="text-[9px] text-text-tertiary leading-none">매치:</span>
                         {m.matchedTerms.slice(0, 6).map((t, i) => (
                           <span key={i}
-                            className="inline-flex items-center h-[14px] px-1.5 rounded-full bg-clover-orange/15 text-clover-orange font-medium text-[9px] leading-none">
+                            className="inline-flex items-center h-[14px] px-1.5 rounded-full bg-clauday-orange/15 text-clauday-orange font-medium text-[9px] leading-none">
                             {t}
                           </span>
                         ))}

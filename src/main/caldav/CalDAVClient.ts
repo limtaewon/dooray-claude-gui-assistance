@@ -1,7 +1,7 @@
 import { createDAVClient } from 'tsdav'
 import { CalDAVCredentialStore } from './CredentialStore'
 import { CalendarObjectsStore } from './CalendarObjectsStore'
-import { parseICal, buildICal } from './ical'
+import { parseICal, buildICal, patchDateTimeInIcs } from './ical'
 
 export interface SyncProgress {
   calendarUrl: string
@@ -341,6 +341,45 @@ export class CalDAVClient {
       filename: `${uid}.ics`,
       iCalString: ical
     })
+  }
+
+  /**
+   * 일정의 DTSTART/DTEND 만 갱신 — 막대 드래그(이동/리사이즈)용.
+   * 기존 ICS 의 ATTENDEE/RRULE/ALARM 등을 보존하기 위해 라인 단위로 교체.
+   * 두레이 CalDAV 에 PUT + If-Match (etag) 로 충돌 방지.
+   * @returns 갱신된 etag (서버가 ETag 헤더로 반환). 없으면 undefined.
+   */
+  async updateEventDateTime(input: {
+    href: string
+    etag?: string
+    existingIcs: string
+    start: string
+    end: string
+    allDay: boolean
+  }): Promise<{ etag?: string }> {
+    const newIcs = patchDateTimeInIcs(input.existingIcs, {
+      start: input.start,
+      end: input.end,
+      allDay: input.allDay
+    })
+    const absUrl = input.href.startsWith('http') ? input.href : SERVER_URL + input.href
+    const auth = basicAuthHeader()
+    const resp = await fetch(absUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: auth,
+        'Content-Type': 'text/calendar; charset=utf-8',
+        ...(input.etag ? { 'If-Match': input.etag } : {})
+      },
+      body: newIcs
+    })
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => '')
+      throw new Error(`CalDAV PUT 실패: ${resp.status} ${body.slice(0, 200)}`)
+    }
+    const newEtag = resp.headers.get('etag') ?? undefined
+    console.log('[CalDAV PUT]', absUrl, 'status=', resp.status, 'newEtag=', newEtag)
+    return { etag: newEtag?.replace(/^["']|["']$/g, '') }
   }
 
   async deleteEvent(url: string, etag?: string): Promise<void> {

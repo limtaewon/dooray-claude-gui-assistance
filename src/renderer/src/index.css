@@ -16,12 +16,12 @@
 
 /* -------- brand (테마 무관) -------- */
 :root {
-  --clover-orange:        #EA580C;   /* Dooray */
-  --clover-orange-light:  #FB923C;
-  --clover-orange-soft:   #FBE4D5;
-  --clover-blue:          #2563EB;   /* Claude */
-  --clover-blue-light:    #3B82F6;
-  --clover-blue-soft:     #DCE6FB;
+  --clauday-orange:        #EA580C;   /* Dooray */
+  --clauday-orange-light:  #FB923C;
+  --clauday-orange-soft:   #FBE4D5;
+  --clauday-blue:          #2563EB;   /* Claude */
+  --clauday-blue-light:    #3B82F6;
+  --clauday-blue-soft:     #DCE6FB;
 
   /* 시맨틱 */
   --success:  #22C55E;
@@ -66,8 +66,8 @@
   --app-font-family: var(--font-ui);
 
   /* AI gradient — 모드 무관 single source of truth (v2) */
-  --ai-gradient:            linear-gradient(135deg, var(--clover-orange-light) 0%, var(--clover-blue-light) 100%);
-  --ai-gradient-horizontal: linear-gradient(90deg, var(--clover-orange) 0%, var(--clover-blue) 100%);
+  --ai-gradient:            linear-gradient(135deg, var(--clauday-orange-light) 0%, var(--clauday-blue-light) 100%);
+  --ai-gradient-horizontal: linear-gradient(90deg, var(--clauday-orange) 0%, var(--clauday-blue) 100%);
 }
 
 /* ============================================================
@@ -95,13 +95,13 @@
   --text-tertiary:     #8A91A0;
 
   /* 액센트 — 라이트 컨텍스트 */
-  --accent-blue:         var(--clover-blue);
-  --accent-blue-light:   var(--clover-blue-light);
-  --accent-blue-soft:    var(--clover-blue-soft);
+  --accent-blue:         var(--clauday-blue);
+  --accent-blue-light:   var(--clauday-blue-light);
+  --accent-blue-soft:    var(--clauday-blue-soft);
   --accent-blue-fg:      #1E3A8A;
-  --accent-orange:       var(--clover-orange);
-  --accent-orange-light: var(--clover-orange-light);
-  --accent-orange-soft:  var(--clover-orange-soft);
+  --accent-orange:       var(--clauday-orange);
+  --accent-orange-light: var(--clauday-orange-light);
+  --accent-orange-soft:  var(--clauday-orange-soft);
 
   /* Mode-aware semantic — LIGHT (dark fg on pale bg)
      bg = 배경 tint, fg = 그 위 텍스트, solid = 단색 사용(버튼/dot) */

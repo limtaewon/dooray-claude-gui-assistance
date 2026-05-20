@@ -12,16 +12,16 @@ const WORKFLOW_ICONS: Record<string, typeof Circle> = {
 }
 
 const WORKFLOW_COLORS: Record<string, string> = {
-  registered: 'text-clover-orange',
-  working: 'text-clover-blue',
+  registered: 'text-clauday-orange',
+  working: 'text-clauday-blue',
   done: 'text-emerald-400',
   closed: 'text-text-secondary'
 }
 
 const WORKFLOW_BG: Record<string, string> = {
   backlog: 'bg-gray-400/10 border-gray-400/20',
-  registered: 'bg-clover-orange/10 border-clover-orange/20',
-  working: 'bg-clover-blue/10 border-clover-blue/20',
+  registered: 'bg-clauday-orange/10 border-clauday-orange/20',
+  working: 'bg-clauday-blue/10 border-clauday-blue/20',
   closed: 'bg-emerald-400/10 border-emerald-400/20'
 }
 
@@ -99,7 +99,7 @@ function TaskAssistant({ onDisconnect }: TaskAssistantProps): JSX.Element {
             onClick={() => setActiveTab(tab)}
             className={`text-xs font-medium transition-colors pb-2 border-b-2 ${
               activeTab === tab
-                ? 'text-clover-blue border-clover-blue'
+                ? 'text-clauday-blue border-clauday-blue'
                 : 'text-text-secondary hover:text-text-primary border-transparent'
             }`}
           >
@@ -188,7 +188,7 @@ function TaskAssistant({ onDisconnect }: TaskAssistantProps): JSX.Element {
                   return (
                     <div
                       key={task.id}
-                      className="flex items-start gap-3 p-3 bg-bg-surface border border-bg-border rounded-lg hover:border-clover-blue/30 hover:bg-bg-surface-hover transition-all"
+                      className="flex items-start gap-3 p-3 bg-bg-surface border border-bg-border rounded-lg hover:border-clauday-blue/30 hover:bg-bg-surface-hover transition-all"
                     >
                       <Icon size={16} className={`mt-0.5 flex-shrink-0 ${color}`} />
                       <div className="flex-1 min-w-0">

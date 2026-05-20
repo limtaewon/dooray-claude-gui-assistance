@@ -54,20 +54,20 @@ function NavButton({
       aria-label={label}
       className={`relative w-9 h-9 rounded-[7px] flex items-center justify-center transition-all duration-150 ${
         active
-          ? 'bg-gradient-to-br from-clover-blue to-clover-blue/80 text-white shadow-md shadow-clover-blue/20'
+          ? 'bg-gradient-to-br from-clauday-blue to-clauday-blue/80 text-white shadow-md shadow-clauday-blue/20'
           : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
       }`}
     >
       <Icon size={20} />
       {badge !== undefined && badge > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-[3px] rounded-full bg-clover-orange text-white text-[9px] font-bold flex items-center justify-center border-2 border-bg-surface">
+        <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-[3px] rounded-full bg-clauday-orange text-white text-[9px] font-bold flex items-center justify-center border-2 border-bg-surface">
           {badge > 99 ? '99+' : badge}
         </span>
       )}
       {pulse && (!badge || badge === 0) && (
         <span className="absolute top-0.5 right-0.5 flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full rounded-full bg-clover-orange opacity-75 animate-ping" />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-clover-orange" />
+          <span className="absolute inline-flex h-full w-full rounded-full bg-clauday-orange opacity-75 animate-ping" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-clauday-orange" />
         </span>
       )}
     </button>

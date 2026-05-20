@@ -41,13 +41,13 @@ function ResizeHandle({ onResize, direction = 'horizontal' }: ResizeHandleProps)
       onMouseDown={handleMouseDown}
       className={`flex-shrink-0 group ${
         direction === 'horizontal'
-          ? 'w-1 cursor-col-resize hover:bg-clover-blue/30 active:bg-clover-blue/50'
-          : 'h-1 cursor-row-resize hover:bg-clover-blue/30 active:bg-clover-blue/50'
+          ? 'w-1 cursor-col-resize hover:bg-clauday-blue/30 active:bg-clauday-blue/50'
+          : 'h-1 cursor-row-resize hover:bg-clauday-blue/30 active:bg-clauday-blue/50'
       } transition-colors`}
     >
       <div className={`${
         direction === 'horizontal' ? 'w-px h-full mx-auto' : 'h-px w-full my-auto'
-      } bg-bg-border group-hover:bg-clover-blue/50`} />
+      } bg-bg-border group-hover:bg-clauday-blue/50`} />
     </div>
   )
 }

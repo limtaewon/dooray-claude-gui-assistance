@@ -138,8 +138,8 @@ function CommunityView({ active = true }: { active?: boolean } = {}): JSX.Elemen
       <div className="px-5 pt-4 pb-3 border-b border-bg-border flex-shrink-0">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-clover-blue/10 border border-clover-blue/30">
-              <Users size={14} className="text-clover-blue" />
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-clauday-blue/10 border border-clauday-blue/30">
+              <Users size={14} className="text-clauday-blue" />
             </div>
             <div>
               <h2 className="text-sm font-bold text-text-primary leading-tight">커뮤니티</h2>
@@ -279,7 +279,7 @@ function PostCard({
       <div className="flex gap-3">
         {/* Left: Dooray task number */}
         <div className="flex-shrink-0 flex flex-col items-center pt-0.5">
-          <div className="min-w-7 h-6 px-1.5 rounded-md flex items-center justify-center text-[11px] font-bold text-clover-blue group-hover:bg-clover-blue group-hover:text-white transition-colors"
+          <div className="min-w-7 h-6 px-1.5 rounded-md flex items-center justify-center text-[11px] font-bold text-clauday-blue group-hover:bg-clauday-blue group-hover:text-white transition-colors"
             style={{ background: 'var(--c-blue-bg)', border: '1px solid color-mix(in oklab, var(--c-blue-fg) 25%, transparent)' }}>
             {post.number ?? '·'}
           </div>
@@ -287,7 +287,7 @@ function PostCard({
 
         {/* Main content */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-text-primary group-hover:text-clover-blue transition-colors leading-snug pr-2">
+          <p className="text-sm font-semibold text-text-primary group-hover:text-clauday-blue transition-colors leading-snug pr-2">
             {post.subject}
           </p>
           {preview && (
@@ -321,7 +321,7 @@ function PostCard({
 
         {/* Right arrow hint */}
         <div className="flex-shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity">
-          <ChevronLeft size={14} className="rotate-180 text-clover-blue" />
+          <ChevronLeft size={14} className="rotate-180 text-clauday-blue" />
         </div>
       </div>
     </div>
@@ -476,7 +476,7 @@ function PostDetail({
           {/* Comments section header */}
           <div className="flex items-center gap-2 mb-3">
             <div className="flex items-center gap-1.5">
-              <MessageSquare size={13} className="text-clover-blue" />
+              <MessageSquare size={13} className="text-clauday-blue" />
               <span className="text-xs font-bold text-text-primary">댓글</span>
               {comments.length > 0 && (
                 <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold"
@@ -886,8 +886,8 @@ ${body || '(빈 내용. 제목을 보고 초안을 작성해줘.)'}
         <div className="flex items-center justify-between px-5 py-3.5"
           style={{ borderBottom: '1px solid var(--bg-border)', background: 'var(--bg-primary)' }}>
           <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-clover-orange/15 border border-clover-orange/30">
-              <Plus size={13} className="text-clover-orange" />
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-clauday-orange/15 border border-clauday-orange/30">
+              <Plus size={13} className="text-clauday-orange" />
             </div>
             <h3 className="text-sm font-bold text-text-primary">새 글 쓰기</h3>
             <span className="text-[10px] px-1.5 py-0.5 rounded-full text-text-tertiary"

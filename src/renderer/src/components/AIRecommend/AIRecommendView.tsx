@@ -101,7 +101,7 @@ function ItemCard({ item, category }: { item: AIRecommendItem; category: Categor
         </div>
         <button
           type="button"
-          className="flex-none flex items-center gap-1 text-[11px] text-clover-blue hover:text-clover-blue/80"
+          className="flex-none flex items-center gap-1 text-[11px] text-clauday-blue hover:text-clauday-blue/80"
           title="두레이에서 열기"
           onClick={(e) => { e.stopPropagation(); window.open(item.url, '_blank', 'noopener,noreferrer') }}
         >
@@ -159,13 +159,13 @@ function PostCard({ post, onSelect }: { post: DoorayTask; onSelect: () => void }
     >
       <div className="flex gap-3">
         <div className="flex-shrink-0 flex flex-col items-center pt-0.5">
-          <div className="min-w-7 h-6 px-1.5 rounded-md flex items-center justify-center text-[11px] font-bold text-clover-blue group-hover:bg-clover-blue group-hover:text-white transition-colors"
+          <div className="min-w-7 h-6 px-1.5 rounded-md flex items-center justify-center text-[11px] font-bold text-clauday-blue group-hover:bg-clauday-blue group-hover:text-white transition-colors"
             style={{ background: 'var(--c-blue-bg)', border: '1px solid color-mix(in oklab, var(--c-blue-fg) 25%, transparent)' }}>
             {post.number ?? '·'}
           </div>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-text-primary group-hover:text-clover-blue transition-colors leading-snug pr-2">{post.subject}</p>
+          <p className="text-sm font-semibold text-text-primary group-hover:text-clauday-blue transition-colors leading-snug pr-2">{post.subject}</p>
           {preview && <p className="text-[11px] text-text-tertiary mt-1 line-clamp-2 leading-relaxed">{preview}</p>}
           <div className="flex items-center gap-3 mt-2">
             <div className="flex items-center gap-1.5">
@@ -183,7 +183,7 @@ function PostCard({ post, onSelect }: { post: DoorayTask; onSelect: () => void }
           </div>
         </div>
         <div className="flex-shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity">
-          <ChevronLeft size={14} className="rotate-180 text-clover-blue" />
+          <ChevronLeft size={14} className="rotate-180 text-clauday-blue" />
         </div>
       </div>
     </button>
@@ -296,7 +296,7 @@ function PostDetail({ post, onBack }: { post: DoorayTask; onBack: () => void }):
           {/* 댓글 (읽기 전용) */}
           <div className="flex items-center gap-2 mb-3">
             <div className="flex items-center gap-1.5">
-              <MessageSquare size={13} className="text-clover-blue" />
+              <MessageSquare size={13} className="text-clauday-blue" />
               <span className="text-xs font-bold text-text-primary">댓글</span>
               {comments.length > 0 && (
                 <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold"
@@ -681,7 +681,7 @@ function AIRecommendView(): JSX.Element {
       <div className="px-5 py-4 space-y-4">
         {/* PageHeader */}
         <div className="flex items-center gap-3 flex-wrap">
-          <Lightbulb size={18} className="text-clover-orange" />
+          <Lightbulb size={18} className="text-clauday-orange" />
           <h2 className="text-[14px] font-semibold text-text-primary">AI 추천</h2>
           {tab === 'posts' && posts.length > 0 && <span className="ds-chip neutral">{posts.length}개</span>}
           {tab === 'recommend' && result && <span className="ds-chip neutral">{totalRec}건</span>}
@@ -765,8 +765,8 @@ function AIRecommendView(): JSX.Element {
           <>
             <div className="ds-card flex items-center justify-center" style={{ padding: '14px 16px' }}>
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-[8px] flex-none flex items-center justify-center bg-clover-blue/10">
-                  <Sparkles size={16} className="text-clover-blue" />
+                <div className="w-8 h-8 rounded-[8px] flex-none flex items-center justify-center bg-clauday-blue/10">
+                  <Sparkles size={16} className="text-clauday-blue" />
                 </div>
                 <div className="text-[12px] text-text-secondary leading-relaxed text-center">
                   <strong className="text-text-primary">AI 활용 사례 공유 프로젝트</strong>의 최신 사례를
@@ -778,7 +778,7 @@ function AIRecommendView(): JSX.Element {
 
             {analyzing && (
               <div className="ds-card flex items-center gap-3" style={{ padding: '12px 14px' }}>
-                <Loader2 size={16} className="animate-spin text-clover-blue flex-none" />
+                <Loader2 size={16} className="animate-spin text-clauday-blue flex-none" />
                 <div className="text-[12px] text-text-secondary flex-1">분석 중...</div>
               </div>
             )}

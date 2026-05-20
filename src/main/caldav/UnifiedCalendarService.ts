@@ -3,13 +3,14 @@ import type {
   UnifiedCalendar,
   UnifiedEvent,
   UnifiedEventCreate,
+  UnifiedEventDateTimeUpdate,
   UnifiedEventQuery
 } from '../../shared/types/calendar'
 import { CalDAVClient, type SyncProgress } from './CalDAVClient'
 import { CalDAVCredentialStore } from './CredentialStore'
 import { LocalEventStore } from './LocalEventStore'
 import { CalendarObjectsStore } from './CalendarObjectsStore'
-import { parseICal } from './ical'
+import { parseICal, patchDateTimeInIcs } from './ical'
 import { HolidayService, HOLIDAY_CALENDAR_ID, HOLIDAY_CALENDAR_NAME } from '../holiday/HolidayService'
 
 /**
@@ -59,12 +60,19 @@ export class UnifiedCalendarService {
     this.calendarsCache = null
   }
 
+  // 짧은 시간에 여러 번 호출되는 emitUpdate 를 1번으로 합쳐 renderer reload 폭주 방지.
+  // (fullSync / incrementalSync / CRUD 가 연달아 emit 호출하던 패턴 + onUpdated listener 중복 시 N×M 폭증)
+  private emitTimer: NodeJS.Timeout | null = null
   emitUpdate(): void {
-    const wins = BrowserWindow.getAllWindows()
-    console.log('[emitUpdate] sending caldav-updated to', wins.length, 'window(s)')
-    for (const w of wins) {
-      if (!w.isDestroyed()) w.webContents.send('caldav-updated')
-    }
+    if (this.emitTimer) return
+    this.emitTimer = setTimeout(() => {
+      this.emitTimer = null
+      const wins = BrowserWindow.getAllWindows()
+      console.log('[emitUpdate] sending caldav-updated to', wins.length, 'window(s)')
+      for (const w of wins) {
+        if (!w.isDestroyed()) w.webContents.send('caldav-updated')
+      }
+    }, 80)
   }
 
   emitSyncProgress(p: SyncProgress | { stage: 'start' | 'complete' | 'error'; message?: string }): void {
@@ -160,7 +168,8 @@ export class UnifiedCalendarService {
         organizer: parsed.organizer,
         attendees: parsed.attendees,
         alarms: parsed.alarms,
-        webUrl: parsed.url
+        webUrl: parsed.url,
+        createdAt: parsed.createdAt
       })
     }
 
@@ -170,11 +179,22 @@ export class UnifiedCalendarService {
   async listEvents(query: UnifiedEventQuery): Promise<UnifiedEvent[]> {
     // 캐시 비었으면 백그라운드 fullSync 트리거 (즉시 반환, sync 끝나면 caldav-updated 이벤트로 reload)
     this.maybeAutoSync()
+    let caldavEvents: UnifiedEvent[]
     if (!this.parsedCache) {
       console.log('[listEvents] parsedCache null → rebuild')
-      this.parsedCache = this.buildParsedCache()
+      const built = this.buildParsedCache()
+      // fullSync 진행 중 ObjectsStore 가 비어있는 상태에서 빈 cache 를 굳혀두면
+      // sync 끝날 때까지 listEvents 가 계속 0 을 반환. 진행 중 + 결과 0 이면 cache 화하지 않음.
+      if (built.length === 0 && this.autoSyncInflight) {
+        console.log('[listEvents] fullSync 진행 중 + 결과 0 → cache 보류 (다음 호출에서 재시도)')
+        caldavEvents = built
+      } else {
+        this.parsedCache = built
+        caldavEvents = built
+      }
     } else {
       console.log('[listEvents] parsedCache hit, count:', this.parsedCache.length)
+      caldavEvents = this.parsedCache
     }
 
     // 공휴일 — 시간 범위 안 일정을 매 호출 시 합산 (이미 캐시된 디스크 데이터라 빠름)
@@ -192,11 +212,12 @@ export class UnifiedCalendarService {
       location: e.location,
       start: e.start,
       end: e.end,
-      allDay: e.allDay
+      allDay: e.allDay,
+      createdAt: e.createdAt
     }))
 
-    // CalDAV 는 메모리 캐시에서 range 필터
-    const caldav = this.parsedCache.filter((e) => {
+    // CalDAV 는 메모리 캐시(또는 직전 빌드 결과)에서 range 필터
+    const caldav = caldavEvents.filter((e) => {
       const s = new Date(e.start).getTime()
       const en = new Date(e.end).getTime()
       return en >= fromMs && s <= toMs
@@ -295,6 +316,8 @@ export class UnifiedCalendarService {
         end: input.end,
         allDay: !!input.allDay
       })
+      // 다른 컴포넌트(월 뷰 등) 가 즉시 반영하도록 caldav-updated 발사
+      this.emitUpdate()
       return {
         source: 'local',
         id: e.id,
@@ -304,7 +327,8 @@ export class UnifiedCalendarService {
         location: e.location,
         start: e.start,
         end: e.end,
-        allDay: e.allDay
+        allDay: e.allDay,
+        createdAt: e.createdAt
       }
     }
     await this.caldav.createEvent({
@@ -328,6 +352,79 @@ export class UnifiedCalendarService {
       start: input.start,
       end: input.end,
       allDay: !!input.allDay
+    }
+  }
+
+  /**
+   * 막대 드래그(이동/리사이즈)로 일정 시각만 갱신.
+   * 다른 속성(참석자/알림/RRULE/제목 등)은 보존된다.
+   *
+   * - local: LocalEventStore.updateEvent 가 patch 처리 → start/end/allDay 만 갱신
+   * - caldav: 객체 URL 의 기존 ICS 를 읽어 DTSTART/DTEND 만 라인 단위로 교체 후 PUT (If-Match etag)
+   */
+  async updateEventDateTime(input: UnifiedEventDateTimeUpdate): Promise<UnifiedEvent> {
+    this.parsedCache = null
+    if (input.source === 'local') {
+      const updated = LocalEventStore.updateEvent(input.id, {
+        start: input.start,
+        end: input.end,
+        allDay: input.allDay
+      })
+      if (!updated) throw new Error('일정을 찾을 수 없습니다.')
+      this.emitUpdate()
+      return {
+        source: 'local',
+        id: updated.id,
+        calendarId: updated.calendarId,
+        summary: updated.summary,
+        description: updated.description,
+        location: updated.location,
+        start: updated.start,
+        end: updated.end,
+        allDay: updated.allDay,
+        createdAt: updated.createdAt
+      }
+    }
+    // CalDAV
+    if (!input.caldavUrl) throw new Error('CalDAV 일정 수정에 객체 URL이 필요합니다.')
+    const existing = CalendarObjectsStore.getCalendar(input.calendarId)[input.caldavUrl]
+    if (!existing) throw new Error('수정할 일정이 캐시에 없습니다. 동기화 후 다시 시도해주세요.')
+    const { etag: newEtag } = await this.caldav.updateEventDateTime({
+      href: input.caldavUrl,
+      etag: input.etag ?? existing.etag,
+      existingIcs: existing.ics,
+      start: input.start,
+      end: input.end,
+      allDay: input.allDay
+    })
+    // 로컬 ObjectsStore 의 ICS 도 즉시 갱신 (서버 응답 기다리지 않고 다음 listEvents 가 새 데이터 반영)
+    const patched = patchDateTimeInIcs(existing.ics, {
+      start: input.start,
+      end: input.end,
+      allDay: input.allDay
+    })
+    CalendarObjectsStore.upsertObject(input.calendarId, input.caldavUrl, {
+      etag: newEtag ?? existing.etag,
+      ics: patched
+    })
+    this.parsedCache = null
+    this.emitUpdate()
+    // 백그라운드 incrementalSync 트리거 — 서버 정규화 결과 반영
+    this.incrementalSync().catch(() => { /* 백그라운드 */ })
+    const parsed = parseICal(patched)
+    return {
+      source: 'caldav',
+      id: parsed?.uid ?? input.id,
+      calendarId: input.calendarId,
+      caldavUrl: input.caldavUrl,
+      etag: newEtag ?? existing.etag,
+      summary: parsed?.summary ?? '',
+      description: parsed?.description,
+      location: parsed?.location,
+      start: parsed?.start ?? input.start,
+      end: parsed?.end ?? input.end,
+      allDay: parsed?.allDay ?? input.allDay,
+      createdAt: parsed?.createdAt
     }
   }
 

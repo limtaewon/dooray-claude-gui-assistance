@@ -54,12 +54,12 @@ function AIProgressIndicator({
   const isLarge = size === 'large'
 
   return (
-    <div className={`rounded-xl bg-gradient-to-br from-clover-orange/10 via-clover-blue/5 to-transparent border border-clover-orange/20 ${isLarge ? 'p-5' : 'p-3'} ${className}`}>
+    <div className={`rounded-xl bg-gradient-to-br from-clauday-orange/10 via-clauday-blue/5 to-transparent border border-clauday-orange/20 ${isLarge ? 'p-5' : 'p-3'} ${className}`}>
       <div className="flex items-center gap-2.5">
         <div className="relative flex-shrink-0">
-          <Sparkles size={isLarge ? 18 : 14} className="text-clover-orange animate-pulse" />
+          <Sparkles size={isLarge ? 18 : 14} className="text-clauday-orange animate-pulse" />
           {progress.stage !== 'error' && (
-            <Loader2 size={isLarge ? 24 : 18} className="absolute -top-0.5 -left-0.5 text-clover-orange/30 animate-spin" />
+            <Loader2 size={isLarge ? 24 : 18} className="absolute -top-0.5 -left-0.5 text-clauday-orange/30 animate-spin" />
           )}
         </div>
         <span className={`font-medium text-text-primary flex-1 ${isLarge ? 'text-sm' : 'text-xs'}`}>
@@ -83,8 +83,8 @@ function AIProgressIndicator({
             <div
               key={s}
               className={`flex-1 ${isLarge ? 'h-1.5' : 'h-1'} rounded-full transition-all ${
-                isActive ? 'bg-clover-orange animate-pulse' :
-                isDone ? 'bg-clover-blue/60' :
+                isActive ? 'bg-clauday-orange animate-pulse' :
+                isDone ? 'bg-clauday-blue/60' :
                 'bg-bg-border'
               }`}
             />

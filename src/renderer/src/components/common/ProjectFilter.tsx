@@ -128,11 +128,11 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
   return (
     <div className="relative">
       <button onClick={() => setOpen(!open)}
-        className={`ds-btn icon sm relative ${pinnedCount > 0 ? 'text-clover-blue' : ''}`}
+        className={`ds-btn icon sm relative ${pinnedCount > 0 ? 'text-clauday-blue' : ''}`}
         title="표시할 프로젝트 설정">
         <Settings size={14} />
         {pinnedCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-clover-blue text-[8px] text-white flex items-center justify-center font-bold">
+          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-clauday-blue text-[8px] text-white flex items-center justify-center font-bold">
             {pinnedCount}
           </span>
         )}
@@ -156,7 +156,7 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="프로젝트 검색..."
-                  className="w-full pl-6 pr-6 py-1 bg-bg-primary border border-bg-border rounded text-[11px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue"
+                  className="w-full pl-6 pr-6 py-1 bg-bg-primary border border-bg-border rounded text-[11px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
                 />
                 {searchQuery && (
                   <button onClick={() => setSearchQuery('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary">
@@ -179,14 +179,14 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
                     <button onClick={() => toggle(p.id)}
                       className="flex-1 flex items-center gap-2 px-3 py-1.5 hover:bg-bg-surface-hover transition-colors text-left">
                       <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 ${
-                        checked ? 'bg-clover-blue border-clover-blue' : 'border-bg-border-light'
+                        checked ? 'bg-clauday-blue border-clauday-blue' : 'border-bg-border-light'
                       }`}>
                         {checked && <Check size={9} className="text-white" />}
                       </div>
                       {isCustom ? (
-                        <Link size={11} className={`flex-shrink-0 ${checked ? 'text-clover-orange' : 'text-text-tertiary'}`} />
+                        <Link size={11} className={`flex-shrink-0 ${checked ? 'text-clauday-orange' : 'text-text-tertiary'}`} />
                       ) : (
-                        <FolderOpen size={11} className={`flex-shrink-0 ${checked ? 'text-clover-blue' : 'text-text-tertiary'}`} />
+                        <FolderOpen size={11} className={`flex-shrink-0 ${checked ? 'text-clauday-blue' : 'text-text-tertiary'}`} />
                       )}
                       <span className={`text-[11px] truncate min-w-0 ${checked ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>{p.code}</span>
                     </button>
@@ -212,7 +212,7 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
                       onChange={(e) => { setAddInput(e.target.value); setAddError('') }}
                       onKeyDown={(e) => e.key === 'Enter' && handleAddProject()}
                       placeholder="프로젝트 ID 또는 URL"
-                      className="flex-1 px-2 py-1 bg-bg-primary border border-bg-border rounded text-[11px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue"
+                      className="flex-1 px-2 py-1 bg-bg-primary border border-bg-border rounded text-[11px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
                       autoFocus
                     />
                     <button onClick={handleAddProject} disabled={adding || !addInput.trim()}

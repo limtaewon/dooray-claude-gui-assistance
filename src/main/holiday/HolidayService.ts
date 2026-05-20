@@ -28,8 +28,12 @@ interface DB {
 }
 
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
-/** 파서 변경 시 옛 캐시 무효화 위한 버전. parseICal 의 종일 DTEND 보정 적용을 위해 2 로 올림 */
-const CACHE_VERSION = 2
+/**
+ * 파서 변경 시 옛 캐시 무효화 위한 버전.
+ *  v2: parseICal 의 종일 DTEND 보정 적용
+ *  v3: 기념일 제외 — DESCRIPTION 이 "공휴일" 인 항목만 노출 (식목일/어버이날 등은 노출 X)
+ */
+const CACHE_VERSION = 3
 
 const store = new Store<DB>({
   name: 'holidays-cache',
@@ -71,7 +75,15 @@ export class HolidayService {
     }
   }
 
-  /** Google ICS 안 모든 VEVENT 추출 (한 VCALENDAR 안 수백 건) */
+  /**
+   * Google ICS 안 모든 VEVENT 추출 (한 VCALENDAR 안 수백 건).
+   *
+   * v1.5 #18: 기념일 제외. Google 한국 공휴일 피드는 DESCRIPTION 으로 두 종류를 구분:
+   *  - "공휴일" → 실제 쉬는 날 (설날/추석/광복절 등)
+   *  - "기념일\n기념일을 숨기려면..." → 안 쉬는 기념일 (식목일/어버이날/스승의날 등)
+   *
+   * 파서가 DESCRIPTION 까지 본 뒤, "공휴일" 만 통과시킨다.
+   */
   private parseAllVEvents(ics: string): HolidayEntry[] {
     const blocks = ics.split('BEGIN:VEVENT').slice(1)
     const out: HolidayEntry[] = []
@@ -81,6 +93,7 @@ export class HolidayService {
       const wrapped = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT${b.slice(0, end + 'END:VEVENT'.length)}\r\nEND:VCALENDAR`
       const parsed = parseICal(wrapped)
       if (!parsed) continue
+      if (!isPublicHoliday(parsed.description)) continue
       out.push({
         uid: parsed.uid,
         start: parsed.start,
@@ -90,6 +103,16 @@ export class HolidayService {
     }
     return out
   }
+}
+
+/**
+ * DESCRIPTION 이 "공휴일" 로 시작하면 실제 휴일.
+ * Google 피드는 "공휴일" / "기념일\n기념일을 숨기려면..." 두 가지만 사용.
+ * DESCRIPTION 없는 항목은 안전하게 제외 (예전엔 노출했지만 v1.5 부터 보수적으로).
+ */
+export function isPublicHoliday(description: string | undefined): boolean {
+  if (!description) return false
+  return description.trim().startsWith('공휴일')
 }
 
 export type { HolidayEntry }

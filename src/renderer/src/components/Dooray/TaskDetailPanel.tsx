@@ -75,7 +75,7 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
           <h3 className="text-sm font-semibold text-text-primary leading-snug">{task.subject}</h3>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             {task.projectCode && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-clover-blue/10 text-clover-blue font-mono">{task.projectCode}</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-clauday-blue/10 text-clauday-blue font-mono">{task.projectCode}</span>
             )}
             <span className="text-[10px] text-text-secondary">{wfName}</span>
             {task.dueDateAt && (
@@ -93,22 +93,22 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
       {/* 액션 버튼 */}
       <div className="flex gap-2 p-3 border-b border-bg-border flex-shrink-0">
         <button onClick={handleSummarize} disabled={summarizing}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-clover-orange/20 to-clover-blue/20 border border-clover-orange/30 text-xs font-medium text-text-primary hover:from-clover-orange/30 hover:to-clover-blue/30 transition-all disabled:opacity-50">
-          <Sparkles size={12} className={`text-clover-orange ${summarizing ? 'animate-pulse' : ''}`} />
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-clauday-orange/20 to-clauday-blue/20 border border-clauday-orange/30 text-xs font-medium text-text-primary hover:from-clauday-orange/30 hover:to-clauday-blue/30 transition-all disabled:opacity-50">
+          <Sparkles size={12} className={`text-clauday-orange ${summarizing ? 'animate-pulse' : ''}`} />
           {summarizing ? 'AI 분석 중...' : 'AI 분석'}
         </button>
         <a href={`https://nhnent.dooray.com/project/posts/${task.id}`} target="_blank" rel="noopener noreferrer"
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-clover-blue/10 border border-clover-blue/30 text-xs text-clover-blue hover:bg-clover-blue/20 transition-all">
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-clauday-blue/10 border border-clauday-blue/30 text-xs text-clauday-blue hover:bg-clauday-blue/20 transition-all">
           <ExternalLink size={12} /> 두레이에서 보기
         </a>
       </div>
 
       {/* AI 요약 */}
       {summary && (
-        <div className="mx-3 mt-3 p-3 rounded-lg bg-gradient-to-r from-clover-orange/5 to-clover-blue/5 border border-clover-orange/20 flex-shrink-0">
+        <div className="mx-3 mt-3 p-3 rounded-lg bg-gradient-to-r from-clauday-orange/5 to-clauday-blue/5 border border-clauday-orange/20 flex-shrink-0">
           <div className="flex items-center gap-1.5 mb-2">
-            <Sparkles size={12} className="text-clover-orange" />
-            <span className="text-[11px] font-semibold text-clover-orange">AI 분석</span>
+            <Sparkles size={12} className="text-clauday-orange" />
+            <span className="text-[11px] font-semibold text-clauday-orange">AI 분석</span>
           </div>
           <div className="text-xs text-text-primary leading-relaxed markdown-body">
             <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>{summary}</ReactMarkdown>

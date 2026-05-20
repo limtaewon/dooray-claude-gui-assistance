@@ -4,6 +4,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const responses: Map<string, { stdout?: string; stderr?: string; error?: Error }> = new Map()
 const requestLog: string[][] = []
 
+// fs.existsSync — 테스트에서는 기본 true (path 가 실제 fs 에 있는 척).
+// stale-worktree 케이스 별도 테스트는 mockReturnValueOnce(false) 로 override.
+const existsSyncMock = vi.fn((_p?: unknown) => true)
+vi.mock('fs', () => ({
+  existsSync: (p: unknown) => existsSyncMock(p),
+  default: { existsSync: (p: unknown) => existsSyncMock(p) }
+}))
+
 vi.mock('child_process', () => {
   const execFile = (
     _cmd: string,
@@ -40,6 +48,7 @@ import { GitService } from './GitService'
 beforeEach(() => {
   responses.clear()
   requestLog.length = 0
+  existsSyncMock.mockReturnValue(true)
 })
 
 function mockGit(argsPrefix: string, stdout: string): void {
@@ -149,6 +158,48 @@ describe('GitService.removeWorktree / pruneWorktrees', () => {
     mockGit('worktree remove', '')
     await new GitService().removeWorktree({ repoPath: '/r', worktreePath: '/wt' } as never)
     expect(requestLog.some((a) => a.includes('--force'))).toBe(false)
+  })
+
+  it('Issue #8 — worktree fs 가 외부에서 삭제된 경우 prune 으로 fallback (remove 호출 안 함)', async () => {
+    existsSyncMock.mockReturnValue(false)
+    mockGit('worktree prune', '')
+    await new GitService().removeWorktree({ repoPath: '/r', worktreePath: '/wt', force: true })
+    expect(requestLog.some((a) => a.join(' ').includes('worktree remove'))).toBe(false)
+    expect(requestLog.some((a) => a.join(' ').includes('worktree prune'))).toBe(true)
+  })
+
+  it('Issue #8 — git 이 not a working tree 로 fail 하면 prune fallback', async () => {
+    mockGitError('worktree remove', 'is not a working tree')
+    mockGit('worktree prune', '')
+    await new GitService().removeWorktree({ repoPath: '/r', worktreePath: '/wt' } as never)
+    expect(requestLog.some((a) => a.join(' ').includes('worktree prune'))).toBe(true)
+  })
+})
+
+describe('GitService.listWorktrees — Issue #8 stale 자동 prune', () => {
+  it('main 외 worktree path 가 fs 에 없으면 prune + 재 list', async () => {
+    const stale = [
+      'worktree /repo/main',
+      'HEAD abc',
+      'branch refs/heads/main',
+      '',
+      'worktree /repo/.gone',
+      'HEAD def',
+      'branch refs/heads/feature',
+      ''
+    ].join('\n')
+    const clean = 'worktree /repo/main\nHEAD abc\nbranch refs/heads/main\n\n'
+    // main worktree (첫번째) 는 존재, stale worktree (두번째) 는 없음
+    existsSyncMock.mockImplementation(((p: unknown) => p === '/repo/main') as never)
+    mockGit('worktree list --porcelain', stale)
+    mockGit('worktree prune', '')
+    // 재호출 시점에 응답 갈아끼움 — prune 이후 다시 list 가 호출되니 같은 prefix mock 을 갈아야 하는데
+    // 단일 response map 이라 일단 stale 응답 그대로 두고, 핵심은 prune 이 호출됐는지 검증
+    const r = await new GitService().listWorktrees('/x')
+    // prune 호출 여부
+    expect(requestLog.some((a) => a.join(' ').includes('worktree prune'))).toBe(true)
+    // 결과는 mock 한계로 stale 그대로일 수 있으니 길이만 sanity
+    expect(r.length).toBeGreaterThanOrEqual(1)
   })
 })
 

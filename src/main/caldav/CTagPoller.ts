@@ -1,7 +1,11 @@
 import { CalDAVCredentialStore } from './CredentialStore'
 import type { UnifiedCalendarService } from './UnifiedCalendarService'
 
-const POLL_INTERVAL_MS = 45_000 // 45초 — 너무 잦으면 부담, 너무 길면 늦음
+// 3분 — 두레이 quota 와 calendar-query REPORT 부담을 줄임.
+// 즉시성이 필요한 경로(CRUD 직후, 수동 새로고침)는 별도로 트리거하므로 polling 은 백업 역할.
+const POLL_INTERVAL_MS = 180_000
+// 429 한 번 맞으면 다음 N tick 동안 스킵 — 두레이 quota 회복 시간 확보
+const BACKOFF_TICKS_ON_429 = 5
 
 /**
  * v1.5 — Incremental Sync Poller.
@@ -11,6 +15,7 @@ const POLL_INTERVAL_MS = 45_000 // 45초 — 너무 잦으면 부담, 너무 길
 export class CTagPoller {
   private timer: NodeJS.Timeout | null = null
   private running = false
+  private skipTicks = 0
 
   constructor(private readonly service: UnifiedCalendarService) {}
 
@@ -28,12 +33,23 @@ export class CTagPoller {
   private async tick(): Promise<void> {
     if (this.running) return
     if (!CalDAVCredentialStore.has()) return
+    if (this.skipTicks > 0) {
+      this.skipTicks--
+      console.log(`[Sync] tick skip (429 backoff 남은 ${this.skipTicks} tick)`)
+      return
+    }
     this.running = true
     try {
       const { anyChange } = await this.service.incrementalSync()
       if (anyChange) console.log('[Sync] incremental: 변경 감지 → 캐시 갱신')
     } catch (e) {
-      console.error('[Sync] tick 실패:', e)
+      const msg = e instanceof Error ? e.message : String(e)
+      if (msg.includes('429')) {
+        this.skipTicks = BACKOFF_TICKS_ON_429
+        console.warn(`[Sync] 429 — 다음 ${BACKOFF_TICKS_ON_429} tick (≈${(BACKOFF_TICKS_ON_429 * POLL_INTERVAL_MS / 60000) | 0}분) 동안 polling 중단`)
+      } else {
+        console.error('[Sync] tick 실패:', e)
+      }
     } finally {
       this.running = false
     }

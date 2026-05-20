@@ -1,13 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react'
-import { RefreshCw, Clock, MapPin, AlertCircle, CalendarDays, Sparkles, Loader2, Settings, Check } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import rehypeRaw from 'rehype-raw'
+import { RefreshCw, Clock, MapPin, AlertCircle, CalendarDays, Loader2, Settings, Check, Plus, ListTodo } from 'lucide-react'
 import type { DoorayCalendarEvent } from '../../../../shared/types/dooray'
-import SkillQuickToggle from './SkillQuickToggle'
 import { LoadingView, ErrorView, EmptyView } from '../common/StateViews'
-import AIToolsPopover from '../common/AIToolsPopover'
-import { Button, SegTabs } from '../common/ds'
+import { Button, Input, SegTabs, useToast } from '../common/ds'
 import CalendarMonthView from './CalendarMonthView'
 import { COLOR_PALETTE, resolveCalendarHex, normalizeHex } from './calendarColors'
 import type { UnifiedCalendar } from '../../../../shared/types/calendar'
@@ -95,7 +90,7 @@ function ColorPickerPopover({ currentHex, anchor, overridden, onPick, onReset, o
               onBlur={commitHexInput}
               placeholder="#RRGGBB"
               spellCheck={false}
-              className={`flex-1 min-w-0 text-[11px] px-2 py-1 rounded bg-bg-surface-hover border ${invalid ? 'border-rose-500' : 'border-bg-border'} text-text-primary outline-none focus:border-clover-blue font-mono`}
+              className={`flex-1 min-w-0 text-[11px] px-2 py-1 rounded bg-bg-surface-hover border ${invalid ? 'border-rose-500' : 'border-bg-border'} text-text-primary outline-none focus:border-clauday-blue font-mono`}
             />
           </div>
           {invalid && <div className="text-[9px] text-rose-400 mt-1">올바른 hex 값을 입력하세요 (예: #3b82f6)</div>}
@@ -215,11 +210,11 @@ function CalendarFilter({ events, filterIds, onFilter, colorOverrides, onChangeC
   return (
     <div className="relative">
       <button onClick={() => setOpen(!open)}
-        className={`ds-btn icon sm ${filterIds.length > 0 ? 'text-clover-blue' : ''}`}
+        className={`ds-btn icon sm ${filterIds.length > 0 ? 'text-clauday-blue' : ''}`}
         title="표시할 캘린더 선택">
         <Settings size={15} />
         {filterIds.length > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-clover-blue text-[8px] text-white flex items-center justify-center font-bold">
+          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-clauday-blue text-[8px] text-white flex items-center justify-center font-bold">
             {filterIds.length}
           </span>
         )}
@@ -287,6 +282,13 @@ function CalendarAssistant(): JSX.Element {
   const [filterLoaded, setFilterLoaded] = useState(false)
   const [colorOverrides, setColorOverrides] = useState<Record<string, string>>({})
   const [colorsLoaded, setColorsLoaded] = useState(false)
+  // 캘린더 메타 (list 뷰의 좌측 막대 색 적용용 — caldav/local/holiday source 정보 + 기본색 포함)
+  const [unifiedCalendars, setUnifiedCalendars] = useState<UnifiedCalendar[]>([])
+  useEffect(() => {
+    window.api.calendar.listCalendars()
+      .then(setUnifiedCalendars)
+      .catch(() => setUnifiedCalendars([]))
+  }, [])
   const [viewMode, setViewMode] = useState<CalendarViewMode>('list')
   const [viewModeLoaded, setViewModeLoaded] = useState(false)
   const [caldavStatus, setCaldavStatus] = useState<{ connected: boolean; username: string | null } | null>(null)
@@ -369,9 +371,10 @@ function CalendarAssistant(): JSX.Element {
       return next
     })
   }, [])
-  // AI (캘린더 분석)
-  const [aiResult, setAiResult] = useState<string | null>(null)
-  const [aiLoading, setAiLoading] = useState(false)
+  // #9 빠른 할일 추가 — 캘린더를 todo 보드처럼 활용. 자연어 한 줄 + Enter → 오늘 종일 로컬 일정 즉시 생성.
+  const [quickTodo, setQuickTodo] = useState('')
+  const [creatingTodo, setCreatingTodo] = useState(false)
+  const toast = useToast()
 
   const loadEvents = useCallback(async () => {
     setLoading(true); setError(null)
@@ -379,52 +382,81 @@ function CalendarAssistant(): JSX.Element {
       const now = new Date()
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
       const endOfWeek = new Date(startOfDay.getTime() + 7 * 24 * 60 * 60 * 1000)
-      const list = await window.api.dooray.calendar.events({ from: startOfDay.toISOString(), to: endOfWeek.toISOString() })
-      setEvents(list || [])
-    } catch (err) { setError(err instanceof Error ? err.message : String(err)); setEvents([]) }
+      // List 뷰도 unified API 로 단일화 (#9 후속). dooray.calendar.events 는 이미
+      // main 의 getEventsLegacy 가 unified 결과를 어댑트한 wrapper 라 호출하면 중복 데이터.
+      // 직접 unified 만 호출하고 DoorayCalendarEvent shape 으로 변환.
+      const unified = await window.api.calendar.listEvents({
+        from: startOfDay.toISOString(),
+        to: endOfWeek.toISOString()
+      })
+      const merged: DoorayCalendarEvent[] = (unified || []).map((u) => ({
+        id: `${u.source}:${u.id}`,
+        subject: u.summary,
+        startedAt: u.start,
+        endedAt: u.end,
+        location: u.location,
+        description: u.description,
+        wholeDayFlag: u.allDay,
+        calendar: {
+          id: u.calendarId,
+          name: u.source === 'local' ? '내 일정' : u.source === 'holiday' ? '공휴일' : '두레이'
+        }
+      }))
+      console.log('[CalendarAssistant] loaded', merged.length, 'events from unified')
+      setEvents(merged)
+    } catch (err) {
+      console.error('[CalendarAssistant] loadEvents 실패:', err)
+      setError(err instanceof Error ? err.message : String(err))
+      setEvents([])
+    }
     finally { setLoading(false) }
   }, [])
 
   useEffect(() => { loadEvents() }, [loadEvents])
+  // caldav-updated 구독은 line 307 의 useEffect 에 이미 등록됨 — 중복 listener 가 loadEvents 를 두 번 호출하던 문제 제거.
 
-  // AI 일정 분석
-  const runAiAnalysis = async (): Promise<void> => {
-    if (events.length === 0) return
-    setAiLoading(true); setAiResult(null)
+  // #9 빠른 할일 추가 — 텍스트 한 줄 → 오늘 종일 로컬 일정 즉시 생성.
+  const handleQuickAdd = async (): Promise<void> => {
+    const text = quickTodo.trim()
+    if (!text || creatingTodo) return
+    setCreatingTodo(true)
     try {
-      const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
-      // 날짜별로 그룹핑해서 AI에게 전달
-      const lines: string[] = []
-      const sortedDates = Object.entries(groupedByDate).sort(([a], [b]) => a.localeCompare(b))
-      for (const [dk, dayEvts] of sortedDates) {
-        const dateLabel = safeDate(dk + 'T00:00:00+09:00')
-        const isTodayDate = dk === todayKey
-        lines.push(`\n### ${dateLabel}${isTodayDate ? ' (오늘)' : ''}`)
-        for (const e of dayEvts) {
-          const s = getStart(e), en = getEnd(e)
-          const evStart = fixDate(s), evEnd = fixDate(en)
-          const isLong = !isNaN(evEnd.getTime()) && (evEnd.getTime() - evStart.getTime() > 2 * 24 * 60 * 60 * 1000)
-          const timeStr = isLong ? `${safeDate(s)} ~ ${safeDate(en)}` : e.wholeDayFlag ? '종일' : `${safeTime(s)}-${safeTime(en)}`
-          lines.push(`- ${timeStr} | ${e.subject || '?'} ${e.location ? `@ ${e.location}` : ''}`)
-        }
+      const cals = await window.api.calendar.listCalendars()
+      const localCal = cals.find((c) => c.source === 'local' && c.writable)
+      if (!localCal) {
+        toast.error('로컬 캘린더가 없습니다')
+        return
       }
-      const eventText = lines.join('\n')
-
-      const mcpServers = await AIToolsPopover.loadSelected('calendarAnalysis')
-      const result = await window.api.ai.ask({
-        prompt: `오늘: ${today}\n\n이번 주 일정 (날짜별 정리):\n${eventText}\n\n위 일정을 분석해줘. 각 이벤트의 날짜를 정확히 확인해서:\n1. 오늘(${today})의 시간별 빈 시간대 (업무시간 09:00-18:00 기준)\n2. 이번 주 가장 바쁜 날 vs 여유있는 날\n3. 연속 회의 경고 (30분 이하 간격인 것만)\n4. 준비가 필요한 일정 (발표, 리뷰 등)\n5. 업무 집중 가능 시간대 추천 (날짜별)`,
-        feature: 'calendarAnalysis',
-        mcpServers
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      await window.api.calendar.createEvent({
+        source: 'local',
+        calendarId: localCal.id,
+        summary: text,
+        start: today.toISOString(),
+        end: today.toISOString(),
+        allDay: true
       })
-      setAiResult(result)
-    } catch (err) { setAiResult(`오류: ${err instanceof Error ? err.message : ''}`) }
-    finally { setAiLoading(false) }
+      setQuickTodo('')
+      toast.success(`할 일 등록: ${text}`)
+      // 월 뷰는 자동 reload (caldav-updated 이벤트 구독). 리스트 뷰는 native API 라 별도.
+      await loadEvents()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '등록 실패')
+    } finally {
+      setCreatingTodo(false)
+    }
   }
 
   // 캘린더 필터 적용 (메모화)
   const displayEvents = useMemo(() =>
     filterIds.length > 0
-      ? events.filter((e) => e.calendar?.id && filterIds.includes(e.calendar.id))
+      ? events.filter((e) => {
+          // 공휴일은 사용자가 토글로 끌 수 없는 캘린더 — filter 무시 (서버 unified API 정책과 동일).
+          // 캘린더 토글 팝업에 공휴일 항목이 없는데 filter 적용하면 다 빠져 일정 0개로 보임.
+          if (e.calendar?.id === 'holiday-kr') return true
+          return !!e.calendar?.id && filterIds.includes(e.calendar.id)
+        })
       : events,
     [events, filterIds]
   )
@@ -469,14 +501,14 @@ function CalendarAssistant(): JSX.Element {
       {/* 헤더 */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-bg-border flex-shrink-0">
         <div className="flex items-center gap-2">
-          <CalendarDays size={18} className="text-clover-blue" />
+          <CalendarDays size={18} className="text-clauday-blue" />
           <h2 className="text-lg font-semibold text-text-primary">이번 주 일정</h2>
           <span className="text-[10px] text-text-tertiary">{displayEvents.length}개{filterIds.length > 0 ? ` / ${events.length}` : ''}</span>
           <CalendarFilter events={events} filterIds={filterIds} onFilter={setFilterIds} colorOverrides={colorOverrides} onChangeColor={handleChangeColor} />
           <button
             onClick={loadEvents}
             disabled={loading}
-            className="ds-btn icon sm text-clover-blue"
+            className="ds-btn icon sm text-clauday-blue"
             title="새로고침"
           >
             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
@@ -491,37 +523,36 @@ function CalendarAssistant(): JSX.Element {
             value={viewMode}
             onChange={setViewMode}
           />
-          <SkillQuickToggle target="calendar" feature="calendarAnalysis" />
-          <Button
-            variant="ai"
-            size="lg"
-            onClick={runAiAnalysis}
-            disabled={aiLoading || events.length === 0}
-            leftIcon={aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-          >
-            {aiLoading ? '분석 중...' : 'AI 일정 분석'}
-          </Button>
         </div>
       </div>
 
-      {/* AI 분석 결과 */}
-      {aiResult && (
-        <div className="mx-6 mt-3 p-4 rounded-xl bg-gradient-to-r from-clover-orange/5 to-clover-blue/5 border border-clover-orange/20 flex-shrink-0 max-h-[50vh] overflow-y-auto">
-          <div className="flex items-center gap-1.5 mb-2 py-1">
-            <Sparkles size={13} className="text-clover-orange" />
-            <span className="text-xs font-semibold text-clover-orange">AI 일정 분석</span>
-            <button onClick={() => setAiResult(null)} className="ml-auto text-[9px] text-text-tertiary hover:text-text-secondary">닫기</button>
-          </div>
-          <div className="markdown-body text-xs leading-relaxed">
-            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{aiResult}</ReactMarkdown>
-          </div>
-        </div>
-      )}
+      {/* #9 빠른 할일 추가 — 캘린더를 todo 보드로 활용. Enter 한 번에 오늘 종일 일정 생성. */}
+      <div className="mx-6 mt-3 flex items-center gap-2 flex-shrink-0">
+        <ListTodo size={14} className="text-clauday-blue flex-shrink-0" />
+        <input
+          type="text"
+          className="flex-1 bg-bg-surface border border-bg-border hover:border-clauday-blue/40 focus:border-clauday-blue/60 outline-none rounded-lg px-3 py-1.5 text-[13px] text-text-primary placeholder-text-tertiary transition-colors"
+          placeholder='오늘 할 일 입력 후 Enter'
+          value={quickTodo}
+          onChange={(e) => setQuickTodo(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleQuickAdd() }}
+          disabled={creatingTodo}
+        />
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={handleQuickAdd}
+          disabled={creatingTodo || !quickTodo.trim()}
+          leftIcon={creatingTodo ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+        >
+          {creatingTodo ? '등록 중...' : '등록'}
+        </Button>
+      </div>
 
       {/* CalDAV 미연결 안내 배너 */}
       {caldavStatus && !caldavStatus.connected && (
-        <div className="mx-6 mt-3 p-3 rounded-xl bg-clover-orange/5 border border-clover-orange/20 flex items-center gap-3 flex-shrink-0">
-          <AlertCircle size={14} className="text-clover-orange flex-shrink-0" />
+        <div className="mx-6 mt-3 p-3 rounded-xl bg-clauday-orange/5 border border-clauday-orange/20 flex items-center gap-3 flex-shrink-0">
+          <AlertCircle size={14} className="text-clauday-orange flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-[11px] text-text-primary font-medium">두레이 CalDAV가 연결되지 않았습니다</p>
             <p className="text-[10px] text-text-tertiary mt-0.5">
@@ -530,7 +561,7 @@ function CalendarAssistant(): JSX.Element {
           </div>
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('goto-settings', { detail: { tab: 'caldav' } }))}
-            className="px-2.5 py-1 rounded-md bg-clover-blue text-white text-[10px] font-medium hover:bg-clover-blue/80 flex-shrink-0">
+            className="px-2.5 py-1 rounded-md bg-clauday-blue text-white text-[10px] font-medium hover:bg-clauday-blue/80 flex-shrink-0">
             연결하러 가기
           </button>
         </div>
@@ -574,9 +605,10 @@ function CalendarAssistant(): JSX.Element {
                       evStart.getTime() <= now.getTime() && now.getTime() <= evEnd.getTime()
                     const isUpcoming = !isNaN(evStart.getTime()) && evStart.getTime() > now.getTime()
                     const periodStr = `${safeDate(getStart(event))} ~ ${safeDate(getEnd(event))}`
+                    const barColor = resolveCalendarHex(event.calendar?.id || '', unifiedCalendars, colorOverrides)
                     return (
                       <div key={`long-${event.id || i}`} className="flex items-start gap-3 p-2.5 bg-bg-surface border border-bg-border rounded-lg hover:border-bg-border-light transition-colors">
-                        <div className="w-1 min-h-[32px] rounded-full flex-shrink-0 bg-emerald-400" />
+                        <div className="w-1 min-h-[32px] rounded-full flex-shrink-0" style={{ backgroundColor: barColor }} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <p className="text-xs text-text-primary">{event.subject || '(제목 없음)'}</p>
@@ -584,7 +616,7 @@ function CalendarAssistant(): JSX.Element {
                               <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-400/15 text-emerald-400 font-medium">진행 중</span>
                             )}
                             {isUpcoming && (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-clover-blue/15 text-clover-blue font-medium">예정</span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-clauday-blue/15 text-clauday-blue font-medium">예정</span>
                             )}
                           </div>
                           <div className="flex items-center gap-3 mt-0.5">
@@ -610,16 +642,17 @@ function CalendarAssistant(): JSX.Element {
               const isToday = dateKey === todayKey
               return (
                 <div key={dateKey}>
-                  <h3 className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isToday ? 'text-clover-blue' : 'text-text-secondary'}`}>
+                  <h3 className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isToday ? 'text-clauday-blue' : 'text-text-secondary'}`}>
                     {safeDate(dateKey + 'T00:00:00+09:00')} {isToday && '(오늘)'} <span className="text-text-tertiary font-normal">{dayEvents.length}개</span>
                   </h3>
                   <div className="space-y-1.5">
                     {dayEvents.map((event, i) => {
                       const isAllDay = event.wholeDayFlag || (!safeTime(getStart(event)) && !safeTime(getEnd(event)))
+                      const barColor = resolveCalendarHex(event.calendar?.id || '', unifiedCalendars, colorOverrides)
                       return (
                         <div key={`${event.id || i}-${dateKey}`} className="bg-bg-surface border border-bg-border rounded-lg hover:border-bg-border-light transition-colors">
                           <div className="flex items-start gap-3 p-2.5">
-                            <div className={`w-1 min-h-[32px] rounded-full flex-shrink-0 ${isAllDay ? 'bg-clover-orange' : 'bg-clover-blue'}`} />
+                            <div className="w-1 min-h-[32px] rounded-full flex-shrink-0" style={{ backgroundColor: barColor }} />
                             <div className="flex-1 min-w-0">
                               <p className="text-xs text-text-primary">{event.subject || '(제목 없음)'}</p>
                               <div className="flex items-center gap-3 mt-0.5">

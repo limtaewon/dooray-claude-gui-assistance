@@ -74,7 +74,7 @@ function BriefingPanel(): JSX.Element {
         {/* 헤더 유지 */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-bg-border flex-shrink-0">
           <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-clover-orange animate-pulse" />
+            <Sparkles size={16} className="text-clauday-orange animate-pulse" />
             <span className="text-sm font-semibold text-text-primary">AI 브리핑 생성 중</span>
           </div>
         </div>
@@ -108,7 +108,7 @@ function BriefingPanel(): JSX.Element {
       {/* 헤더 */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-bg-border flex-shrink-0">
         <div className="flex items-center gap-2">
-          <Sparkles size={16} className="text-clover-orange" />
+          <Sparkles size={16} className="text-clauday-orange" />
           <span className="text-sm font-semibold text-text-primary">AI 브리핑</span>
           {history.length > 0 && (
             <button
@@ -192,8 +192,8 @@ function BriefingPanel(): JSX.Element {
             <div
               className="rounded-xl px-4 py-3.5"
               style={{
-                background: 'linear-gradient(90deg, rgba(234,88,12,0.06), rgba(37,99,235,0.06))',
-                border: '1px solid transparent'
+                background: 'linear-gradient(90deg, rgba(234,88,12,0.10), rgba(37,99,235,0.10))',
+                border: '1px solid rgba(234,88,12,0.45)'
               }}
             >
               <div className="text-[13px] leading-relaxed text-text-primary">{briefing.greeting}</div>
@@ -203,37 +203,46 @@ function BriefingPanel(): JSX.Element {
                 {briefing.mentioned && briefing.mentioned.length > 0 && <Chip tone="violet" dot>멘션 {briefing.mentioned.length}</Chip>}
                 {briefing.todayEvents.length > 0 && <Chip tone="emerald" dot>회의 {briefing.todayEvents.length}</Chip>}
               </div>
+              {/* 참고 데이터 메타 — 사용자가 "뭘 보고 만든 결과인지" 한 줄로 인지.
+                  토글한 프로젝트 태스크 + 토글한 캘린더 일정은 항상 base 로 들어감.
+                  스킬/MCP 가 활성이면 추가 보강 분석이 그 위에서 일어남. */}
+              {briefing.sourceMeta && (
+                <div className="mt-2 text-[10px] text-text-tertiary">
+                  참고: 내 태스크 {briefing.sourceMeta.taskCount}개 · CC {briefing.sourceMeta.ccTaskCount}개 · 오늘 마감 {briefing.sourceMeta.dueTodayCount}개 · 일정 {briefing.sourceMeta.eventCount}개
+                  {briefing.sourceMeta.eventRange ? ` (${briefing.sourceMeta.eventRange})` : ''}
+                </div>
+              )}
             </div>
 
             {briefing.urgent.length > 0 && (
-              <Section icon={AlertTriangle} iconColor="text-red-400" title="긴급" count={briefing.urgent.length} bgColor="from-red-500/8 to-transparent border-red-500/22">
+              <Section icon={AlertTriangle} iconColor="text-red-500 dark:text-red-400" title="긴급" count={briefing.urgent.length} bgColor="from-red-500/10 to-transparent border-red-500/45">
                 {briefing.urgent.map((item, i) => <TaskItem key={i} taskId={item.taskId} subject={item.subject} detail={item.reason} />)}
               </Section>
             )}
 
             {briefing.focus.length > 0 && (
-              <Section icon={Target} iconColor="text-clover-blue" title="오늘 집중" count={briefing.focus.length} bgColor="from-clover-blue/8 to-transparent border-clover-blue/22">
+              <Section icon={Target} iconColor="text-blue-900 dark:text-clauday-blue" title="오늘 집중" count={briefing.focus.length} bgColor="from-clauday-blue/10 to-transparent border-clauday-blue/65">
                 {briefing.focus.map((item, i) => <TaskItem key={i} taskId={item.taskId} subject={item.subject} detail={item.reason} />)}
               </Section>
             )}
 
             {briefing.mentioned && briefing.mentioned.length > 0 && (
-              <Section icon={MessageSquare} iconColor="text-violet-400" title="멘션/답장" count={briefing.mentioned.length} bgColor="from-violet-500/8 to-transparent border-violet-500/22">
+              <Section icon={MessageSquare} iconColor="text-violet-600 dark:text-violet-400" title="멘션/답장" count={briefing.mentioned.length} bgColor="from-violet-500/10 to-transparent border-violet-500/45">
                 {briefing.mentioned.map((item, i) => <TaskItem key={i} taskId={item.taskId} subject={item.subject} detail={item.reason} />)}
               </Section>
             )}
 
             {briefing.stale.length > 0 && (
-              <Section icon={Clock} iconColor="text-clover-orange" title="착수 필요" count={briefing.stale.length} bgColor="from-clover-orange/8 to-transparent border-clover-orange/22">
+              <Section icon={Clock} iconColor="text-orange-900 dark:text-clauday-orange" title="착수 필요" count={briefing.stale.length} bgColor="from-clauday-orange/10 to-transparent border-clauday-orange/65">
                 {briefing.stale.map((item, i) => <TaskItem key={i} taskId={item.taskId} subject={item.subject} detail={`${item.daysSinceCreated}일째`} />)}
               </Section>
             )}
 
             {briefing.todayEvents.length > 0 && (
-              <Section icon={Calendar} iconColor="text-emerald-400" title="오늘 회의" count={briefing.todayEvents.length} bgColor="from-emerald-400/8 to-transparent border-emerald-400/22">
+              <Section icon={Calendar} iconColor="text-emerald-600 dark:text-emerald-400" title="오늘 일정" count={briefing.todayEvents.length} bgColor="from-emerald-500/10 to-transparent border-emerald-500/45">
                 {briefing.todayEvents.map((evt, i) => (
                   <div key={i} className="flex items-center gap-2 text-xs">
-                    <span className="text-emerald-400 font-mono">{evt.time}</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-mono">{evt.time}</span>
                     <span className="text-text-primary flex-1">{evt.subject}</span>
                   </div>
                 ))}
@@ -241,10 +250,10 @@ function BriefingPanel(): JSX.Element {
             )}
 
             {briefing.recommendations.length > 0 && (
-              <Section icon={Lightbulb} iconColor="text-yellow-400" title="AI 제안" count={briefing.recommendations.length} bgColor="from-yellow-400/8 to-transparent border-yellow-400/22">
-                <div className="space-y-1">
+              <Section icon={Lightbulb} iconColor="text-amber-600 dark:text-yellow-400" title="AI 제안" count={briefing.recommendations.length} bgColor="from-amber-500/10 to-transparent border-amber-500/45">
+                <div className="space-y-1.5">
                   {briefing.recommendations.map((rec, i) => (
-                    <div key={i} className="text-xs text-text-primary leading-relaxed">{rec}</div>
+                    <RecommendationItem key={i} text={rec} index={i} />
                   ))}
                 </div>
               </Section>
@@ -270,6 +279,67 @@ function Section({ icon: Icon, iconColor, title, count, bgColor, children }: {
         {count !== undefined && <span className="text-[10px] text-text-tertiary">· {count}</span>}
       </div>
       <div className="space-y-1">{children}</div>
+    </div>
+  )
+}
+
+/**
+ * AI 제안 한 줄을 시각적 위계로 분해 — 시간 anchor(오전/오후/EOD/N일/HH시) chip 좌측 분리 +
+ * 18자리 raw taskId 숨김(클릭은 두레이로 열림) + emoji prefix 살리기 + 번호.
+ * 단순 텍스트 줄 나열로는 6개 추천이 뭉뚱그려져 안 읽힘.
+ */
+function RecommendationItem({ text, index }: { text: string; index: number }): JSX.Element {
+  // 시간 anchor 추출 (우선순위 순)
+  const ANCHOR_PATTERNS: Array<RegExp> = [
+    /^(오전\s*후반|오전|오후\s*블록\s*\d+시간|오후|EOD\s*전|EOD|점심\s*후|점심|미팅\s*전|회의\s*전|주간회의\s*전|시작\s*전)\s*[:：]?\s*/,
+    /^(\d{1,2}일\s*\([월화수목금토일]\)\s*\d{0,2}시?|\d{1,2}일\s*\d{0,2}시?|\d{1,2}\/\d{1,2}\s*\d{0,2}시?)\s*[:：]?\s*/
+  ]
+  let anchor: string | null = null
+  let body = text
+  for (const re of ANCHOR_PATTERNS) {
+    const m = body.match(re)
+    if (m) {
+      anchor = m[1].trim().replace(/[:：]\s*$/, '').trim()
+      body = body.slice(m[0].length).trim()
+      break
+    }
+  }
+
+  // 18자리 raw taskId 추출 → 클릭 가능한 mini chip 으로 (괄호 통째 제거 후 별도 표시)
+  const taskIds: string[] = []
+  body = body.replace(/\((\d{15,20})\)/g, (_, id: string) => {
+    taskIds.push(id)
+    return ''
+  }).replace(/\s+/g, ' ').replace(/\s+([,.])/g, '$1').trim()
+
+  // 선행 emoji prefix (⚠️🔴🟡🚨📋💬🔍🚀⏰⏳🔄📝🏖️ 등)
+  let leadingEmoji: string | null = null
+  const em = body.match(/^([\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]+(?:\s*[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]+)*)\s+/u)
+  if (em) {
+    leadingEmoji = em[1].trim()
+    body = body.slice(em[0].length).trim()
+  }
+
+  return (
+    <div className="flex items-start gap-2 py-1 px-1.5 -mx-1.5 rounded-md hover:bg-bg-surface-hover transition-colors">
+      <span className="flex-none w-4 text-[10px] text-text-tertiary font-mono mt-1 text-right">{index + 1}.</span>
+      <span className="flex-1 text-[12px] text-text-primary leading-relaxed">
+        {leadingEmoji && <span className="mr-1 text-[13px]">{leadingEmoji}</span>}
+        {anchor && (
+          <span className="inline-block align-middle mr-1.5">
+            <Chip tone="orange">{anchor}</Chip>
+          </span>
+        )}
+        {body}
+        {taskIds.map((id, i) => (
+          <a key={`${id}-${i}`} href={`https://nhnent.dooray.com/project/posts/${id}`}
+             target="_blank" rel="noopener noreferrer"
+             className="inline-flex items-center gap-0.5 ml-1 px-1.5 py-0.5 rounded border border-bg-border-strong bg-bg-surface text-text-secondary hover:text-clauday-blue hover:border-clauday-blue text-[10px] font-mono align-middle"
+             title={`두레이에서 ${id} 열기`}>
+            #{id.slice(-4)}
+          </a>
+        ))}
+      </span>
     </div>
   )
 }
@@ -341,11 +411,11 @@ function BriefingFeedback(): JSX.Element {
           <p className="text-[10px] text-text-secondary text-center">뭐가 아쉬웠나요? (선택)</p>
           <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={2}
             placeholder="예: 긴급 기준이 안 맞아요, 멘션된 태스크를 더 강조해주세요"
-            className="w-full px-3 py-2 bg-bg-surface border border-bg-border rounded-lg text-[11px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue resize-none" />
+            className="w-full px-3 py-2 bg-bg-surface border border-bg-border rounded-lg text-[11px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue resize-none" />
           <div className="flex justify-end gap-2">
             <button onClick={() => setFeedback(null)} className="text-[10px] text-text-tertiary hover:text-text-secondary">취소</button>
             <button onClick={() => submit('down', comment)}
-              className="px-3 py-1 rounded-md bg-clover-blue text-white text-[10px] font-medium hover:bg-clover-blue/80">
+              className="px-3 py-1 rounded-md bg-clauday-blue text-white text-[10px] font-medium hover:bg-clauday-blue/80">
               제출
             </button>
           </div>

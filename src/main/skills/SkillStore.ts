@@ -2,7 +2,7 @@ import { app } from 'electron'
 import { join } from 'path'
 import { homedir } from 'os'
 import { readFileSync, writeFileSync, readdirSync, unlinkSync, mkdirSync, existsSync, copyFileSync, statSync } from 'fs'
-import type { CloverSkill, SkillTarget } from '../../shared/types/skill'
+import type { ClaudaySkill, SkillTarget } from '../../shared/types/skill'
 
 /**
  * 스킬 파일시스템 저장소 (.md 형식, Claude Code CLI 스킬과 동일한 구조)
@@ -19,8 +19,8 @@ import type { CloverSkill, SkillTarget } from '../../shared/types/skill'
  * ...
  *
  * 저장 위치:
- *   ~/Library/Application Support/clover/briefing/skills/*.md
- *   ~/Library/Application Support/clover/report/skills/*.md
+ *   ~/Library/Application Support/Clauday/briefing/skills/*.md
+ *   ~/Library/Application Support/Clauday/report/skills/*.md
  */
 const TARGETS: SkillTarget[] = ['briefing', 'report', 'calendar', 'wiki', 'task', 'messenger', 'insights', 'aiRecommend', 'all']
 // 'chat'은 구버전 호환용 (스킬 파일은 남아있을 수 있으므로 읽기 위해 유지)
@@ -39,7 +39,7 @@ function parseFrontmatter(raw: string): { meta: Record<string, string>; content:
   return { meta, content: match[2] }
 }
 
-function toFrontmatter(skill: CloverSkill): string {
+function toFrontmatter(skill: ClaudaySkill): string {
   return `---
 name: ${skill.name}
 description: ${skill.description}
@@ -49,13 +49,13 @@ autoApply: ${skill.autoApply}
 ${skill.content}`
 }
 
-function fileToSkill(filePath: string, target: string): CloverSkill | null {
+function fileToSkill(filePath: string, target: string): ClaudaySkill | null {
   try {
     const raw = readFileSync(filePath, 'utf-8')
 
     // JSON 호환 (기존 파일)
     if (raw.trimStart().startsWith('{')) {
-      const skill = JSON.parse(raw) as CloverSkill
+      const skill = JSON.parse(raw) as ClaudaySkill
       skill.target = target as SkillTarget
       return skill
     }
@@ -134,11 +134,11 @@ export class SkillStore {
     return join(this.targetDir(target), `${safeName}.md`)
   }
 
-  private readSkillsFromDir(target: string): CloverSkill[] {
+  private readSkillsFromDir(target: string): ClaudaySkill[] {
     const dir = this.targetDir(target)
     if (!existsSync(dir)) return []
     const files = readdirSync(dir).filter((f) => f.endsWith('.md') || f.endsWith('.json'))
-    const skills: CloverSkill[] = []
+    const skills: ClaudaySkill[] = []
     for (const file of files) {
       const skill = fileToSkill(join(dir, file), target)
       if (skill) skills.push(skill)
@@ -147,9 +147,9 @@ export class SkillStore {
   }
 
   /** 인메모리 캐시 (save/delete 시 무효화) */
-  private skillCache = new Map<string, CloverSkill[]>()
+  private skillCache = new Map<string, ClaudaySkill[]>()
 
-  private readCached(target: string): CloverSkill[] {
+  private readCached(target: string): ClaudaySkill[] {
     const cached = this.skillCache.get(target)
     if (cached) return cached
     const skills = this.readSkillsFromDir(target)
@@ -161,13 +161,13 @@ export class SkillStore {
     this.skillCache.clear()
   }
 
-  list(): CloverSkill[] {
-    const all: CloverSkill[] = []
+  list(): ClaudaySkill[] {
+    const all: ClaudaySkill[] = []
     for (const target of TARGETS) all.push(...this.readCached(target))
     return all.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))
   }
 
-  get(id: string): CloverSkill | null {
+  get(id: string): ClaudaySkill | null {
     for (const target of TARGETS) {
       // .md 먼저, .json 폴백
       for (const ext of ['.md', '.json']) {
@@ -180,7 +180,7 @@ export class SkillStore {
     return null
   }
 
-  save(skill: CloverSkill): void {
+  save(skill: ClaudaySkill): void {
     // 모든 target에서 이전 파일 삭제 (.md, .json 모두)
     const safeName = skill.id.replace(/[^a-zA-Z0-9_-]/g, '_')
     for (const target of TARGETS) {
@@ -202,7 +202,7 @@ export class SkillStore {
     this.invalidateCache()
   }
 
-  forTarget(target: string): CloverSkill[] {
+  forTarget(target: string): ClaudaySkill[] {
     const skills = [...this.readCached(target), ...this.readCached('all')]
     return skills.filter((s) => s.enabled && s.autoApply)
   }

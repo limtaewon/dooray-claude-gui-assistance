@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   ChevronLeft, ChevronRight, Clock, MapPin, Plus,
   CalendarDays as CalIcon, Loader2, Trash2, Bell, Users, ExternalLink, Check, X as XIcon, HelpCircle,
-  Edit2, UserCheck, Star
+  Edit2, UserCheck, Star, CalendarPlus
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -11,7 +11,8 @@ import { Modal, Input, Textarea, Button } from '../common/ds'
 import type {
   UnifiedCalendar,
   UnifiedEvent,
-  UnifiedEventCreate
+  UnifiedEventCreate,
+  UnifiedEventDateTimeUpdate
 } from '../../../../shared/types/calendar'
 import { colorStyleFor as sharedColorStyleFor, type ColorStyle } from './calendarColors'
 
@@ -72,6 +73,94 @@ function fmtDateInput(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
+/** 등록순 타이브레이커 — createdAt 없는 항목은 뒤로 (Infinity). */
+function createdAtAsc(a: UnifiedEvent, b: UnifiedEvent): number {
+  const at = a.createdAt ? new Date(a.createdAt).getTime() : Number.POSITIVE_INFINITY
+  const bt = b.createdAt ? new Date(b.createdAt).getTime() : Number.POSITIVE_INFINITY
+  return at - bt
+}
+
+/** 'YYYY.MM.DD HH:mm 등록' — 상세 모달용 */
+function fmtCreatedAt(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} 등록`
+}
+
+/**
+ * 막대 드래그(이동/리사이즈)로 이벤트의 새 start/end 를 계산.
+ * 시간 이벤트는 시:분 그대로 유지하고 날짜만 평행이동. 종일 이벤트는 일 단위.
+ */
+function dayDelta(a: Date, b: Date): number {
+  return Math.round((startOfDay(b).getTime() - startOfDay(a).getTime()) / 86400000)
+}
+function shiftDate(d: Date, days: number): Date {
+  const r = new Date(d); r.setDate(r.getDate() + days); return r
+}
+type BarDragMode = 'move' | 'resize-start' | 'resize-end'
+interface BarDragState {
+  event: UnifiedEvent
+  mode: BarDragMode
+  originStart: Date
+  originEnd: Date
+  /** mouseDown 시점에 잡은 날 — move 모드의 평행이동 기준점 */
+  anchorDay: Date
+  /** 현재 마우스 위치가 가리키는 일자 */
+  hoverDay: Date
+}
+
+/** UnifiedEvent 가 막대 드래그 대상이 될 수 있는지 (휴일/RRULE/external 등 제외) */
+function isEventDraggable(e: UnifiedEvent): boolean {
+  if (e.source === 'holiday') return false
+  if (e.rrule) return false
+  if (e.source !== 'local' && e.source !== 'caldav') return false
+  return true
+}
+
+/** BarDragState 의 현재 hoverDay 기준 미리보기 시각을 ISO 로 변환 */
+function computePreviewIso(
+  state: BarDragState
+): { start: string; end: string; allDay: boolean } {
+  const { event, mode, originStart, originEnd, anchorDay, hoverDay } = state
+  if (mode === 'move') {
+    const delta = dayDelta(anchorDay, hoverDay)
+    const newStart = shiftDate(originStart, delta)
+    const newEnd = shiftDate(originEnd, delta)
+    return { start: newStart.toISOString(), end: newEnd.toISOString(), allDay: event.allDay }
+  }
+  if (mode === 'resize-start') {
+    // 시작일은 hover 일, 종료일 이후로는 못 넘어감
+    const candidate = hoverDay.getTime() > startOfDay(originEnd).getTime()
+      ? startOfDay(originEnd)
+      : hoverDay
+    if (event.allDay) {
+      return {
+        start: candidate.toISOString(),
+        end: originEnd.toISOString(),
+        allDay: true
+      }
+    }
+    // 시간 이벤트: 원본의 시:분 보존하면서 일자만 이동
+    const newStart = new Date(candidate)
+    newStart.setHours(originStart.getHours(), originStart.getMinutes(), originStart.getSeconds(), 0)
+    return { start: newStart.toISOString(), end: originEnd.toISOString(), allDay: false }
+  }
+  // resize-end
+  const candidate = hoverDay.getTime() < startOfDay(originStart).getTime()
+    ? startOfDay(originStart)
+    : hoverDay
+  if (event.allDay) {
+    return {
+      start: originStart.toISOString(),
+      end: candidate.toISOString(),
+      allDay: true
+    }
+  }
+  const newEnd = new Date(candidate)
+  newEnd.setHours(originEnd.getHours(), originEnd.getMinutes(), originEnd.getSeconds(), 0)
+  return { start: originStart.toISOString(), end: newEnd.toISOString(), allDay: false }
+}
+
 type Segment = {
   event: UnifiedEvent
   col: number
@@ -112,11 +201,17 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
   const [moreDate, setMoreDate] = useState<Date | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  // 드래그
+  // 드래그 — 셀 선택 (새 일정 생성)
   const dragAnchorRef = useRef<Date | null>(null)
   const [dragRange, setDragRange] = useState<DragRange | null>(null)
   const dragDidMoveRef = useRef(false)
   const [isDragging, setIsDragging] = useState(false)
+
+  // 막대 드래그 — 기존 일정의 이동/리사이즈
+  const [barDrag, setBarDrag] = useState<BarDragState | null>(null)
+  const barDragMovedRef = useRef(false)
+  const [barDragSaving, setBarDragSaving] = useState(false)
+  const [barDragError, setBarDragError] = useState<string | null>(null)
 
   // 월 전환 lock — idle + max-time 이중 보호
   const wheelLockRef = useRef(false)
@@ -252,7 +347,10 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
       const bdur = startOfDay(new Date(b.end)).getTime() - startOfDay(new Date(b.start)).getTime()
       if (adur !== bdur) return bdur - adur
       if (a.allDay !== b.allDay) return a.allDay ? -1 : 1
-      return new Date(a.start).getTime() - new Date(b.start).getTime()
+      const startDiff = new Date(a.start).getTime() - new Date(b.start).getTime()
+      if (startDiff !== 0) return startDiff
+      // 동률 시 등록순 (먼저 등록된 일정이 위로). createdAt 없으면 끝으로.
+      return createdAtAsc(a, b)
     })
     const occupy = Array.from({ length: 7 }, () => new Set<number>())
     const out: Segment[] = []
@@ -293,7 +391,9 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
       return t >= startOfDay(new Date(e.start)).getTime() && t <= startOfDay(new Date(e.end)).getTime()
     }).sort((a, b) => {
       if (a.allDay !== b.allDay) return a.allDay ? -1 : 1
-      return new Date(a.start).getTime() - new Date(b.start).getTime()
+      const startDiff = new Date(a.start).getTime() - new Date(b.start).getTime()
+      if (startDiff !== 0) return startDiff
+      return createdAtAsc(a, b)
     })
 
   const calendarName = (id: string): string =>
@@ -443,6 +543,86 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
     }
   }, [isDragging, jumpMonths])
 
+  /**
+   * 막대 드래그(이동/리사이즈) — 전역 mousemove/mouseup.
+   * onMouseDown 은 막대 자체에 달려있고, 그 후의 트래킹은 여기서.
+   */
+  useEffect(() => {
+    if (!barDrag) return
+    const startOriginDay = startOfDay(barDrag.anchorDay).getTime()
+    const onMove = (e: MouseEvent): void => {
+      const stack = document.elementsFromPoint(e.clientX, e.clientY)
+      let cellEl: HTMLElement | null = null
+      for (const el of stack) {
+        const c = (el as HTMLElement).closest?.('[data-date]') as HTMLElement | null
+        if (c) { cellEl = c; break }
+      }
+      if (!cellEl?.dataset.date) return
+      const [y, m, d] = cellEl.dataset.date.split('-').map(Number)
+      const day = new Date(y, m - 1, d)
+      if (startOfDay(day).getTime() !== startOriginDay) barDragMovedRef.current = true
+      setBarDrag((prev) => (prev ? { ...prev, hoverDay: day } : prev))
+    }
+    const onUp = async (): Promise<void> => {
+      const final = barDragRef.current
+      setBarDrag(null)
+      if (!final) return
+      if (!barDragMovedRef.current) return  // 단순 클릭 → 상세 모달 (막대 onClick 가 처리)
+      const preview = computePreviewIso(final)
+      // 변경 없으면 noop
+      const sameStart = new Date(preview.start).getTime() === final.originStart.getTime()
+      const sameEnd = new Date(preview.end).getTime() === final.originEnd.getTime()
+      if (sameStart && sameEnd) return
+      setBarDragSaving(true)
+      setBarDragError(null)
+      try {
+        if (final.event.source !== 'local' && final.event.source !== 'caldav') return
+        const payload: UnifiedEventDateTimeUpdate = {
+          source: final.event.source,
+          id: final.event.id,
+          calendarId: final.event.calendarId,
+          caldavUrl: final.event.caldavUrl,
+          etag: final.event.etag,
+          start: preview.start,
+          end: preview.end,
+          allDay: preview.allDay
+        }
+        await window.api.calendar.updateEventDateTime(payload)
+        await loadEvents()
+      } catch (err) {
+        console.error('[barDrag] update 실패:', err)
+        setBarDragError(err instanceof Error ? err.message : '일정 변경 실패')
+      } finally {
+        setBarDragSaving(false)
+      }
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [barDrag, loadEvents])
+
+  // barDrag 상태를 mouseup 핸들러가 캡쳐된 시점이 아닌 최신 값으로 읽을 수 있게 ref 미러
+  const barDragRef = useRef<BarDragState | null>(null)
+  useEffect(() => { barDragRef.current = barDrag }, [barDrag])
+
+  /** 막대 드래그 시작 핸들러 — segment 의 mouseDown 에 부착 */
+  const startBarDrag = useCallback((event: UnifiedEvent, mode: BarDragMode, dayAtClick: Date) => {
+    if (!isEventDraggable(event)) return
+    setBarDragError(null)
+    barDragMovedRef.current = false
+    setBarDrag({
+      event,
+      mode,
+      originStart: new Date(event.start),
+      originEnd: new Date(event.end),
+      anchorDay: dayAtClick,
+      hoverDay: dayAtClick
+    })
+  }, [])
+
   /** 드래그 미리보기의 row별 segment */
   const dragSegmentsForRow = (week: Date[]): { col: number; span: number; startsHere: boolean; endsHere: boolean } | null => {
     if (!dragRange) return null
@@ -458,6 +638,25 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
       span: colEnd - col + 1,
       startsHere: ds >= rowStart,
       endsHere: de <= rowEnd
+    }
+  }
+
+  /** 막대 드래그의 row별 ghost segment */
+  const barDragSegForRow = (week: Date[]): { col: number; span: number; startsHere: boolean; endsHere: boolean } | null => {
+    if (!barDrag) return null
+    const preview = computePreviewIso(barDrag)
+    const rowStart = startOfDay(week[0]).getTime()
+    const rowEnd = startOfDay(week[6]).getTime()
+    const ps = startOfDay(new Date(preview.start)).getTime()
+    const pe = startOfDay(new Date(preview.end)).getTime()
+    if (pe < rowStart || ps > rowEnd) return null
+    const col = Math.max(0, Math.floor((Math.max(ps, rowStart) - rowStart) / 86400000))
+    const colEnd = Math.min(6, Math.floor((Math.min(pe, rowEnd) - rowStart) / 86400000))
+    return {
+      col,
+      span: colEnd - col + 1,
+      startsHere: ps >= rowStart,
+      endsHere: pe <= rowEnd
     }
   }
 
@@ -486,7 +685,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
         {WEEKDAYS.map((w, i) => (
           <div key={w}
             className={`px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-right ${
-              i === 0 ? 'text-rose-400' : i === 6 ? 'text-clover-blue' : 'text-text-secondary'
+              i === 0 ? 'text-rose-400' : i === 6 ? 'text-clauday-blue' : 'text-text-secondary'
             }`}>{w}</div>
         ))}
       </div>
@@ -517,7 +716,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                       <div className="absolute top-1 right-1.5 z-[1] flex items-center gap-0.5 pointer-events-none">
                         {isToday ? (
                           <>
-                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-clover-blue text-white text-[11px] font-bold leading-none">{day.getDate()}</span>
+                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-clauday-blue text-white text-[11px] font-bold leading-none">{day.getDate()}</span>
                             <span className="text-[11px] font-medium text-text-secondary">일</span>
                           </>
                         ) : (
@@ -525,7 +724,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                             di === 0
                               ? inMonth ? 'text-rose-400' : 'text-rose-400/45'
                               : di === 6
-                                ? inMonth ? 'text-clover-blue' : 'text-clover-blue/45'
+                                ? inMonth ? 'text-clauday-blue' : 'text-clauday-blue/45'
                                 : inMonth ? 'text-text-secondary' : 'text-text-tertiary/40'
                           }`}>{day.getDate()}일</span>
                         )}
@@ -536,7 +735,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                         <span
                           onMouseDown={(e) => e.stopPropagation()}
                           onClick={(e) => { e.stopPropagation(); setMoreDate(day) }}
-                          className="absolute bottom-1.5 left-2 right-2 text-[10px] text-text-tertiary hover:text-clover-blue text-left cursor-pointer">
+                          className="absolute bottom-1.5 left-2 right-2 text-[10px] text-text-tertiary hover:text-clauday-blue text-left cursor-pointer">
                           +{hCount}개 더 보기
                         </span>
                       )}
@@ -554,7 +753,30 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                   return (
                     <div className="pointer-events-none absolute inset-0 grid grid-cols-7 z-20">
                       <div style={{ gridColumn: `${ds.col + 1} / span ${ds.span}` }}
-                        className={`m-0.5 ring-2 ring-clover-blue bg-clover-blue/5 ${rL} ${rR}`} />
+                        className={`m-0.5 ring-2 ring-clauday-blue bg-clauday-blue/5 ${rL} ${rR}`} />
+                    </div>
+                  )
+                })()}
+
+                {/* 막대 드래그 ghost — 이동/리사이즈 미리보기 */}
+                {(() => {
+                  if (!barDrag) return null
+                  const bs = barDragSegForRow(week)
+                  if (!bs) return null
+                  const c = colorStyleFor(barDrag.event.calendarId, calendars)
+                  const rL = bs.startsHere ? 'rounded-l-md' : ''
+                  const rR = bs.endsHere ? 'rounded-r-md' : ''
+                  return (
+                    <div className="pointer-events-none absolute inset-0 grid grid-cols-7 z-30"
+                      style={{ paddingTop: DATE_AREA_H + 2 }}>
+                      <div style={{ gridColumn: `${bs.col + 1} / span ${bs.span}` }}
+                        className="row-start-1 px-[2px]">
+                        <div
+                          style={{ height: SLOT_H, backgroundColor: c.barBg, color: c.barText }}
+                          className={`flex items-center px-1.5 text-[10px] leading-none font-medium ring-2 ring-clauday-blue ${rL} ${rR}`}>
+                          <span className="truncate">{barDrag.event.summary}</span>
+                        </div>
+                      </div>
                     </div>
                   )
                 })()}
@@ -570,6 +792,9 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                     const barStyle: React.CSSProperties = seg.isMulti
                       ? { height: SLOT_H, backgroundColor: c.barBg, color: c.barText }
                       : { height: SLOT_H, backgroundColor: c.softBg, color: c.softText }
+                    const draggable = isEventDraggable(seg.event)
+                    // 드래그 중인 이벤트의 원본 막대는 살짝 흐리게
+                    const isBeingDragged = barDrag?.event.id === seg.event.id && barDrag?.event.source === seg.event.source
                     return (
                       <div key={`${seg.event.source}:${seg.event.id || seg.event.start}-${wi}-${seg.slot}`}
                         style={{ gridColumn: `${seg.col + 1} / span ${seg.span}`, marginTop: top }}
@@ -577,16 +802,36 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                         <div
                           onMouseDown={(e) => {
                             if (e.button !== 0) return
-                            // 막대는 셀과 sibling 이라 bubble 로는 셀 anchor 못 잡음 → 막대에서 직접 잡기
+                            // 휴일/RRULE 등은 드래그 X — 단순 클릭 모달
+                            if (!draggable) return
+                            // 막대 클릭은 셀까지 전파 안 되게 (셀 드래그는 새 일정 생성용)
+                            e.stopPropagation()
+                            e.preventDefault()
                             const rowStartDay = week[0]
-                            const day = addDays(rowStartDay, seg.col)
-                            dragAnchorRef.current = day
-                            dragDidMoveRef.current = false
-                            setIsDragging(true)
+                            // 멀티-week 막대도 row 안에서의 col 로 anchor 결정
+                            const dayAtClick = addDays(rowStartDay, seg.col)
+                            startBarDrag(seg.event, 'move', dayAtClick)
                           }}
-                          onClick={(e) => { e.stopPropagation(); if (!dragDidMoveRef.current) setSelected(seg.event) }}
-                          style={barStyle}
-                          className={`flex items-center gap-1 px-1.5 cursor-pointer truncate text-[10px] leading-none font-medium hover:brightness-110 ${radiusL} ${radiusR}`}>
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            // 드래그로 안 움직였으면 상세 모달. 막대 드래그가 진행됐으면 mouseup 측에서 처리
+                            if (!barDragMovedRef.current && !barDragSaving) setSelected(seg.event)
+                          }}
+                          style={{ ...barStyle, opacity: isBeingDragged ? 0.35 : 1 }}
+                          className={`relative flex items-center gap-1 px-1.5 truncate text-[10px] leading-none font-medium hover:brightness-110 ${radiusL} ${radiusR} ${draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}>
+                          {/* 좌측 리사이즈 핸들 — 막대의 실제 시작 segment 에서만 노출 */}
+                          {draggable && seg.startsHere && (
+                            <span
+                              onMouseDown={(e) => {
+                                if (e.button !== 0) return
+                                e.stopPropagation()
+                                e.preventDefault()
+                                startBarDrag(seg.event, 'resize-start', addDays(week[0], seg.col))
+                              }}
+                              className={`absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-white/40 ${radiusL}`}
+                              title="시작일 변경"
+                            />
+                          )}
                           {seg.event.source === 'holiday' && seg.startsHere && (
                             <Star size={9} className="flex-shrink-0" fill="currentColor" />
                           )}
@@ -598,6 +843,19 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                               ? `${!seg.startsHere ? '… ' : ''}${seg.event.summary}`
                               : `${fmtTime(new Date(seg.event.start))} ${seg.event.summary}`}
                           </span>
+                          {/* 우측 리사이즈 핸들 — 막대의 실제 끝 segment 에서만 */}
+                          {draggable && seg.endsHere && (
+                            <span
+                              onMouseDown={(e) => {
+                                if (e.button !== 0) return
+                                e.stopPropagation()
+                                e.preventDefault()
+                                startBarDrag(seg.event, 'resize-end', addDays(week[0], seg.col + seg.span - 1))
+                              }}
+                              className={`absolute right-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-white/40 ${radiusR}`}
+                              title="종료일 변경"
+                            />
+                          )}
                         </div>
                       </div>
                     )
@@ -688,7 +946,7 @@ function EventDetailBody({ event, calendarName, colorBg }: {
           <span className="truncate max-w-[140px]">{calendarName}</span>
           <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${
             event.source === 'local' ? 'bg-emerald-500/15 text-emerald-400'
-              : event.source === 'caldav' ? 'bg-clover-blue/15 text-clover-blue'
+              : event.source === 'caldav' ? 'bg-clauday-blue/15 text-clauday-blue'
               : 'bg-rose-500/15 text-rose-400'
           }`}>{event.source === 'local' ? '내 일정' : event.source === 'caldav' ? '두레이' : '공휴일'}</span>
         </div>
@@ -699,6 +957,13 @@ function EventDetailBody({ event, calendarName, colorBg }: {
         <DetailRow icon={<Clock size={14} />}>
           <span className="text-text-primary">{fmtRange(new Date(event.start), new Date(event.end), event.allDay)}</span>
         </DetailRow>
+
+        {/* 등록 시간 — createdAt 있을 때만 (공휴일은 없음) */}
+        {event.createdAt && (
+          <DetailRow icon={<CalendarPlus size={14} />}>
+            <span className="text-text-tertiary text-[11px]">{fmtCreatedAt(event.createdAt)}</span>
+          </DetailRow>
+        )}
 
         {/* 장소 */}
         {event.location && (
@@ -746,7 +1011,7 @@ function EventDetailBody({ event, calendarName, colorBg }: {
           <DetailRow icon={<Bell size={14} />}>
             <div className="flex flex-wrap gap-1.5">
               {event.alarms.map((a, i) => (
-                <span key={i} className="px-2 py-0.5 rounded-md bg-clover-orange/10 text-clover-orange text-[11px] font-medium">
+                <span key={i} className="px-2 py-0.5 rounded-md bg-clauday-orange/10 text-clauday-orange text-[11px] font-medium">
                   {fmtTrigger(a.trigger)}
                 </span>
               ))}
@@ -758,7 +1023,7 @@ function EventDetailBody({ event, calendarName, colorBg }: {
         {event.webUrl && (
           <DetailRow icon={<ExternalLink size={14} />}>
             <a href={event.webUrl} target="_blank" rel="noreferrer"
-              className="text-clover-blue hover:underline truncate inline-block max-w-full">{event.webUrl}</a>
+              className="text-clauday-blue hover:underline truncate inline-block max-w-full">{event.webUrl}</a>
           </DetailRow>
         )}
       </div>
@@ -810,7 +1075,7 @@ function AttendeeSummary({ attendees }: { attendees: UnifiedEvent['attendees'] }
 function PartstatIcon({ partstat }: { partstat?: string }): JSX.Element {
   if (partstat === 'ACCEPTED') return <Check size={10} className="text-emerald-400 flex-shrink-0" />
   if (partstat === 'DECLINED') return <XIcon size={10} className="text-rose-400 flex-shrink-0" />
-  if (partstat === 'TENTATIVE') return <HelpCircle size={10} className="text-clover-orange flex-shrink-0" />
+  if (partstat === 'TENTATIVE') return <HelpCircle size={10} className="text-clauday-orange flex-shrink-0" />
   return <span className="w-2 h-2 rounded-full border border-text-tertiary flex-shrink-0" />
 }
 
@@ -818,7 +1083,7 @@ function statusBadgeOf(status?: string): { label: string; cls: string } | null {
   if (!status) return null
   switch (status.toUpperCase()) {
     case 'CONFIRMED': return { label: '확정', cls: 'bg-emerald-500/15 text-emerald-400' }
-    case 'TENTATIVE': return { label: '임시', cls: 'bg-clover-orange/15 text-clover-orange' }
+    case 'TENTATIVE': return { label: '임시', cls: 'bg-clauday-orange/15 text-clauday-orange' }
     case 'CANCELLED': return { label: '취소됨', cls: 'bg-rose-500/15 text-rose-400 line-through' }
     default: return null
   }
@@ -904,7 +1169,7 @@ function NewEventModal({ range, calendars, onClose, onCreate }: {
   return (
     <Modal open onClose={onClose}
       width={420}
-      icon={<Plus size={14} className="text-clover-blue" />}
+      icon={<Plus size={14} className="text-clauday-blue" />}
       title={title}
       footer={
         <div className="flex items-center justify-end gap-2 w-full">
@@ -931,7 +1196,7 @@ function NewEventModal({ range, calendars, onClose, onCreate }: {
           </select>
         </Field>
         <label className="flex items-center gap-1.5 text-text-secondary">
-          <input type="checkbox" className="accent-clover-blue" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />종일
+          <input type="checkbox" className="accent-clauday-blue" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />종일
         </label>
         {!allDay && (
           <div className="grid grid-cols-2 gap-2">

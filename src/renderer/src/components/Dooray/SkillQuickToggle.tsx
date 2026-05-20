@@ -3,7 +3,7 @@ import {
   Zap, ToggleLeft, ToggleRight, Plus, Trash2, Edit3, Save, Sparkles, Loader2,
   FileText, Eye, Upload, Download, LayoutTemplate, Check
 } from 'lucide-react'
-import type { CloverSkill, SkillTarget } from '../../../../shared/types/skill'
+import type { ClaudaySkill, SkillTarget } from '../../../../shared/types/skill'
 import { SKILL_TEMPLATES, type SkillTemplate } from '../../../../shared/types/skill-templates'
 
 interface SkillQuickToggleProps {
@@ -37,9 +37,9 @@ async function writeMcpSelection(feature: string, selection: string[]): Promise<
 
 function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProps): JSX.Element {
   const [open, setOpen] = useState(false)
-  const [skills, setSkills] = useState<CloverSkill[]>([])
+  const [skills, setSkills] = useState<ClaudaySkill[]>([])
   const [mode, setMode] = useState<Mode>('list')
-  const [editing, setEditing] = useState<CloverSkill | null>(null)
+  const [editing, setEditing] = useState<ClaudaySkill | null>(null)
 
   // AI 생성
   const [aiPrompt, setAiPrompt] = useState('')
@@ -93,7 +93,7 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
   }
 
   const load = useCallback(async () => {
-    const all = await window.api.cloverSkills.list()
+    const all = await window.api.claudaySkills.list()
     setSkills(all.filter((s) => s.target === target || s.target === 'all'))
   }, [target])
 
@@ -104,10 +104,10 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
     setOpen(false); setMode('list'); setEditing(null); setAiPrompt('')
   }
 
-  const toggle = async (skill: CloverSkill): Promise<void> => {
+  const toggle = async (skill: ClaudaySkill): Promise<void> => {
     skill.enabled = !skill.enabled
     skill.updatedAt = new Date().toISOString()
-    await window.api.cloverSkills.save(skill)
+    await window.api.claudaySkills.save(skill)
     window.api.analytics.track('skill.toggle', { meta: { target: skill.target, enabled: skill.enabled } })
     load()
   }
@@ -116,12 +116,12 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
     const s = skills.find((x) => x.id === id)
     const label = s?.name || '이 스킬'
     if (!window.confirm(`"${label}" 스킬을 삭제할까요?\n삭제 후에는 복구할 수 없습니다.`)) return
-    await window.api.cloverSkills.delete(id)
+    await window.api.claudaySkills.delete(id)
     window.api.analytics.track('skill.delete', { meta: { target } })
     load()
   }
 
-  const startEdit = (skill?: CloverSkill): void => {
+  const startEdit = (skill?: ClaudaySkill): void => {
     setEditing(skill || {
       id: `skill-${Date.now()}`, name: '', description: '', target,
       enabled: true, content: '', autoApply: true,
@@ -150,7 +150,7 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
     if (!editing || !editing.name.trim()) return
     const isNew = !skills.some((s) => s.id === editing.id)
     editing.updatedAt = new Date().toISOString()
-    await window.api.cloverSkills.save(editing)
+    await window.api.claudaySkills.save(editing)
     window.api.analytics.track(isNew ? 'skill.create' : 'skill.update', { meta: { target: editing.target, source: 'manual' } })
     setEditing(null)
     setMode('list')
@@ -198,17 +198,17 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
   const importSkills = async (file: File): Promise<void> => {
     try {
       const text = await file.text()
-      const list = JSON.parse(text) as CloverSkill[]
+      const list = JSON.parse(text) as ClaudaySkill[]
       if (!Array.isArray(list)) throw new Error('배열 형식이 아님')
       for (const s of list) {
-        const skill: CloverSkill = {
+        const skill: ClaudaySkill = {
           ...s,
           id: `skill-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           target: s.target || target,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         }
-        await window.api.cloverSkills.save(skill)
+        await window.api.claudaySkills.save(skill)
       }
       window.api.analytics.track('skill.import', { meta: { target, count: list.length } })
       load()
@@ -254,12 +254,12 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
                 )}
                 <button onClick={() => { setMode('ai-generate'); setEditing(null) }}
                   className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-colors ${
-                    mode === 'ai-generate' ? 'bg-gradient-to-r from-orange-500/30 to-blue-500/30 text-clover-orange' : 'bg-bg-surface-hover text-clover-blue hover:bg-bg-border'
+                    mode === 'ai-generate' ? 'bg-gradient-to-r from-orange-500/30 to-blue-500/30 text-clauday-orange' : 'bg-bg-surface-hover text-clauday-blue hover:bg-bg-border'
                   }`}>
                   <Sparkles size={10} /> AI 생성
                 </button>
                 <button onClick={() => startEdit()}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md bg-bg-surface-hover text-clover-blue text-[10px] font-medium hover:bg-bg-border">
+                  className="flex items-center gap-1 px-2 py-1 rounded-md bg-bg-surface-hover text-clauday-blue text-[10px] font-medium hover:bg-bg-border">
                   <Plus size={10} /> 직접
                 </button>
               </div>
@@ -269,7 +269,7 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
             <div className="flex items-center gap-1 px-3 py-1.5 border-b border-bg-border bg-bg-primary">
               <button onClick={() => setMode('preview')}
                 className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-colors ${
-                  mode === 'preview' ? 'bg-bg-surface-hover text-clover-blue' : 'text-text-tertiary hover:text-text-secondary'
+                  mode === 'preview' ? 'bg-bg-surface-hover text-clauday-blue' : 'text-text-tertiary hover:text-text-secondary'
                 }`}>
                 <Eye size={10} /> 미리보기
               </button>
@@ -293,7 +293,7 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1 h-3 rounded-full bg-clover-blue" />
+                    <span className="w-1 h-3 rounded-full bg-clauday-blue" />
                     <span className="text-[11px] font-semibold text-text-primary">
                       MCP 서버
                     </span>
@@ -403,8 +403,8 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
             {mode === 'preview' && (
               <div className="max-h-64 overflow-y-auto p-3 bg-bg-primary">
                 <div className="flex items-center gap-1 mb-2">
-                  <Eye size={11} className="text-clover-blue" />
-                  <span className="text-[10px] font-semibold text-clover-blue">AI에게 전달되는 system prompt</span>
+                  <Eye size={11} className="text-clauday-blue" />
+                  <span className="text-[10px] font-semibold text-clauday-blue">AI에게 전달되는 system prompt</span>
                 </div>
                 {activeCount === 0 ? (
                   <p className="text-[10px] text-text-tertiary">활성화된 스킬이 없어 기본 프롬프트만 전달됩니다.</p>
@@ -417,7 +417,7 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
 {skills.filter((s) => s.enabled).map((s) => `\n### ${s.name}\n${s.content}`).join('\n\n')}
                   </pre>
                 )}
-                <button onClick={() => setMode('list')} className="mt-3 text-[10px] text-clover-blue hover:underline">← 목록으로</button>
+                <button onClick={() => setMode('list')} className="mt-3 text-[10px] text-clauday-blue hover:underline">← 목록으로</button>
               </div>
             )}
 
@@ -425,8 +425,8 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
             {mode === 'ai-generate' && (
               <div className="p-4 border-b border-bg-border bg-gradient-to-b from-bg-surface-hover to-bg-surface">
                 <div className="flex items-center gap-1.5 mb-2">
-                  <Sparkles size={13} className="text-clover-orange" />
-                  <span className="text-[11px] font-semibold text-clover-orange">AI 스킬 생성기</span>
+                  <Sparkles size={13} className="text-clauday-orange" />
+                  <span className="text-[11px] font-semibold text-clauday-orange">AI 스킬 생성기</span>
                 </div>
                 <p className="text-[10px] text-text-secondary mb-3">
                   원하는 기능을 자연어로 설명하면 AI가 스킬을 만들어줍니다
@@ -437,7 +437,7 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
                   placeholder="예: 임태원과 FI 휴가 캘린더 일정만 브리핑해줘 (dooray-mcp 체크 → AI가 ID 조회해서 박아넣음)"
                   rows={3}
                   autoFocus
-                  className="w-full px-3 py-2 bg-bg-primary border border-bg-border rounded-lg text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue resize-none mb-3"
+                  className="w-full px-3 py-2 bg-bg-primary border border-bg-border rounded-lg text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue resize-none mb-3"
                 />
 
                 {/* MCP 선택 — 스킬 생성 중 실시간 데이터 조회용 */}
@@ -458,11 +458,11 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
                           <button key={name} onClick={() => toggleMcp(name)}
                             className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border transition-colors ${
                               checked
-                                ? 'bg-clover-blue/15 border-clover-blue/40 text-clover-blue font-medium'
+                                ? 'bg-clauday-blue/15 border-clauday-blue/40 text-clauday-blue font-medium'
                                 : 'bg-bg-primary border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light'
                             }`}>
                             <span className={`w-3 h-3 rounded border flex items-center justify-center flex-shrink-0 ${
-                              checked ? 'bg-clover-blue border-clover-blue' : 'border-bg-border-light'
+                              checked ? 'bg-clauday-blue border-clauday-blue' : 'border-bg-border-light'
                             }`}>
                               {checked && <span className="text-white text-[8px]">✓</span>}
                             </span>
@@ -473,7 +473,7 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
                     </div>
                   )}
                   {selectedMcp.size > 0 && (
-                    <p className="text-[9px] text-clover-orange mt-1.5">
+                    <p className="text-[9px] text-clauday-orange mt-1.5">
                       ⚠ MCP 조회는 시간이 더 걸려요 (30초~2분). 비용도 증가.
                     </p>
                   )}
@@ -497,14 +497,14 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
               <div className="p-3 border-b border-bg-border bg-bg-surface-hover">
                 <input type="text" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })}
                   placeholder="스킬 이름" autoFocus
-                  className="w-full px-2.5 py-1.5 bg-bg-primary border border-bg-border rounded-md text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue mb-2" />
+                  className="w-full px-2.5 py-1.5 bg-bg-primary border border-bg-border rounded-md text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue mb-2" />
                 <input type="text" value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })}
                   placeholder="설명 (선택)"
-                  className="w-full px-2.5 py-1.5 bg-bg-primary border border-bg-border rounded-md text-xs text-text-secondary placeholder-text-tertiary focus:outline-none focus:border-clover-blue mb-2" />
+                  className="w-full px-2.5 py-1.5 bg-bg-primary border border-bg-border rounded-md text-xs text-text-secondary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue mb-2" />
                 <textarea value={editing.content} onChange={(e) => setEditing({ ...editing, content: e.target.value })}
                   placeholder={"## 규칙\n- 조건과 동작\n\n## 출력 형식\n- 결과 형태"}
                   rows={8}
-                  className="w-full px-2.5 py-1.5 bg-bg-primary border border-bg-border rounded-md text-xs text-text-secondary placeholder-text-tertiary font-mono focus:outline-none focus:border-clover-blue resize-y mb-2" />
+                  className="w-full px-2.5 py-1.5 bg-bg-primary border border-bg-border rounded-md text-xs text-text-secondary placeholder-text-tertiary font-mono focus:outline-none focus:border-clauday-blue resize-y mb-2" />
                 <div className="flex items-center justify-between">
                   <label className="flex items-center gap-1.5 text-[10px] text-text-secondary">
                     <input type="checkbox" checked={editing.autoApply} onChange={(e) => setEditing({ ...editing, autoApply: e.target.checked })} className="accent-blue-500" />
@@ -536,7 +536,7 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
                         </button>
                       )}
                       <button onClick={() => setMode('ai-generate')}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-gradient-to-r from-orange-500/20 to-blue-500/20 text-clover-orange text-[10px] font-medium hover:from-orange-500/30 hover:to-blue-500/30">
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-gradient-to-r from-orange-500/20 to-blue-500/20 text-clauday-orange text-[10px] font-medium hover:from-orange-500/30 hover:to-blue-500/30">
                         <Sparkles size={10} /> AI로 생성
                       </button>
                     </div>

@@ -22,6 +22,18 @@ function subscribeTerminalOutput(cb: (payload: TerminalOutputPayload) => void): 
 import { IPC_CHANNELS } from '../shared/types/ipc'
 
 // CalDAV 데이터 변경 알림 (sync 결과 → main → 여기 → renderer 구독자)
+// #7 OS 알림 클릭 → renderer 가 subscribe 한 콜백으로 라우팅 (contextIsolation 이라 dispatchEvent 불가)
+const gotoAiRecommendHandlers = new Set<() => void>()
+ipcRenderer.on('goto-ai-recommend', () => {
+  for (const h of gotoAiRecommendHandlers) {
+    try { h() } catch { /* ignore */ }
+  }
+})
+function subscribeGotoAiRecommend(cb: () => void): () => void {
+  gotoAiRecommendHandlers.add(cb)
+  return () => { gotoAiRecommendHandlers.delete(cb) }
+}
+
 const caldavUpdatedHandlers = new Set<() => void>()
 ipcRenderer.on('caldav-updated', () => {
   console.log('[preload] caldav-updated received, handlers:', caldavUpdatedHandlers.size)
@@ -74,6 +86,7 @@ import type {
   UnifiedCalendar,
   UnifiedEvent,
   UnifiedEventCreate,
+  UnifiedEventDateTimeUpdate,
   UnifiedEventQuery,
   LocalCalendar,
   LocalCalendarCreate,
@@ -288,6 +301,8 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_LIST_EVENTS, q),
     createEvent: (input: UnifiedEventCreate): Promise<UnifiedEvent> =>
       ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_CREATE_EVENT, input),
+    updateEventDateTime: (input: UnifiedEventDateTimeUpdate): Promise<UnifiedEvent> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_UPDATE_EVENT_DATETIME, input),
     deleteEvent: (p: { source: 'local' | 'caldav'; id: string; calendarId?: string; caldavUrl?: string; etag?: string }): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_DELETE_EVENT, p)
   },
@@ -298,6 +313,35 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.LOCAL_CALENDAR_UPDATE, input),
     delete: (id: string): Promise<{ ok: true }> =>
       ipcRenderer.invoke(IPC_CHANNELS.LOCAL_CALENDAR_DELETE, id)
+  },
+
+  // Shell — OS 기본 핸들러로 열기 (절대경로/URL/file://)
+  shell: {
+    openPath: (target: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SHELL_OPEN_PATH, target),
+    /** 이미지 파일 → data URL (#2 썸네일). 5MB 초과 / 비파일은 ok:false */
+    readImageDataUrl: (target: string): Promise<{ ok: boolean; dataUrl?: string; error?: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SHELL_READ_IMAGE_DATAURL, target),
+    /** 파일을 부모 폴더 안에서 highlight (Warp 식 Show in Finder) */
+    showInFolder: (target: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SHELL_SHOW_IN_FOLDER, target)
+  },
+
+  // CLAUDE.md 카탈로그 (#3) — 앱 내장 템플릿 목록 + 적용
+  claudeMdTemplates: {
+    list: (): Promise<Array<{ id: string; name: string; description: string }>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_MD_TEMPLATES_LIST),
+    apply: (input: { id: string; cwd?: string; overwrite?: boolean }): Promise<{ ok: boolean; path?: string; conflict?: boolean; error?: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_MD_TEMPLATES_APPLY, input)
+  },
+
+  // AI 추천 새 글 알림 (#7) — 토글 + 알림 클릭 라우팅
+  aiRecommendNotify: {
+    getEnabled: (): Promise<boolean> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_RECOMMEND_NOTIFY_GET_ENABLED),
+    setEnabled: (enabled: boolean): Promise<{ ok: true; enabled: boolean }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_RECOMMEND_NOTIFY_SET_ENABLED, enabled),
+    onGoto: subscribeGotoAiRecommend
   },
 
   // Terminal
@@ -368,7 +412,7 @@ const api = {
   ai: {
     available: (): Promise<boolean> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_AVAILABLE),
-    ask: (params: { prompt: string; systemPrompt?: string; model?: AIModelName; maxBudget?: string; requestId?: string; feature?: keyof AIModelConfig; mcpServers?: string[] }): Promise<string> =>
+    ask: (params: { prompt: string; systemPrompt?: string; model?: AIModelName; maxBudget?: string; requestId?: string; feature?: keyof AIModelConfig; mcpServers?: string[]; imagePaths?: string[] }): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_ASK, params),
     briefing: (requestId?: string, mcpServers?: string[]): Promise<AIBriefing> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_BRIEFING, { requestId, mcpServers }),
@@ -417,18 +461,18 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_CUSTOM_PROJECTS, projectIds)
   },
 
-  // Clover Skills
-  cloverSkills: {
-    list: (): Promise<import('../shared/types/skill').CloverSkill[]> =>
-      ipcRenderer.invoke(IPC_CHANNELS.CLOVER_SKILLS_LIST),
-    get: (id: string): Promise<import('../shared/types/skill').CloverSkill | null> =>
-      ipcRenderer.invoke(IPC_CHANNELS.CLOVER_SKILLS_GET, id),
-    save: (skill: import('../shared/types/skill').CloverSkill): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.CLOVER_SKILLS_SAVE, skill),
+  // Clauday Skills
+  claudaySkills: {
+    list: (): Promise<import('../shared/types/skill').ClaudaySkill[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDAY_SKILLS_LIST),
+    get: (id: string): Promise<import('../shared/types/skill').ClaudaySkill | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDAY_SKILLS_GET, id),
+    save: (skill: import('../shared/types/skill').ClaudaySkill): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDAY_SKILLS_SAVE, skill),
     delete: (id: string): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.CLOVER_SKILLS_DELETE, id),
-    forTarget: (target: string): Promise<import('../shared/types/skill').CloverSkill[]> =>
-      ipcRenderer.invoke(IPC_CHANNELS.CLOVER_SKILLS_FOR_TARGET, target)
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDAY_SKILLS_DELETE, id),
+    forTarget: (target: string): Promise<import('../shared/types/skill').ClaudaySkill[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDAY_SKILLS_FOR_TARGET, target)
   },
 
   // Briefing Store
@@ -597,6 +641,6 @@ const api = {
   }
 }
 
-export type CloverAPI = typeof api
+export type ClaudayAPI = typeof api
 
 contextBridge.exposeInMainWorld('api', api)

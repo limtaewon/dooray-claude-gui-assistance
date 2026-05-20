@@ -181,7 +181,7 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
   height: 16px; padding: 0 5px;
   font-size: 9px; font-weight: 700;
   border-radius: 999px;
-  background: var(--clover-orange); color: #fff;
+  background: var(--clauday-orange); color: #fff;
 }
 
 /* ---------- Segmented Tabs (ds-btn 기본 32px와 동일 높이로 정렬) ---------- */

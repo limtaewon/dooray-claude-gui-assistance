@@ -57,7 +57,7 @@ function SkillCard({
       className={`ds-card group cursor-pointer relative transition-all ${
         selectable
           ? ''
-          : 'hover:border-clover-blue/40'
+          : 'hover:border-clauday-blue/40'
       }`}
       style={{
         padding: '12px 14px',
@@ -74,8 +74,8 @@ function SkillCard({
         </div>
       )}
       <div className="flex items-start gap-2.5">
-        <div className="w-7 h-7 rounded-[6px] flex-none flex items-center justify-center bg-clover-blue/10">
-          <Sparkles size={15} className="text-clover-blue" />
+        <div className="w-7 h-7 rounded-[6px] flex-none flex items-center justify-center bg-clauday-blue/10">
+          <Sparkles size={15} className="text-clauday-blue" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-[13px] font-semibold text-text-primary truncate">{skill.name}</div>
@@ -130,7 +130,7 @@ function SkillCard({
         {onRun && (
           <button
             onClick={(e) => { e.stopPropagation(); onRun() }}
-            className="flex items-center gap-1 text-[11px] text-text-secondary hover:text-clover-blue"
+            className="flex items-center gap-1 text-[11px] text-text-secondary hover:text-clauday-blue"
           >
             <Play size={11} /> 실행
           </button>

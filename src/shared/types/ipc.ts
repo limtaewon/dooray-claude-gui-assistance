@@ -20,6 +20,21 @@ export const IPC_CHANNELS = {
   // Usage
   USAGE_QUERY: 'usage:query',
 
+  // Shell — OS 기본 핸들러로 path/URL 열기 (#6 터미널 path cmd+클릭 등)
+  SHELL_OPEN_PATH: 'shell:open-path',
+  /** 이미지 파일을 data URL 로 변환 (#2 터미널 이미지 사이드 패널 썸네일) */
+  SHELL_READ_IMAGE_DATAURL: 'shell:read-image-dataurl',
+  /** 파일의 부모 폴더를 OS 파일 탐색기에서 열고 해당 파일 highlight (Warp 식 Show in Finder) */
+  SHELL_SHOW_IN_FOLDER: 'shell:show-in-folder',
+
+  // CLAUDE.md 카탈로그 (#3) — 앱 내장 템플릿 목록 + 사용자가 고른 폴더에 적용
+  CLAUDE_MD_TEMPLATES_LIST: 'claude-md:templates:list',
+  CLAUDE_MD_TEMPLATES_APPLY: 'claude-md:templates:apply',
+
+  // AI 추천 새 글 OS 알림 (#7) — 1시간 폴링 + silent hours. 사용자 토글.
+  AI_RECOMMEND_NOTIFY_GET_ENABLED: 'ai-recommend:notify:get-enabled',
+  AI_RECOMMEND_NOTIFY_SET_ENABLED: 'ai-recommend:notify:set-enabled',
+
   // Dooray
   DOORAY_TOKEN_SET: 'dooray:token:set',
   DOORAY_TOKEN_GET: 'dooray:token:get',
@@ -59,6 +74,7 @@ export const IPC_CHANNELS = {
   CALENDAR_LIST_CALENDARS: 'calendar:list-calendars',
   CALENDAR_LIST_EVENTS: 'calendar:list-events',
   CALENDAR_CREATE_EVENT: 'calendar:create-event',
+  CALENDAR_UPDATE_EVENT_DATETIME: 'calendar:update-event-datetime',
   CALENDAR_DELETE_EVENT: 'calendar:delete-event',
   LOCAL_CALENDAR_CREATE: 'local-calendar:create',
   LOCAL_CALENDAR_UPDATE: 'local-calendar:update',
@@ -180,12 +196,12 @@ export const IPC_CHANNELS = {
   SETTINGS_GET_CUSTOM_PROJECTS: 'settings:get-custom-projects',
   SETTINGS_SET_CUSTOM_PROJECTS: 'settings:set-custom-projects',
 
-  // Clover Skills
-  CLOVER_SKILLS_LIST: 'clover-skills:list',
-  CLOVER_SKILLS_GET: 'clover-skills:get',
-  CLOVER_SKILLS_SAVE: 'clover-skills:save',
-  CLOVER_SKILLS_DELETE: 'clover-skills:delete',
-  CLOVER_SKILLS_FOR_TARGET: 'clover-skills:for-target',
+  // Clauday Skills (target 별 파일시스템 스킬)
+  CLAUDAY_SKILLS_LIST: 'clauday-skills:list',
+  CLAUDAY_SKILLS_GET: 'clauday-skills:get',
+  CLAUDAY_SKILLS_SAVE: 'clauday-skills:save',
+  CLAUDAY_SKILLS_DELETE: 'clauday-skills:delete',
+  CLAUDAY_SKILLS_FOR_TARGET: 'clauday-skills:for-target',
 
   // Shared Skills (Dooray 공개 프로젝트 기반 공유소)
   SHARED_SKILLS_LIST: 'shared-skills:list',

@@ -9,7 +9,7 @@ interface LoadingViewProps {
 export function LoadingView({ message = '불러오는 중...', className = '' }: LoadingViewProps): JSX.Element {
   return (
     <div className={`flex flex-col items-center justify-center gap-2 py-10 ${className}`}>
-      <Loader2 size={20} className="animate-spin text-clover-blue" />
+      <Loader2 size={20} className="animate-spin text-clauday-blue" />
       <p className="text-xs text-text-secondary">{message}</p>
     </div>
   )
@@ -30,7 +30,7 @@ export function ErrorView({ message, onRetry, className = '' }: ErrorViewProps):
       {onRetry && (
         <button
           onClick={onRetry}
-          className="mt-1 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-surface border border-bg-border text-[11px] text-text-primary hover:border-clover-blue/50 transition-colors"
+          className="mt-1 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-surface border border-bg-border text-[11px] text-text-primary hover:border-clauday-blue/50 transition-colors"
         >
           <RefreshCw size={11} /> 다시 시도
         </button>
@@ -72,7 +72,7 @@ export function EmptyView({
       {actionLabel && onAction && (
         <button
           onClick={onAction}
-          className="mt-1 flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-clover-blue text-white text-xs font-medium hover:bg-clover-blue/80 transition-colors"
+          className="mt-1 flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-xs font-medium hover:bg-clauday-blue/80 transition-colors"
         >
           {actionLabel}
         </button>

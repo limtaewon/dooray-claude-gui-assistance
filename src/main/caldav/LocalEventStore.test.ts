@@ -111,6 +111,22 @@ describe('LocalEventStore — 이벤트 CRUD', () => {
     expect(LocalEventStore.updateEvent('missing', { summary: 'x' })).toBeNull()
   })
 
+  it('updateEvent — start/end 변경 시 createdAt 은 보존된다 (막대 드래그 시나리오)', () => {
+    const e = LocalEventStore.createEvent({
+      calendarId: LocalEventStore.DEFAULT_CALENDAR_ID, summary: '리뷰',
+      start: '2026-05-13T09:00:00Z', end: '2026-05-13T10:00:00Z', allDay: false
+    })
+    const origCreatedAt = e.createdAt
+    expect(origCreatedAt).toBeTruthy()
+    const updated = LocalEventStore.updateEvent(e.id, {
+      start: '2026-05-20T09:00:00Z',
+      end: '2026-05-20T10:00:00Z'
+    })
+    expect(updated!.start).toBe('2026-05-20T09:00:00Z')
+    // createdAt 은 그대로
+    expect(updated!.createdAt).toBe(origCreatedAt)
+  })
+
   it('deleteEvent', () => {
     const e = LocalEventStore.createEvent({
       calendarId: LocalEventStore.DEFAULT_CALENDAR_ID, summary: 'x',

@@ -1,5 +1,16 @@
 import { WikiService } from './WikiService'
 
+/** 두레이 API 는 body 를 string 또는 { mimeType, content } 객체 양쪽으로 줌 — 둘 다 처리. */
+function extractBodyText(body: unknown): string {
+  if (!body) return ''
+  if (typeof body === 'string') return body
+  if (typeof body === 'object' && body !== null) {
+    const o = body as { content?: unknown }
+    if (typeof o.content === 'string') return o.content
+  }
+  return ''
+}
+
 export type WikiStorageKind = 'skills' | 'mcps'
 
 interface WikiStorageItem {
@@ -151,19 +162,35 @@ export class WikiStorageService {
       this.store.delete(this.storeKey(wikiId, kind))
       return []
     }
-    return children
-      .filter((p) => !(p.subject || '').startsWith('[DELETED]'))
-      .map((p) => ({
-        pageId: p.id,
-        name: p.subject || '',
-        content: p.body || '',
-        updatedAt: p.updatedAt ? new Date(p.updatedAt).getTime() : 0
-      }))
+    const visible = children.filter((p) => !(p.subject || '').startsWith('[DELETED]'))
+
+    // 두레이 위키 list 응답에 body 가 inline 으로 안 들어와 카드의 description / 모달 본문이 비는 문제.
+    // 각 페이지의 body 를 wiki.get 으로 병렬 fetch 해서 채워준다. 위키 한 컨테이너의 페이지 수가 보통 < 50 이라
+    // N+1 호출 부담이 크지 않음. 실패한 페이지는 빈 본문으로 두고 결과에서 제외하지는 않음.
+    const bodies = await Promise.all(
+      visible.map(async (p) => {
+        const inline = extractBodyText(p.body)
+        if (inline) return inline
+        try {
+          const full = await this.wiki.get(wikiId, p.id)
+          return extractBodyText((full as { body?: unknown }).body)
+        } catch {
+          return ''
+        }
+      })
+    )
+
+    return visible.map((p, i) => ({
+      pageId: p.id,
+      name: p.subject || '',
+      content: bodies[i],
+      updatedAt: p.updatedAt ? new Date(p.updatedAt).getTime() : 0
+    }))
   }
 
   async get(wikiId: string, pageId: string): Promise<{ name: string; content: string }> {
     const page = await this.wiki.get(wikiId, pageId)
-    return { name: page.subject || '', content: page.body || '' }
+    return { name: page.subject || '', content: extractBodyText((page as { body?: unknown }).body) }
   }
 
   async upload(params: { wikiId: string; kind: WikiStorageKind; name: string; content: string; parentPageIdHint?: string }): Promise<{ pageId: string; updated: boolean }> {

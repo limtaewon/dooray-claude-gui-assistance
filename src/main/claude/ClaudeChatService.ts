@@ -170,10 +170,16 @@ export class ClaudeChatService {
       args.push('--resume', opts.resumeSessionId)
     }
 
+    // Windows: claude 가 .cmd / .ps1 형태일 수 있어 spawn 의 .cmd 추론을 위해 shell:true 강제.
+    // (Issue #11) Node 의 spawn 은 Windows 에서 확장자 없는 path 호출 시 .cmd 자동 추론을 못함.
+    const isWindows = process.platform === 'win32'
     const proc = spawn(this.claudeBin, args, {
       cwd: opts.cwd,
       env: enrichedClaudeEnv(),
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe'],
+      shell: isWindows,
+      // Windows + shell:true 에서 한글 등 unicode 인자가 cmd 의 codepage 변환으로 깨지는 것 방지
+      windowsVerbatimArguments: isWindows
     })
 
     const session: ChatSession = {

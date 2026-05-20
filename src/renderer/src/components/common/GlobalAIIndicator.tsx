@@ -27,10 +27,10 @@ function GlobalAIIndicator(): JSX.Element | null {
   const timeStr = seconds < 60 ? `${seconds}초` : `${Math.floor(seconds / 60)}분 ${seconds % 60}초`
 
   return (
-    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-clover-orange/20 to-clover-blue/20 border border-clover-orange/30">
+    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-clauday-orange/20 to-clauday-blue/20 border border-clauday-orange/30">
       <div className="relative flex items-center justify-center">
-        <Sparkles size={11} className="text-clover-orange" />
-        <Loader2 size={14} className="absolute text-clover-orange/40 animate-spin" />
+        <Sparkles size={11} className="text-clauday-orange" />
+        <Loader2 size={14} className="absolute text-clauday-orange/40 animate-spin" />
       </div>
       <span className="text-[10px] text-text-primary font-medium truncate max-w-[200px]">
         {active.message}

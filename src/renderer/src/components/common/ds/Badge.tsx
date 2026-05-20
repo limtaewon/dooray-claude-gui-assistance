@@ -3,8 +3,8 @@ import type { ReactNode } from 'react'
 export type BadgeTone = 'orange' | 'blue' | 'emerald' | 'red' | 'violet'
 
 const BADGE_BG: Record<BadgeTone, string> = {
-  orange:  'var(--clover-orange)',
-  blue:    'var(--clover-blue)',
+  orange:  'var(--clauday-orange)',
+  blue:    'var(--clauday-blue)',
   emerald: '#22C55E',
   red:     '#EF4444',
   violet:  '#A78BFA'

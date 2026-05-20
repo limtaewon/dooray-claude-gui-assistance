@@ -65,7 +65,7 @@ function DoorayImage({ src, alt, className }: Props): JSX.Element | null {
     const is404 = error.includes('404')
     return (
       <a href={webUrl} target="_blank" rel="noreferrer"
-        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-surface border border-bg-border text-[11px] text-text-secondary hover:border-clover-blue/40 hover:text-clover-blue transition-colors"
+        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-surface border border-bg-border text-[11px] text-text-secondary hover:border-clauday-blue/40 hover:text-clauday-blue transition-colors"
         title={error}>
         <ImageOff size={13} className="flex-shrink-0" />
         <span className="truncate max-w-xs">{alt || '이미지'}</span>

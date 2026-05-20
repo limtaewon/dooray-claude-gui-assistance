@@ -387,13 +387,20 @@ export class TaskService {
     return allTasks.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
   }
 
-  // 오늘 마감 태스크 (전체 프로젝트)
-  async listDueTodayTasks(): Promise<DoorayTask[]> {
+  // 오늘 마감 태스크 — projectIds 지정 시 그 프로젝트만, 안 주면 전체 (위험 — 두레이 quota 압박).
+  // 브리핑/대시보드는 토글된 pinnedProjects 만 전달해서 호출량 제한.
+  async listDueTodayTasks(projectIds?: string[]): Promise<DoorayTask[]> {
     const memberId = await this.getMyMemberId()
-    const projects = await this.listMyProjects()
+    let targets: Array<{ id: string; code?: string }>
+    if (projectIds && projectIds.length > 0) {
+      targets = projectIds.map((id) => ({ id, code: this.projectCache.get(id)?.code }))
+    } else {
+      const projects = await this.listMyProjects()
+      targets = projects.map((p) => ({ id: p.id, code: p.code }))
+    }
     const allTasks: DoorayTask[] = []
     const results = await mapWithConcurrency(
-      projects.slice(0, 20),
+      targets.slice(0, 20),
       TaskService.MAX_CONCURRENT,
       async (p) => {
         try {

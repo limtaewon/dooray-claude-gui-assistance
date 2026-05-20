@@ -36,6 +36,8 @@ export interface ParsedEvent {
   attendees?: IcalPerson[]
   alarms?: IcalAlarm[]
   url?: string
+  /** CREATED 가 있으면 우선, 없으면 DTSTAMP. ISO 8601. */
+  createdAt?: string
 }
 
 export interface BuildICalInput {
@@ -46,6 +48,8 @@ export interface BuildICalInput {
   start: string
   end: string
   allDay?: boolean
+  /** 기존 일정 갱신 시 CREATED 보존. 미지정 시 DTSTAMP(=현재 시각) 와 동일하게 기록. */
+  createdAt?: string
 }
 
 export function parseICal(data: string): ParsedEvent | null {
@@ -82,6 +86,10 @@ export function parseICal(data: string): ParsedEvent | null {
   // VALARM 블록 (여러 개 가능)
   const alarms = extractValarms(ev)
 
+  // CREATED 우선, fallback DTSTAMP (모든 VEVENT 는 DTSTAMP 필수)
+  const createdRaw = getPropRaw(ev, 'CREATED') ?? getPropRaw(ev, 'DTSTAMP')
+  const createdAt = createdRaw ? (parseDtRaw(createdRaw)?.iso) : undefined
+
   return {
     uid,
     summary: decodeText(getProp(ev, 'SUMMARY') ?? '(제목 없음)'),
@@ -95,7 +103,8 @@ export function parseICal(data: string): ParsedEvent | null {
     organizer: organizer && (organizer.name || organizer.email) ? organizer : undefined,
     attendees: attendees.length > 0 ? attendees : undefined,
     alarms: alarms.length > 0 ? alarms : undefined,
-    url: getProp(ev, 'URL')
+    url: getProp(ev, 'URL'),
+    createdAt
   }
 }
 
@@ -142,14 +151,27 @@ function extractValarms(ev: string[]): IcalAlarm[] {
 
 export function buildICal(input: BuildICalInput): string {
   const allDay = !!input.allDay
-  const fmt = (iso: string, isAllDay: boolean): string => {
+  /** 시간 포함 이벤트: UTC Z 표기 (CalDAV 표준). */
+  const fmtTimed = (iso: string): string => {
     const d = new Date(iso)
-    if (isAllDay) return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}`
     return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`
   }
-  const dtstart = allDay ? `DTSTART;VALUE=DATE:${fmt(input.start, true)}` : `DTSTART:${fmt(input.start, false)}`
-  const dtend = allDay ? `DTEND;VALUE=DATE:${fmt(input.end, true)}` : `DTEND:${fmt(input.end, false)}`
-  const dtstamp = fmt(new Date().toISOString(), false)
+  /**
+   * 종일 이벤트: 사용자가 의도한 "달력상 날짜" 를 보존해야 함.
+   * 로컬 자정 ISO 를 UTC 로 변환한 ISO 가 들어오면 getUTCDate() 는 KST 기준 하루 빠진 값을 반환 → off-by-one.
+   * 따라서 로컬 일자 (Date getter) 로 추출. dayOffset 으로 RFC 5545 의 DTEND exclusive 규칙(+1일) 적용.
+   */
+  const fmtAllDay = (iso: string, dayOffset = 0): string => {
+    const d = new Date(iso)
+    if (dayOffset !== 0) d.setDate(d.getDate() + dayOffset)
+    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`
+  }
+  const dtstart = allDay ? `DTSTART;VALUE=DATE:${fmtAllDay(input.start)}` : `DTSTART:${fmtTimed(input.start)}`
+  // DTEND: 종일은 exclusive → 사용자 의도 종료일 + 1일
+  const dtend = allDay ? `DTEND;VALUE=DATE:${fmtAllDay(input.end, 1)}` : `DTEND:${fmtTimed(input.end)}`
+  const dtstamp = fmtTimed(new Date().toISOString())
+  // CREATED: 신규는 DTSTAMP 와 동일, 업데이트는 입력값 보존
+  const created = input.createdAt ? fmtTimed(input.createdAt) : dtstamp
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -157,6 +179,7 @@ export function buildICal(input: BuildICalInput): string {
     'BEGIN:VEVENT',
     `UID:${input.uid}`,
     `DTSTAMP:${dtstamp}`,
+    `CREATED:${created}`,
     dtstart,
     dtend,
     `SUMMARY:${escapeText(input.summary)}`,
@@ -166,6 +189,51 @@ export function buildICal(input: BuildICalInput): string {
     'END:VCALENDAR'
   ].filter(Boolean)
   return lines.join('\r\n')
+}
+
+/**
+ * 기존 VEVENT 의 DTSTART/DTEND/DTSTAMP 만 교체한 새 ICS 문자열을 만든다.
+ * ATTENDEE/RRULE/VALARM 등 다른 필드는 그대로 보존 — 막대 드래그로 일정 시각만 변경할 때 사용.
+ *
+ * - allDay 면 RFC 5545 의 DTEND exclusive 규칙대로 +1일 적용
+ * - 시간 이벤트는 UTC Z 표기
+ * - DTSTAMP 는 현재 시각으로 갱신 (CalDAV 가 LAST-MODIFIED 와 동등하게 다룸)
+ */
+export function patchDateTimeInIcs(ics: string, input: { start: string; end: string; allDay: boolean }): string {
+  const allDay = !!input.allDay
+  const fmtTimed = (iso: string): string => {
+    const d = new Date(iso)
+    return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`
+  }
+  const fmtAllDay = (iso: string, dayOffset = 0): string => {
+    const d = new Date(iso)
+    if (dayOffset !== 0) d.setDate(d.getDate() + dayOffset)
+    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`
+  }
+  const dtstartLine = allDay
+    ? `DTSTART;VALUE=DATE:${fmtAllDay(input.start)}`
+    : `DTSTART:${fmtTimed(input.start)}`
+  // DTEND: 종일은 exclusive → +1일
+  const dtendLine = allDay
+    ? `DTEND;VALUE=DATE:${fmtAllDay(input.end, 1)}`
+    : `DTEND:${fmtTimed(input.end)}`
+  const dtstampLine = `DTSTAMP:${fmtTimed(new Date().toISOString())}`
+
+  // RFC 5545 lined ICS — CRLF + line folding. 정규식으로 unfold 까지는 필요 X — DTSTART/DTEND 는 짧아 보통 fold 안 됨.
+  // 그래도 라인 단위 매칭이 안전하려면 unfold 후 다시 fold... 우선 단순 형태로 처리, 향후 line fold 발생 시 보강.
+  const replaceLine = (text: string, key: 'DTSTART' | 'DTEND' | 'DTSTAMP', newLine: string): string => {
+    // DTSTART, DTSTART;VALUE=DATE, DTSTART;TZID=... 모두 매치 (라인 시작 ~ \r\n 또는 \n)
+    const re = new RegExp(`^${key}(?:;[^:\\r\\n]*)?:[^\\r\\n]*`, 'm')
+    if (re.test(text)) return text.replace(re, newLine)
+    // 키가 없으면 (이상 케이스) 새 라인을 BEGIN:VEVENT 다음에 삽입
+    return text.replace(/(BEGIN:VEVENT\r?\n)/, `$1${newLine}\r\n`)
+  }
+
+  let out = ics
+  out = replaceLine(out, 'DTSTART', dtstartLine)
+  out = replaceLine(out, 'DTEND', dtendLine)
+  out = replaceLine(out, 'DTSTAMP', dtstampLine)
+  return out
 }
 
 /**

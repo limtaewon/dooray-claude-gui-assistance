@@ -13,6 +13,16 @@ function extractBodyText(body: unknown): string {
   return ''
 }
 
+/** SKILL.md 의 frontmatter 에서 description 추출. 없으면 undefined. */
+function extractFrontmatterDescription(body: string): string | undefined {
+  const m = body.match(/^\s*---\r?\n([\s\S]*?)\r?\n---/)
+  if (!m) return undefined
+  const fm = m[1]
+  const d = fm.match(/^\s*description\s*:\s*(.+?)\s*$/m)
+  if (!d) return undefined
+  return d[1].trim().replace(/^["']|["']$/g, '')
+}
+
 /**
  * Dooray 위키 하위 페이지를 저장소로 쓰는 Claude Code 스킬 공유소.
  * 각 페이지 = 1 스킬.
@@ -84,16 +94,31 @@ export class SharedSkillsService {
       }))
     }
 
-    return pages.map((p) => {
+    // 각 페이지의 본문도 병렬 fetch — frontmatter 의 description 만 추출해 카드 표시용으로 채워줌.
+    // list 의 메타 응답에 body 가 없어서 본 문 안 가져오면 사용자가 카드에서 어떤 스킬인지 알 수 없는 문제(#1) 대응.
+    const bodies = await Promise.all(
+      pages.map(async (p) => {
+        try {
+          const full = await this.wikiService.get(this.wikiId, p.id)
+          return extractBodyText((full as { body?: unknown }).body)
+        } catch {
+          return ''
+        }
+      })
+    )
+
+    return pages.map((p, i) => {
       const subject = p.subject || p.title || 'untitled'
       const filename = subject.replace(/[^a-zA-Z0-9_\-]/g, '-').slice(0, 64) || `skill-${p.id}`
       const { id: creatorId, name: inlineName } = readCreator(p)
       const creatorName = inlineName || (creatorId ? nameMap.get(creatorId) : '') || '알 수 없음'
+      const body = bodies[i] || ''
       return {
         postId: p.id,
         filename,
         name: subject,
         content: '',
+        description: extractFrontmatterDescription(body),
         authorName: creatorName,
         authorId: creatorId,
         createdAt: p.createdAt || '',

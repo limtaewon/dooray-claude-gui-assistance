@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import { Send, Square, Sparkles, Wrench, RotateCcw, FolderOpen, History, Server, X, Check, AlertCircle, Paperclip, Image as ImageIcon, Cpu, TerminalSquare } from 'lucide-react'
+import { Send, Square, Sparkles, Wrench, RotateCcw, FolderOpen, History, Server, X, Check, AlertCircle, Paperclip, Image as ImageIcon, Cpu, TerminalSquare, ChevronDown, Zap } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -273,7 +273,38 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
   return (
     <div
       className={`absolute inset-0 flex flex-col bg-bg-primary ${isActive ? '' : 'invisible pointer-events-none'}`}
+      // #11 드롭존 확장 — input 만 받던 drag/drop 을 Pane 전체로. 메시지 영역 위로 끌어와도 첨부됨.
+      onDragEnter={(e) => {
+        if (!e.dataTransfer?.types?.includes('Files')) return
+        e.preventDefault()
+        setDragOver(true)
+      }}
+      onDragOver={(e) => {
+        if (!e.dataTransfer?.types?.includes('Files')) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'copy'
+        setDragOver(true)
+      }}
+      onDragLeave={(e) => {
+        // Pane 의 바깥 경계로 나갈 때만 해제 (자식 transition 무시)
+        if (e.currentTarget === e.target) setDragOver(false)
+      }}
+      onDrop={async (e) => {
+        const files = Array.from(e.dataTransfer?.files || [])
+        if (files.length === 0) return
+        e.preventDefault()
+        setDragOver(false)
+        for (const f of files) await addAttachment(f)
+      }}
     >
+      {/* 드롭 오버레이 — Pane 전체에 시각 피드백 */}
+      {dragOver && (
+        <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-clauday-orange/5 backdrop-blur-[1px] border-2 border-dashed border-clauday-orange/60">
+          <div className="px-4 py-2 rounded-full bg-clauday-orange/15 border border-clauday-orange/50 text-[12px] font-semibold text-clauday-orange">
+            놓으면 첨부됩니다
+          </div>
+        </div>
+      )}
       {/* Breadcrumb */}
       {cwd && (
         <div className="flex items-center gap-2 px-4 py-2 border-b border-bg-border text-[12px] text-text-secondary flex-shrink-0">
@@ -297,18 +328,8 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
             onClose={() => setMcpOpen(false)}
           />
           {ctxTokens > 0 && <CtxBadge tokens={ctxTokens} />}
-          <button
-            onClick={() => {
-              // 인앱 터미널 화면으로 이동 + 새 셸 탭에서 cwd · claude --resume <sid> 자동 입력
-              const initialCommand = sessionId ? `claude --resume ${sessionId}` : 'claude'
-              window.dispatchEvent(new CustomEvent('create-terminal', { detail: { cwd, initialCommand } }))
-              window.dispatchEvent(new CustomEvent('goto-terminal'))
-            }}
-            className="ds-toolbar-btn"
-            title={sessionId ? `인앱 터미널에서 이어가기 (claude --resume ${sessionId.slice(0, 8)})` : '인앱 터미널에서 claude 실행'}
-          >
-            <TerminalSquare size={14} /> 터미널
-          </button>
+          {/* #8 터미널 진입 — bypass / 일반 두 옵션 드롭다운 (예전엔 Shift+Alt 모디파이어). */}
+          <TerminalDropdown sessionId={sessionId} cwd={cwd} />
           <button
             onClick={reset}
             disabled={messages.length === 0}
@@ -324,7 +345,7 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
       <div ref={scrollRef} onScroll={handleTranscriptScroll} className="flex-1 overflow-y-auto">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center gap-3 text-text-tertiary">
-            <Sparkles size={36} className="text-clover-orange/60" />
+            <Sparkles size={36} className="text-clauday-orange/60" />
             <div className="text-center">
               <div className="text-sm font-medium text-text-primary">Claude Code</div>
               <div className="text-[11px] mt-1">아래 입력창에 질문이나 지시를 입력하세요</div>
@@ -335,7 +356,7 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
             {messages.map((m) => <MessageRow key={m.id} msg={m} />)}
             {busy && (
               <div className="flex items-center gap-2 text-[11px] text-text-tertiary pl-12">
-                <span className="w-1.5 h-1.5 rounded-full bg-clover-orange animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-clauday-orange animate-pulse" />
                 Claude 가 생각 중...
               </div>
             )}
@@ -348,24 +369,8 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
         )}
       </div>
 
-      {/* Input — 드래그앤드롭 + 클립보드 paste 지원 */}
-      <div
-        className={`border-t bg-bg-surface px-4 py-3 flex-shrink-0 transition-colors ${
-          dragOver ? 'border-clover-orange bg-clover-orange/5' : 'border-bg-border'
-        }`}
-        onDragEnter={(e) => { e.preventDefault(); setDragOver(true) }}
-        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDragOver(true) }}
-        onDragLeave={(e) => {
-          // 자식으로 들어가는 dragleave 무시
-          if (e.currentTarget === e.target) setDragOver(false)
-        }}
-        onDrop={async (e) => {
-          e.preventDefault()
-          setDragOver(false)
-          const files = Array.from(e.dataTransfer.files || [])
-          for (const f of files) await addAttachment(f)
-        }}
-      >
+      {/* Input — 클립보드 paste 는 textarea 핸들러가 처리. 드롭은 Pane wrapper(#11) 가 전 영역으로 받음. */}
+      <div className="border-t bg-bg-surface px-4 py-3 flex-shrink-0 border-bg-border">
         {/* 첨부 chips */}
         {attachments.length > 0 && (
           <div className="w-full mb-2 flex items-center gap-1.5 flex-wrap">
@@ -376,7 +381,7 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
                 style={{ background: 'var(--bg-primary)', border: '1px solid var(--bg-border)' }}
                 title={a.path}
               >
-                {a.isImage ? <ImageIcon size={11} className="text-clover-orange" /> : <Paperclip size={11} className="text-clover-blue" />}
+                {a.isImage ? <ImageIcon size={11} className="text-clauday-orange" /> : <Paperclip size={11} className="text-clauday-blue" />}
                 <span className="text-text-secondary max-w-[180px] truncate">{a.name}</span>
                 <button onClick={() => removeAttachment(a.id)}
                   className="ml-0.5 text-text-tertiary hover:text-red-400">
@@ -411,11 +416,11 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
                     onClick={() => insertSkill(s)}
                     className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer border-l-2 transition-colors ${
                       isHi
-                        ? 'bg-clover-orange/15 border-l-clover-orange'
+                        ? 'bg-clauday-orange/15 border-l-clauday-orange'
                         : 'border-l-transparent hover:bg-bg-surface-hover'
                     }`}
                   >
-                    <Sparkles size={11} className={`flex-none ${isHi ? 'text-clover-orange' : 'text-clover-blue'}`} />
+                    <Sparkles size={11} className={`flex-none ${isHi ? 'text-clauday-orange' : 'text-clauday-blue'}`} />
                     <span className={`text-[12px] truncate ${isHi ? 'text-text-primary font-semibold' : 'text-text-primary'}`}>{s.name}</span>
                     <span className="text-[10px] text-text-tertiary font-mono truncate flex-1 text-right">{s.filename}</span>
                   </div>
@@ -495,15 +500,168 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
   )
 }
 
+/** 절대 path / URL 같이 OS 핸들러로 열 만한 대상인지 판정 (#6 채팅 메시지 클릭 열기) */
+function isOpenableTarget(s: string): boolean {
+  if (!s) return false
+  if (/^https?:\/\//i.test(s)) return true
+  if (/^file:\/\//i.test(s)) return true
+  if (s.startsWith('~/') || s.startsWith('/')) return true
+  if (/^[A-Za-z]:[\\/]/.test(s)) return true
+  return false
+}
+
+function openTarget(target: string): void {
+  const resolved = target.replace(/^file:\/\//, '')
+  window.api.shell.openPath(resolved).catch((err) => console.warn('[chat-link] open 실패', err))
+}
+
+function nodeToText(node: React.ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(nodeToText).join('')
+  return ''
+}
+
+/**
+ * plain text 안의 path/URL 을 자동 link 로 분해.
+ * inline code 가 path 의 일부만 캡처해서 클릭 시 잘못된 부모 폴더로 이동하던 문제 해결.
+ * - 절대 path / ~/ / 윈도우 드라이브 / http(s) URL 매칭
+ * - path 는 Cmd+클릭, URL 은 일반 클릭
+ */
+// URL or PATH 매칭. 우선순위:
+//   m[1] = http(s) URL
+//   m[2] = single-quoted path (공백 OK — 'Application Support' 등 macOS 경로)
+//   m[3] = double-quoted path
+//   m[4] = 따옴표 없는 path (공백 분리)
+const PATH_OR_URL_RE = /(https?:\/\/[^\s"'`<>()[\]{}]+)|'((?:~|\/|\b[A-Za-z]:[\\/])[^'\r\n]+?)'|"((?:~|\/|\b[A-Za-z]:[\\/])[^"\r\n]+?)"|((?:~|\/|\b[A-Za-z]:[\\/])[^\s"'`<>(){}[\],]+)/g
+
+function linkifyString(s: string, baseKey: string): React.ReactNode[] {
+  if (!s) return [s]
+  const out: React.ReactNode[] = []
+  let last = 0
+  PATH_OR_URL_RE.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = PATH_OR_URL_RE.exec(s)) !== null) {
+    if (m.index > last) out.push(s.slice(last, m.index))
+    const target = m[1] ?? m[2] ?? m[3] ?? m[4]
+    if (target) out.push(<LinkChip key={`${baseKey}-${m.index}`} target={target} />)
+    last = m.index + m[0].length
+  }
+  if (last < s.length) out.push(s.slice(last))
+  return out.length > 0 ? out : [s]
+}
+
+/**
+ * 채팅 메시지 안의 path/URL 링크 — Warp 식 hover popover.
+ *   - hover 시 위쪽에 작은 popover: "Open file [⌘ + Click]" / "Show in Finder" (파일)
+ *     또는 "Open in browser" (URL)
+ *   - 파일은 ⌘+클릭으로만 활성화 (실수 클릭 방지). URL 은 일반 클릭.
+ */
+function LinkChip({ target }: { target: string }): JSX.Element {
+  const [hover, setHover] = useState(false)
+  const isHttp = /^https?:\/\//i.test(target)
+  const handleOpen = (): void => { openTarget(target) }
+  const handleReveal = (): void => {
+    window.api.shell.showInFolder(target).catch((err) => console.warn('[show-in-folder] 실패', err))
+  }
+  return (
+    <span
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ position: 'relative', display: 'inline' }}
+    >
+      <a
+        onClick={(e) => {
+          if (!isHttp && !e.metaKey && !e.ctrlKey) return
+          e.preventDefault()
+          handleOpen()
+        }}
+        className="text-clauday-blue underline decoration-clauday-blue/40 hover:decoration-clauday-blue cursor-pointer"
+      >
+        {target}
+      </a>
+      {hover && (
+        <span
+          // popover — anchor 의 위쪽에 띄움. inline 컨테이너 안이라 absolute + transform 으로 anchor 가운데로 시프트
+          className="pointer-events-auto"
+          style={{
+            position: 'absolute',
+            bottom: '100%',
+            left: 0,
+            marginBottom: 4,
+            background: 'var(--bg-surface-raised)',
+            border: '1px solid var(--bg-border)',
+            borderRadius: 6,
+            boxShadow: '0 6px 18px rgba(0,0,0,0.35)',
+            padding: '4px 6px',
+            zIndex: 50,
+            whiteSpace: 'nowrap',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4
+          }}
+        >
+          {isHttp ? (
+            <button
+              onClick={(e) => { e.preventDefault(); handleOpen() }}
+              className="px-2 py-0.5 rounded text-[11px] text-text-primary hover:bg-bg-surface-hover"
+            >
+              Open in browser
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={(e) => { e.preventDefault(); handleOpen() }}
+                className="px-2 py-0.5 rounded text-[11px] text-text-primary hover:bg-bg-surface-hover"
+              >
+                Open file
+                <span className="ml-1 text-[10px] text-text-tertiary">⌘+클릭</span>
+              </button>
+              <span className="text-text-tertiary text-[10px]">|</span>
+              <button
+                onClick={(e) => { e.preventDefault(); handleReveal() }}
+                className="px-2 py-0.5 rounded text-[11px] text-text-primary hover:bg-bg-surface-hover"
+              >
+                Show in Finder
+              </button>
+            </>
+          )}
+        </span>
+      )}
+    </span>
+  )
+}
+
+/** ReactNode 의 자식 중 string 들을 linkifyString 으로 부분 치환. 다른 React element 는 그대로 유지. */
+function linkifyChildren(children: React.ReactNode, baseKey: string): React.ReactNode {
+  if (typeof children === 'string') return linkifyString(children, baseKey)
+  if (Array.isArray(children)) {
+    const flat: React.ReactNode[] = []
+    children.forEach((c, i) => {
+      if (typeof c === 'string') flat.push(...linkifyString(c, `${baseKey}-${i}`))
+      else flat.push(c)
+    })
+    return flat
+  }
+  return children
+}
+
 /** 마크다운 렌더링 컴포넌트 — 코드 블록, 표, 리스트 등 정상 표시 */
 const markdownComponents = {
-  // 코드 블록을 시각적으로 명확하게
+  // 코드 블록을 시각적으로 명확하게. 인라인 코드의 내용이 절대경로/URL 이면 Cmd+클릭으로 열림.
   code: ({ inline, className, children, ...props }: { inline?: boolean; className?: string; children?: React.ReactNode }) => {
     if (inline) {
+      const text = nodeToText(children).trim()
+      const openable = isOpenableTarget(text)
       return (
         <code
-          className="px-1 py-0.5 rounded font-mono text-[12px]"
-          style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--c-orange-fg)' }}
+          className={`px-1 py-0.5 rounded font-mono text-[12px] ${openable ? 'cursor-pointer hover:underline' : ''}`}
+          style={{ background: 'rgba(0,0,0,0.2)', color: openable ? 'var(--c-blue-fg, #93C5FD)' : 'var(--c-orange-fg)' }}
+          onClick={openable ? (e) => {
+            if (!e.metaKey && !e.ctrlKey) return
+            e.preventDefault()
+            openTarget(text)
+          } : undefined}
+          title={openable ? `⌘+클릭으로 열기 — ${text}` : undefined}
           {...props}
         >
           {children}
@@ -535,23 +693,44 @@ const markdownComponents = {
   ),
   td: ({ children }: { children?: React.ReactNode }) => (
     <td className="px-2 py-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-      {children}
+      {linkifyChildren(children, 'td')}
     </td>
   ),
-  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="text-clover-blue hover:underline">
-      {children}
-    </a>
-  ),
+  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
+    if (href && isOpenableTarget(href)) {
+      const isFile = !/^https?:\/\//i.test(href)
+      return (
+        <a
+          onClick={(e) => {
+            // 파일 path 는 Cmd+클릭으로만 (실수 클릭 방지), URL 은 일반 클릭
+            if (isFile && !e.metaKey && !e.ctrlKey) return
+            e.preventDefault()
+            openTarget(href)
+          }}
+          title={isFile ? `⌘+클릭으로 열기 — ${href}` : `클릭으로 열기 — ${href}`}
+          className={`text-clauday-blue hover:underline ${isFile ? 'cursor-pointer' : ''}`}
+        >
+          {children}
+        </a>
+      )
+    }
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className="text-clauday-blue hover:underline">
+        {children}
+      </a>
+    )
+  },
+  // 텍스트가 담기는 영역 — plain text 안의 path/URL 자동 link 화 (#6 채팅 메시지 클릭 열기)
   ul: ({ children }: { children?: React.ReactNode }) => <ul className="list-disc pl-5 my-1 space-y-0.5">{children}</ul>,
   ol: ({ children }: { children?: React.ReactNode }) => <ol className="list-decimal pl-5 my-1 space-y-0.5">{children}</ol>,
-  h1: ({ children }: { children?: React.ReactNode }) => <h1 className="text-base font-bold mt-2 mb-1">{children}</h1>,
-  h2: ({ children }: { children?: React.ReactNode }) => <h2 className="text-sm font-bold mt-2 mb-1">{children}</h2>,
-  h3: ({ children }: { children?: React.ReactNode }) => <h3 className="text-[13px] font-semibold mt-1.5 mb-1">{children}</h3>,
-  p: ({ children }: { children?: React.ReactNode }) => <p className="my-0.5">{children}</p>,
+  li: ({ children }: { children?: React.ReactNode }) => <li>{linkifyChildren(children, 'li')}</li>,
+  h1: ({ children }: { children?: React.ReactNode }) => <h1 className="text-base font-bold mt-2 mb-1">{linkifyChildren(children, 'h1')}</h1>,
+  h2: ({ children }: { children?: React.ReactNode }) => <h2 className="text-sm font-bold mt-2 mb-1">{linkifyChildren(children, 'h2')}</h2>,
+  h3: ({ children }: { children?: React.ReactNode }) => <h3 className="text-[13px] font-semibold mt-1.5 mb-1">{linkifyChildren(children, 'h3')}</h3>,
+  p: ({ children }: { children?: React.ReactNode }) => <p className="my-0.5">{linkifyChildren(children, 'p')}</p>,
   blockquote: ({ children }: { children?: React.ReactNode }) => (
     <blockquote className="border-l-2 pl-3 my-1.5 italic" style={{ borderColor: 'color-mix(in oklab, var(--c-orange-fg) 50%, transparent)', color: 'var(--text-secondary)' }}>
-      {children}
+      {linkifyChildren(children, 'blockquote')}
     </blockquote>
   )
 }
@@ -718,7 +897,7 @@ function SessionHistoryButton({
                       key={s.sessionId}
                       onClick={() => onSelect(s.sessionId, s.cwd)}
                       className={`w-full text-left px-3 py-2 hover:bg-bg-surface-hover transition-colors flex flex-col gap-0.5 ${
-                        isCurrent ? 'bg-clover-blue/10 border-l-2 border-clover-blue' : ''
+                        isCurrent ? 'bg-clauday-blue/10 border-l-2 border-clauday-blue' : ''
                       }`}
                     >
                       <span className="text-[12px] text-text-primary line-clamp-2 font-medium">
@@ -728,7 +907,7 @@ function SessionHistoryButton({
                         <span>{formatRelative(s.lastActivityAt)}</span>
                         <span>·</span>
                         <span>{s.messageCount}개 메시지</span>
-                        {isCurrent && <span className="text-clover-blue">· 현재</span>}
+                        {isCurrent && <span className="text-clauday-blue">· 현재</span>}
                       </div>
                     </button>
                   )
@@ -823,6 +1002,74 @@ function McpStatusButton({
                 ))}
               </div>
             )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/**
+ * #8 터미널 진입 드롭다운 — 일반 / bypass 두 옵션.
+ * 사용자가 모디파이어 키(Shift/Alt)로 분기하던 걸 명시적 메뉴로 변경.
+ */
+function TerminalDropdown({ sessionId, cwd }: { sessionId: string | undefined; cwd: string }): JSX.Element {
+  const [open, setOpen] = useState(false)
+  const spawn = (bypass: boolean): void => {
+    const flags = bypass ? ' --dangerously-skip-permissions' : ''
+    const initialCommand = sessionId ? `claude --resume ${sessionId}${flags}` : `claude${flags}`
+    window.dispatchEvent(new CustomEvent('create-terminal', { detail: { cwd, initialCommand } }))
+    window.dispatchEvent(new CustomEvent('goto-terminal'))
+    setOpen(false)
+  }
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="ds-toolbar-btn flex items-center gap-1"
+        title={sessionId
+          ? `인앱 터미널에서 이어가기 (claude --resume ${sessionId.slice(0, 8)})`
+          : '인앱 터미널에서 claude 실행'}
+      >
+        <TerminalSquare size={14} />
+        터미널
+        <ChevronDown size={11} className="opacity-70" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          {/* ds-menu-item 이 한 줄 가정이라 description 2줄이 다음 항목과 겹쳐 보이는 이슈 → 자체 padding 적용 */}
+          <div
+            className="absolute rounded-lg shadow-2xl overflow-hidden py-1"
+            style={{
+              top: 'calc(100% + 4px)',
+              right: 0,
+              minWidth: 260,
+              zIndex: 40,
+              background: 'var(--bg-surface-raised)',
+              border: '1px solid var(--bg-border)'
+            }}
+          >
+            <button
+              onClick={() => spawn(false)}
+              className="w-full flex items-start gap-2.5 px-3 py-2 text-left hover:bg-bg-surface-hover transition-colors"
+            >
+              <TerminalSquare size={13} className="text-clauday-blue mt-0.5 flex-shrink-0" />
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <span className="text-[12px] text-text-primary font-medium leading-tight">터미널에서 열기</span>
+                <span className="text-[10px] text-text-tertiary leading-tight">권한 확인 살림 (기본)</span>
+              </div>
+            </button>
+            <button
+              onClick={() => spawn(true)}
+              className="w-full flex items-start gap-2.5 px-3 py-2 text-left hover:bg-bg-surface-hover transition-colors"
+            >
+              <Zap size={13} className="text-clauday-orange mt-0.5 flex-shrink-0" />
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <span className="text-[12px] text-text-primary font-medium leading-tight">bypass 로 열기</span>
+                <span className="text-[10px] text-text-tertiary leading-tight">--dangerously-skip-permissions · 권한 확인 건너뜀</span>
+              </div>
+            </button>
           </div>
         </>
       )}

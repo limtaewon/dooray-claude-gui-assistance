@@ -11,7 +11,7 @@ describe('Badge', () => {
   it('기본 톤은 orange', () => {
     const { container } = render(<Badge>1</Badge>)
     const el = container.firstChild as HTMLElement
-    expect(el.style.background).toContain('clover-orange')
+    expect(el.style.background).toContain('clauday-orange')
   })
 
   it('tone 별 배경색 매핑', () => {

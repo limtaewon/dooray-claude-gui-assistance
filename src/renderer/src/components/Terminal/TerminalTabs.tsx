@@ -24,7 +24,7 @@ function TerminalTabs({
           onClick={() => onSelect(session.id)}
           className={`flex items-center gap-1.5 px-3 h-7 rounded text-xs cursor-pointer transition-colors group ${
             activeId === session.id
-              ? 'bg-clover-blue text-white'
+              ? 'bg-clauday-blue text-white'
               : 'text-text-secondary hover:text-text-primary hover:bg-bg-border'
           }`}
         >
@@ -34,7 +34,7 @@ function TerminalTabs({
               e.stopPropagation()
               onClose(session.id)
             }}
-            className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-clover-orange"
+            className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-clauday-orange"
           >
             <X size={12} />
           </button>
