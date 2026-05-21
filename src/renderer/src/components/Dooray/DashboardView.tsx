@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import type { DoorayTask, DoorayProject } from '../../../../shared/types/dooray'
 import SkillQuickToggle from './SkillQuickToggle'
+import AIToolsPopover from '../common/AIToolsPopover'
 import {
   Button, Chip, Card, Avatar, Input, Textarea, FieldLabel, Kbd,
   EmptyView, LoadingView, useToast, type ChipTone
@@ -69,6 +70,7 @@ function DashboardView(): JSX.Element {
   const [composing, setComposing] = useState(false)
   const [creating, setCreating] = useState(false)
   const [activeTemplateName, setActiveTemplateName] = useState<string | null>(null)
+  const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null)
 
   // 템플릿
   const [templates, setTemplates] = useState<Array<{ id: string; name: string }>>([])
@@ -187,6 +189,7 @@ function DashboardView(): JSX.Element {
       setSubject(detail.subject || detail.name || templateName)
       setBody(detail.body || '')
       setActiveTemplateName(detail.name || templateName)
+      setActiveTemplateId(templateId)
     } catch (err) {
       toast.error('템플릿 로드 실패', err instanceof Error ? err.message : String(err))
     }
@@ -226,10 +229,13 @@ JSON 형태로만 응답:
 JSON 형태로만 응답:
 {"subject": "짧고 동사로 시작한 제목", "body": "마크다운 본문 — 목적/배경/체크리스트", "tagIds": ["선택한 태그 id 0~N개"]}`
 
+      // task 스킬이 mcp__dooray-mcp__* 같은 도구 호출을 지시할 수 있으므로 사용자가 선택한 MCP 서버 목록을 함께 넘긴다.
+      const mcpServers = await AIToolsPopover.loadSelected('task')
       const raw = await window.api.ai.ask({
         prompt,
         feature: 'summarizeTask',
-        imagePaths: aiImages.length > 0 ? aiImages : undefined
+        imagePaths: aiImages.length > 0 ? aiImages : undefined,
+        mcpServers: mcpServers.length > 0 ? mcpServers : undefined
       })
       const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim()
       const match = cleaned.match(/\{[\s\S]*\}/)
@@ -291,11 +297,12 @@ JSON 형태로만 응답:
         projectId: nlProject,
         subject: subject.trim(),
         body: body,
-        tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined
+        tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
+        templateId: activeTemplateId || undefined
       })
       const proj = projects.find((p) => p.id === nlProject)
       toast.success(`${proj?.code || '프로젝트'}에 생성됨`, `"${subject.trim()}" 태스크가 두레이에 등록됐어요`)
-      setSubject(''); setBody(''); setAiHint(''); setActiveTemplateName(null); setSelectedTagIds([]); setAiImages([])
+      setSubject(''); setBody(''); setAiHint(''); setActiveTemplateName(null); setActiveTemplateId(null); setSelectedTagIds([]); setAiImages([])
       // 방금 생성한 태스크가 즉시 보이도록 캐시 우회
       await load(true)
     } catch (err) {
@@ -428,6 +435,7 @@ JSON 형태로만 응답:
                   <span className="text-[11px] font-semibold text-text-primary">AI 자동작성</span>
                   <span className="text-[10px] text-text-tertiary">자연어 + 이미지로 제목·본문·태그까지 한 번에</span>
                   <div className="flex-1" />
+                  <AIToolsPopover feature="task" size="sm" />
                   <SkillQuickToggle target="task" />
                   <div className="relative">
                     <Button

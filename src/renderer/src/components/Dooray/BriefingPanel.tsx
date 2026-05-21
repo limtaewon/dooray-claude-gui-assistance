@@ -200,7 +200,7 @@ function BriefingPanel(): JSX.Element {
               <div className="flex items-center gap-1.5 mt-2">
                 {briefing.urgent.length > 0 && <Chip tone="orange" dot>긴급 {briefing.urgent.length}</Chip>}
                 {briefing.focus.length > 0 && <Chip tone="blue" dot>집중 {briefing.focus.length}</Chip>}
-                {briefing.mentioned && briefing.mentioned.length > 0 && <Chip tone="violet" dot>멘션 {briefing.mentioned.length}</Chip>}
+                {briefing.mentioned && briefing.mentioned.length > 0 && <Chip tone="neutral" dot>참고 {briefing.mentioned.length}</Chip>}
                 {briefing.todayEvents.length > 0 && <Chip tone="emerald" dot>회의 {briefing.todayEvents.length}</Chip>}
               </div>
               {/* 참고 데이터 메타 — 사용자가 "뭘 보고 만든 결과인지" 한 줄로 인지.
@@ -208,38 +208,59 @@ function BriefingPanel(): JSX.Element {
                   스킬/MCP 가 활성이면 추가 보강 분석이 그 위에서 일어남. */}
               {briefing.sourceMeta && (
                 <div className="mt-2 text-[10px] text-text-tertiary">
-                  참고: 내 태스크 {briefing.sourceMeta.taskCount}개 · CC {briefing.sourceMeta.ccTaskCount}개 · 오늘 마감 {briefing.sourceMeta.dueTodayCount}개 · 일정 {briefing.sourceMeta.eventCount}개
-                  {briefing.sourceMeta.eventRange ? ` (${briefing.sourceMeta.eventRange})` : ''}
+                  <div>
+                    참고: 내 태스크 {briefing.sourceMeta.taskCount}개 · CC {briefing.sourceMeta.ccTaskCount}개 · 오늘 마감 {briefing.sourceMeta.dueTodayCount}개 · 일정 {briefing.sourceMeta.eventCount}개
+                    {briefing.sourceMeta.eventRange ? ` (${briefing.sourceMeta.eventRange})` : ''}
+                  </div>
+                  {briefing.sourceMeta.probes && briefing.sourceMeta.probes.length > 0 && (
+                    <details className="mt-1">
+                      <summary className="cursor-pointer hover:text-text-secondary">
+                        🔎 AI 가 확인한 외부 출처 {briefing.sourceMeta.probes.length}개
+                      </summary>
+                      <ul className="mt-1 ml-3 space-y-0.5 list-disc list-inside">
+                        {briefing.sourceMeta.probes.map((p, i) => (
+                          <li key={i} className="font-mono">
+                            <span className="text-text-secondary">{p.name}</span>
+                            {p.summary ? <span className="text-text-tertiary"> {p.summary}</span> : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
                 </div>
               )}
             </div>
 
             {briefing.urgent.length > 0 && (
-              <Section icon={AlertTriangle} iconColor="text-red-500 dark:text-red-400" title="긴급" count={briefing.urgent.length} bgColor="from-red-500/10 to-transparent border-red-500/45">
+              <Section icon={AlertTriangle} iconColor="text-red-500 dark:text-red-400" title="긴급" count={briefing.urgent.length} bgColor="from-red-500/12 to-transparent border-red-500/60">
                 {briefing.urgent.map((item, i) => <TaskItem key={i} taskId={item.taskId} subject={item.subject} detail={item.reason} />)}
               </Section>
             )}
 
             {briefing.focus.length > 0 && (
-              <Section icon={Target} iconColor="text-blue-900 dark:text-clauday-blue" title="오늘 집중" count={briefing.focus.length} bgColor="from-clauday-blue/10 to-transparent border-clauday-blue/65">
+              <Section icon={Target} iconColor="text-blue-700 dark:text-clauday-blue" title="오늘 집중" count={briefing.focus.length} bgColor="from-clauday-blue/15 to-transparent border-clauday-blue">
                 {briefing.focus.map((item, i) => <TaskItem key={i} taskId={item.taskId} subject={item.subject} detail={item.reason} />)}
               </Section>
             )}
 
-            {briefing.mentioned && briefing.mentioned.length > 0 && (
-              <Section icon={MessageSquare} iconColor="text-violet-600 dark:text-violet-400" title="멘션/답장" count={briefing.mentioned.length} bgColor="from-violet-500/10 to-transparent border-violet-500/45">
-                {briefing.mentioned.map((item, i) => <TaskItem key={i} taskId={item.taskId} subject={item.subject} detail={item.reason} />)}
+            {briefing.recommendations.length > 0 && (
+              <Section icon={Lightbulb} iconColor="text-violet-600 dark:text-violet-300" title="AI 제안" count={briefing.recommendations.length} bgColor="from-violet-500/10 to-transparent border-violet-500/55">
+                <div className="space-y-1.5">
+                  {briefing.recommendations.map((rec, i) => (
+                    <RecommendationItem key={i} text={rec} index={i} />
+                  ))}
+                </div>
               </Section>
             )}
 
             {briefing.stale.length > 0 && (
-              <Section icon={Clock} iconColor="text-orange-900 dark:text-clauday-orange" title="착수 필요" count={briefing.stale.length} bgColor="from-clauday-orange/10 to-transparent border-clauday-orange/65">
+              <Section icon={Clock} iconColor="text-amber-700 dark:text-amber-400" title="착수 필요" count={briefing.stale.length} bgColor="from-amber-500/12 to-transparent border-amber-500/70">
                 {briefing.stale.map((item, i) => <TaskItem key={i} taskId={item.taskId} subject={item.subject} detail={`${item.daysSinceCreated}일째`} />)}
               </Section>
             )}
 
             {briefing.todayEvents.length > 0 && (
-              <Section icon={Calendar} iconColor="text-emerald-600 dark:text-emerald-400" title="오늘 일정" count={briefing.todayEvents.length} bgColor="from-emerald-500/10 to-transparent border-emerald-500/45">
+              <Section icon={Calendar} iconColor="text-emerald-600 dark:text-emerald-400" title="오늘 일정" count={briefing.todayEvents.length} bgColor="from-emerald-500/10 to-transparent border-emerald-500/55">
                 {briefing.todayEvents.map((evt, i) => (
                   <div key={i} className="flex items-center gap-2 text-xs">
                     <span className="text-emerald-600 dark:text-emerald-400 font-mono">{evt.time}</span>
@@ -249,13 +270,9 @@ function BriefingPanel(): JSX.Element {
               </Section>
             )}
 
-            {briefing.recommendations.length > 0 && (
-              <Section icon={Lightbulb} iconColor="text-amber-600 dark:text-yellow-400" title="AI 제안" count={briefing.recommendations.length} bgColor="from-amber-500/10 to-transparent border-amber-500/45">
-                <div className="space-y-1.5">
-                  {briefing.recommendations.map((rec, i) => (
-                    <RecommendationItem key={i} text={rec} index={i} />
-                  ))}
-                </div>
+            {briefing.mentioned && briefing.mentioned.length > 0 && (
+              <Section icon={MessageSquare} iconColor="text-slate-500 dark:text-slate-400" title="참고사항" count={briefing.mentioned.length} bgColor="from-slate-500/8 to-transparent border-slate-500/40">
+                {briefing.mentioned.map((item, i) => <TaskItem key={i} taskId={item.taskId} subject={item.subject} detail={item.reason} />)}
               </Section>
             )}
 
@@ -281,6 +298,48 @@ function Section({ icon: Icon, iconColor, title, count, bgColor, children }: {
       <div className="space-y-1">{children}</div>
     </div>
   )
+}
+
+/**
+ * 본문 텍스트 안의 URL 을 자동으로 anchor 로 렌더링.
+ * - http(s):// 로 시작하는 URL 매칭. 호스트 별로 (nhnent / github.com / github.nhnent.com 등) 짧은 라벨로 축약.
+ * - Dooray 태스크 URL 은 별도 chip 처리 안 하고 일반 링크처럼 — 시각적 일관성.
+ */
+const URL_RE = /(https?:\/\/[^\s,()<>]+)/g
+function linkifyText(text: string): React.ReactNode {
+  if (!text || !URL_RE.test(text)) return text
+  URL_RE.lastIndex = 0
+  const parts: React.ReactNode[] = []
+  let last = 0
+  let m: RegExpExecArray | null
+  let i = 0
+  while ((m = URL_RE.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index))
+    const url = m[1]
+    let label = url
+    try {
+      const u = new URL(url)
+      // 호스트 + path 마지막 segment 만 노출 — 예: github.nhnent.com/org/repo/pull/123 → "nhnent #123"
+      const host = u.hostname.replace(/^www\./, '')
+      const segs = u.pathname.split('/').filter(Boolean)
+      const tail = segs[segs.length - 1] || ''
+      const hostShort = host.endsWith('nhnent.com') ? 'nhnent'
+        : host === 'github.com' ? 'github'
+        : host
+      const isPr = /\/(pull|issues)\/\d+/.test(u.pathname)
+      label = isPr ? `${hostShort} #${tail}` : `${hostShort}/${tail || ''}`.replace(/\/$/, '')
+    } catch { /* keep raw */ }
+    parts.push(
+      <a key={`url-${i++}`} href={url} target="_blank" rel="noopener noreferrer"
+        className="inline-flex items-center gap-0.5 mx-0.5 px-1.5 py-0.5 rounded border border-bg-border-strong bg-bg-surface text-text-secondary hover:text-clauday-blue hover:border-clauday-blue text-[10px] font-mono align-baseline"
+        title={url}>
+        {label}
+      </a>
+    )
+    last = m.index + url.length
+  }
+  if (last < text.length) parts.push(text.slice(last))
+  return <>{parts}</>
 }
 
 /**
@@ -330,7 +389,7 @@ function RecommendationItem({ text, index }: { text: string; index: number }): J
             <Chip tone="orange">{anchor}</Chip>
           </span>
         )}
-        {body}
+        {linkifyText(body)}
         {taskIds.map((id, i) => (
           <a key={`${id}-${i}`} href={`https://nhnent.dooray.com/project/posts/${id}`}
              target="_blank" rel="noopener noreferrer"
@@ -345,24 +404,26 @@ function RecommendationItem({ text, index }: { text: string; index: number }): J
 }
 
 function TaskItem({ taskId, subject, detail }: { taskId?: string; subject: string; detail: string }): JSX.Element {
-  const content = (
-    <>
-      <span className="text-text-primary block">{subject}</span>
-      {detail && <span className="text-text-secondary block text-[11px] leading-relaxed mt-0.5">{detail}</span>}
-    </>
-  )
+  // detail 안에 URL 이 있으면 outer anchor 로 감쌀 수 없음(nested <a>) — subject 만 링크화하고 detail 은 별도 줄.
+  const detailNode = detail
+    ? <div className="text-text-secondary text-[11px] leading-relaxed mt-0.5">{linkifyText(detail)}</div>
+    : null
   if (taskId) {
     return (
-      <a href={`https://nhnent.dooray.com/project/posts/${taskId}`} target="_blank" rel="noopener noreferrer"
-        className="block text-xs px-1.5 -mx-1.5 py-1 rounded hover:bg-bg-surface-hover transition-colors cursor-pointer"
-        title="두레이에서 열기">
-        {content}
-      </a>
+      <div className="text-xs px-1.5 -mx-1.5 py-1 rounded hover:bg-bg-surface-hover transition-colors">
+        <a href={`https://nhnent.dooray.com/project/posts/${taskId}`} target="_blank" rel="noopener noreferrer"
+          className="text-text-primary hover:text-clauday-blue cursor-pointer"
+          title="두레이에서 열기">
+          {subject}
+        </a>
+        {detailNode}
+      </div>
     )
   }
   return (
     <div className="text-xs">
-      {content}
+      <span className="text-text-primary block">{subject}</span>
+      {detailNode}
     </div>
   )
 }
@@ -410,7 +471,7 @@ function BriefingFeedback(): JSX.Element {
         <div className="space-y-2">
           <p className="text-[10px] text-text-secondary text-center">뭐가 아쉬웠나요? (선택)</p>
           <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={2}
-            placeholder="예: 긴급 기준이 안 맞아요, 멘션된 태스크를 더 강조해주세요"
+            placeholder="예: 긴급 기준이 안 맞아요, 참고사항 태스크를 더 강조해주세요"
             className="w-full px-3 py-2 bg-bg-surface border border-bg-border rounded-lg text-[11px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue resize-none" />
           <div className="flex justify-end gap-2">
             <button onClick={() => setFeedback(null)} className="text-[10px] text-text-tertiary hover:text-text-secondary">취소</button>

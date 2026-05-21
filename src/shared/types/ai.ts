@@ -26,6 +26,8 @@ export interface AISourceMeta {
   collectedAt: string
   /** 위임 모드 여부 — UI 에서 "+ AI 가 MCP 로 추가 수집" 안내 표시 */
   delegated?: boolean
+  /** 에이전틱 브리핑에서 LLM 이 호출한 도구 목록 — "확인한 출처" UI 노출용 */
+  probes?: Array<{ name: string; summary?: string }>
 }
 
 export interface AIBriefing {

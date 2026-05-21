@@ -1,5 +1,68 @@
 # Changelog
 
+## [1.5.0] - CalDAV 자체 캘린더 + 에이전틱 브리핑/보고서
+
+v1.5는 두 가지 큰 축이 있습니다. 첫째, 두레이 캘린더를 CalDAV 로 자체 수집해 구글 캘린더 스타일 월간 뷰까지 연결한 캘린더 도메인 자립. 둘째, AI 브리핑과 보고서가 두레이 데이터만 정리하던 단계를 넘어 사용자 셸 명령(gh, git, npm 등) · 웹 검색 · MCP 도구를 직접 호출해 외부 시스템 상태(PR, CI, 배포, 이슈)를 fetch 한 뒤 결과 URL 까지 브리핑 본문에 인용하는 에이전틱 모드. 부차적으로 디자인 시스템 v2 시맨틱 토큰, 라이트 모드 가독성 패치, 광범위한 단위/통합 테스트(700+) 와 CI 게이트(typecheck, coverage 70%) 정착 등 안정화 기반이 정비됐습니다.
+
+### 신규 기능 — 캘린더 자립
+- **CalDAV 자체 통합** — 두레이 캘린더 토큰만으로 회사 캘린더를 직접 동기화. CTag polling 3분 주기 + 429 backoff 5 tick, 80ms emitUpdate debounce, fullSync 진행 중 빈 결과 시 캐시 보류로 두레이 quota 보호
+- **구글 캘린더 스타일 월간 뷰** — 드래그로 일정 이동/리사이즈, dot/bar 시각화, 종일/타임드 일정 분리, 멀티데이 멀티위크 segment 분할
+- **빠른 할 일 입력** — 헤더 인라인 입력 → 종일 로컬 일정 즉시 생성. 캘린더 list 즉시 반영
+- **표시할 캘린더 선택 + 사용자 지정 색** — ⚙ 아이콘 dropdown, 활성 개수 badge. 캘린더별 색상 override + reset
+- **공휴일 가상 캘린더** (한국) — `dooray-claude-holidays-ko` 디스크 캐시, 보라 톤 고정
+- **CalDAV displayName 강건화** — 두레이가 displayName 을 동일 문자열("두레이") 로 주거나 객체(`{_text}`) 로 주는 케이스 대응 + URL segment 폴백으로 항상 구분 가능한 라벨
+
+### 신규 기능 — 에이전틱 AI (브리핑/보고서)
+- **에이전틱 brief/report** — Claude CLI 호출 시 `Bash` + `WebSearch` + `WebFetch` + 사용자가 선택한 MCP 광범위 허용. effort `high`, budget 2.5~3.0 USD. Edit/Write/TodoWrite/Task 는 명시적 차단 (read-only)
+- **사용자 스킬 기반 grounding** — 캘린더 일정·todo 키워드를 사용자 스킬(`task`/`briefing`/`report` 타겟) 의 트리거에 매칭, 스킬이 지시한 셸 명령(예: `gh pr list`)/MCP 호출/웹 fetch 를 LLM 이 직접 실행한 뒤 그 결과를 본문에 인용
+- **확인한 출처(probes) 노출** — 헤더 메타 아래 `🔎 AI 가 확인한 외부 출처 N개` 디테일. 호출된 도구 이름과 인자 요약을 모노스페이스로 펼쳐 보기
+- **URL 자동 링크화** — `linkifyText` 헬퍼가 본문의 http(s) URL 을 호스트별 라벨링된 칩으로 자동 변환 (예: `nhnent #1234`, `github org/repo`). recommendations 와 TaskItem detail 양쪽 적용
+- **빠른 태스크 AI 채우기 (MCP 허용)** — DashboardView 의 AI 자동작성 카드에 `AIToolsPopover` 추가. 사용자가 dooray-mcp 등을 토글하면 스킬의 `mcp__dooray-mcp__get_task_list_with_param` 같은 호출이 실제로 동작
+- **템플릿 ID 전달** — 빠른 태스크에서 두레이 템플릿을 선택하면 templateId 까지 함께 POST 해서 두레이가 템플릿 lineage 로 기록
+
+### 신규 기능 — 메뉴/탐색
+- **Shift × 2 단축키** — 400ms 이내 Shift 두 번 → ⌘K 와 동일한 CommandPalette (IntelliJ "Search Everywhere" 패턴). Shift+다른 키 조합은 자동 무효화
+- **두레이 sub-tab 직접 점프** — CommandPalette 에 `두레이 — 대시보드 / 태스크 / 위키 / 캘린더 / 메신저 / AI 브리핑 / AI 보고서` 7개 직행 항목
+- **사이드바 항목 순서/노출 커스텀** — 설정 > 외관 & 동작 > 사이드바 항목 섹션. 위/아래 화살표 + 노출 체크박스 + 기본값 초기화. 신규 view 추가 시 자동 append (forward-compat)
+- **두레이 토큰 설정 페이지 URL 정정** — `/setting/api/token` 으로 통일
+
+### 신규 기능 — 브리핑 UX
+- **섹션 색상/순서 재조정** — 긴급(red) → 오늘 집중(blue 강화) → AI 제안(violet) → 착수 필요(amber, focus 와 명확 구분) → 오늘 일정(emerald) → 참고사항(slate)
+- **멘션/답장 → 참고사항** rename. 화면 최하단으로 이동
+- **시간 anchor chip + emoji prefix + 18자리 taskId mini-chip** — AI 제안 한 줄을 시각적으로 분해해 6개가 뭉뚱그려 안 읽히는 문제 해결
+
+### 신규 기능 — 와처(Monitoring)
+- **AI 생성 필터 칩 직접 편집** — 각 칩 hover 시 × 삭제, 카테고리별 입력란 + Enter/+ 로 직접 추가, "규칙 비우기" 한 번에 초기화
+- **AI 없이 시작** — 빈 규칙으로 들어가서 처음부터 직접 작성 가능
+- **Socket Mode 설정을 Settings 에 미러링** — 사이드바 팝업은 유지하면서 설정 > 두레이 연결 탭 하단에도 같은 UI
+
+### 신규 기능 — Hard-delete 정책
+- **모든 delete 는 hard delete** — 위키 페이지/공유 스킬에서 두레이 405 미지원 시 `[DELETED] 원래제목` 으로 rename 하던 soft-delete 폴백 제거. DELETE 실패하면 "두레이에서 직접 삭제" 안내 에러를 사용자에게 노출
+- 기존 `[DELETED]` 접두사 페이지는 list 필터로 계속 가려져 backward-compat
+
+### 디자인 시스템 / 가독성
+- **v2 시맨틱 토큰 superset** — `elev/ring/wf/chart/avatar` 추가. 기존 토큰은 alias 로 유지
+- **라이트 모드 P0 가독성 패치** — text-primary/secondary/tertiary 대비 강화, 호버/포커스 톤 일관성
+- **다크 warmer 톤** — 차가운 push 를 줄이고 두레이 색과 자연스럽게 섞이도록
+- **두레이 태그·캘린더 color-mix tint** — 외부 색 신뢰 안티패턴 제거. 사용자가 정한 색을 brand 톤으로 mix 해 dark/light 양쪽에서 합리적
+- **캘린더 이벤트 폰트** — 10px → 11px, 슬롯 높이 18 → 20px
+
+### 문서 / 기반
+- **디자인 시스템 문서 패키지** — `docs/design-system/` (color-policy, theming, tokens, components/*)
+- **개발자 온보딩 문서** — `docs/dev/` (architecture, conventions, domains/{ai-routing, caldav, claude-chat, dooray-bot, mcp-skills, terminal})
+- **CI 게이트** — typecheck (`tsconfig.node.json` + `tsconfig.web.json`) + 커버리지 라인/스테이트먼트 70% / 함수 80% 강제
+- **CI Windows runner 추가** — Issue #11 windows claude spawn(`shell:true`) 검증 포함
+- **테스트 인프라** — Vitest + RTL 셋업. main 서비스(WatcherService/AIService/SocketModeClient/TerminalManager/GitService/Analytics/ClaudeChat/ConfigWatcher/DoorayClient/TaskService/SharedSkillsService/CTagPoller/AttachmentService/usage 파서/CalDAV 저장소/holidays/claude 세션), 디자인 시스템 컴포넌트, 렌더러 훅, view-level 통합, IPC 라우터 채널 정합, 멘션 파이프라인까지 700+ 테스트
+
+### 호환성 / 버그 수정
+- Issue #11 Windows claude spawn — `shell:true` 옵션
+- Issue #8 worktree 외부 삭제 방어 — auto prune, removeWorktree fallback
+- **typecheck 30건** 선재 오류 정리 (briefing 분류 누수 정정 type 좁히기, `'done'` deadcode 제거)
+- **CTagPoller 테스트 인터벌 동기화** — 3분으로 변경된 polling 주기에 맞춰 advanceTimersByTimeAsync 도 180s 로
+- **jsdom localStorage 폴리필** — Node 26 의 실험적 localStorage 가 플래그 없이 비활성이라 jsdom 25 가 빈 채로 두는 문제. `test/setup.ts` 에서 메모리 폴리필 주입해 useFontSettings/useTheme 류 23개 테스트 복구
+- **AISourceMeta.probes** — AI 가 호출한 도구를 type-safe 하게 노출
+- 브리핑 cross-category dedup + subject 원본 강제 + CC↔담당 누수 정정 (e80dc64)
+
 ## [1.4.1] - 안정화 + UX 개선
 
 ### 버그 수정

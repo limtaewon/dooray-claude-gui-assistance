@@ -69,7 +69,7 @@ function DooraySetup({ onConfigured }: DooraySetupProps): JSX.Element {
   }
 
   const openTokenPage = (): void => {
-    window.open('https://nhnent.dooray.com/member/apiKey', '_blank')
+    window.open('https://nhnent.dooray.com/setting/api/token', '_blank')
   }
 
   if (checking) {

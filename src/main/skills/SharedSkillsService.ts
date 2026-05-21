@@ -172,14 +172,22 @@ export class SharedSkillsService {
   }
 
   /**
-   * 공유 스킬 삭제.
-   * Dooray 위키 API는 DELETE를 지원하지 않아서 제목에 [DELETED] prefix를 붙여 소프트 삭제.
-   * 목록 조회 시 해당 prefix 항목은 필터링됨.
+   * 공유 스킬 hard delete (Clauday 정책: 모든 delete 는 진짜 삭제).
+   * 두레이 위키가 DELETE 를 거부하면 에러를 노출해 사용자가 직접 처리하도록 한다.
+   * (예전엔 [DELETED] prefix 로 soft-delete 했으나 v1.5 부터 제거.)
    */
   async delete(postId: string): Promise<void> {
-    const page = await this.wikiService.get(this.wikiId, postId)
-    const currentSubject = page.subject || page.title || 'untitled'
-    if (currentSubject.startsWith(DELETED_PREFIX)) return // 이미 삭제됨
-    await this.wikiService.renameTitle(this.wikiId, postId, `${DELETED_PREFIX}${currentSubject}`)
+    try {
+      await this.wikiService.deletePage(this.wikiId, postId)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg.includes('(403)') || msg.includes('(401)')) {
+        throw new Error('본인이 등록한 공유 스킬만 삭제할 수 있습니다.')
+      }
+      if (msg.includes('(405)')) {
+        throw new Error('두레이가 이 위키에 대한 DELETE 를 거부합니다. 두레이에서 직접 삭제해주세요.')
+      }
+      throw err
+    }
   }
 }

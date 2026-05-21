@@ -54,6 +54,25 @@ const BRIEFING_SYSTEM_PROMPT = `두레이 업무 브리핑을 생성하세요. 3
 - reason 도 데이터의 실제 값 인용: 마감일·workflowName·daysSinceCreated·subject 키워드 등.
 - "~필요할 가능성", "~수 있음" 같은 추측 표현은 데이터에서 직접 도출되는 경우만 사용. 근거가 없으면 mentioned 에 넣지 말 것.
 
+**에이전틱 행동** — 두레이 데이터만 정리하지 말고 외부 시스템 상태를 적극 fetch 하라:
+
+오늘 캘린더 일정/todo(특히 \`source=local\`) 가 외부 시스템 상태를 암시하면, 사용 가능한 도구로 **직접 grounding data 를 fetch** 한 뒤 recommendations 에 실제 항목·번호·URL 을 인용하라. 막연한 "확인하세요" 대신 구체적인 데이터로 답한다.
+
+사용 가능한 도구 (사용자 환경에 따라 일부는 동작 안 할 수 있음 — 실패하면 조용히 skip):
+- \`Bash\` — 사용자 셸 명령. 사용자가 "사용자 정의 규칙(스킬)" 섹션에서 권장한 명령을 우선 활용.
+- \`WebSearch\` / \`WebFetch\` — 외부 정보·뉴스·릴리스 노트 조회.
+- \`mcp__dooray-mcp__*\` — 두레이 태스크/위키/캘린더/멤버 추가 조회.
+
+**사용자 스킬을 항상 먼저 확인하라.** 아래 "사용자 정의 규칙" 섹션에 사용자가 정의한 도메인별 명령/패턴(예: PR 조회, 배포 상태, 사내 시스템 등)이 있으면 그것이 가장 신뢰할 수 있는 가이드다. 캘린더/todo 키워드와 사용자 스킬의 트리거를 매칭해서 도구 호출.
+
+**호출을 망설이지 말 것**:
+- "두레이 데이터에 이미 있으니 됐다" 는 잘못된 판단. 두레이와 외부 시스템(VCS, CI, 모니터링, 메신저 등)은 별개 — 둘 다 봐야 완전한 그림.
+- 도구 결과가 비거나 에러 → 조용히 skip, 다른 도구 시도. 실패 명령을 사용자에게 노출하지 않는다.
+- 같은 도구를 같은 인자로 두 번 호출 금지.
+- 결과가 있으면 recommendations 에 **URL 그대로 포함** (UI 가 자동으로 링크화함). 예: "리뷰 대기 PR 3건: https://... , https://... , https://..."
+- 호출 횟수 권장: 외부 트리거 있으면 **3~8회**, 트리거 없으면 0회.
+- **최종 응답은 반드시 아래 JSON 만**. 도구 호출 사이에 텍스트 설명 추가 금지.
+
 반드시 아래 JSON 형식으로만 응답하세요:
 {
   "greeting": "상황을 요약한 한줄 (예: 목요일 아침, 배치 알림이 쏟아지고 있습니다)",
@@ -62,7 +81,7 @@ const BRIEFING_SYSTEM_PROMPT = `두레이 업무 브리핑을 생성하세요. 3
   "mentioned": [{"taskId": "...", "subject": "...", "reason": "왜 내가 알아야 하는지"}],
   "stale": [{"taskId": "...", "subject": "...", "daysSinceCreated": 3}],
   "todayEvents": [{"subject": "...", "time": "14:00-15:00"}],
-  "recommendations": ["구체적 행동 제안 1", "구체적 행동 제안 2", "구체적 행동 제안 3"]
+  "recommendations": ["구체적 행동 제안 1 (도구로 확인한 실제 데이터 인용)", "구체적 행동 제안 2", "..."]
 }`
 
 /**
@@ -161,6 +180,13 @@ function buildArgs(prompt: string, opts: {
   webOnly?: boolean
   /** Read tool 추가 허용 — 이미지/파일 분석용 */
   allowRead?: boolean
+  /**
+   * 에이전틱 모드 — 캘린더 일정/태스크 컨텍스트를 보고 LLM 이 외부 grounding data 를
+   * 직접 fetch 해서 진짜 비서 같은 브리핑을 만들도록 광범위 도구 허용.
+   * 허용: Bash, WebSearch, WebFetch, Read + mcpServers (지정 시) 또는 기본 MCP 셋.
+   * 차단: Edit, Write, TodoWrite, Task (브리핑은 read-only 작업).
+   */
+  agentic?: boolean
 }): string[] {
   const args = [
     '-p', prompt,
@@ -182,6 +208,15 @@ function buildArgs(prompt: string, opts: {
   const allowed: string[] = []
   if (opts.noTools) {
     args.push('--disallowedTools', 'mcp__*,Bash,Edit,Write,Read,TodoWrite,WebFetch,WebSearch,Task')
+  } else if (opts.agentic) {
+    // 에이전틱 — 광범위 read-only 권한. 쓰기 도구는 명시적으로 차단.
+    allowed.push('Bash', 'WebSearch', 'WebFetch', 'Read')
+    if (opts.mcpServers && opts.mcpServers.length > 0) {
+      for (const name of opts.mcpServers) allowed.push(`mcp__${name}__*`)
+    } else {
+      allowed.push('mcp__dooray-mcp__*', 'mcp__mcp-clickhouse__*', 'mcp__mysql-nfi__*')
+    }
+    args.push('--disallowedTools', 'Edit,Write,TodoWrite,Task')
   } else if (opts.webOnly) {
     allowed.push('WebSearch', 'WebFetch')
   } else if (opts.mcpServers && opts.mcpServers.length > 0) {
@@ -189,7 +224,7 @@ function buildArgs(prompt: string, opts: {
   } else if (opts.allowMcp) {
     allowed.push('mcp__dooray-mcp__*', 'mcp__mcp-clickhouse__*', 'mcp__mysql-nfi__*')
   }
-  if (opts.allowRead && !opts.noTools) allowed.push('Read')
+  if (opts.allowRead && !opts.noTools && !opts.agentic) allowed.push('Read')
   if (allowed.length > 0) args.push('--allowedTools', allowed.join(','))
   return args
 }
@@ -616,9 +651,9 @@ ${skillBlock}`
       year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
     })
 
-    // closed/done 은 브리핑에 무의미 — 토큰 낭비 + LLM 혼선 (실제 데이터에서 50개 중 31개가 closed 인 케이스 발견).
+    // closed 는 브리핑에 무의미 — 토큰 낭비 + LLM 혼선 (실제 데이터에서 50개 중 31개가 closed 인 케이스 발견).
     // registered + working 만 남긴 뒤 50개 slice.
-    const activeTasks = tasks.filter((t) => t.workflowClass !== 'closed' && t.workflowClass !== 'done')
+    const activeTasks = tasks.filter((t) => t.workflowClass !== 'closed')
     const taskData = activeTasks.slice(0, 50).map((t) => ({
       id: t.id, subject: t.subject, status: t.workflowClass,
       workflowName: t.workflow?.name, project: t.projectCode,
@@ -683,17 +718,31 @@ ${JSON.stringify(eventData)}`
     const args = buildArgs(prompt, {
       model: this.pickModel('briefing', 'opus'),
       systemPrompt: this.buildSystemPrompt(BRIEFING_SYSTEM_PROMPT, 'briefing'),
-      // 위임 모드는 MCP 다중 호출 → 토큰 소비 ↑, 여유있게 설정
-      maxBudget: allEmpty ? '2.0' : '0.3',
-      effort: allEmpty ? 'medium' : 'low',
+      // 에이전틱 — 캘린더 일정 보고 LLM 이 사용자 스킬의 명령/MCP/web 으로 grounding data 직접 fetch.
+      // 도구 호출 라운드트립 고려해서 budget/effort 여유있게.
+      maxBudget: allEmpty ? '3.0' : '2.5',
+      effort: 'high',
       mcpServers,
-      allowMcp: false
+      agentic: true
     })
 
     this.emitProgress(requestId, 'thinking', `🤖 Claude (${this.pickModel('briefing', 'opus')}) 시작 중...`, started)
+    // 에이전틱 모드 — 도구 호출 라운드트립이 있어 5분까지 허용. allEmpty 는 그대로 무제한.
+    const probes: Array<{ name: string; summary?: string }> = []
     const result = await this.runClaudeStream(args, (chunk) => {
       this.emitProgress(requestId, 'streaming', '✨ 응답 생성 중...', started, chunk)
-    }, allEmpty ? { timeoutMs: null } : {})
+      // chunk 에서 도구 호출 라인 캡처 — runClaudeStream 이 "\n🔧 toolName {input}\n" 형식으로 emit
+      const match = chunk.match(/🔧 ([\w-]+(?:__[\w-]+)?)\s+(\{[^\n]*\})/)
+      if (match) {
+        const name = match[1]
+        const inputStr = match[2]
+        const summary = inputStr.length > 100 ? inputStr.slice(0, 97) + '...' : inputStr
+        // 같은 (name, summary) 중복 제거
+        if (!probes.some((p) => p.name === name && p.summary === summary)) {
+          probes.push({ name, summary })
+        }
+      }
+    }, allEmpty ? { timeoutMs: null } : { timeoutMs: 300000 })
     this.emitProgress(requestId, 'parsing', '결과 정리 중...', started)
 
     // JSON 추출 — 마크다운 코드블록(```json ... ```) 처리 및 에러 명확화
@@ -727,7 +776,7 @@ ${JSON.stringify(eventData)}`
       //  3) cross-category dedup — 한 taskId 가 여러 카테고리에 있으면 우선순위 (urgent > focus > stale > mentioned) 만 유지
       //  4) subject 는 두레이 원본으로 강제 교체 (LLM 이 emoji/prefix 붙이는 누수 방지)
       const myIds = new Set([
-        ...tasks.filter((t) => t.workflowClass !== 'closed' && t.workflowClass !== 'done').map((t) => t.id),
+        ...tasks.filter((t) => t.workflowClass !== 'closed').map((t) => t.id),
         ...(dueTodayTasks || []).map((t) => t.id)
       ])
       const ccIds = new Set((ccTasks || []).map((t) => t.id))
@@ -789,14 +838,19 @@ ${JSON.stringify(eventData)}`
       urgent = restoreSubject(urgent)
       focus = restoreSubject(focus)
       stale = restoreSubject(stale)
-      const mentionedFinal = restoreSubject(mentioned)
+      // mentioned 는 AIBriefing 의 strict shape 으로 좁히기 — reason 누락 시 기본 문구 채움
+      const mentionedFinal = restoreSubject(mentioned).map((m) => ({
+        taskId: m.taskId,
+        subject: m.subject,
+        reason: m.reason || '참조된 항목'
+      }))
 
       const safe: AIBriefing = {
         greeting: briefing.greeting || '오늘도 좋은 하루 보내세요!',
-        urgent,
-        focus,
+        urgent: urgent as AIBriefing['urgent'],
+        focus: focus as AIBriefing['focus'],
         mentioned: mentionedFinal,
-        stale,
+        stale: stale as AIBriefing['stale'],
         todayEvents: Array.isArray(briefing.todayEvents) ? briefing.todayEvents : [],
         recommendations: Array.isArray(briefing.recommendations) ? briefing.recommendations : [],
         sourceMeta: {
@@ -806,7 +860,8 @@ ${JSON.stringify(eventData)}`
           eventCount: events.length,
           eventRange: `${fmtMD(startOfDay)}~${fmtMD(endOfWeek)}`,
           collectedAt: new Date(started).toISOString(),
-          delegated: !!delegated
+          delegated: !!delegated,
+          probes: probes.length > 0 ? probes : undefined
         }
       }
       this.emitProgress(requestId, 'done', '완료', started)
@@ -859,18 +914,40 @@ ${JSON.stringify(eventData)}`
 구체성 가드:
 - "확인", "검토", "점검", "재확인" 같은 막연한 동사 단독 사용 금지
 - 각 항목은 [동사 + 대상 + (가능하면) 일시/상태] 형태
-- 진행중 항목은 현재 워크플로 상태/마감일을 본문에 인용`,
+- 진행중 항목은 현재 워크플로 상태/마감일을 본문에 인용
+
+**에이전틱 행동** — 두레이 데이터만 정리하지 말고 외부 시스템 상태를 적극 fetch 하라:
+- 보고서 기간 안의 일정/태스크가 외부 시스템(PR, CI, 배포, 모니터링, 메신저 등) 상태를 암시하면 사용 가능한 도구로 직접 grounding data 를 가져와 본문에 인용한다.
+- 사용 가능한 도구: \`Bash\` (사용자 셸 명령), \`WebSearch\` / \`WebFetch\`, \`mcp__dooray-mcp__*\`, 기타 활성 MCP.
+- 사용자가 "사용자 정의 규칙(스킬)" 섹션에서 지시한 명령/패턴이 있으면 그것을 우선 활용.
+- 결과 URL 은 마크다운 링크 형태로 본문에 그대로 포함. UI 가 자동 렌더링한다.
+- "이미 두레이에 있으니 됐다"는 잘못된 판단 — 외부 시스템은 별개. 둘 다 봐야 완전한 그림.
+- 도구 결과가 비거나 에러여도 다른 카테고리는 계속 작성. 실패 명령을 사용자에게 노출하지 않는다.
+- 같은 도구를 같은 인자로 두 번 호출 금지.`,
         'report'
       ),
-      maxBudget: allEmpty ? '2.0' : '0.3',
-      effort: allEmpty ? 'medium' : 'low',
-      mcpServers
+      // 에이전틱 — Bash + Web + MCP 광범위 허용. 보고서는 깊이 있는 분석이라 budget/effort 여유있게.
+      maxBudget: allEmpty ? '3.5' : '3.0',
+      effort: 'high',
+      mcpServers,
+      agentic: true
     })
 
     this.emitProgress(requestId, 'thinking', `${period} 보고서 작성 중...`, started)
+    const probes: Array<{ name: string; summary?: string }> = []
     const result = await this.runClaudeStream(args, (chunk) => {
       this.emitProgress(requestId, 'streaming', `${period} 보고서 작성 중...`, started, chunk)
-    }, allEmpty ? { timeoutMs: null } : {})
+      // 도구 호출 라인 캡처 — 브리핑과 동일 패턴
+      const match = chunk.match(/🔧 ([\w-]+(?:__[\w-]+)?)\s+(\{[^\n]*\})/)
+      if (match) {
+        const name = match[1]
+        const inputStr = match[2]
+        const summary = inputStr.length > 100 ? inputStr.slice(0, 97) + '...' : inputStr
+        if (!probes.some((p) => p.name === name && p.summary === summary)) {
+          probes.push({ name, summary })
+        }
+      }
+    }, allEmpty ? { timeoutMs: null } : { timeoutMs: 300000 })
     this.emitProgress(requestId, 'done', '완료', started)
 
     return {
@@ -882,7 +959,8 @@ ${JSON.stringify(eventData)}`
         ccTaskCount: 0,
         dueTodayCount: 0,
         eventCount: events.length,
-        collectedAt: new Date(started).toISOString()
+        collectedAt: new Date(started).toISOString(),
+        probes: probes.length > 0 ? probes : undefined
       }
     }
   }

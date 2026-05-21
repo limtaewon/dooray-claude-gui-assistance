@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Check, Cpu, Key, Eye, EyeOff, ExternalLink, SlidersHorizontal, LogOut, BarChart2, Moon, Sun, Type, CalendarDays, Loader2, AlertCircle } from 'lucide-react'
+import { Check, Cpu, Key, Eye, EyeOff, ExternalLink, SlidersHorizontal, LogOut, BarChart2, Moon, Sun, Type, CalendarDays, Loader2, AlertCircle, Zap, X, ChevronUp, ChevronDown, GripVertical, RotateCcw } from 'lucide-react'
+import { CUSTOMIZABLE_NAV_ITEMS, DEFAULT_SIDEBAR_PREFS, type SidebarPrefs, type SidebarView } from '../Layout/Sidebar'
 import type { AIModelConfig, AIModelName } from '../../../../shared/types/ai'
 import UsageInsights from './UsageInsights'
 import { useTheme } from '../../hooks/useTheme'
@@ -303,6 +304,147 @@ function DoorayTokenSettings(): JSX.Element {
         <button onClick={handleSave} disabled={saving || !newToken.trim()}
           className="mt-2 px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-xs font-medium hover:bg-clauday-blue/80 disabled:opacity-50">
           {saving ? '검증 중...' : '저장 및 검증'}
+        </button>
+      </div>
+
+      {/* Socket Mode 실시간 메시지 수신 — Bot WebSocket */}
+      <div className="mt-6 pt-6 border-t border-bg-border">
+        <SocketModeSettings hasApiToken={hasToken === true} />
+      </div>
+    </div>
+  )
+}
+
+/** =========== Socket Mode (실시간 WebSocket 메시지 수신) =========== */
+interface SocketBotStatus { state: string; lastError: string | null; ready: boolean }
+function SocketModeSettings({ hasApiToken }: { hasApiToken: boolean }): JSX.Element {
+  const [domain, setDomain] = useState('')
+  const [domainDraft, setDomainDraft] = useState('')
+  const [status, setStatus] = useState<SocketBotStatus | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    let unsub: (() => void) | undefined
+    void (async () => {
+      try {
+        const [cfg, st] = await Promise.all([
+          window.api.bot.getConfig().catch(() => ({ domain: '' })),
+          window.api.bot.getStatus().catch(() => ({ state: 'DISCONNECTED', lastError: null, ready: false }))
+        ])
+        setDomain(cfg.domain || '')
+        setDomainDraft(cfg.domain || '')
+        setStatus(st)
+      } catch (err) { console.warn('[SocketModeSettings] init 실패:', err) }
+    })()
+    try { unsub = window.api.bot.onStateUpdate((s) => setStatus(s)) }
+    catch (err) { console.warn('[SocketModeSettings] onStateUpdate 등록 실패:', err) }
+    return () => { if (unsub) unsub() }
+  }, [])
+
+  const save = async (): Promise<void> => {
+    setSaving(true)
+    try {
+      const next = await window.api.bot.setConfig({ domain: domainDraft.trim() })
+      setStatus(next)
+      setDomain(domainDraft.trim())
+    } finally { setSaving(false) }
+  }
+
+  const clear = async (): Promise<void> => {
+    if (!window.confirm('Socket Mode 를 비활성화할까요? 다시 폴링 방식으로 메시지를 수신합니다.')) return
+    setSaving(true)
+    try {
+      await window.api.bot.setConfig({ domain: '' })
+      setDomain('')
+      setDomainDraft('')
+      setStatus(await window.api.bot.getStatus())
+    } finally { setSaving(false) }
+  }
+
+  const state = status?.state || 'DISCONNECTED'
+  const isActive = state === 'ACTIVE'
+  const isConnecting = state === 'CONNECTING'
+  const isStandby = state === 'STANDBY'
+  const stateLabel = isActive ? 'ACTIVE'
+    : isConnecting ? 'CONNECTING'
+    : isStandby ? 'STANDBY'
+    : !domain ? '폴링만'
+    : '연결 안 됨'
+  const stateDesc = isActive ? '실시간 push 수신 중'
+    : isConnecting ? '연결 중...'
+    : isStandby ? '다른 세션 활성 — 대기 중'
+    : !domain ? '도메인 설정 시 실시간 모드'
+    : (status?.lastError || '에러')
+
+  return (
+    <div>
+      <div className="mb-4 flex items-center gap-2">
+        <Zap size={14} className="text-clauday-orange" />
+        <div>
+          <h3 className="text-sm font-semibold text-text-primary">Socket Mode (실시간 메시지 수신)</h3>
+          <p className="text-[10px] text-text-tertiary mt-0.5">
+            두레이 도메인을 입력하면 WebSocket으로 메시지를 실시간 수신합니다 (폴링 누락 0). API 토큰은 그대로 재사용해요.
+          </p>
+        </div>
+      </div>
+
+      {!hasApiToken && (
+        <div className="p-2 mb-3 rounded text-[11px] flex items-start gap-1.5"
+          style={{ background: 'var(--c-yellow-bg)', border: '1px solid color-mix(in oklab, var(--c-yellow-fg) 30%, transparent)', color: 'var(--c-yellow-fg)' }}>
+          <AlertCircle size={12} className="flex-none mt-0.5" />
+          <span>먼저 위에서 두레이 API 토큰을 등록하세요.</span>
+        </div>
+      )}
+
+      <div className="p-4 rounded-xl bg-bg-surface border border-bg-border mb-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-text-primary font-medium">현재 상태</p>
+            <p className={`text-[10px] mt-0.5 flex items-center gap-1.5 ${
+              isActive ? 'text-emerald-400'
+                : isConnecting ? 'text-clauday-blue'
+                : isStandby ? 'text-amber-400'
+                : !domain ? 'text-text-tertiary'
+                : 'text-red-400'
+            }`}>
+              {isActive && <Check size={10} />}
+              {isConnecting && <Loader2 size={10} className="animate-spin" />}
+              {(isStandby || (!isActive && !isConnecting && domain)) && <AlertCircle size={10} />}
+              <span className="font-semibold">{stateLabel}</span>
+              <span className="text-text-tertiary">· {stateDesc}</span>
+            </p>
+          </div>
+          {domain && (
+            <button onClick={clear} disabled={saving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 text-[11px] hover:bg-red-500/20">
+              <X size={11} /> 비활성화
+            </button>
+          )}
+        </div>
+        {status?.lastError && (
+          <div className="mt-2 p-2 rounded text-[10px] text-red-400"
+            style={{ background: 'var(--c-red-bg)', border: '1px solid color-mix(in oklab, var(--c-red-fg) 25%, transparent)' }}>
+            {status.lastError}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <label className="text-[11px] font-medium text-text-secondary block mb-1.5">두레이 도메인</label>
+        <input
+          type="text"
+          value={domainDraft}
+          onChange={(e) => setDomainDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing || e.keyCode === 229) return
+            if (e.key === 'Enter') { e.preventDefault(); void save() }
+          }}
+          placeholder="company.dooray.com"
+          className="w-full px-3 py-2 bg-bg-surface border border-bg-border rounded-lg text-xs font-mono text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-orange"
+        />
+        <button onClick={save} disabled={saving || !hasApiToken || !domainDraft.trim()}
+          className="mt-2 px-4 py-1.5 rounded-lg bg-clauday-orange text-white text-xs font-medium hover:bg-clauday-orange/80 disabled:opacity-50">
+          {saving ? '연결 중...' : domain ? '재연결' : '연결'}
         </button>
       </div>
     </div>
@@ -663,6 +805,15 @@ function AppBehaviorSettings(): JSX.Element {
         </div>
       </div>
 
+      {/* 사이드바 커스텀 */}
+      <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden mt-3">
+        <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30">
+          <span className="text-xs font-medium text-text-primary">사이드바 항목</span>
+          <p className="text-[10px] text-text-tertiary mt-0.5">순서를 바꾸거나 자주 안 쓰는 항목을 숨길 수 있습니다. 설정/매뉴얼은 항상 노출됩니다.</p>
+        </div>
+        <SidebarPrefsSection />
+      </div>
+
       {/* 알림 */}
       <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden mt-3">
         <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30">
@@ -676,6 +827,112 @@ function AppBehaviorSettings(): JSX.Element {
       <p className="text-[10px] text-text-tertiary mt-3">
         💡 <strong className="text-text-secondary">AI 스킬 관리</strong>는 각 AI 기능 화면 우측의 <span className="text-amber-400 font-medium">스킬</span> 버튼에서 바로 할 수 있습니다.
       </p>
+    </div>
+  )
+}
+
+/**
+ * 사이드바 항목 순서/노출 커스텀.
+ * - 저장 형식: `{ order: View[], hidden: View[] }` (settings 'sidebarPrefs')
+ * - 변경 즉시 sidebar 에 반영 — `sidebar-prefs-changed` window 이벤트 dispatch.
+ */
+function SidebarPrefsSection(): JSX.Element {
+  const [prefs, setPrefs] = useState<SidebarPrefs | null>(null)
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    window.api.settings.get('sidebarPrefs').then((saved) => {
+      if (saved && typeof saved === 'object') setPrefs(saved as SidebarPrefs)
+      else setPrefs(null)
+      setLoaded(true)
+    }).catch(() => { setPrefs(null); setLoaded(true) })
+  }, [])
+
+  // 카탈로그 + 저장된 prefs 머지해서 표시할 항목 순서 결정 (resolveOrderedItems 와 같은 로직, hidden 까지 포함)
+  const itemsAll = (() => {
+    const map = new Map(CUSTOMIZABLE_NAV_ITEMS.map((i) => [i.view, i]))
+    const seen = new Set<SidebarView>()
+    const ordered: typeof CUSTOMIZABLE_NAV_ITEMS = []
+    const order = prefs?.order || DEFAULT_SIDEBAR_PREFS.order
+    for (const view of order) {
+      const item = map.get(view)
+      if (item && !seen.has(view)) { ordered.push(item); seen.add(view) }
+    }
+    for (const item of CUSTOMIZABLE_NAV_ITEMS) if (!seen.has(item.view)) ordered.push(item)
+    return ordered
+  })()
+  const hidden = new Set(prefs?.hidden || [])
+
+  const persist = async (next: SidebarPrefs): Promise<void> => {
+    setPrefs(next)
+    await window.api.settings.set('sidebarPrefs', next)
+    window.dispatchEvent(new CustomEvent('sidebar-prefs-changed'))
+  }
+
+  const move = (view: SidebarView, dir: -1 | 1): void => {
+    const order = itemsAll.map((i) => i.view)
+    const idx = order.indexOf(view)
+    const j = idx + dir
+    if (idx < 0 || j < 0 || j >= order.length) return
+    ;[order[idx], order[j]] = [order[j], order[idx]]
+    void persist({ order, hidden: Array.from(hidden) })
+  }
+
+  const toggleHidden = (view: SidebarView): void => {
+    const next = new Set(hidden)
+    if (next.has(view)) next.delete(view); else next.add(view)
+    void persist({ order: itemsAll.map((i) => i.view), hidden: Array.from(next) })
+  }
+
+  const resetAll = (): void => {
+    void persist({ ...DEFAULT_SIDEBAR_PREFS })
+  }
+
+  if (!loaded) {
+    return <div className="p-3 text-[10px] text-text-tertiary">불러오는 중...</div>
+  }
+
+  return (
+    <div className="p-2">
+      <div className="space-y-0.5">
+        {itemsAll.map((item, idx) => {
+          const Icon = item.icon
+          const isHidden = hidden.has(item.view)
+          const isFirst = idx === 0
+          const isLast = idx === itemsAll.length - 1
+          return (
+            <div key={item.view}
+              className={`flex items-center gap-2 px-2 py-1.5 rounded-lg ${isHidden ? 'opacity-50' : 'hover:bg-bg-surface-hover'}`}>
+              <GripVertical size={12} className="text-text-tertiary flex-none" />
+              <Icon size={14} className={isHidden ? 'text-text-tertiary' : 'text-text-secondary'} />
+              <span className={`flex-1 text-xs ${isHidden ? 'text-text-tertiary line-through' : 'text-text-primary'}`}>
+                {item.label}
+              </span>
+              <button onClick={() => move(item.view, -1)} disabled={isFirst}
+                aria-label="위로"
+                className="p-1 rounded hover:bg-bg-primary/50 text-text-tertiary hover:text-text-primary disabled:opacity-30 disabled:hover:bg-transparent">
+                <ChevronUp size={12} />
+              </button>
+              <button onClick={() => move(item.view, 1)} disabled={isLast}
+                aria-label="아래로"
+                className="p-1 rounded hover:bg-bg-primary/50 text-text-tertiary hover:text-text-primary disabled:opacity-30 disabled:hover:bg-transparent">
+                <ChevronDown size={12} />
+              </button>
+              <label className="flex items-center gap-1 cursor-pointer ml-1 text-[10px] text-text-tertiary hover:text-text-secondary">
+                <input type="checkbox" checked={!isHidden} onChange={() => toggleHidden(item.view)}
+                  className="accent-clauday-blue" />
+                <span>{isHidden ? '숨김' : '표시'}</span>
+              </label>
+            </div>
+          )
+        })}
+      </div>
+      <div className="mt-2 pt-2 border-t border-bg-border/50 flex justify-end">
+        <button onClick={resetAll}
+          className="flex items-center gap-1.5 text-[10px] text-text-tertiary hover:text-text-primary px-2 py-1 rounded hover:bg-bg-surface-hover">
+          <RotateCcw size={10} /> 기본값으로 초기화
+        </button>
+      </div>
     </div>
   )
 }

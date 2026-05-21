@@ -154,7 +154,7 @@ describe('WikiStorageService.upload', () => {
   })
 })
 
-describe('WikiStorageService.softDelete', () => {
+describe('WikiStorageService.softDelete (hard-delete only, v1.5+)', () => {
   it('hard delete 성공 시 종료', async () => {
     wiki.deletePage.mockResolvedValue(undefined)
     await svc.softDelete('w1', 'p1')
@@ -166,17 +166,9 @@ describe('WikiStorageService.softDelete', () => {
     await expect(svc.softDelete('w1', 'p1')).rejects.toThrow(/본인이 작성/)
   })
 
-  it('405 등 미지원이면 [DELETED] 접두사로 soft delete 폴백', async () => {
+  it('405 등 미지원도 더 이상 soft delete 폴백 안 함 — 그대로 에러', async () => {
     wiki.deletePage.mockRejectedValue(new Error('Dooray API 오류 (405): method not allowed'))
-    wiki.get.mockResolvedValue({ subject: '원래 제목', body: '' })
-    await svc.softDelete('w1', 'p1')
-    expect(wiki.renameTitle).toHaveBeenCalledWith('w1', 'p1', '[DELETED] 원래 제목')
-  })
-
-  it('이미 [DELETED] 면 다시 안 붙임', async () => {
-    wiki.deletePage.mockRejectedValue(new Error('Dooray API 오류 (405)'))
-    wiki.get.mockResolvedValue({ subject: '[DELETED] x', body: '' })
-    await svc.softDelete('w1', 'p1')
+    await expect(svc.softDelete('w1', 'p1')).rejects.toThrow(/DELETE 를 지원하지 않/)
     expect(wiki.renameTitle).not.toHaveBeenCalled()
   })
 })

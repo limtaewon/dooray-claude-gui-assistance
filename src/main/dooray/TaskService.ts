@@ -597,13 +597,14 @@ export class TaskService {
     return Array.from(map.entries()).map(([id, v]) => ({ id, name: v.name, color: v.color }))
   }
 
-  /** 태스크(커뮤니티 게시글) 생성 */
+  /** 태스크(커뮤니티 게시글) 생성. templateId 가 있으면 두레이가 해당 템플릿 lineage 로 저장한다 (UI 에서 "템플릿 적용됨" 표시). */
   async createTask(params: {
     projectId: string
     subject: string
     body: string
     assigneeIds?: string[] // 기본: 자기 자신
     tagIds?: string[]      // 일부 프로젝트는 태그 필수 — 호출자가 선택해 전달
+    templateId?: string    // 빠른 태스크에서 템플릿을 골라 시작한 경우 그 id 를 함께 기록
   }): Promise<{ id: string }> {
     const myId = await this.getMyMemberId()
     const to = (params.assigneeIds && params.assigneeIds.length > 0
@@ -619,6 +620,9 @@ export class TaskService {
     }
     if (params.tagIds && params.tagIds.length > 0) {
       payload.tagIdList = params.tagIds
+    }
+    if (params.templateId) {
+      payload.templateId = params.templateId
     }
 
     const res = await this.client.request<DoorayItemResponse<{ id: string }>>(

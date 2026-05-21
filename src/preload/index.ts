@@ -199,8 +199,8 @@ const api = {
         ipcRenderer.on(IPC_CHANNELS.DOORAY_TASKS_PARTIAL, handler)
         return () => ipcRenderer.removeListener(IPC_CHANNELS.DOORAY_TASKS_PARTIAL, handler)
       },
-      /** 태스크 생성 (커뮤니티 글쓰기) */
-      create: (params: { projectId: string; subject: string; body: string; assigneeIds?: string[]; tagIds?: string[] }): Promise<{ id: string }> =>
+      /** 태스크 생성 (커뮤니티 글쓰기). templateId 전달 시 두레이가 해당 템플릿 lineage 로 글을 기록. */
+      create: (params: { projectId: string; subject: string; body: string; assigneeIds?: string[]; tagIds?: string[]; templateId?: string }): Promise<{ id: string }> =>
         ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_CREATE, params),
       /** 프로젝트 태그 목록 (빠른 태스크 생성 시 태그 선택용) */
       tags: (projectId: string): Promise<Array<{ id: string; name: string; color: string }>> =>

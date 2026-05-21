@@ -385,10 +385,13 @@ function CalendarAssistant(): JSX.Element {
       // List 뷰도 unified API 로 단일화 (#9 후속). dooray.calendar.events 는 이미
       // main 의 getEventsLegacy 가 unified 결과를 어댑트한 wrapper 라 호출하면 중복 데이터.
       // 직접 unified 만 호출하고 DoorayCalendarEvent shape 으로 변환.
-      const unified = await window.api.calendar.listEvents({
-        from: startOfDay.toISOString(),
-        to: endOfWeek.toISOString()
-      })
+      // 캘린더 이름은 listCalendars 결과에서 lookup — 같이 fetch 해서 매 이벤트에 실제 이름 부여.
+      const [unified, calMeta] = await Promise.all([
+        window.api.calendar.listEvents({ from: startOfDay.toISOString(), to: endOfWeek.toISOString() }),
+        window.api.calendar.listCalendars().catch(() => [] as UnifiedCalendar[])
+      ])
+      const nameById = new Map<string, string>()
+      for (const c of (calMeta || [])) nameById.set(c.id, c.name)
       const merged: DoorayCalendarEvent[] = (unified || []).map((u) => ({
         id: `${u.source}:${u.id}`,
         subject: u.summary,
@@ -399,7 +402,10 @@ function CalendarAssistant(): JSX.Element {
         wholeDayFlag: u.allDay,
         calendar: {
           id: u.calendarId,
-          name: u.source === 'local' ? '내 일정' : u.source === 'holiday' ? '공휴일' : '두레이'
+          name: u.source === 'local'
+            ? (nameById.get(u.calendarId) || '내 일정')
+            : u.source === 'holiday' ? '공휴일'
+            : (nameById.get(u.calendarId) || '캘린더')
         }
       }))
       console.log('[CalendarAssistant] loaded', merged.length, 'events from unified')

@@ -30,7 +30,7 @@ import { colorStyleFor as sharedColorStyleFor, type ColorStyle } from './calenda
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 const MIN_VISIBLE_PER_CELL = 1
 const FALLBACK_VISIBLE_PER_CELL = 3
-const SLOT_H = 18
+const SLOT_H = 20
 const SLOT_GAP = 2
 const DATE_AREA_H = 28
 const MORE_LINE_H = 22
@@ -773,7 +773,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                         className="row-start-1 px-[2px]">
                         <div
                           style={{ height: SLOT_H, backgroundColor: c.barBg, color: c.barText }}
-                          className={`flex items-center px-1.5 text-[10px] leading-none font-medium ring-2 ring-clauday-blue ${rL} ${rR}`}>
+                          className={`flex items-center px-1.5 text-[11px] leading-none font-medium ring-2 ring-clauday-blue ${rL} ${rR}`}>
                           <span className="truncate">{barDrag.event.summary}</span>
                         </div>
                       </div>
@@ -818,7 +818,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                             if (!barDragMovedRef.current && !barDragSaving) setSelected(seg.event)
                           }}
                           style={{ ...barStyle, opacity: isBeingDragged ? 0.35 : 1 }}
-                          className={`relative flex items-center gap-1 px-1.5 truncate text-[10px] leading-none font-medium hover:brightness-110 ${radiusL} ${radiusR} ${draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}>
+                          className={`relative flex items-center gap-1 px-1.5 truncate text-[11px] leading-none font-medium hover:brightness-110 ${radiusL} ${radiusR} ${draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}>
                           {/* 좌측 리사이즈 핸들 — 막대의 실제 시작 segment 에서만 노출 */}
                           {draggable && seg.startsHere && (
                             <span

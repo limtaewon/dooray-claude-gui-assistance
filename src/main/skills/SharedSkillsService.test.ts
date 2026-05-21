@@ -139,16 +139,22 @@ describe('SharedSkillsService.download', () => {
   })
 })
 
-describe('SharedSkillsService.delete', () => {
-  it('[DELETED] prefix 로 soft-delete', async () => {
-    wiki.get.mockResolvedValue({ id: 'p1', subject: '원래 제목', creator: {} })
+describe('SharedSkillsService.delete (hard-delete only, v1.5+)', () => {
+  it('hard delete 호출', async () => {
+    wiki.deletePage.mockResolvedValue(undefined)
     await svc.delete('p1')
-    expect(wiki.renameTitle).toHaveBeenCalledWith('wiki-1', 'p1', '[DELETED] 원래 제목')
+    expect(wiki.deletePage).toHaveBeenCalledWith('wiki-1', 'p1')
+    expect(wiki.renameTitle).not.toHaveBeenCalled()
   })
 
-  it('이미 [DELETED] 면 no-op', async () => {
-    wiki.get.mockResolvedValue({ id: 'p1', subject: '[DELETED] gone', creator: {} })
-    await svc.delete('p1')
+  it('403 권한 오류는 사용자 친화적 메시지', async () => {
+    wiki.deletePage.mockRejectedValue(new Error('Dooray API 오류 (403)'))
+    await expect(svc.delete('p1')).rejects.toThrow(/본인이 등록/)
+  })
+
+  it('405 미지원도 더 이상 soft delete 폴백 안 함 — 그대로 에러', async () => {
+    wiki.deletePage.mockRejectedValue(new Error('Dooray API 오류 (405)'))
+    await expect(svc.delete('p1')).rejects.toThrow(/DELETE 를 거부/)
     expect(wiki.renameTitle).not.toHaveBeenCalled()
   })
 })

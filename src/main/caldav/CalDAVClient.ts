@@ -33,6 +33,40 @@ function pad(n: number): string { return String(n).padStart(2, '0') }
 
 type DAVClient = Awaited<ReturnType<typeof createDAVClient>>
 
+/**
+ * tsdav 가 캘린더의 displayName 을 string 또는 {_text}/{_cdata}/{value} 형식 객체로 줄 수 있음.
+ * 두레이 응답에서 displayName 자체가 비어있거나 동일 문자열("두레이" 등) 인 경우도 있어
+ * URL 마지막 segment 를 폴백 라벨로 사용해 캘린더를 구분 가능하게 만든다.
+ */
+function extractDisplayName(raw: unknown, url: string): string {
+  // 1) 평문 string
+  if (typeof raw === 'string') {
+    const s = raw.trim()
+    if (s && s !== '두레이' && s !== '캘린더') return s
+  }
+  // 2) tsdav 가 XML 파서 결과를 객체로 감싼 경우
+  if (raw && typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>
+    for (const key of ['_text', '_cdata', 'value', '#text', '_']) {
+      const v = obj[key]
+      if (typeof v === 'string' && v.trim()) {
+        const s = v.trim()
+        if (s !== '두레이' && s !== '캘린더') return s
+      }
+    }
+  }
+  // 3) URL 마지막 segment — `.../calendars/<user>/<calId>/` 에서 calId
+  try {
+    const u = new URL(url)
+    const segs = u.pathname.split('/').filter(Boolean)
+    const last = segs[segs.length - 1]
+    if (last) return decodeURIComponent(last)
+  } catch { /* invalid url, fallthrough */ }
+  // 4) displayName 이 있긴 한데 "두레이" 같은 중복명이면 그대로라도 반환 (구분 못해도 라벨은 있음)
+  if (typeof raw === 'string' && raw.trim()) return raw.trim()
+  return '캘린더'
+}
+
 // tsdav v2 의 fetchCalendarObjects 가 두레이 응답의 일부 필드에서 startsWith 호출하다
 // 깨지는 호환성 문제 → REPORT 요청은 직접 HTTP 로 처리.
 function basicAuthHeader(): string {
@@ -211,7 +245,7 @@ export class CalDAVClient {
       const tz = (cal as Record<string, unknown>).timezone
       return {
         url: cal.url,
-        displayName: typeof dn === 'string' ? dn : String(dn ?? '캘린더'),
+        displayName: extractDisplayName(dn, cal.url),
         description: typeof desc === 'string' ? desc : undefined,
         color: typeof color === 'string' ? color : undefined,
         timezone: typeof tz === 'string' ? tz : undefined
@@ -516,7 +550,7 @@ export class CalDAVClient {
       const dn = (cal as Record<string, unknown>).displayName
       const color = (cal as Record<string, unknown>).calendarColor
       CalendarObjectsStore.setCalendarMeta(cal.url, {
-        displayName: typeof dn === 'string' ? dn : String(dn ?? '캘린더'),
+        displayName: extractDisplayName(dn, cal.url),
         color: typeof color === 'string' ? color : undefined
       })
     }
@@ -530,7 +564,7 @@ export class CalDAVClient {
         const cal = queue.shift()
         if (!cal) return
         const dn = (cal as Record<string, unknown>).displayName
-        const calName = typeof dn === 'string' ? dn : String(dn ?? '캘린더')
+        const calName = extractDisplayName(dn, cal.url)
         let count = 0
         try {
           count = await this.fullSyncCalendar(cal.url)
@@ -615,7 +649,7 @@ export class CalDAVClient {
       const dn = (cal as Record<string, unknown>).displayName
       const color = (cal as Record<string, unknown>).calendarColor
       CalendarObjectsStore.setCalendarMeta(cal.url, {
-        displayName: typeof dn === 'string' ? dn : String(dn ?? '캘린더'),
+        displayName: extractDisplayName(dn, cal.url),
         color: typeof color === 'string' ? color : undefined
       })
     }

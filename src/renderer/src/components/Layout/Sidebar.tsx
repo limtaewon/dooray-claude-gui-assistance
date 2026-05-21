@@ -1,51 +1,72 @@
 import { useEffect, useState } from 'react'
 import { Server, Sparkles, BarChart3, Calendar, Terminal, BookOpen, MessageSquare, GitBranch, Settings, Users, Radar, Lightbulb, Bot } from 'lucide-react'
 
-type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent'
+export type SidebarView = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent'
+// 호환성 유지를 위해 기존 별칭도 export
+export type View = SidebarView
 
 interface SidebarProps {
   activeView: View
   onViewChange: (view: View) => void
 }
 
-interface NavItem { view: View; icon: typeof Server; label: string }
+export interface SidebarNavItem { view: View; icon: typeof Server; label: string }
 
-const NAV_GROUPS: { key: string; label: string; items: NavItem[] }[] = [
-  {
-    key: 'work',
-    label: '작업 영역',
-    items: [
-      { view: 'dooray', icon: Calendar, label: '두레이' },
-      { view: 'monitoring', icon: Radar, label: '모니터링' },
-      { view: 'agent', icon: Bot, label: '에이전트' },
-      { view: 'terminal', icon: Terminal, label: '터미널' },
-      { view: 'git', icon: GitBranch, label: '브랜치 작업' },
-      { view: 'community', icon: Users, label: '커뮤니티' }
-    ]
-  },
-  {
-    key: 'tools',
-    label: '도구',
-    items: [
-      { view: 'mcp', icon: Server, label: 'MCP 서버' },
-      { view: 'skills', icon: Sparkles, label: 'Claude 스킬' },
-      { view: 'ai-recommend', icon: Lightbulb, label: 'AI 추천' },
-      { view: 'sessions', icon: MessageSquare, label: 'Claude 채팅' },
-      { view: 'usage', icon: BarChart3, label: '사용량' }
-    ]
-  }
+/** 사용자가 순서/노출을 커스텀할 수 있는 항목 전체 (settings/manual 은 standalone, 항상 노출/고정). */
+export const CUSTOMIZABLE_NAV_ITEMS: SidebarNavItem[] = [
+  { view: 'dooray', icon: Calendar, label: '두레이' },
+  { view: 'monitoring', icon: Radar, label: '모니터링' },
+  { view: 'agent', icon: Bot, label: '에이전트' },
+  { view: 'terminal', icon: Terminal, label: '터미널' },
+  { view: 'git', icon: GitBranch, label: '브랜치 작업' },
+  { view: 'community', icon: Users, label: '커뮤니티' },
+  { view: 'mcp', icon: Server, label: 'MCP 서버' },
+  { view: 'skills', icon: Sparkles, label: 'Claude 스킬' },
+  { view: 'ai-recommend', icon: Lightbulb, label: 'AI 추천' },
+  { view: 'sessions', icon: MessageSquare, label: 'Claude 채팅' },
+  { view: 'usage', icon: BarChart3, label: '사용량' }
 ]
 
-const STANDALONE_ITEMS: NavItem[] = [
+const STANDALONE_ITEMS: SidebarNavItem[] = [
   { view: 'manual', icon: BookOpen, label: '매뉴얼' },
   { view: 'settings', icon: Settings, label: '설정' }
 ]
+
+export interface SidebarPrefs {
+  /** 사용자 선호 순서. 새로 추가된 view 는 자동으로 뒤에 append. */
+  order: View[]
+  /** 숨김 처리된 view 목록. */
+  hidden: View[]
+}
+
+export const DEFAULT_SIDEBAR_PREFS: SidebarPrefs = {
+  order: CUSTOMIZABLE_NAV_ITEMS.map((i) => i.view),
+  hidden: []
+}
+
+/** 저장된 prefs 와 현재 카탈로그를 머지 — 신규 항목은 뒤에 append, 사라진 항목은 제거. */
+function resolveOrderedItems(prefs: SidebarPrefs | null): SidebarNavItem[] {
+  const map = new Map(CUSTOMIZABLE_NAV_ITEMS.map((i) => [i.view, i]))
+  const seen = new Set<View>()
+  const ordered: SidebarNavItem[] = []
+  const order = prefs?.order || DEFAULT_SIDEBAR_PREFS.order
+  const hidden = new Set(prefs?.hidden || [])
+  for (const view of order) {
+    const item = map.get(view)
+    if (item && !seen.has(view)) { ordered.push(item); seen.add(view) }
+  }
+  // 새로 추가된 view (사용자 prefs 에 없음) 는 카탈로그 순서대로 뒤에
+  for (const item of CUSTOMIZABLE_NAV_ITEMS) {
+    if (!seen.has(item.view)) ordered.push(item)
+  }
+  return ordered.filter((i) => !hidden.has(i.view))
+}
 
 /** Design System v1 Sidebar (56px). 36×36 버튼, 20px 아이콘, 활성 상태 blue 그라디언트.
  *  불투명도 낮은 분리선으로 그룹 구분. */
 function NavButton({
   view, icon: Icon, label, active, onClick, badge, pulse
-}: NavItem & { active: boolean; onClick: () => void; badge?: number; pulse?: boolean }): JSX.Element {
+}: SidebarNavItem & { active: boolean; onClick: () => void; badge?: number; pulse?: boolean }): JSX.Element {
   return (
     <button
       key={view}
@@ -79,6 +100,23 @@ function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
   const [monitoringPulse, setMonitoringPulse] = useState(false)
   const [agentUnread, setAgentUnread] = useState(0)
   const [agentPulse, setAgentPulse] = useState(false)
+  const [prefs, setPrefs] = useState<SidebarPrefs | null>(null)
+
+  // 저장된 prefs 로드 + 변경 이벤트 구독 — 설정에서 바꾸면 즉시 반영
+  useEffect(() => {
+    const load = (): void => {
+      window.api.settings.get('sidebarPrefs')
+        .then((saved) => {
+          if (saved && typeof saved === 'object') setPrefs(saved as SidebarPrefs)
+          else setPrefs(null)
+        })
+        .catch(() => setPrefs(null))
+    }
+    load()
+    const onChange = (): void => load()
+    window.addEventListener('sidebar-prefs-changed', onChange)
+    return () => window.removeEventListener('sidebar-prefs-changed', onChange)
+  }, [])
 
   useEffect(() => {
     const refresh = async (): Promise<void> => {
@@ -114,30 +152,25 @@ function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
     }
   }, [activeView])
 
+  const items = resolveOrderedItems(prefs)
+
   return (
     <aside className="w-14 bg-bg-surface border-r border-bg-border flex flex-col items-center py-2 gap-0.5 flex-shrink-0">
-      {NAV_GROUPS.map((group, i) => (
-        <div key={group.key} className="flex flex-col items-center gap-0.5 w-full">
-          {group.items.map((item) => (
-            <NavButton
-              key={item.view}
-              {...item}
-              active={activeView === item.view}
-              onClick={() => onViewChange(item.view)}
-              badge={
-                item.view === 'monitoring' ? monitoringUnread :
-                item.view === 'agent' ? agentUnread : undefined
-              }
-              pulse={
-                item.view === 'monitoring' ? monitoringPulse :
-                item.view === 'agent' ? agentPulse : undefined
-              }
-            />
-          ))}
-          {i < NAV_GROUPS.length - 1 && (
-            <div className="w-7 h-px bg-bg-border/60 my-1" />
-          )}
-        </div>
+      {items.map((item) => (
+        <NavButton
+          key={item.view}
+          {...item}
+          active={activeView === item.view}
+          onClick={() => onViewChange(item.view)}
+          badge={
+            item.view === 'monitoring' ? monitoringUnread :
+            item.view === 'agent' ? agentUnread : undefined
+          }
+          pulse={
+            item.view === 'monitoring' ? monitoringPulse :
+            item.view === 'agent' ? agentPulse : undefined
+          }
+        />
       ))}
       <div className="flex-1" />
       <div className="w-7 h-px bg-bg-border/60 my-1" />

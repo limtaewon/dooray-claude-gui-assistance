@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
-  X, Sparkles, Loader2, Check, AlertCircle, Radar, Search, Hash, Lock
+  X, Sparkles, Loader2, Check, AlertCircle, Radar, Search, Hash, Lock, Plus
 } from 'lucide-react'
 import type { Watcher, FilterRule } from '../../../../shared/types/watcher'
 import type { DoorayChannel } from '../../../../shared/types/messenger'
@@ -127,32 +127,49 @@ function WatcherEditModal({ watcher, onClose, onSaved }: Props): JSX.Element {
               <span className="text-[10px] text-text-tertiary">
                 자연어로 작성하면 AI가 키워드/정규식/제외 규칙을 자동 생성합니다
               </span>
-              <button onClick={handleGenerate} disabled={generating || !instruction.trim()}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-clauday-orange to-clauday-blue disabled:opacity-40 hover:opacity-90">
-                {generating ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                {generating ? 'AI 생성 중...' : filter ? '다시 생성' : 'AI로 규칙 만들기'}
-              </button>
+              <div className="flex items-center gap-1.5">
+                {!filter && (
+                  <button onClick={() => setFilter({ description: '직접 작성한 규칙', anyOf: [], allOf: [], regex: [], exclude: [], excludeRegex: [] })}
+                    className="px-2.5 py-1.5 rounded-lg text-xs text-text-secondary border border-bg-border hover:text-text-primary hover:border-clauday-orange">
+                    직접 만들기
+                  </button>
+                )}
+                <button onClick={handleGenerate} disabled={generating || !instruction.trim()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-clauday-orange to-clauday-blue disabled:opacity-40 hover:opacity-90">
+                  {generating ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                  {generating ? 'AI 생성 중...' : filter ? '다시 생성' : 'AI로 규칙 만들기'}
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* 생성된 규칙 미리보기 */}
+          {/* 생성된 규칙 — 직접 편집/추가/삭제 가능 */}
           {filter && (
             <div className="rounded-xl bg-clauday-orange/5 border border-clauday-orange/30 p-3 space-y-2">
-              <div className="flex items-center gap-1.5 mb-1">
-                <Check size={11} className="text-clauday-orange" />
-                <span className="text-[11px] font-semibold text-text-primary">{filter.description}</span>
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-1.5">
+                  <Check size={11} className="text-clauday-orange" />
+                  <span className="text-[11px] font-semibold text-text-primary">{filter.description}</span>
+                </div>
+                <button onClick={() => setFilter(null)}
+                  className="text-[10px] text-text-tertiary hover:text-red-400">
+                  규칙 비우기
+                </button>
               </div>
               <div className="grid grid-cols-2 gap-2 text-[10px]">
-                <RuleSection label="포함 (OR)" items={filter.anyOf} color="text-emerald-400" />
-                <RuleSection label="모두 포함 (AND)" items={filter.allOf} color="text-clauday-blue" />
-                <RuleSection label="정규식" items={filter.regex} color="text-purple-400" mono />
-                <RuleSection label="제외" items={filter.exclude} color="text-red-400" />
-                {filter.excludeRegex && filter.excludeRegex.length > 0 && (
-                  <RuleSection label="제외 정규식" items={filter.excludeRegex} color="text-red-400" mono />
-                )}
+                <EditableRuleSection label="포함 (OR)" items={filter.anyOf} color="text-emerald-400"
+                  onChange={(items) => setFilter({ ...filter, anyOf: items })} />
+                <EditableRuleSection label="모두 포함 (AND)" items={filter.allOf} color="text-clauday-blue"
+                  onChange={(items) => setFilter({ ...filter, allOf: items })} />
+                <EditableRuleSection label="정규식" items={filter.regex} color="text-purple-400" mono
+                  onChange={(items) => setFilter({ ...filter, regex: items })} />
+                <EditableRuleSection label="제외" items={filter.exclude} color="text-red-400"
+                  onChange={(items) => setFilter({ ...filter, exclude: items })} />
+                <EditableRuleSection label="제외 정규식" items={filter.excludeRegex} color="text-red-400" mono
+                  onChange={(items) => setFilter({ ...filter, excludeRegex: items })} />
               </div>
               <p className="text-[9px] text-text-tertiary pt-1 border-t border-bg-border/50">
-                💡 결과가 맞지 않으면 지시사항을 수정하고 "다시 생성"
+                💡 칩의 × 로 삭제, 아래 입력란으로 직접 추가. AI 결과 전체를 바꾸려면 지시사항 수정 후 "다시 생성"
               </p>
             </div>
           )}
@@ -217,18 +234,58 @@ function WatcherEditModal({ watcher, onClose, onSaved }: Props): JSX.Element {
   )
 }
 
-function RuleSection({ label, items, color, mono }: { label: string; items?: string[]; color: string; mono?: boolean }): JSX.Element | null {
-  if (!items || items.length === 0) return null
+function EditableRuleSection({ label, items, color, mono, onChange }: {
+  label: string
+  items?: string[]
+  color: string
+  mono?: boolean
+  onChange: (items: string[]) => void
+}): JSX.Element {
+  const [draft, setDraft] = useState('')
+  const list = items || []
+  const removeAt = (i: number): void => {
+    onChange(list.filter((_, idx) => idx !== i))
+  }
+  const add = (): void => {
+    const v = draft.trim()
+    if (!v) return
+    if (list.includes(v)) { setDraft(''); return }
+    onChange([...list, v])
+    setDraft('')
+  }
   return (
     <div>
       <div className={`text-[9px] font-bold mb-0.5 ${color}`}>{label}</div>
-      <div className="flex flex-wrap gap-1">
-        {items.map((t, i) => (
+      <div className="flex flex-wrap gap-1 mb-1">
+        {list.map((t, i) => (
           <span key={i}
-            className={`px-1.5 py-0.5 rounded text-[10px] bg-bg-surface border border-bg-border text-text-primary ${mono ? 'font-mono' : ''}`}>
+            className={`group inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-bg-surface border border-bg-border text-text-primary ${mono ? 'font-mono' : ''}`}>
             {t}
+            <button onClick={() => removeAt(i)}
+              aria-label={`${t} 삭제`}
+              className="opacity-50 group-hover:opacity-100 hover:text-red-400 transition-opacity">
+              <X size={9} />
+            </button>
           </span>
         ))}
+      </div>
+      <div className="flex items-center gap-1">
+        <input
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing || e.keyCode === 229) return
+            if (e.key === 'Enter') { e.preventDefault(); add() }
+          }}
+          placeholder="직접 추가"
+          className={`flex-1 min-w-0 px-1.5 py-0.5 rounded text-[10px] bg-bg-surface border border-bg-border text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-orange ${mono ? 'font-mono' : ''}`}
+        />
+        <button onClick={add} disabled={!draft.trim()}
+          aria-label={`${label} 항목 추가`}
+          className="p-0.5 rounded text-text-tertiary hover:text-clauday-orange disabled:opacity-30">
+          <Plus size={11} />
+        </button>
       </div>
     </div>
   )

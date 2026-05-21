@@ -31,7 +31,7 @@ describe('CTagPoller', () => {
     await Promise.resolve()
     expect(incrementalSync.mock.calls.length).toBeGreaterThanOrEqual(1)
     const after = incrementalSync.mock.calls.length
-    await vi.advanceTimersByTimeAsync(45_000)
+    await vi.advanceTimersByTimeAsync(180_000)
     expect(incrementalSync.mock.calls.length).toBeGreaterThan(after)
     poller.stop()
   })
@@ -62,7 +62,7 @@ describe('CTagPoller', () => {
     const poller = new CTagPoller({ incrementalSync } as never)
     poller.start()
     // 첫 호출은 running, 두 번째는 skip
-    await vi.advanceTimersByTimeAsync(45_000)
+    await vi.advanceTimersByTimeAsync(180_000)
     expect(incrementalSync).toHaveBeenCalledTimes(1)
     resolveSync({ anyChange: false })
     poller.stop()
@@ -88,7 +88,7 @@ describe('CTagPoller', () => {
     poller.start()
     await Promise.resolve()
     const after = incrementalSync.mock.calls.length
-    await vi.advanceTimersByTimeAsync(45_000)
+    await vi.advanceTimersByTimeAsync(180_000)
     expect(errSpy).toHaveBeenCalled()
     expect(incrementalSync.mock.calls.length).toBeGreaterThan(after)
     errSpy.mockRestore()

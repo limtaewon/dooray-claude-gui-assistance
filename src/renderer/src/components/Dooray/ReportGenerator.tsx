@@ -197,7 +197,22 @@ function ReportGenerator(): JSX.Element {
               </div>
               {report.sourceMeta && (
                 <div className="mt-1 text-[10px] text-text-tertiary">
-                  참고: 내 태스크 {report.sourceMeta.taskCount}개 · 일정 {report.sourceMeta.eventCount}개
+                  <div>참고: 내 태스크 {report.sourceMeta.taskCount}개 · 일정 {report.sourceMeta.eventCount}개</div>
+                  {report.sourceMeta.probes && report.sourceMeta.probes.length > 0 && (
+                    <details className="mt-1">
+                      <summary className="cursor-pointer hover:text-text-secondary">
+                        🔎 AI 가 확인한 외부 출처 {report.sourceMeta.probes.length}개
+                      </summary>
+                      <ul className="mt-1 ml-3 space-y-0.5 list-disc list-inside">
+                        {report.sourceMeta.probes.map((p, i) => (
+                          <li key={i} className="font-mono">
+                            <span className="text-text-secondary">{p.name}</span>
+                            {p.summary ? <span className="text-text-tertiary"> {p.summary}</span> : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
                 </div>
               )}
             </div>

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   Calendar as CalendarIcon, Terminal as TerminalIcon, GitBranch, Users, Server, Sparkles,
-  MessageSquare, BarChart3, BookOpen, Settings as SettingsIcon, Radar, Moon, Sun, Lightbulb, Bot
+  MessageSquare, BarChart3, BookOpen, Settings as SettingsIcon, Radar, Moon, Sun, Lightbulb, Bot,
+  LayoutDashboard, ListTodo, MessageCircle, FileText
 } from 'lucide-react'
 import Sidebar from './components/Layout/Sidebar'
 import TitleBar from './components/Layout/TitleBar'
@@ -77,17 +78,47 @@ function App(): JSX.Element {
     dwellStartRef.current = { view: activeView, at: Date.now() }
   }, [activeView])
 
-  // ⌘K 글로벌 단축키
+  // ⌘K 글로벌 단축키 + Shift 2회 (IntelliJ "Search Everywhere" 식) 단축키
   useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
+    const DOUBLE_SHIFT_MS = 400
+    let lastShiftAt = 0
+    let shiftCorrupted = false // Shift 누른 동안 다른 키 같이 눌렀으면 "쉬프트만 두 번" 패턴 아님
+
+    const onKeyDown = (e: KeyboardEvent): void => {
       const meta = e.metaKey || e.ctrlKey
       if (meta && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         setCmdOpen((o) => !o)
+        return
+      }
+      // Shift 외 다른 키가 같이 눌렸으면 더블 Shift 후보 무효화
+      if (e.shiftKey && e.key !== 'Shift') {
+        shiftCorrupted = true
       }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    const onKeyUp = (e: KeyboardEvent): void => {
+      if (e.key !== 'Shift') return
+      // Shift+다른키 조합이었으면 카운트 안 함
+      if (shiftCorrupted) {
+        shiftCorrupted = false
+        lastShiftAt = 0
+        return
+      }
+      const now = Date.now()
+      if (lastShiftAt && now - lastShiftAt < DOUBLE_SHIFT_MS) {
+        // 입력 필드에서 Shift 두 번 눌러도 글자가 안 들어가니 그대로 트리거
+        setCmdOpen((o) => !o)
+        lastShiftAt = 0
+      } else {
+        lastShiftAt = now
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+    }
   }, [])
 
   // #4 메뉴 이동 — Cmd+E "최근 뷰" 팝업.
@@ -192,8 +223,15 @@ function App(): JSX.Element {
     {
       label: '이동',
       items: [
-        { id: 'go-dooray', label: '두레이 대시보드', icon: <CalendarIcon size={13} />, hint: '⌘1' },
+        { id: 'go-dooray:dashboard', label: '두레이 — 대시보드', icon: <LayoutDashboard size={13} />, hint: '⌘1' },
+        { id: 'go-dooray:tasks', label: '두레이 — 태스크', icon: <ListTodo size={13} /> },
+        { id: 'go-dooray:wiki', label: '두레이 — 위키', icon: <BookOpen size={13} /> },
+        { id: 'go-dooray:calendar', label: '두레이 — 캘린더', icon: <CalendarIcon size={13} /> },
+        { id: 'go-dooray:messenger', label: '두레이 — 메신저', icon: <MessageCircle size={13} /> },
+        { id: 'go-dooray:briefing', label: '두레이 — AI 브리핑', icon: <Sparkles size={13} /> },
+        { id: 'go-dooray:report', label: '두레이 — AI 보고서', icon: <FileText size={13} /> },
         { id: 'go-monitoring', label: '모니터링', icon: <Radar size={13} />, hint: '⌘2' },
+        { id: 'go-agent', label: '에이전트', icon: <Bot size={13} /> },
         { id: 'go-terminal', label: '터미널', icon: <TerminalIcon size={13} />, hint: '⌘3' },
         { id: 'go-git', label: '브랜치 작업', icon: <GitBranch size={13} />, hint: '⌘4' },
         { id: 'go-community', label: '커뮤니티', icon: <Users size={13} /> },
@@ -221,8 +259,15 @@ function App(): JSX.Element {
 
   const runCommand = (item: CommandItem): void => {
     if (item.id.startsWith('go-')) {
-      const view = item.id.slice(3) as View
+      const target = item.id.slice(3) // e.g. "dooray:tasks" or "monitoring"
+      const [view, subTab] = target.split(':') as [View, string | undefined]
       setActiveView(view)
+      if (view === 'dooray' && subTab) {
+        // DoorayAssistant 가 listen — 약간의 지연(렌더 후) 보장 위해 microtask 로 dispatch
+        Promise.resolve().then(() => {
+          window.dispatchEvent(new CustomEvent('goto-dooray-subtab', { detail: { tab: subTab } }))
+        })
+      }
       return
     }
     if (item.id === 'toggle-theme') toggleTheme()

@@ -216,24 +216,23 @@ export class WikiStorageService {
   }
 
   /**
-   * 위키 페이지 hard delete. Dooray 는 서버 사이드에서 작성자(또는 관리자)만 삭제 허용 — 권한 없으면 403.
-   * 405 (DELETE 미지원) 같은 케이스에는 [DELETED] 접두사 soft-delete 로 폴백.
-   * (메서드 이름은 backward-compat 으로 softDelete 유지.)
+   * 위키 페이지 hard delete. Dooray 서버 사이드에서 작성자(또는 관리자)만 삭제 허용 — 권한 없으면 403.
+   * **이전 버전의 soft-delete([DELETED] prefix) 폴백은 제거됨** (Clauday 정책: 모든 delete 는 hard delete).
+   * DELETE 가 막혀있으면 에러를 그대로 노출해서 사용자가 두레이 권한/지원 여부를 직접 확인하도록 한다.
+   * (메서드 이름은 backward-compat 으로 softDelete 유지 — 호출자가 많아 즉시 rename 안 함.)
    */
   async softDelete(wikiId: string, pageId: string): Promise<void> {
     try {
       await this.wiki.deletePage(wikiId, pageId)
-      return
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       if (msg.includes('(403)') || msg.includes('(401)')) {
         throw new Error('본인이 작성한 페이지만 삭제할 수 있습니다.')
       }
-      // 그 외 (405 등) — soft delete fallback
+      if (msg.includes('(405)')) {
+        throw new Error('이 위키는 두레이 측에서 DELETE 를 지원하지 않습니다. 두레이에서 직접 삭제해주세요.')
+      }
+      throw err
     }
-    const page = await this.wiki.get(wikiId, pageId)
-    const oldTitle = page.subject || ''
-    if (oldTitle.startsWith('[DELETED]')) return
-    await this.wiki.renameTitle(wikiId, pageId, `[DELETED] ${oldTitle}`)
   }
 }
