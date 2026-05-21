@@ -20,6 +20,46 @@ function subscribeTerminalOutput(cb: (payload: TerminalOutputPayload) => void): 
   return () => { terminalOutputHandlers.delete(cb) }
 }
 import { IPC_CHANNELS } from '../shared/types/ipc'
+
+// CalDAV 데이터 변경 알림 (sync 결과 → main → 여기 → renderer 구독자)
+// #7 OS 알림 클릭 → renderer 가 subscribe 한 콜백으로 라우팅 (contextIsolation 이라 dispatchEvent 불가)
+const gotoAiRecommendHandlers = new Set<() => void>()
+ipcRenderer.on('goto-ai-recommend', () => {
+  for (const h of gotoAiRecommendHandlers) {
+    try { h() } catch { /* ignore */ }
+  }
+})
+function subscribeGotoAiRecommend(cb: () => void): () => void {
+  gotoAiRecommendHandlers.add(cb)
+  return () => { gotoAiRecommendHandlers.delete(cb) }
+}
+
+const caldavUpdatedHandlers = new Set<() => void>()
+ipcRenderer.on('caldav-updated', () => {
+  console.log('[preload] caldav-updated received, handlers:', caldavUpdatedHandlers.size)
+  for (const h of caldavUpdatedHandlers) {
+    try { h() } catch { /* ignore */ }
+  }
+})
+function subscribeCaldavUpdated(cb: () => void): () => void {
+  caldavUpdatedHandlers.add(cb)
+  return () => { caldavUpdatedHandlers.delete(cb) }
+}
+
+// CalDAV 동기화 진행률 알림
+type SyncProgressPayload =
+  | { calendarUrl: string; calendarName: string; current: number; total: number; objectCount: number }
+  | { stage: 'start' | 'complete' | 'error'; message?: string }
+const caldavSyncHandlers = new Set<(p: SyncProgressPayload) => void>()
+ipcRenderer.on('caldav-sync-progress', (_: IpcRendererEvent, payload: SyncProgressPayload) => {
+  for (const h of caldavSyncHandlers) {
+    try { h(payload) } catch { /* ignore */ }
+  }
+})
+function subscribeCaldavSyncProgress(cb: (p: SyncProgressPayload) => void): () => void {
+  caldavSyncHandlers.add(cb)
+  return () => { caldavSyncHandlers.delete(cb) }
+}
 import type { McpServerConfig } from '../shared/types/mcp'
 import type { Skill, SkillSaveRequest } from '../shared/types/skills'
 import type { UsageQueryParams, UsageSummary } from '../shared/types/usage'
@@ -33,6 +73,25 @@ import type {
   DoorayCalendarEvent,
   DoorayCalendarQueryParams
 } from '../shared/types/dooray'
+import type {
+  CalDAVCalendar,
+  CalDAVCredentialStatus,
+  CalDAVEvent,
+  CalDAVEventCreate,
+  CalDAVEventQuery,
+  CalDAVSaveCredentialsInput,
+  CalDAVTestResult
+} from '../shared/types/caldav'
+import type {
+  UnifiedCalendar,
+  UnifiedEvent,
+  UnifiedEventCreate,
+  UnifiedEventDateTimeUpdate,
+  UnifiedEventQuery,
+  LocalCalendar,
+  LocalCalendarCreate,
+  LocalCalendarUpdate
+} from '../shared/types/calendar'
 import type { AIBriefing, AIReport, AIProgressEvent, AIModelConfig, AIModelName } from '../shared/types/ai'
 import type { TerminalSession, TerminalCreateOptions, TerminalResizeOptions } from '../shared/types/terminal'
 import type {
@@ -140,8 +199,8 @@ const api = {
         ipcRenderer.on(IPC_CHANNELS.DOORAY_TASKS_PARTIAL, handler)
         return () => ipcRenderer.removeListener(IPC_CHANNELS.DOORAY_TASKS_PARTIAL, handler)
       },
-      /** 태스크 생성 (커뮤니티 글쓰기) */
-      create: (params: { projectId: string; subject: string; body: string; assigneeIds?: string[]; tagIds?: string[] }): Promise<{ id: string }> =>
+      /** 태스크 생성 (커뮤니티 글쓰기). templateId 전달 시 두레이가 해당 템플릿 lineage 로 글을 기록. */
+      create: (params: { projectId: string; subject: string; body: string; assigneeIds?: string[]; tagIds?: string[]; templateId?: string }): Promise<{ id: string }> =>
         ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_CREATE, params),
       /** 프로젝트 태그 목록 (빠른 태스크 생성 시 태그 선택용) */
       tags: (projectId: string): Promise<Array<{ id: string; name: string; color: string }>> =>
@@ -201,6 +260,88 @@ const api = {
       events: (params: DoorayCalendarQueryParams): Promise<DoorayCalendarEvent[]> =>
         ipcRenderer.invoke(IPC_CHANNELS.DOORAY_CALENDAR_EVENTS, params)
     }
+  },
+
+  // CalDAV (v1.5)
+  caldav: {
+    testConnect: (input: CalDAVSaveCredentialsInput): Promise<CalDAVTestResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALDAV_TEST_CONNECT, input),
+    saveCredentials: (input: CalDAVSaveCredentialsInput): Promise<{ ok: true }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALDAV_SAVE_CREDENTIALS, input),
+    status: (): Promise<CalDAVCredentialStatus> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALDAV_STATUS),
+    disconnect: (): Promise<{ ok: true }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALDAV_DISCONNECT),
+    listCalendars: (): Promise<CalDAVCalendar[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALDAV_LIST_CALENDARS),
+    listEvents: (query: CalDAVEventQuery): Promise<CalDAVEvent[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALDAV_LIST_EVENTS, query),
+    createEvent: (input: CalDAVEventCreate): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALDAV_CREATE_EVENT, input),
+    deleteEvent: (p: { url: string; etag?: string }): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALDAV_DELETE_EVENT, p),
+    /** 전체 동기화 — 초기 연결 시 호출. 진행률은 onSyncProgress 로 구독 */
+    fullSync: (): Promise<{ totalObjects: number }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALDAV_FULL_SYNC),
+    /** 변경분만 동기화 — 수동 새로고침에 사용 */
+    incrementalSync: (): Promise<{ anyChange: boolean }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALDAV_INCREMENTAL_SYNC),
+    /** CalDAV 데이터 변경(sync 결과) 시 호출됨. cleanup 함수 반환 */
+    onUpdated: (cb: () => void): (() => void) => subscribeCaldavUpdated(cb),
+    /** 동기화 진행률 구독 */
+    onSyncProgress: (cb: (p: SyncProgressPayload) => void): (() => void) =>
+      subscribeCaldavSyncProgress(cb)
+  },
+
+  // Calendar (통합 — CalDAV + 로컬)
+  calendar: {
+    listCalendars: (): Promise<UnifiedCalendar[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_LIST_CALENDARS),
+    listEvents: (q: UnifiedEventQuery): Promise<UnifiedEvent[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_LIST_EVENTS, q),
+    createEvent: (input: UnifiedEventCreate): Promise<UnifiedEvent> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_CREATE_EVENT, input),
+    updateEventDateTime: (input: UnifiedEventDateTimeUpdate): Promise<UnifiedEvent> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_UPDATE_EVENT_DATETIME, input),
+    deleteEvent: (p: { source: 'local' | 'caldav'; id: string; calendarId?: string; caldavUrl?: string; etag?: string }): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_DELETE_EVENT, p)
+  },
+  localCalendar: {
+    create: (input: LocalCalendarCreate): Promise<LocalCalendar> =>
+      ipcRenderer.invoke(IPC_CHANNELS.LOCAL_CALENDAR_CREATE, input),
+    update: (input: LocalCalendarUpdate): Promise<{ ok: true }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.LOCAL_CALENDAR_UPDATE, input),
+    delete: (id: string): Promise<{ ok: true }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.LOCAL_CALENDAR_DELETE, id)
+  },
+
+  // Shell — OS 기본 핸들러로 열기 (절대경로/URL/file://)
+  shell: {
+    openPath: (target: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SHELL_OPEN_PATH, target),
+    /** 이미지 파일 → data URL (#2 썸네일). 5MB 초과 / 비파일은 ok:false */
+    readImageDataUrl: (target: string): Promise<{ ok: boolean; dataUrl?: string; error?: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SHELL_READ_IMAGE_DATAURL, target),
+    /** 파일을 부모 폴더 안에서 highlight (Warp 식 Show in Finder) */
+    showInFolder: (target: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SHELL_SHOW_IN_FOLDER, target)
+  },
+
+  // CLAUDE.md 카탈로그 (#3) — 앱 내장 템플릿 목록 + 적용
+  claudeMdTemplates: {
+    list: (): Promise<Array<{ id: string; name: string; description: string }>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_MD_TEMPLATES_LIST),
+    apply: (input: { id: string; cwd?: string; overwrite?: boolean }): Promise<{ ok: boolean; path?: string; conflict?: boolean; error?: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_MD_TEMPLATES_APPLY, input)
+  },
+
+  // AI 추천 새 글 알림 (#7) — 토글 + 알림 클릭 라우팅
+  aiRecommendNotify: {
+    getEnabled: (): Promise<boolean> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_RECOMMEND_NOTIFY_GET_ENABLED),
+    setEnabled: (enabled: boolean): Promise<{ ok: true; enabled: boolean }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_RECOMMEND_NOTIFY_SET_ENABLED, enabled),
+    onGoto: subscribeGotoAiRecommend
   },
 
   // Terminal
@@ -271,7 +412,7 @@ const api = {
   ai: {
     available: (): Promise<boolean> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_AVAILABLE),
-    ask: (params: { prompt: string; systemPrompt?: string; model?: AIModelName; maxBudget?: string; requestId?: string; feature?: keyof AIModelConfig; mcpServers?: string[] }): Promise<string> =>
+    ask: (params: { prompt: string; systemPrompt?: string; model?: AIModelName; maxBudget?: string; requestId?: string; feature?: keyof AIModelConfig; mcpServers?: string[]; imagePaths?: string[] }): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_ASK, params),
     briefing: (requestId?: string, mcpServers?: string[]): Promise<AIBriefing> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_BRIEFING, { requestId, mcpServers }),
@@ -281,8 +422,6 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_REPORT, { type, requestId, mcpServers }),
     generateWiki: (taskSubject: string, taskBody?: string, projectCode?: string, requestId?: string): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_WIKI, { taskSubject, taskBody, projectCode, requestId }),
-    generateMeetingNote: (eventSubject: string, eventDescription?: string, attendees?: string[], requestId?: string): Promise<string> =>
-      ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_MEETING_NOTE, { eventSubject, eventDescription, attendees, requestId }),
     wikiProofread: (title: string, content: string, requestId?: string): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_WIKI_PROOFREAD, { title, content, requestId }),
     wikiImprove: (title: string, content: string, requestId?: string): Promise<string> =>
@@ -322,18 +461,18 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_CUSTOM_PROJECTS, projectIds)
   },
 
-  // Clover Skills
-  cloverSkills: {
-    list: (): Promise<import('../shared/types/skill').CloverSkill[]> =>
-      ipcRenderer.invoke(IPC_CHANNELS.CLOVER_SKILLS_LIST),
-    get: (id: string): Promise<import('../shared/types/skill').CloverSkill | null> =>
-      ipcRenderer.invoke(IPC_CHANNELS.CLOVER_SKILLS_GET, id),
-    save: (skill: import('../shared/types/skill').CloverSkill): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.CLOVER_SKILLS_SAVE, skill),
+  // Clauday Skills
+  claudaySkills: {
+    list: (): Promise<import('../shared/types/skill').ClaudaySkill[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDAY_SKILLS_LIST),
+    get: (id: string): Promise<import('../shared/types/skill').ClaudaySkill | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDAY_SKILLS_GET, id),
+    save: (skill: import('../shared/types/skill').ClaudaySkill): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDAY_SKILLS_SAVE, skill),
     delete: (id: string): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.CLOVER_SKILLS_DELETE, id),
-    forTarget: (target: string): Promise<import('../shared/types/skill').CloverSkill[]> =>
-      ipcRenderer.invoke(IPC_CHANNELS.CLOVER_SKILLS_FOR_TARGET, target)
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDAY_SKILLS_DELETE, id),
+    forTarget: (target: string): Promise<import('../shared/types/skill').ClaudaySkill[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDAY_SKILLS_FOR_TARGET, target)
   },
 
   // Briefing Store
@@ -502,6 +641,6 @@ const api = {
   }
 }
 
-export type CloverAPI = typeof api
+export type ClaudayAPI = typeof api
 
 contextBridge.exposeInMainWorld('api', api)

@@ -11,7 +11,26 @@ import { TaskService } from './dooray/TaskService'
 import { WikiService } from './dooray/WikiService'
 import { WikiStorageService } from './dooray/WikiStorageService'
 import type { WikiStorageKind } from './dooray/WikiStorageService'
-import { CalendarService } from './dooray/CalendarService'
+// CalendarService(두레이 네이티브 calendar v1 API) — v1.5 에서 UnifiedCalendarService 로 대체됨
+import { CalDAVClient } from './caldav/CalDAVClient'
+import { CalDAVCredentialStore } from './caldav/CredentialStore'
+import { LocalEventStore } from './caldav/LocalEventStore'
+import { UnifiedCalendarService } from './caldav/UnifiedCalendarService'
+import { CTagPoller } from './caldav/CTagPoller'
+import { CalendarObjectsStore } from './caldav/CalendarObjectsStore'
+import { HolidayService } from './holiday/HolidayService'
+import type {
+  CalDAVEventCreate,
+  CalDAVEventQuery,
+  CalDAVSaveCredentialsInput
+} from '../shared/types/caldav'
+import type {
+  UnifiedEventCreate,
+  UnifiedEventDateTimeUpdate,
+  UnifiedEventQuery,
+  LocalCalendarCreate,
+  LocalCalendarUpdate
+} from '../shared/types/calendar'
 import { MessengerService } from './dooray/MessengerService'
 import { BotService } from './dooray/socket-mode/BotService'
 import { MentionDispatcher } from './dooray/mention/MentionDispatcher'
@@ -26,6 +45,8 @@ import { HookServer, type HookEventPayload } from './dooray/mention/HookServer'
 import { readLastAssistantText, truncateForMessenger } from './dooray/mention/transcriptReader'
 import { relative as pathRelative, sep as pathSep, basename as pathBasename } from 'path'
 import { WatcherService } from './watcher/WatcherService'
+import { AiRecommendNotifier } from './ai-recommend/AiRecommendNotifier'
+import { cleanFirstMessage } from './claude/sessionPreview'
 import { AIService, setUserAnthropicApiKey, getClaudeBin } from './ai/AIService'
 import { ClaudeChatService } from './claude/ClaudeChatService'
 import { ClaudeSessionService } from './claude/ClaudeSessionService'
@@ -54,6 +75,7 @@ const configWatcher = new ConfigWatcher()
 const usageParser = new UsageParser()
 const doorayClient = new DoorayClient()
 const taskService = new TaskService(doorayClient)
+const aiRecommendNotifier = new AiRecommendNotifier(taskService)
 const wikiService = new WikiService(doorayClient)
 // store 초기화는 아래에서 하지만, lambda 들이 method 호출 시점에 평가되므로 문제 없음.
 // (단, 첫 IPC 호출 전에 store 가 반드시 초기화되어 있어야 함.)
@@ -69,7 +91,65 @@ const sharedSkills = new SharedSkillsService(wikiService, skillsManager, {
 sharedSkills.setMyMemberIdResolver(() =>
   taskService.getMyMemberIdPublic().catch(() => null)
 )
-const calendarService = new CalendarService(doorayClient)
+const caldavClient = new CalDAVClient()
+const holidayService = new HolidayService()
+const unifiedCalendar = new UnifiedCalendarService(caldavClient, holidayService)
+// 시작 시 공휴일 백그라운드 refresh (캐시 7일 TTL 안이면 skip)
+holidayService.getHolidays().catch((e) => console.error('[main] 공휴일 refresh 실패:', e))
+const ctagPoller = new CTagPoller(unifiedCalendar)
+ctagPoller.start()
+
+// 자격증명만 있고 ICS 캐시가 비어있으면 시작 시 silent fullSync (앱 첫 부팅/캐시 클리어 후 등)
+const _hasCreds = CalDAVCredentialStore.has()
+const _cachedCalendars = CalendarObjectsStore.listCalendarUrls().length
+const _cachedObjects = CalendarObjectsStore.totalObjectCount()
+console.log('[main] CalDAV 부팅 상태:', { hasCredentials: _hasCreds, cachedCalendars: _cachedCalendars, cachedObjects: _cachedObjects })
+
+// 옛 sync 흔적(time-range 도입 전 무제한 받은 큰 캐시) 자동 정리 — 임계값 10000
+// (이전 2000은 캘린더/이벤트 많은 사용자가 매 부팅마다 강제 fullSync 도는 문제 있었음)
+const STALE_CACHE_THRESHOLD = 10000
+if (_cachedObjects > STALE_CACHE_THRESHOLD) {
+  console.log(`[main] 큰 옛 캐시 감지 (${_cachedObjects} > ${STALE_CACHE_THRESHOLD}) → clearAll 후 새 fullSync`)
+  CalendarObjectsStore.clearAll()
+}
+
+const _needFullSync = _hasCreds && CalendarObjectsStore.totalObjectCount() === 0
+if (_needFullSync) {
+  console.log('[main] 자동 fullSync 시작 (자격증명 있음 + ICS 캐시 0건)')
+  unifiedCalendar.fullSync()
+    .then((r) => console.log('[main] 자동 fullSync 완료:', r))
+    .catch((e) => console.error('[main] 자동 fullSync 실패:', e))
+} else if (!_hasCreds) {
+  console.log('[main] 자동 fullSync skip: 자격증명 없음/손상')
+} else {
+  console.log('[main] 자동 fullSync skip: ICS 캐시 이미 존재 (' + CalendarObjectsStore.totalObjectCount() + '건)')
+}
+
+/**
+ * v1.5: UnifiedCalendarService 결과를 옛 DoorayCalendarEvent 형식으로 변환.
+ * 프론트의 BriefingPanel / list view / AI 분석이 점진적으로 새 인터페이스로
+ * 옮겨가는 동안 호환 어댑터로 사용.
+ */
+async function getEventsLegacy(params: { from: string; to: string }): Promise<import('../shared/types/dooray').DoorayCalendarEvent[]> {
+  const [evts, cals] = await Promise.all([
+    unifiedCalendar.listEvents({ from: params.from, to: params.to }),
+    unifiedCalendar.listCalendars()
+  ])
+  const calMap = new Map(cals.map((c) => [c.id, c]))
+  return evts.map((e) => {
+    const cal = calMap.get(e.calendarId)
+    return {
+      id: `${e.source}:${e.id}`,
+      subject: e.summary,
+      description: e.description,
+      location: e.location,
+      startedAt: e.start,
+      endedAt: e.end,
+      wholeDayFlag: e.allDay,
+      calendar: cal ? { id: cal.id, name: cal.name } : undefined
+    }
+  })
+}
 const messengerService = new MessengerService(doorayClient)
 sharedSkills.setMemberNameResolver((id) => messengerService.getMemberName(id))
 const botService = new BotService(doorayClient)
@@ -400,6 +480,122 @@ function registerIpcHandlers(): void {
     skillsManager.exportToFolder(filenames)
   )
 
+  // AI 추천 새 글 알림 (#7) — 토글 IPC
+  ipcMain.handle(IPC_CHANNELS.AI_RECOMMEND_NOTIFY_GET_ENABLED, () => aiRecommendNotifier.isEnabled())
+  ipcMain.handle(IPC_CHANNELS.AI_RECOMMEND_NOTIFY_SET_ENABLED, (_, enabled: boolean) => {
+    aiRecommendNotifier.setEnabled(!!enabled)
+    return { ok: true as const, enabled: aiRecommendNotifier.isEnabled() }
+  })
+
+  // CLAUDE.md 카탈로그 (#3) — 앱 내장 템플릿 목록 + 적용
+  // apply: 사용자에게 폴더 선택 dialog 띄우고, 그 폴더의 CLAUDE.md 에 본문 저장.
+  // 이미 파일이 있으면 overwrite=true 일 때만 덮어씀.
+  ipcMain.handle(IPC_CHANNELS.CLAUDE_MD_TEMPLATES_LIST, async () => {
+    const { CLAUDE_MD_TEMPLATES } = await import('./claudeMdCatalog')
+    return CLAUDE_MD_TEMPLATES.map(({ id, name, description }) => ({ id, name, description }))
+  })
+  ipcMain.handle(
+    IPC_CHANNELS.CLAUDE_MD_TEMPLATES_APPLY,
+    async (
+      _,
+      input: { id: string; cwd?: string; overwrite?: boolean }
+    ): Promise<{ ok: boolean; path?: string; conflict?: boolean; error?: string }> => {
+      const { findClaudeMdTemplate } = await import('./claudeMdCatalog')
+      const tpl = findClaudeMdTemplate(input.id)
+      if (!tpl) return { ok: false, error: '존재하지 않는 템플릿입니다.' }
+      let targetCwd = input.cwd
+      if (!targetCwd) {
+        const win = BrowserWindow.getFocusedWindow()
+        const r = await dialog.showOpenDialog(win!, {
+          properties: ['openDirectory', 'createDirectory'],
+          title: 'CLAUDE.md 를 적용할 프로젝트 폴더 선택',
+          buttonLabel: '여기에 적용'
+        })
+        if (r.canceled || r.filePaths.length === 0) return { ok: false, error: 'cancelled' }
+        targetCwd = r.filePaths[0]
+      }
+      const fs = await import('fs')
+      const { join } = await import('path')
+      const target = join(targetCwd, 'CLAUDE.md')
+      try {
+        if (fs.existsSync(target) && !input.overwrite) {
+          return { ok: false, path: target, conflict: true }
+        }
+        await fs.promises.writeFile(target, tpl.body, 'utf-8')
+        return { ok: true, path: target }
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : '쓰기 실패' }
+      }
+    }
+  )
+
+  // 이미지 → data URL (#2 사이드 패널 썸네일). 5MB 초과면 거절. 간단 LRU 캐시.
+  const imageDataUrlCache = new Map<string, { url: string; mtimeMs: number; size: number }>()
+  ipcMain.handle(IPC_CHANNELS.SHELL_READ_IMAGE_DATAURL, async (_, target: string): Promise<{ ok: boolean; dataUrl?: string; error?: string }> => {
+    if (!target || typeof target !== 'string') return { ok: false, error: 'invalid target' }
+    const { homedir } = await import('os')
+    const fs = await import('fs')
+    const { extname, basename } = await import('path')
+    const expanded = target.startsWith('~/') || target === '~'
+      ? target.replace(/^~/, homedir())
+      : target
+    try {
+      const stat = await fs.promises.stat(expanded)
+      if (!stat.isFile()) return { ok: false, error: 'not a file' }
+      if (stat.size > 5 * 1024 * 1024) return { ok: false, error: 'too large (>5MB)' }
+      const cached = imageDataUrlCache.get(expanded)
+      if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+        return { ok: true, dataUrl: cached.url }
+      }
+      const ext = extname(expanded).slice(1).toLowerCase() || 'png'
+      const mime = ext === 'svg' ? 'image/svg+xml' : ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
+      const buf = await fs.promises.readFile(expanded)
+      const url = `data:${mime};base64,${buf.toString('base64')}`
+      // 캐시 사이즈 cap (20개)
+      if (imageDataUrlCache.size > 20) {
+        const firstKey = imageDataUrlCache.keys().next().value as string | undefined
+        if (firstKey) imageDataUrlCache.delete(firstKey)
+      }
+      imageDataUrlCache.set(expanded, { url, mtimeMs: stat.mtimeMs, size: stat.size })
+      void basename(expanded)
+      return { ok: true, dataUrl: url }
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : 'read failed' }
+    }
+  })
+
+  // Show in Finder / Explorer — 파일의 부모 폴더 열고 해당 파일을 highlight (Warp 풍 hover 액션).
+  ipcMain.handle(IPC_CHANNELS.SHELL_SHOW_IN_FOLDER, async (_, target: string) => {
+    if (!target || typeof target !== 'string') return { ok: false, error: 'invalid target' }
+    const { homedir } = await import('os')
+    const expanded = target.startsWith('~/') || target === '~'
+      ? target.replace(/^~/, homedir())
+      : target
+    try {
+      shell.showItemInFolder(expanded)
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : 'show failed' }
+    }
+  })
+
+  // Shell — OS 기본 핸들러로 path/URL 열기. 절대경로/URL 만 허용.
+  // 상대경로는 cwd 결합이 필요한데 호출 측이 미리 절대경로로 만들어 전달해야 함.
+  // ~/ 시작은 home 으로 자동 치환.
+  ipcMain.handle(IPC_CHANNELS.SHELL_OPEN_PATH, async (_, target: string) => {
+    if (!target || typeof target !== 'string') return { ok: false, error: 'invalid target' }
+    if (/^(https?|mailto|vscode|cursor|file):/i.test(target)) {
+      await shell.openExternal(target)
+      return { ok: true }
+    }
+    const { homedir } = await import('os')
+    const expanded = target.startsWith('~/') || target === '~'
+      ? target.replace(/^~/, homedir())
+      : target
+    const err = await shell.openPath(expanded)
+    return err ? { ok: false, error: err } : { ok: true }
+  })
+
   // Usage (5분 캐시)
   const usageCache: Record<string, { data: unknown; timestamp: number }> = {}
   ipcMain.handle(IPC_CHANNELS.USAGE_QUERY, async (_, params: UsageQueryParams) => {
@@ -412,11 +608,19 @@ function registerIpcHandlers(): void {
   })
 
   // Dooray
-  ipcMain.handle(IPC_CHANNELS.DOORAY_TOKEN_SET, (_, token: string) =>
-    doorayClient.setToken(token)
-  )
+  ipcMain.handle(IPC_CHANNELS.DOORAY_TOKEN_SET, async (_, token: string) => {
+    const r = await doorayClient.setToken(token)
+    // 토큰 새로 설정되면 AI 추천 폴러 재시작 (silent 초기 fetch 로 cursor 갱신)
+    aiRecommendNotifier.stop()
+    aiRecommendNotifier.start().catch((e) => console.warn('[main] notifier 재시작 실패:', e))
+    return r
+  })
   ipcMain.handle(IPC_CHANNELS.DOORAY_TOKEN_GET, () => doorayClient.getToken())
-  ipcMain.handle(IPC_CHANNELS.DOORAY_TOKEN_DELETE, () => doorayClient.deleteToken())
+  ipcMain.handle(IPC_CHANNELS.DOORAY_TOKEN_DELETE, async () => {
+    const r = await doorayClient.deleteToken()
+    aiRecommendNotifier.stop()
+    return r
+  })
   ipcMain.handle(IPC_CHANNELS.DOORAY_TOKEN_VALIDATE, () => doorayClient.validateToken())
   ipcMain.handle(IPC_CHANNELS.DOORAY_MY_MEMBER_ID, () =>
     taskService.getMyMemberIdPublic().catch(() => null)
@@ -636,10 +840,73 @@ function registerIpcHandlers(): void {
     IPC_CHANNELS.DOORAY_WIKI_STORAGE_RESOLVE,
     (_, input: string) => wikiStorage.resolveWikiId(input)
   )
-  ipcMain.handle(IPC_CHANNELS.DOORAY_CALENDAR_LIST, () => calendarService.listCalendars())
+  // 옛 dooray.calendar.* IPC 는 v1.5 에서 UnifiedCalendarService 어댑터로 동작.
+  // 두레이 네이티브 calendar v1 API 직접 호출은 더 이상 하지 않음.
+  ipcMain.handle(IPC_CHANNELS.DOORAY_CALENDAR_LIST, async () => {
+    const cals = await unifiedCalendar.listCalendars()
+    return cals.map((c) => ({ id: c.id, name: c.name, type: c.source }))
+  })
   ipcMain.handle(IPC_CHANNELS.DOORAY_CALENDAR_EVENTS, (_, params: DoorayCalendarQueryParams) =>
-    calendarService.getEvents(params)
+    getEventsLegacy(params)
   )
+
+  // CalDAV (v1.5)
+  ipcMain.handle(IPC_CHANNELS.CALDAV_TEST_CONNECT, (_, input: CalDAVSaveCredentialsInput) =>
+    caldavClient.testConnection(input.username, input.password)
+  )
+  ipcMain.handle(IPC_CHANNELS.CALDAV_SAVE_CREDENTIALS, (_, input: CalDAVSaveCredentialsInput) => {
+    CalDAVCredentialStore.save(input.username, input.password)
+    caldavClient.invalidate()
+    unifiedCalendar.invalidateCache()
+    // 새 자격증명으로 polling 재가동 (이미 시작된 상태면 그대로 다음 tick 부터 새 자격증명 사용)
+    return { ok: true as const }
+  })
+  ipcMain.handle(IPC_CHANNELS.CALDAV_STATUS, () => ({
+    connected: CalDAVCredentialStore.has(),
+    username: CalDAVCredentialStore.getUsername()
+  }))
+  ipcMain.handle(IPC_CHANNELS.CALDAV_DISCONNECT, () => {
+    CalDAVCredentialStore.clear()
+    caldavClient.invalidate()
+    unifiedCalendar.invalidateCache()
+    return { ok: true as const }
+  })
+  ipcMain.handle(IPC_CHANNELS.CALDAV_LIST_CALENDARS, () => caldavClient.listCalendars())
+  ipcMain.handle(IPC_CHANNELS.CALDAV_LIST_EVENTS, (_, q: CalDAVEventQuery) => caldavClient.listEvents(q))
+  ipcMain.handle(IPC_CHANNELS.CALDAV_CREATE_EVENT, (_, input: CalDAVEventCreate) => caldavClient.createEvent(input))
+  ipcMain.handle(IPC_CHANNELS.CALDAV_DELETE_EVENT, (_, p: { url: string; etag?: string }) =>
+    caldavClient.deleteEvent(p.url, p.etag)
+  )
+  ipcMain.handle(IPC_CHANNELS.CALDAV_FULL_SYNC, () => unifiedCalendar.fullSync())
+  ipcMain.handle(IPC_CHANNELS.CALDAV_INCREMENTAL_SYNC, () => unifiedCalendar.incrementalSync())
+
+  // Calendar (통합)
+  ipcMain.handle(IPC_CHANNELS.CALENDAR_LIST_CALENDARS, () => unifiedCalendar.listCalendars())
+  ipcMain.handle(IPC_CHANNELS.CALENDAR_LIST_EVENTS, (_, q: UnifiedEventQuery) =>
+    unifiedCalendar.listEvents(q)
+  )
+  ipcMain.handle(IPC_CHANNELS.CALENDAR_CREATE_EVENT, (_, input: UnifiedEventCreate) =>
+    unifiedCalendar.createEvent(input)
+  )
+  ipcMain.handle(IPC_CHANNELS.CALENDAR_UPDATE_EVENT_DATETIME, (_, input: UnifiedEventDateTimeUpdate) =>
+    unifiedCalendar.updateEventDateTime(input)
+  )
+  ipcMain.handle(
+    IPC_CHANNELS.CALENDAR_DELETE_EVENT,
+    (_, p: { source: 'local' | 'caldav'; id: string; calendarId?: string; caldavUrl?: string; etag?: string }) =>
+      unifiedCalendar.deleteEvent(p)
+  )
+  ipcMain.handle(IPC_CHANNELS.LOCAL_CALENDAR_CREATE, (_, input: LocalCalendarCreate) =>
+    LocalEventStore.createCalendar(input.name, input.color)
+  )
+  ipcMain.handle(IPC_CHANNELS.LOCAL_CALENDAR_UPDATE, (_, input: LocalCalendarUpdate) => {
+    LocalEventStore.updateCalendar(input.id, { name: input.name, color: input.color })
+    return { ok: true as const }
+  })
+  ipcMain.handle(IPC_CHANNELS.LOCAL_CALENDAR_DELETE, (_, id: string) => {
+    LocalEventStore.deleteCalendar(id)
+    return { ok: true as const }
+  })
 
   // Terminal
   ipcMain.handle(IPC_CHANNELS.TERMINAL_CREATE, (_, opts?: TerminalCreateOptions) =>
@@ -748,7 +1015,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.AI_AVAILABLE, () => aiService.isAvailable())
   ipcMain.handle(
     IPC_CHANNELS.AI_ASK,
-    async (_, { prompt, systemPrompt, model, maxBudget, requestId, feature, mcpServers }: {
+    async (_, { prompt, systemPrompt, model, maxBudget, requestId, feature, mcpServers, imagePaths }: {
       prompt: string
       systemPrompt?: string
       model?: import('../shared/types/ai').AIModelName
@@ -756,7 +1023,8 @@ function registerIpcHandlers(): void {
       requestId?: string
       feature?: keyof import('../shared/types/ai').AIModelConfig
       mcpServers?: string[]
-    }) => aiService.ask(prompt, { systemPrompt, model, maxBudget, requestId, feature, mcpServers })
+      imagePaths?: string[]
+    }) => aiService.ask(prompt, { systemPrompt, model, maxBudget, requestId, feature, mcpServers, imagePaths })
   )
   ipcMain.handle(IPC_CHANNELS.AI_BRIEFING, async (_, opts?: { requestId?: string; mcpServers?: string[] }) => {
     const requestId = opts?.requestId
@@ -778,56 +1046,49 @@ function registerIpcHandlers(): void {
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
       const endOfWeek = new Date(startOfDay.getTime() + 7 * 24 * 60 * 60 * 1000)
 
-      // 스킬 + MCP가 활성화되면 AI가 모든 데이터 수집을 MCP로 직접 처리한다.
+      // 정책 변경: 사용자가 토글한 프로젝트의 태스크 + 토글한 캘린더 일정은 **항상** main 이 사전 fetch.
+      // 스킬/MCP 는 base 데이터 위 보강 분석 (특정 키워드 필터, 외부 정보, 가공 룰) 으로만 쓰임.
+      // 예전 'delegateAll' 모드는 base 데이터 누락 위험이 커서 제거.
       const briefingSkills = skillStore.forTarget('briefing')
       const hasActiveSkill = briefingSkills.length > 0
-      const hasMcp = (mcpServers || []).length > 0
-      const delegateAll = hasActiveSkill && hasMcp
+      const pinnedProjects = (store.get('pinnedProjects', []) as string[]) || []
+      const pinnedCalendars = (store.get('pinnedCalendars', []) as string[]) || []
 
-      let tasks: import('../shared/types/dooray').DoorayTask[] = []
-      let ccTasks: import('../shared/types/dooray').DoorayTask[] = []
-      let dueTodayTasks: import('../shared/types/dooray').DoorayTask[] = []
-      let events: import('../shared/types/dooray').DoorayCalendarEvent[] = []
+      emit('📋 담당 태스크 조회 중...')
+      const tasksP = taskService.listMyTasks(pinnedProjects.length > 0 ? pinnedProjects : undefined, true).then((r) => {
+        emit(`✓ 담당 태스크 ${r.length}개${pinnedProjects.length > 0 ? ` (토글 ${pinnedProjects.length}개 프로젝트)` : ''}`)
+        return r
+      })
 
-      if (delegateAll) {
-        emit(`🧠 스킬 ${briefingSkills.length}개 + MCP ${mcpServers?.length || 0}개 → AI가 직접 데이터 수집`)
-      } else {
-        // 각 Dooray 호출을 병렬 실행하되, 진행상황은 개별 emit
-        // 브리핑은 "지금 시점"의 상태를 보여줘야 하므로 항상 force=true
-        emit('📋 담당 태스크 조회 중...')
-        const tasksP = taskService.listMyTasks(undefined, true).then((r) => {
-          emit(`✓ 담당 태스크 ${r.length}개`)
-          return r
+      emit('👥 CC/멘션 태스크 조회 중...')
+      const ccP = taskService.listMyCcTasks(pinnedProjects.length > 0 ? pinnedProjects : undefined).then((r) => {
+        emit(`✓ CC 태스크 ${r.length}개${pinnedProjects.length > 0 ? ` (토글 ${pinnedProjects.length}개)` : ''}`)
+        return r
+      })
+
+      emit('⏰ 오늘 마감 태스크 조회 중...')
+      const dueP = taskService.listDueTodayTasks(pinnedProjects.length > 0 ? pinnedProjects : undefined).then((r) => {
+        emit(`✓ 오늘 마감 ${r.length}개`)
+        return r
+      })
+
+      emit('📅 이번주 일정 조회 중...')
+      const eventsP = getEventsLegacy({ from: startOfDay.toISOString(), to: endOfWeek.toISOString() })
+        .then((r) => {
+          const filtered = pinnedCalendars.length > 0
+            ? r.filter((e) => {
+                const idStr = String(e.id || '')
+                if (idStr.startsWith('local:') || idStr.startsWith('holiday:')) return true
+                return !!e.calendar?.id && pinnedCalendars.includes(e.calendar.id)
+              })
+            : r
+          emit(`✓ 일정 ${filtered.length}개${pinnedCalendars.length > 0 ? ` (토글 적용 / 전체 ${r.length})` : ''}`)
+          return filtered
         })
 
-        emit('👥 CC/멘션 태스크 조회 중...')
-        const ccP = taskService.listMyCcTasks().then((r) => {
-          emit(`✓ CC 태스크 ${r.length}개`)
-          return r
-        })
+      const [tasks, ccTasks, dueTodayTasks, events] = await Promise.all([tasksP, ccP, dueP, eventsP])
 
-        emit('⏰ 오늘 마감 태스크 조회 중...')
-        const dueP = taskService.listDueTodayTasks().then((r) => {
-          emit(`✓ 오늘 마감 ${r.length}개`)
-          return r
-        })
-
-        const pinnedCalendars = (store.get('pinnedCalendars', []) as string[]) || []
-        emit('📅 이번주 일정 조회 중...')
-        const eventsP = calendarService
-          .getEvents({ from: startOfDay.toISOString(), to: endOfWeek.toISOString() })
-          .then((r) => {
-            const filtered = pinnedCalendars.length > 0
-              ? r.filter((e) => e.calendar?.id && pinnedCalendars.includes(e.calendar.id))
-              : r
-            emit(`✓ 일정 ${filtered.length}개${pinnedCalendars.length > 0 ? ` (필터 적용 / 전체 ${r.length})` : ''}`)
-            return filtered
-          })
-
-        ;[tasks, ccTasks, dueTodayTasks, events] = await Promise.all([tasksP, ccP, dueP, eventsP])
-      }
-
-      if (hasActiveSkill) emit(`🔍 스킬 ${briefingSkills.length}개 자동 적용`)
+      if (hasActiveSkill) emit(`🔍 스킬 ${briefingSkills.length}개 보강 적용 (MCP 로 추가 분석 가능)`)
 
       return aiService.generateBriefing(
         tasks,
@@ -836,7 +1097,9 @@ function registerIpcHandlers(): void {
         ccTasks,
         dueTodayTasks,
         requestId,
-        mcpServers
+        mcpServers,
+        // base 데이터 항상 사전 fetch — 위임 모드 제거. AI 가 추가 분석은 스킬+MCP 로.
+        false
       )
     } catch (err) {
       return {
@@ -853,24 +1116,28 @@ function registerIpcHandlers(): void {
   )
   ipcMain.handle(IPC_CHANNELS.AI_GENERATE_REPORT, async (_, { type, requestId, mcpServers }: { type: 'daily' | 'weekly'; requestId?: string; mcpServers?: string[] }) => {
     try {
-      // 보고서는 두레이에서 변경된 최신 상태를 즉시 반영해야 한다 (이슈 #5)
-      const tasks = await taskService.listMyTasks(undefined, true)
+      // 정책: 토글한 프로젝트의 태스크 + 토글한 캘린더 일정은 항상 base 로 사전 fetch.
+      const pinnedProjects = (store.get('pinnedProjects', []) as string[]) || []
+      const pinnedCalendars = (store.get('pinnedCalendars', []) as string[]) || []
+      const tasks = await taskService.listMyTasks(
+        pinnedProjects.length > 0 ? pinnedProjects : undefined,
+        true
+      )
       const now = new Date()
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
       const endOfWeek = new Date(startOfDay.getTime() + 7 * 24 * 60 * 60 * 1000)
-      const reportSkills = skillStore.forTarget('report')
-      const delegateEventsToAi = reportSkills.length > 0 && (mcpServers || []).length > 0
-      const pinnedCalendars = (store.get('pinnedCalendars', []) as string[]) || []
-      let events: import('../shared/types/dooray').DoorayCalendarEvent[] = []
-      if (!delegateEventsToAi) {
-        const allEvents = await calendarService.getEvents({
-          from: startOfDay.toISOString(),
-          to: endOfWeek.toISOString()
-        })
-        events = pinnedCalendars.length > 0
-          ? allEvents.filter((e) => e.calendar?.id && pinnedCalendars.includes(e.calendar.id))
-          : allEvents
-      }
+      const allEvents = await getEventsLegacy({
+        from: startOfDay.toISOString(),
+        to: endOfWeek.toISOString()
+      })
+      const events = pinnedCalendars.length > 0
+        ? allEvents.filter((e) => {
+            const idStr = String(e.id || '')
+            // local(빠른 todo) + holiday 는 토글 UI 에 없으므로 항상 포함 (브리핑과 동일 정책)
+            if (idStr.startsWith('local:') || idStr.startsWith('holiday:')) return true
+            return !!e.calendar?.id && pinnedCalendars.includes(e.calendar.id)
+          })
+        : allEvents
       return aiService.generateReport(type, tasks, events, requestId, mcpServers)
     } catch (err) {
       return { title: '오류', content: err instanceof Error ? err.message : '보고서 생성 실패', generatedAt: new Date().toISOString() }
@@ -881,12 +1148,6 @@ function registerIpcHandlers(): void {
     async (_, { taskSubject, taskBody, projectCode, requestId }: { taskSubject: string; taskBody?: string; projectCode?: string; requestId?: string }) =>
       aiService.generateWikiDraft(taskSubject, taskBody, projectCode, requestId)
   )
-  ipcMain.handle(
-    IPC_CHANNELS.AI_GENERATE_MEETING_NOTE,
-    async (_, { eventSubject, eventDescription, attendees, requestId }: { eventSubject: string; eventDescription?: string; attendees?: string[]; requestId?: string }) =>
-      aiService.generateMeetingNote(eventSubject, eventDescription, attendees, requestId)
-  )
-
   // AI 모델 설정
   ipcMain.handle(IPC_CHANNELS.AI_MODEL_CONFIG_GET, () => aiService.getModelConfig())
   ipcMain.handle(IPC_CHANNELS.AI_MODEL_CONFIG_SET, (_, config: import('../shared/types/ai').AIModelConfig) => {
@@ -918,14 +1179,14 @@ function registerIpcHandlers(): void {
     taskService.setCustomProjectIds(dedup)
   })
 
-  // Clover Skills (파일시스템 기반 - ~/Library/Application Support/clover/skills/)
-  ipcMain.handle(IPC_CHANNELS.CLOVER_SKILLS_LIST, () => skillStore.list())
-  ipcMain.handle(IPC_CHANNELS.CLOVER_SKILLS_GET, (_, id: string) => skillStore.get(id))
-  ipcMain.handle(IPC_CHANNELS.CLOVER_SKILLS_SAVE, (_, skill: Record<string, unknown>) =>
-    skillStore.save(skill as unknown as import('../shared/types/skill').CloverSkill)
+  // Clauday Skills (파일시스템 기반 - ~/Library/Application Support/Clauday/skills/)
+  ipcMain.handle(IPC_CHANNELS.CLAUDAY_SKILLS_LIST, () => skillStore.list())
+  ipcMain.handle(IPC_CHANNELS.CLAUDAY_SKILLS_GET, (_, id: string) => skillStore.get(id))
+  ipcMain.handle(IPC_CHANNELS.CLAUDAY_SKILLS_SAVE, (_, skill: Record<string, unknown>) =>
+    skillStore.save(skill as unknown as import('../shared/types/skill').ClaudaySkill)
   )
-  ipcMain.handle(IPC_CHANNELS.CLOVER_SKILLS_DELETE, (_, id: string) => skillStore.delete(id))
-  ipcMain.handle(IPC_CHANNELS.CLOVER_SKILLS_FOR_TARGET, (_, target: string) => skillStore.forTarget(target))
+  ipcMain.handle(IPC_CHANNELS.CLAUDAY_SKILLS_DELETE, (_, id: string) => skillStore.delete(id))
+  ipcMain.handle(IPC_CHANNELS.CLAUDAY_SKILLS_FOR_TARGET, (_, target: string) => skillStore.forTarget(target))
 
   // Briefing Store
   ipcMain.handle(IPC_CHANNELS.BRIEFING_SAVE, (_, briefing: unknown) => {
@@ -988,6 +1249,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.DOORAY_WIKI_DOMAINS, () => wikiService.listDomains())
 
   // Claude Sessions (mtime 기반 캐시 + 비동기 fs + 스트림 읽기)
+  // cleanFirstMessage 는 단위 테스트를 위해 별도 모듈로 분리 (#13).
   interface SessionMeta { id: string; project: string; firstMsg: string; timestamp: string; lines: number }
   interface SessionCacheEntry { meta: SessionMeta; mtimeMs: number; size: number; path: string }
   const sessionCache = new Map<string, SessionCacheEntry>()
@@ -1026,7 +1288,7 @@ function registerIpcHandlers(): void {
                     const msg = d.message || {}
                     let c = msg.content || ''
                     if (Array.isArray(c)) c = c.map((x: Record<string, string>) => x.text || '').join(' ')
-                    firstMsg = String(c).replace(/<[^>]+>/g, '').replace(/\n/g, ' ').substring(0, 100).trim()
+                    firstMsg = cleanFirstMessage(String(c))
                     timestamp = d.timestamp || ''
                   }
                 } catch {}
@@ -1382,6 +1644,9 @@ app.whenReady().then(() => {
   registerIpcHandlers()
   configWatcher.start()
   createWindow()
+  // #7 AI 추천 새 글 폴러 시작 (1시간 주기, silent hours 22-9시).
+  // 토큰 미설정 / 네트워크 실패는 알아서 다음 주기 재시도.
+  aiRecommendNotifier.start().catch((e) => console.warn('[main] aiRecommendNotifier 시작 실패:', e))
 
   // 터미널 세션 30초마다 자동 저장
   setInterval(() => {

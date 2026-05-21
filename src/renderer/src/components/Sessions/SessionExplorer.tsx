@@ -108,7 +108,7 @@ function SessionExplorer(): JSX.Element {
         <div className="px-4 py-3 border-b border-bg-border flex-shrink-0">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-1.5">
-              <MessageSquare size={15} className="text-clover-blue" />
+              <MessageSquare size={15} className="text-clauday-blue" />
               <h2 className="text-sm font-semibold text-text-primary">세션 탐색기</h2>
               <span className="text-[9px] text-text-tertiary">{filtered.length}/{sessions.length}</span>
             </div>
@@ -122,11 +122,11 @@ function SessionExplorer(): JSX.Element {
             <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
             <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setRenderCount(50) }}
               placeholder="세션 검색 (내용, 프로젝트, ID)..."
-              className="w-full pl-7 pr-2 py-1.5 bg-bg-surface border border-bg-border rounded-lg text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue" />
+              className="w-full pl-7 pr-2 py-1.5 bg-bg-surface border border-bg-border rounded-lg text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue" />
           </div>
           {/* 프로젝트 필터 */}
           <select value={projectFilter} onChange={(e) => { setProjectFilter(e.target.value); setRenderCount(50) }}
-            className="w-full px-2 py-1 bg-bg-surface border border-bg-border rounded text-[10px] text-text-secondary focus:outline-none focus:border-clover-blue">
+            className="w-full px-2 py-1 bg-bg-surface border border-bg-border rounded text-[10px] text-text-secondary focus:outline-none focus:border-clauday-blue">
             <option value="">전체 프로젝트</option>
             {projects.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
@@ -177,24 +177,34 @@ function SessionExplorer(): JSX.Element {
                 </div>
                 <div className="flex gap-1.5">
                   <button onClick={summarizeSession} disabled={summarizing || !messages.length}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-clover-orange/20 to-clover-blue/20 border border-clover-orange/30 text-[10px] font-medium text-text-primary disabled:opacity-40">
-                    {summarizing ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} className="text-clover-orange" />}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-clauday-orange/20 to-clauday-blue/20 border border-clauday-orange/30 text-[10px] font-medium text-text-primary disabled:opacity-40">
+                    {summarizing ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} className="text-clauday-orange" />}
                     AI 요약
                   </button>
                   <button onClick={async () => {
                     await navigator.clipboard.writeText(`claude -r ${selectedSession.id}`)
                     setCopied(true); setTimeout(() => setCopied(false), 2000)
-                  }} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-bg-surface border border-bg-border text-[10px] text-text-secondary hover:text-text-primary">
+                  }} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-bg-surface border border-bg-border text-[10px] text-text-secondary hover:text-text-primary"
+                    title="claude -r <id> — 권한 확인 살림">
                     {copied ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
                     resume 복사
+                  </button>
+                  {/* #8 bypass 옵션 — 같은 세션을 권한 자동통과로 이어받기 */}
+                  <button onClick={async () => {
+                    await navigator.clipboard.writeText(`claude -r ${selectedSession.id} --dangerously-skip-permissions`)
+                    setCopied(true); setTimeout(() => setCopied(false), 2000)
+                  }} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-clauday-orange/10 border border-clauday-orange/40 text-[10px] text-clauday-orange hover:bg-clauday-orange/15"
+                    title="claude -r <id> --dangerously-skip-permissions — 권한 확인 건너뜀 (조심)">
+                    {copied ? <Check size={10} /> : <Copy size={10} />}
+                    bypass 복사
                   </button>
                 </div>
               </div>
               {summary && (
-                <div className="mt-2 p-2.5 rounded-lg bg-gradient-to-r from-clover-orange/5 to-clover-blue/5 border border-clover-orange/20">
+                <div className="mt-2 p-2.5 rounded-lg bg-gradient-to-r from-clauday-orange/5 to-clauday-blue/5 border border-clauday-orange/20">
                   <div className="flex items-center gap-1 mb-1">
-                    <Sparkles size={10} className="text-clover-orange" />
-                    <span className="text-[9px] font-semibold text-clover-orange">AI 요약</span>
+                    <Sparkles size={10} className="text-clauday-orange" />
+                    <span className="text-[9px] font-semibold text-clauday-orange">AI 요약</span>
                   </div>
                   <p className="text-xs text-text-primary leading-relaxed">{summary}</p>
                 </div>
@@ -210,7 +220,7 @@ function SessionExplorer(): JSX.Element {
               ) : messages.map((m, i) => (
                 <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[85%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed ${
-                    m.role === 'user' ? 'bg-clover-blue text-white rounded-br-sm' : 'bg-bg-surface border border-bg-border text-text-primary rounded-bl-sm'
+                    m.role === 'user' ? 'bg-clauday-blue text-white rounded-br-sm' : 'bg-bg-surface border border-bg-border text-text-primary rounded-bl-sm'
                   }`}>
                     <div className="whitespace-pre-wrap break-words">{m.content.substring(0, 500)}{m.content.length > 500 ? '...' : ''}</div>
                   </div>
@@ -243,7 +253,7 @@ const SessionRow = memo(function SessionRow({ session, isSelected, onSelect, for
       onClick={() => onSelect(session)}
       style={{ contentVisibility: 'auto', containIntrinsicSize: '0 60px' }}
       className={`px-4 py-2.5 border-b border-bg-border/50 cursor-pointer transition-colors ${
-        isSelected ? 'bg-clover-blue/5' : 'hover:bg-bg-surface-hover'
+        isSelected ? 'bg-clauday-blue/5' : 'hover:bg-bg-surface-hover'
       }`}
     >
       <div className="flex items-start justify-between gap-2">

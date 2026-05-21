@@ -95,7 +95,7 @@ function AIToolsPopover({ feature, size = 'sm', onChange }: AIToolsPopoverProps)
         <Wrench size={size === 'md' ? 13 : 12} />
         {count > 0 && (
           <span
-            className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-[3px] rounded-full bg-clover-blue text-white text-[9px] font-bold flex items-center justify-center border-2 border-bg-primary"
+            className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-[3px] rounded-full bg-clauday-blue text-white text-[9px] font-bold flex items-center justify-center border-2 border-bg-primary"
             style={{ lineHeight: 1 }}
           >
             {count}
@@ -127,7 +127,7 @@ function AIToolsPopover({ feature, size = 'sm', onChange }: AIToolsPopoverProps)
                   >
                     <span
                       className={`w-[14px] h-[14px] rounded-[4px] flex items-center justify-center flex-none ${
-                        checked ? 'bg-clover-blue' : 'bg-bg-border'
+                        checked ? 'bg-clauday-blue' : 'bg-bg-border'
                       }`}
                     >
                       {checked && <Check size={10} className="text-white" />}

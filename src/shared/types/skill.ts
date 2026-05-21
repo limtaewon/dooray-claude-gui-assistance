@@ -1,4 +1,4 @@
-export interface CloverSkill {
+export interface ClaudaySkill {
   id: string
   name: string
   description: string
@@ -18,7 +18,7 @@ export interface CloverSkill {
   updatedAt: string
 }
 
-export type SkillTarget = CloverSkill['target']
+export type SkillTarget = ClaudaySkill['target']
 
 export const SKILL_TARGETS: { value: SkillTarget; label: string; description: string }[] = [
   { value: 'briefing', label: '브리핑', description: '매일 업무 분석 · 우선순위 추천' },

@@ -208,8 +208,8 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
       <div className="w-72 flex-shrink-0 border-r border-bg-border flex flex-col">
         <div className="px-4 pt-4 pb-3 border-b border-bg-border flex-shrink-0">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-clover-orange/10 border border-clover-orange/30">
-              <Radar size={14} className="text-clover-orange" />
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-clauday-orange/10 border border-clauday-orange/30">
+              <Radar size={14} className="text-clauday-orange" />
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-sm font-bold text-text-primary leading-tight">모니터링</h2>
@@ -218,11 +218,11 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
             <button onClick={handleRefresh} disabled={refreshing}
               className="p-1.5 rounded-lg hover:bg-bg-surface text-text-tertiary hover:text-text-secondary disabled:opacity-40"
               title="새로고침">
-              <RefreshCw size={13} className={refreshing ? 'animate-spin text-clover-blue' : ''} />
+              <RefreshCw size={13} className={refreshing ? 'animate-spin text-clauday-blue' : ''} />
             </button>
           </div>
           <button onClick={() => setEditing('new')}
-            className="mt-3 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-clover-orange to-clover-blue hover:opacity-90 transition-opacity">
+            className="mt-3 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-clauday-orange to-clauday-blue hover:opacity-90 transition-opacity">
             <Plus size={12} />
             새 와처
           </button>
@@ -259,7 +259,7 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
                 return (
                   <div key={w.id}
                     className={`group flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors border-l-2 ${
-                      active ? 'bg-clover-orange/10 border-clover-orange' : 'hover:bg-bg-surface border-transparent'
+                      active ? 'bg-clauday-orange/10 border-clauday-orange' : 'hover:bg-bg-surface border-transparent'
                     }`}
                     onClick={() => setSelectedId(w.id)}>
                     <button onClick={(e) => { e.stopPropagation(); handleToggle(w) }}
@@ -268,7 +268,7 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
                       {w.enabled ? <Bell size={12} /> : <BellOff size={12} />}
                     </button>
                     <div className="flex-1 min-w-0">
-                      <div className={`text-xs font-medium truncate ${active ? 'text-clover-orange' : 'text-text-primary'}`}>
+                      <div className={`text-xs font-medium truncate ${active ? 'text-clauday-orange' : 'text-text-primary'}`}>
                         {w.name}
                       </div>
                       <div className="text-[9px] text-text-tertiary truncate">
@@ -276,7 +276,7 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
                       </div>
                     </div>
                     {count > 0 && (
-                      <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-clover-orange text-white font-bold">
+                      <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-clauday-orange text-white font-bold">
                         {count > 99 ? '99+' : count}
                       </span>
                     )}
@@ -341,7 +341,7 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
                   const saved = savedKeywords.includes(k)
                   return (
                     <span key={k} className="inline-flex items-center gap-1 h-5 px-1.5 rounded-[4px] font-mono text-[10.5px] font-semibold"
-                      style={{ background: 'rgba(234,88,12,0.14)', color: '#FB923C' }}>
+                      style={{ background: 'var(--c-orange-bg)', color: 'var(--c-orange-fg)' }}>
                       {k}
                       {!saved && (
                         <button onClick={() => removeKeyword(k)} className="opacity-70 hover:opacity-100" aria-label="키워드 제거">
@@ -372,7 +372,7 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
             {/* Stats row */}
             <div className="px-5 py-1.5 border-b border-bg-border flex items-center gap-2 flex-shrink-0 text-[10px] text-text-tertiary">
               <span>매치된 메시지 <span className="text-text-secondary font-semibold">{filteredMessages.length}</span>{messages.length !== filteredMessages.length && <span className="text-text-tertiary"> / {messages.length}</span>}</span>
-              {newCount > 0 && <span>· 신규 <span className="text-clover-orange font-semibold">{newCount}</span></span>}
+              {newCount > 0 && <span>· 신규 <span className="text-clauday-orange font-semibold">{newCount}</span></span>}
               <span>· 마지막 스캔: {lastScanText}</span>
               <div className="flex-1" />
               <button

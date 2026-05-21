@@ -12,12 +12,12 @@ const WORKFLOW_ICONS: Record<string, typeof Circle> = {
   backlog: Circle, registered: AlertCircle, working: Clock, done: CheckCircle2, closed: CheckCircle2
 }
 const WORKFLOW_COLORS: Record<string, string> = {
-  backlog: 'text-text-tertiary', registered: 'text-clover-orange', working: 'text-clover-blue',
+  backlog: 'text-text-tertiary', registered: 'text-clauday-orange', working: 'text-clauday-blue',
   done: 'text-emerald-400', closed: 'text-text-tertiary'
 }
 const WORKFLOW_BG_COLORS: Record<string, string> = {
-  backlog: 'bg-gray-500/10 text-gray-400', registered: 'bg-clover-orange/10 text-clover-orange',
-  working: 'bg-clover-blue/10 text-clover-blue', done: 'bg-emerald-400/10 text-emerald-400',
+  backlog: 'bg-gray-500/10 text-gray-400', registered: 'bg-clauday-orange/10 text-clauday-orange',
+  working: 'bg-clauday-blue/10 text-clauday-blue', done: 'bg-emerald-400/10 text-emerald-400',
   closed: 'bg-gray-500/10 text-gray-400'
 }
 
@@ -95,7 +95,7 @@ const TaskRow = memo(function TaskRow({ task, isSelected, currentTagFilter, onSe
       // content-visibility: 뷰포트 밖에 있을 때 렌더 스킵 (브라우저 내장 가상화)
       style={{ contentVisibility: 'auto', containIntrinsicSize: '0 60px' }}
       className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
-        isSelected ? 'bg-clover-blue/5' : 'hover:bg-bg-surface-hover'
+        isSelected ? 'bg-clauday-blue/5' : 'hover:bg-bg-surface-hover'
       }`}
     >
       <Icon size={14} className={`flex-shrink-0 ${color}`} />
@@ -375,7 +375,7 @@ function ProjectTaskView(): JSX.Element {
                     value={projectQuery}
                     onChange={(e) => setProjectQuery(e.target.value)}
                     placeholder="프로젝트 검색"
-                    className="w-full pl-6 pr-6 py-1 bg-bg-primary border border-bg-border rounded text-[10px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue"
+                    className="w-full pl-6 pr-6 py-1 bg-bg-primary border border-bg-border rounded text-[10px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
                   />
                   {projectQuery && (
                     <button onClick={() => setProjectQuery('')}
@@ -403,11 +403,11 @@ function ProjectTaskView(): JSX.Element {
                       onClick={() => setSelectedProject(p)}
                       className={`w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors ${
                         isSelected
-                          ? 'bg-clover-blue/10 text-clover-blue border-r-2 border-clover-blue'
+                          ? 'bg-clauday-blue/10 text-clauday-blue border-r-2 border-clauday-blue'
                           : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
                       }`}
                     >
-                      <FolderOpen size={13} className={`flex-shrink-0 ${isSelected ? 'text-clover-blue' : 'text-text-tertiary'}`} />
+                      <FolderOpen size={13} className={`flex-shrink-0 ${isSelected ? 'text-clauday-blue' : 'text-text-tertiary'}`} />
                       <span className="text-xs font-medium truncate min-w-0">{p.code}</span>
                     </button>
                   )
@@ -451,7 +451,7 @@ function ProjectTaskView(): JSX.Element {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="업무 검색..."
-                  className="w-40 px-2.5 py-1 bg-bg-surface border border-bg-border rounded text-[11px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue"
+                  className="w-40 px-2.5 py-1 bg-bg-surface border border-bg-border rounded text-[11px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
                 />
 
                 {/* 상태 드롭다운 */}
@@ -459,7 +459,7 @@ function ProjectTaskView(): JSX.Element {
                   <button
                     onClick={() => { setShowWfDropdown(!showWfDropdown); setShowTagDropdown(false) }}
                     className={`flex items-center gap-1 px-2.5 py-1 rounded text-[11px] border transition-colors ${
-                      wfFilter !== '전체' ? 'bg-clover-blue/10 border-clover-blue/30 text-clover-blue' : 'bg-bg-surface border-bg-border text-text-secondary hover:border-bg-border-light'
+                      wfFilter !== '전체' ? 'bg-clauday-blue/10 border-clauday-blue/30 text-clauday-blue' : 'bg-bg-surface border-bg-border text-text-secondary hover:border-bg-border-light'
                     }`}
                   >
                     상태: {wfFilter} <ChevronRight size={10} className={`transition-transform ${showWfDropdown ? 'rotate-90' : ''}`} />
@@ -467,17 +467,17 @@ function ProjectTaskView(): JSX.Element {
                   {showWfDropdown && (
                     <div className="absolute top-full left-0 mt-1 w-48 bg-bg-surface border border-bg-border rounded-lg shadow-xl z-20 py-1 max-h-60 overflow-y-auto">
                       <button onClick={() => { setWfFilter('전체'); setShowWfDropdown(false) }}
-                        className={`w-full text-left px-3 py-1.5 text-[11px] transition-colors ${wfFilter === '전체' ? 'bg-clover-blue/10 text-clover-blue' : 'text-text-secondary hover:bg-bg-surface-hover'}`}>
+                        className={`w-full text-left px-3 py-1.5 text-[11px] transition-colors ${wfFilter === '전체' ? 'bg-clauday-blue/10 text-clauday-blue' : 'text-text-secondary hover:bg-bg-surface-hover'}`}>
                         전체
                       </button>
                       {workflowCounts.map((wf) => (
                         <button key={wf.name} onClick={() => { setWfFilter(wf.name); setShowWfDropdown(false) }}
                           className={`w-full text-left px-3 py-1.5 text-[11px] flex items-center justify-between transition-colors ${
-                            wfFilter === wf.name ? 'bg-clover-blue/10 text-clover-blue' : 'text-text-secondary hover:bg-bg-surface-hover'
+                            wfFilter === wf.name ? 'bg-clauday-blue/10 text-clauday-blue' : 'text-text-secondary hover:bg-bg-surface-hover'
                           }`}>
                           <span className="flex items-center gap-1.5">
                             <span className={`w-1.5 h-1.5 rounded-full ${
-                              wf.cls === 'working' ? 'bg-clover-blue' : wf.cls === 'registered' ? 'bg-clover-orange' : wf.cls === 'closed' ? 'bg-emerald-400' : 'bg-gray-400'
+                              wf.cls === 'working' ? 'bg-clauday-blue' : wf.cls === 'registered' ? 'bg-clauday-orange' : wf.cls === 'closed' ? 'bg-emerald-400' : 'bg-gray-400'
                             }`} />
                             {wf.name}
                           </span>
@@ -493,7 +493,7 @@ function ProjectTaskView(): JSX.Element {
                   <button
                     onClick={() => { setShowTagDropdown(!showTagDropdown); setShowWfDropdown(false) }}
                     className={`flex items-center gap-1 px-2.5 py-1 rounded text-[11px] border transition-colors ${
-                      tagFilter !== '전체' ? 'bg-clover-blue/10 border-clover-blue/30 text-clover-blue' : 'bg-bg-surface border-bg-border text-text-secondary hover:border-bg-border-light'
+                      tagFilter !== '전체' ? 'bg-clauday-blue/10 border-clauday-blue/30 text-clauday-blue' : 'bg-bg-surface border-bg-border text-text-secondary hover:border-bg-border-light'
                     }`}
                   >
                     태그: {tagFilter} <ChevronRight size={10} className={`transition-transform ${showTagDropdown ? 'rotate-90' : ''}`} />
@@ -501,13 +501,13 @@ function ProjectTaskView(): JSX.Element {
                   {showTagDropdown && (
                     <div className="absolute top-full left-0 mt-1 w-56 bg-bg-surface border border-bg-border rounded-lg shadow-xl z-20 py-1 max-h-60 overflow-y-auto">
                       <button onClick={() => { setTagFilter('전체'); setShowTagDropdown(false) }}
-                        className={`w-full text-left px-3 py-1.5 text-[11px] transition-colors ${tagFilter === '전체' ? 'bg-clover-blue/10 text-clover-blue' : 'text-text-secondary hover:bg-bg-surface-hover'}`}>
+                        className={`w-full text-left px-3 py-1.5 text-[11px] transition-colors ${tagFilter === '전체' ? 'bg-clauday-blue/10 text-clauday-blue' : 'text-text-secondary hover:bg-bg-surface-hover'}`}>
                         전체
                       </button>
                       {tagList.map((tag) => (
                         <button key={tag.name} onClick={() => { setTagFilter(tag.name); setShowTagDropdown(false) }}
                           className={`w-full text-left px-3 py-1.5 text-[11px] flex items-center justify-between transition-colors ${
-                            tagFilter === tag.name ? 'bg-clover-blue/10 text-clover-blue' : 'text-text-secondary hover:bg-bg-surface-hover'
+                            tagFilter === tag.name ? 'bg-clauday-blue/10 text-clauday-blue' : 'text-text-secondary hover:bg-bg-surface-hover'
                           }`}>
                           <span className="flex items-center gap-1.5">
                             <span className="px-1.5 py-0.5 rounded text-[9px] border" style={tagStyle(tag.color)}>{tag.name}</span>
@@ -531,7 +531,7 @@ function ProjectTaskView(): JSX.Element {
               ) : error ? (
                 <div className="text-center py-8">
                   <p className="text-xs text-red-400">{error}</p>
-                  <button onClick={() => loadTasks(selectedProject.id)} className="text-xs text-clover-blue hover:underline mt-2">다시 시도</button>
+                  <button onClick={() => loadTasks(selectedProject.id)} className="text-xs text-clauday-blue hover:underline mt-2">다시 시도</button>
                 </div>
               ) : filteredTasks.length === 0 ? (
                 <div className="text-text-secondary text-sm text-center py-12">

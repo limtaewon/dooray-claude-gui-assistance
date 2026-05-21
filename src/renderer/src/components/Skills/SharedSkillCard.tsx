@@ -27,16 +27,22 @@ function SharedSkillCard({ skill, busy, onOpen, onDownload, onDelete }: SharedSk
   return (
     <div
       onClick={onOpen}
-      className="ds-card group cursor-pointer relative hover:border-clover-blue/40 transition-colors"
+      className="ds-card group cursor-pointer relative hover:border-clauday-blue/40 transition-colors"
       style={{ padding: '12px 14px' }}
     >
       <div className="flex items-start gap-2.5">
-        <div className="w-7 h-7 rounded-[6px] flex-none flex items-center justify-center bg-clover-blue/10">
-          <Sparkles size={15} className="text-clover-blue" />
+        <div className="w-7 h-7 rounded-[6px] flex-none flex items-center justify-center bg-clauday-blue/10">
+          <Sparkles size={15} className="text-clauday-blue" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-[13px] font-semibold text-text-primary truncate">{skill.name}</div>
-          <div className="flex items-center gap-1 text-[10.5px] text-text-tertiary mt-0.5">
+          {/* frontmatter description — 2줄까지. 없으면 작성자 정보가 한 줄 위로. */}
+          {skill.description && (
+            <div className="text-[11px] text-text-secondary mt-0.5 leading-relaxed line-clamp-2">
+              {skill.description}
+            </div>
+          )}
+          <div className="flex items-center gap-1 text-[10.5px] text-text-tertiary mt-1">
             <User size={10} />
             <span className="truncate">{skill.authorName}{skill.isMine && ' · 나'}</span>
           </div>
@@ -58,7 +64,7 @@ function SharedSkillCard({ skill, busy, onOpen, onDownload, onDelete }: SharedSk
         <button
           onClick={(e) => { e.stopPropagation(); onDownload() }}
           disabled={busy}
-          className="flex items-center gap-1 text-[11px] text-clover-blue hover:text-clover-blue/80 font-medium disabled:opacity-40"
+          className="flex items-center gap-1 text-[11px] text-clauday-blue hover:text-clauday-blue/80 font-medium disabled:opacity-40"
         >
           <Download size={11} /> 다운로드
         </button>

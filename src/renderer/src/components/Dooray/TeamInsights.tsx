@@ -92,8 +92,8 @@ function TeamInsights(): JSX.Element {
 
       {/* 요약 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <StatCard label="전체 태스크" value={totalStats.total} icon={BarChart3} color="text-clover-blue" />
-        <StatCard label="진행중" value={totalStats.working} icon={TrendingUp} color="text-clover-blue" />
+        <StatCard label="전체 태스크" value={totalStats.total} icon={BarChart3} color="text-clauday-blue" />
+        <StatCard label="진행중" value={totalStats.working} icon={TrendingUp} color="text-clauday-blue" />
         <StatCard label="완료율" value={`${completionRate}%`} icon={Users} color="text-emerald-400" />
         <StatCard label="지연" value={totalStats.overdue} icon={AlertTriangle} color="text-red-400" />
       </div>
@@ -110,12 +110,12 @@ function TeamInsights(): JSX.Element {
                 title={`백로그 ${totalStats.backlog}`}
               />
               <div
-                className="bg-clover-orange h-full transition-all"
+                className="bg-clauday-orange h-full transition-all"
                 style={{ width: `${(totalStats.registered / totalStats.total) * 100}%` }}
                 title={`등록 ${totalStats.registered}`}
               />
               <div
-                className="bg-clover-blue h-full transition-all"
+                className="bg-clauday-blue h-full transition-all"
                 style={{ width: `${(totalStats.working / totalStats.total) * 100}%` }}
                 title={`진행중 ${totalStats.working}`}
               />
@@ -129,8 +129,8 @@ function TeamInsights(): JSX.Element {
         </div>
         <div className="flex gap-4 mt-1.5">
           <Legend color="bg-gray-400" label="백로그" count={totalStats.backlog} />
-          <Legend color="bg-clover-orange" label="등록" count={totalStats.registered} />
-          <Legend color="bg-clover-blue" label="진행중" count={totalStats.working} />
+          <Legend color="bg-clauday-orange" label="등록" count={totalStats.registered} />
+          <Legend color="bg-clauday-blue" label="진행중" count={totalStats.working} />
           <Legend color="bg-emerald-400" label="완료" count={totalStats.closed} />
         </div>
       </div>
@@ -159,8 +159,8 @@ function TeamInsights(): JSX.Element {
                   {activeTotal > 0 && (
                     <>
                       <div className="bg-gray-400 h-full" style={{ width: `${(p.backlog / activeTotal) * 100}%` }} />
-                      <div className="bg-clover-orange h-full" style={{ width: `${(p.registered / activeTotal) * 100}%` }} />
-                      <div className="bg-clover-blue h-full" style={{ width: `${(p.working / activeTotal) * 100}%` }} />
+                      <div className="bg-clauday-orange h-full" style={{ width: `${(p.registered / activeTotal) * 100}%` }} />
+                      <div className="bg-clauday-blue h-full" style={{ width: `${(p.working / activeTotal) * 100}%` }} />
                       <div className="bg-emerald-400 h-full" style={{ width: `${(p.closed / activeTotal) * 100}%` }} />
                     </>
                   )}

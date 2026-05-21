@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   LayoutDashboard, Plus, Loader2, RotateCcw, Target, ArrowRight, FileText,
-  Wand2, ChevronRight, ChevronDown, Send, Timer
+  Wand2, ChevronRight, ChevronDown, Send, Timer, Image as ImageIcon, X
 } from 'lucide-react'
 import type { DoorayTask, DoorayProject } from '../../../../shared/types/dooray'
 import SkillQuickToggle from './SkillQuickToggle'
+import AIToolsPopover from '../common/AIToolsPopover'
 import {
   Button, Chip, Card, Avatar, Input, Textarea, FieldLabel, Kbd,
   EmptyView, LoadingView, useToast, type ChipTone
@@ -69,6 +70,7 @@ function DashboardView(): JSX.Element {
   const [composing, setComposing] = useState(false)
   const [creating, setCreating] = useState(false)
   const [activeTemplateName, setActiveTemplateName] = useState<string | null>(null)
+  const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null)
 
   // 템플릿
   const [templates, setTemplates] = useState<Array<{ id: string; name: string }>>([])
@@ -77,6 +79,9 @@ function DashboardView(): JSX.Element {
   // 빠른 태스크 생성: 프로젝트별 태그. 일부 프로젝트는 태그 필수라 미선택 시 생성 실패.
   const [availableTags, setAvailableTags] = useState<Array<{ id: string; name: string; color: string }>>([])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+  // AI 자동작성 이미지 첨부 (paste/drop) — 절대경로 list
+  const [aiImages, setAiImages] = useState<string[]>([])
+  const [aiDropActive, setAiDropActive] = useState(false)
 
   const [createExpanded, setCreateExpanded] = useState<boolean>(
     () => localStorage.getItem(CREATE_EXPANDED_KEY) === '1'
@@ -184,6 +189,7 @@ function DashboardView(): JSX.Element {
       setSubject(detail.subject || detail.name || templateName)
       setBody(detail.body || '')
       setActiveTemplateName(detail.name || templateName)
+      setActiveTemplateId(templateId)
     } catch (err) {
       toast.error('템플릿 로드 실패', err instanceof Error ? err.message : String(err))
     }
@@ -191,47 +197,96 @@ function DashboardView(): JSX.Element {
 
   // AI로 채우기
   const composeWithAI = async (): Promise<void> => {
-    const hasInput = aiHint.trim() || subject.trim() || body.trim()
+    const hasInput = aiHint.trim() || subject.trim() || body.trim() || aiImages.length > 0
     if (!hasInput) {
-      toast.warn('내용이 필요해요', 'AI 지시 또는 편집 중인 내용이 있어야 합니다')
+      toast.warn('내용이 필요해요', 'AI 지시·편집 중인 내용·이미지 중 하나는 있어야 합니다')
       return
     }
     setComposing(true)
     try {
       const hasExisting = subject.trim() || body.trim()
+      // 태그 후보 — id/name 둘 다 노출해 AI 가 정확한 id 로 선택하도록
+      const tagCatalog = availableTags.length > 0
+        ? `\n\n[선택 가능한 태그 — 가장 적합한 것만 골라 id 로 반환]
+${JSON.stringify(availableTags.map((t) => ({ id: t.id, name: t.name })))}`
+        : ''
+      const imageHint = aiImages.length > 0 ? `\n\n첨부된 이미지를 우선 분석하여 화면/오류/스크린샷 등 시각 정보를 본문에 반영하세요.` : ''
       const prompt = hasExisting
-        ? `다음 두레이 태스크 초안을 다듬으세요.${aiHint.trim() ? ` 지시: ${aiHint.trim()}` : ' 가독성·구조 개선.'}${activeTemplateName ? ` (템플릿 "${activeTemplateName}" 기반)` : ''}
+        ? `다음 두레이 태스크 초안을 다듬으세요.${aiHint.trim() ? ` 지시: ${aiHint.trim()}` : ' 가독성·구조 개선.'}${activeTemplateName ? ` (템플릿 "${activeTemplateName}" 기반)` : ''}${imageHint}
 
 [현재 제목]
 ${subject || '(비어있음)'}
 
 [현재 본문]
-${body || '(비어있음)'}
+${body || '(비어있음)'}${tagCatalog}
 
 JSON 형태로만 응답:
-{"subject": "...", "body": "..."}`
-        : `다음 자연어 지시를 두레이 태스크로 변환하세요.
+{"subject": "...", "body": "...", "tagIds": ["선택한 태그 id 0~N개"]}`
+        : `다음 자연어 지시를 두레이 태스크로 변환하세요.${imageHint}
 
-지시: ${aiHint.trim()}
+지시: ${aiHint.trim() || '(첨부 이미지를 분석해서 적절한 태스크 초안 작성)'}${tagCatalog}
 
 JSON 형태로만 응답:
-{"subject": "짧고 동사로 시작한 제목", "body": "마크다운 본문 — 목적/배경/체크리스트"}`
+{"subject": "짧고 동사로 시작한 제목", "body": "마크다운 본문 — 목적/배경/체크리스트", "tagIds": ["선택한 태그 id 0~N개"]}`
 
-      const raw = await window.api.ai.ask({ prompt, feature: 'summarizeTask' })
+      // task 스킬이 mcp__dooray-mcp__* 같은 도구 호출을 지시할 수 있으므로 사용자가 선택한 MCP 서버 목록을 함께 넘긴다.
+      const mcpServers = await AIToolsPopover.loadSelected('task')
+      const raw = await window.api.ai.ask({
+        prompt,
+        feature: 'summarizeTask',
+        imagePaths: aiImages.length > 0 ? aiImages : undefined,
+        mcpServers: mcpServers.length > 0 ? mcpServers : undefined
+      })
       const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim()
       const match = cleaned.match(/\{[\s\S]*\}/)
       if (!match) throw new Error('AI 응답에서 JSON을 찾을 수 없습니다')
-      const parsed = JSON.parse(match[0]) as { subject?: string; body?: string }
+      const parsed = JSON.parse(match[0]) as { subject?: string; body?: string; tagIds?: string[] }
       if (!parsed.subject) throw new Error('제목이 비어있습니다')
       setSubject(parsed.subject)
       setBody(parsed.body || '')
-      toast.ai('AI가 채웠어요', '제목과 본문을 확인 후 생성하세요')
+      // 태그 자동 선택 — 응답에 명시된 tagIds 중 실제 availableTags 에 있는 것만 반영
+      if (Array.isArray(parsed.tagIds) && parsed.tagIds.length > 0) {
+        const valid = new Set(availableTags.map((t) => t.id))
+        const picked = parsed.tagIds.filter((id) => valid.has(id))
+        if (picked.length > 0) setSelectedTagIds(picked)
+      }
+      toast.ai('AI가 채웠어요', `제목·본문${parsed.tagIds && parsed.tagIds.length > 0 ? '·태그' : ''}을 확인 후 생성하세요`)
     } catch (err) {
       toast.error('AI 변환 실패', err instanceof Error ? err.message : String(err))
     } finally {
       setComposing(false)
     }
   }
+
+  // 이미지 첨부 — File 또는 ArrayBuffer 받아서 main 에 저장 후 절대경로를 state 에 추가
+  const attachImage = async (file: File): Promise<void> => {
+    try {
+      const buf = await file.arrayBuffer()
+      const name = file.name || `pasted-${Date.now()}.png`
+      const abs = await window.api.claude.saveAttachment(name, buf)
+      setAiImages((prev) => [...prev, abs])
+    } catch (err) {
+      toast.error('이미지 첨부 실패', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  const handleAiPaste = useCallback(async (e: React.ClipboardEvent): Promise<void> => {
+    const items = Array.from(e.clipboardData?.items || [])
+    const imgs = items.filter((it) => it.type.startsWith('image/'))
+    if (imgs.length === 0) return
+    e.preventDefault()
+    for (const it of imgs) {
+      const f = it.getAsFile()
+      if (f) await attachImage(f)
+    }
+  }, [])
+
+  const handleAiDrop = useCallback(async (e: React.DragEvent): Promise<void> => {
+    e.preventDefault()
+    setAiDropActive(false)
+    const files = Array.from(e.dataTransfer?.files || []).filter((f) => f.type.startsWith('image/'))
+    for (const f of files) await attachImage(f)
+  }, [])
 
   const createOnDooray = async (): Promise<void> => {
     if (!subject.trim()) { toast.warn('제목이 필요해요', '태스크 제목을 먼저 입력하세요'); return }
@@ -242,11 +297,12 @@ JSON 형태로만 응답:
         projectId: nlProject,
         subject: subject.trim(),
         body: body,
-        tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined
+        tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
+        templateId: activeTemplateId || undefined
       })
       const proj = projects.find((p) => p.id === nlProject)
       toast.success(`${proj?.code || '프로젝트'}에 생성됨`, `"${subject.trim()}" 태스크가 두레이에 등록됐어요`)
-      setSubject(''); setBody(''); setAiHint(''); setActiveTemplateName(null); setSelectedTagIds([])
+      setSubject(''); setBody(''); setAiHint(''); setActiveTemplateName(null); setActiveTemplateId(null); setSelectedTagIds([]); setAiImages([])
       // 방금 생성한 태스크가 즉시 보이도록 캐시 우회
       await load(true)
     } catch (err) {
@@ -263,7 +319,7 @@ JSON 형태로만 응답:
 
   const reset = (): void => {
     if ((subject.trim() || body.trim()) && !window.confirm('편집 중인 내용을 모두 지울까요?')) return
-    setSubject(''); setBody(''); setAiHint(''); setActiveTemplateName(null)
+    setSubject(''); setBody(''); setAiHint(''); setActiveTemplateName(null); setAiImages([]); setSelectedTagIds([])
   }
 
   // 프로젝트 설정이 비어있으면 전체 프로젝트가 그대로 깔리기 때문에 헤더 칩이 가로로 넘쳐 깨진다.
@@ -314,7 +370,7 @@ JSON 형태로만 응답:
                   ].map((opt) => (
                     <div
                       key={opt.v}
-                      className={`ds-menu-item ${autoSyncMin === opt.v ? 'text-clover-blue font-semibold' : ''}`}
+                      className={`ds-menu-item ${autoSyncMin === opt.v ? 'text-clauday-blue font-semibold' : ''}`}
                       onClick={() => setAndSaveAutoSync(opt.v)}
                     >
                       {opt.label}
@@ -346,7 +402,7 @@ JSON 형태로만 응답:
             {createExpanded
               ? <ChevronDown size={12} className="text-text-secondary" />
               : <ChevronRight size={12} className="text-text-secondary" />}
-            <Plus size={12} className="text-clover-blue" />
+            <Plus size={12} className="text-clauday-blue" />
             <span className="text-[12px] font-semibold text-text-primary">빠른 태스크 생성</span>
             <span className="text-[10px] text-text-tertiary">· 템플릿 · AI · 직접 입력 모두 가능</span>
             <div className="flex-1" />
@@ -355,40 +411,32 @@ JSON 형태로만 응답:
 
           {createExpanded && (
             <div className="px-3 pb-3 pt-2 border-t border-bg-border flex flex-col gap-2">
-              {/* 프로젝트 + 제목 — 좁은 폭에서는 세로 stack */}
-              <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2">
-                <div className="flex flex-col gap-1">
-                  <FieldLabel>프로젝트</FieldLabel>
-                  <select
-                    className="ds-input sm"
-                    value={nlProject}
-                    onChange={(e) => setNlProject(e.target.value)}
-                  >
-                    {projects.map((p) => <option key={p.id} value={p.id}>{p.code}</option>)}
-                  </select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <FieldLabel>제목</FieldLabel>
-                  <Input
-                    size="sm"
-                    placeholder="예: 로그인 세션 만료 이슈 수정"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                  />
-                </div>
+              {/* 1) 프로젝트 */}
+              <div className="flex flex-col gap-1">
+                <FieldLabel>프로젝트</FieldLabel>
+                <select
+                  className="ds-input sm"
+                  value={nlProject}
+                  onChange={(e) => setNlProject(e.target.value)}
+                >
+                  {projects.map((p) => <option key={p.id} value={p.id}>{p.code}</option>)}
+                </select>
               </div>
 
-              {/* 본문 + 도구 바 */}
-              <div className="flex flex-col gap-1">
+              {/* 2) AI 자동작성 패널 — 자연어 지시(textarea) + 이미지 첨부 (drop/paste) + 태그 자동 선택 */}
+              <div
+                className={`rounded-lg bg-clauday-orange/5 px-3 py-2.5 flex flex-col gap-2 transition-colors ${aiDropActive ? 'ring-2 ring-clauday-orange' : ''}`}
+                onDragOver={(e) => { e.preventDefault(); setAiDropActive(true) }}
+                onDragLeave={() => setAiDropActive(false)}
+                onDrop={handleAiDrop}
+              >
                 <div className="flex items-center gap-2">
-                  <FieldLabel className="!mb-0">본문</FieldLabel>
-                  <span className="text-[10px] text-text-tertiary">· 마크다운</span>
-                  {activeTemplateName && (
-                    <span className="text-[10px] text-text-tertiary">· 템플릿: <span className="text-text-secondary font-medium">{activeTemplateName}</span></span>
-                  )}
+                  <Wand2 size={12} className="text-clauday-orange" />
+                  <span className="text-[11px] font-semibold text-text-primary">AI 자동작성</span>
+                  <span className="text-[10px] text-text-tertiary">자연어 + 이미지로 제목·본문·태그까지 한 번에</span>
                   <div className="flex-1" />
-
-                  {/* 템플릿 드롭다운 */}
+                  <AIToolsPopover feature="task" size="sm" />
+                  <SkillQuickToggle target="task" />
                   <div className="relative">
                     <Button
                       variant="secondary"
@@ -419,13 +467,76 @@ JSON 형태로만 응답:
                       </>
                     )}
                   </div>
+                </div>
 
-                  <SkillQuickToggle target="task" />
+                {/* Textarea — 높이 ↑, paste 이미지 핸들 */}
+                <Textarea
+                  rows={4}
+                  className="!text-[12px]"
+                  style={{ resize: 'vertical' }}
+                  placeholder={'예: "로그인 세션 만료 이슈 — 30분으로 늘리는 작업"\n또는 화면 스크린샷을 붙여넣기/드래그하여 첨부하세요'}
+                  value={aiHint}
+                  onChange={(e) => setAiHint(e.target.value)}
+                  onPaste={handleAiPaste}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !composing) {
+                      e.preventDefault()
+                      composeWithAI()
+                    }
+                  }}
+                />
+
+                {/* 첨부 이미지 미리보기 칩 */}
+                {aiImages.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {aiImages.map((p, i) => (
+                      <div key={`${p}-${i}`}
+                        className="flex items-center gap-1 px-2 py-1 rounded bg-bg-surface border border-bg-border text-[10px] text-text-secondary">
+                        <ImageIcon size={10} className="text-clauday-orange" />
+                        <span className="font-mono truncate max-w-[180px]" title={p}>{p.split(/[/\\]/).pop()}</span>
+                        <button
+                          onClick={() => setAiImages((prev) => prev.filter((_, idx) => idx !== i))}
+                          className="text-text-tertiary hover:text-red-400"
+                          title="첨부 제거"
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-text-tertiary flex-1">
+                    {aiImages.length > 0 ? `🖼 이미지 ${aiImages.length}장 첨부됨 — Vision 으로 함께 분석` : '⌘+Enter 로 실행 · 이미지는 paste/drop'}
+                  </span>
                   <Button variant="ai" onClick={composeWithAI}
                     disabled={composing}
                     leftIcon={composing ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}>
-                    {composing ? 'AI 작업 중...' : 'AI로 채우기'}
+                    {composing ? '작성 중...' : 'AI 채우기'}
                   </Button>
+                </div>
+              </div>
+
+              {/* 3) 제목 */}
+              <div className="flex flex-col gap-1">
+                <FieldLabel>제목</FieldLabel>
+                <Input
+                  size="sm"
+                  placeholder="예: 로그인 세션 만료 이슈 수정"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                />
+              </div>
+
+              {/* 4) 본문 */}
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <FieldLabel className="!mb-0">본문</FieldLabel>
+                  <span className="text-[10px] text-text-tertiary">· 마크다운</span>
+                  {activeTemplateName && (
+                    <span className="text-[10px] text-text-tertiary">· 템플릿: <span className="text-text-secondary font-medium">{activeTemplateName}</span></span>
+                  )}
                 </div>
 
                 <Textarea
@@ -438,59 +549,14 @@ JSON 형태로만 응답:
                 />
               </div>
 
-              {/* 태그 — "Group: Name" 형식이면 그룹별로 묶고, AI 가 본문 기반으로 추천 가능 */}
+              {/* 5) 태그 — "Group: Name" 형식이면 그룹별로 묶음. AI 채우기 시 자동 선택. */}
               {availableTags.length > 0 && (
                 <TagPickerSection
                   tags={availableTags}
                   selectedIds={selectedTagIds}
                   onChange={setSelectedTagIds}
-                  onAiSuggest={async () => {
-                    if (!subject.trim() && !body.trim() && !aiHint.trim()) {
-                      toast.warn('내용이 필요해요', '제목·본문·AI 지시 중 하나는 입력하세요')
-                      return
-                    }
-                    try {
-                      const tagsList = availableTags.map((t) => `${t.id}::${t.name}`).join('\n')
-                      const prompt = `다음 두레이 태스크에 가장 적절한 태그를 골라주세요.
-제목: ${subject || '(없음)'}
-본문: ${body || '(없음)'}
-지시: ${aiHint || '(없음)'}
-
-가능한 태그 (id::이름):
-${tagsList}
-
-규칙:
-- "그룹: 이름" 형식 태그가 있으면 각 그룹에서 가장 적합한 1개만 선택 (필수 그룹 대응)
-- 명백히 부적합한 태그는 제외
-- 확실하지 않으면 빈 배열 반환
-
-JSON 으로만 응답:
-{"tagIds": ["id1", "id2", ...]}`
-                      const raw = await window.api.ai.ask({ prompt, feature: 'summarizeTask' })
-                      const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim()
-                      const m = cleaned.match(/\{[\s\S]*\}/)
-                      if (!m) throw new Error('AI 응답에서 JSON을 찾지 못했습니다')
-                      const parsed = JSON.parse(m[0]) as { tagIds?: string[] }
-                      const valid = (parsed.tagIds || []).filter((id) => availableTags.some((t) => t.id === id))
-                      setSelectedTagIds(valid)
-                      toast.ai(`AI 추천 태그 ${valid.length}개 적용`)
-                    } catch (err) {
-                      toast.error('AI 태그 추천 실패', err instanceof Error ? err.message : String(err))
-                    }
-                  }}
                 />
               )}
-
-              {/* AI 지시 (선택) */}
-              <div className="flex flex-col gap-1">
-                <FieldLabel>AI 지시 (선택)</FieldLabel>
-                <Input
-                  size="sm"
-                  placeholder="자연어로 설명하고 'AI로 채우기' 클릭"
-                  value={aiHint}
-                  onChange={(e) => setAiHint(e.target.value)}
-                />
-              </div>
 
               {/* 하단 액션 */}
               <div className="flex items-center gap-2">
@@ -582,17 +648,15 @@ function formatDue(due?: string): string {
 
 /**
  * 태그 선택 영역 — "Group: Name" 형식이면 그룹별로 묶어 표시.
- * 그룹별 라벨 옆에 (필수 의심) 안내문은 미지원 — 두레이 API 가 group required 정보를 안 주므로
- * 사용자가 AI 추천을 누르거나 직접 그룹 당 1개씩 선택하도록 유도.
+ * 두레이 API 가 group required 정보를 안 주므로 사용자가 직접 그룹 당 1개씩 선택.
  */
 interface TagPickerSectionProps {
   tags: Array<{ id: string; name: string; color: string }>
   selectedIds: string[]
   onChange: (ids: string[]) => void
-  onAiSuggest: () => void | Promise<void>
 }
 
-function TagPickerSection({ tags, selectedIds, onChange, onAiSuggest }: TagPickerSectionProps): JSX.Element {
+function TagPickerSection({ tags, selectedIds, onChange }: TagPickerSectionProps): JSX.Element {
   // "Group: Name" 또는 "Group/Name" 형식이면 그룹 추출. 그 외는 "기타" 그룹.
   const groups = useMemo(() => {
     const map = new Map<string, Array<{ id: string; name: string; color: string; label: string }>>()
@@ -621,10 +685,6 @@ function TagPickerSection({ tags, selectedIds, onChange, onAiSuggest }: TagPicke
         <span className="text-[10px] text-text-tertiary">
           그룹별 1개씩 선택 권장 (프로젝트에 따라 일부 그룹은 필수)
         </span>
-        <div className="flex-1" />
-        <Button variant="ai" onClick={() => void onAiSuggest()} leftIcon={<Wand2 size={11} />}>
-          AI 추천
-        </Button>
       </div>
       <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">
         {groups.map(([groupName, items]) => (
@@ -635,17 +695,24 @@ function TagPickerSection({ tags, selectedIds, onChange, onAiSuggest }: TagPicke
             <div className="flex flex-wrap gap-1 flex-1">
               {items.map((tag) => {
                 const selected = selectedIds.includes(tag.id)
+                // 외부에서 들어온 hex는 hue로만 사용 — color-mix로 surface와 섞고
+                // 글자색은 var(--text-primary)로 가독성 보장 (라이트/다크 둘 다 자동)
+                const hex = `#${tag.color}`
                 return (
                   <button
                     key={tag.id}
                     type="button"
                     onClick={() => toggle(tag.id)}
-                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
-                      selected
-                        ? 'border-clover-orange bg-clover-orange/15 text-text-primary'
-                        : 'border-bg-border text-text-secondary hover:border-clover-orange/50'
-                    }`}
-                    style={selected ? undefined : { color: `#${tag.color}` }}
+                    className="text-[10px] px-2 py-0.5 rounded-full border transition-colors"
+                    style={{
+                      background: selected
+                        ? `color-mix(in oklab, ${hex} 35%, var(--bg-surface))`
+                        : `color-mix(in oklab, ${hex} 14%, var(--bg-surface))`,
+                      borderColor: selected
+                        ? `color-mix(in oklab, ${hex} 80%, var(--text-secondary))`
+                        : `color-mix(in oklab, ${hex} 55%, var(--bg-border))`,
+                      color: 'var(--text-primary)'
+                    }}
                   >
                     {tag.label}
                   </button>

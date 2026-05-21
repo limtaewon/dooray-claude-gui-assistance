@@ -250,9 +250,9 @@ function WikiManager(): JSX.Element {
                 <div key={d.id} className="flex items-center group">
                   <button onClick={() => setSelectedDomain(d)}
                     className={`flex-1 flex items-center gap-2 px-3 py-1.5 text-left transition-colors ${
-                      isSelected ? 'bg-clover-blue/10 text-clover-blue border-r-2 border-clover-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
+                      isSelected ? 'bg-clauday-blue/10 text-clauday-blue border-r-2 border-clauday-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
                     }`}>
-                    <FolderOpen size={11} className={`flex-shrink-0 ${isSelected ? 'text-clover-blue' : 'text-text-tertiary'}`} />
+                    <FolderOpen size={11} className={`flex-shrink-0 ${isSelected ? 'text-clauday-blue' : 'text-text-tertiary'}`} />
                     <span className="text-[11px] font-medium truncate min-w-0">{d.name}</span>
                   </button>
                   <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity mr-1">
@@ -291,7 +291,7 @@ function WikiManager(): JSX.Element {
               <div className="relative">
                 <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary" />
                 <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="페이지 검색..."
-                  className="w-full pl-6 pr-2 py-1 bg-bg-primary border border-bg-border rounded text-[10px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-blue" />
+                  className="w-full pl-6 pr-2 py-1 bg-bg-primary border border-bg-border rounded text-[10px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue" />
               </div>
             </div>
             <div className="flex-1 overflow-y-auto py-1">
@@ -320,9 +320,9 @@ function WikiManager(): JSX.Element {
                 ].map((a) => (
                   <button key={a.key} onClick={() => runAi(a.key)} disabled={aiLoading || !pageContent} title={a.desc}
                     className={`flex items-center gap-1 px-2 py-1 rounded-md border text-[10px] transition-colors disabled:opacity-40 ${
-                      aiAction === a.key && aiResult ? 'bg-clover-orange/10 border-clover-orange/30 text-clover-orange' : 'bg-bg-surface border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light'
+                      aiAction === a.key && aiResult ? 'bg-clauday-orange/10 border-clauday-orange/30 text-clauday-orange' : 'bg-bg-surface border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light'
                     }`}>
-                    <Sparkles size={9} className="text-clover-orange" /> {a.label}
+                    <Sparkles size={9} className="text-clauday-orange" /> {a.label}
                   </button>
                 ))}
                 <div className="ml-auto"><SkillQuickToggle target="all" /></div>
@@ -348,8 +348,8 @@ function WikiManager(): JSX.Element {
                   {/* 결과 도구바 */}
                   <div className="flex items-center justify-between px-4 py-2 border-b border-bg-border bg-bg-surface/50 flex-shrink-0">
                     <div className="flex items-center gap-1.5">
-                      <Sparkles size={12} className="text-clover-orange" />
-                      <span className="text-[11px] font-semibold text-clover-orange">
+                      <Sparkles size={12} className="text-clauday-orange" />
+                      <span className="text-[11px] font-semibold text-clauday-orange">
                         {aiAction === 'proofread' ? '교정 결과' : aiAction === 'improve' ? '개선 결과' : 'AI 결과'}
                       </span>
                     </div>
@@ -357,7 +357,7 @@ function WikiManager(): JSX.Element {
                       {canPush && (
                         <>
                           <button onClick={() => { if (editMode) setEditMode(false); else { setEditContent(aiResult || ''); setEditMode(true) } }}
-                            className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] ${editMode ? 'bg-clover-blue/10 text-clover-blue' : 'text-text-secondary hover:text-text-primary'}`}>
+                            className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] ${editMode ? 'bg-clauday-blue/10 text-clauday-blue' : 'text-text-secondary hover:text-text-primary'}`}>
                             {editMode ? <><Eye size={9} /> 미리보기</> : <><Edit3 size={9} /> 편집</>}
                           </button>
                           <button onClick={pushToWiki} disabled={pushing}
@@ -383,7 +383,7 @@ function WikiManager(): JSX.Element {
                       <AIProgressIndicator progress={aiProgress} showStreamPreview />
                     ) : editMode ? (
                       <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)}
-                        className="w-full min-h-[400px] bg-bg-primary border border-bg-border rounded-lg p-3 text-xs text-text-primary font-mono focus:outline-none focus:border-clover-blue resize-y" />
+                        className="w-full min-h-[400px] bg-bg-primary border border-bg-border rounded-lg p-3 text-xs text-text-primary font-mono focus:outline-none focus:border-clauday-blue resize-y" />
                     ) : (
                       <div className="markdown-body text-xs leading-relaxed">
                         <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>{aiResult || ''}</ReactMarkdown>
@@ -418,7 +418,7 @@ const TreeRow = memo(function TreeRow({ node, depth, isSelected, onToggle, onSel
       <div
         style={{ paddingLeft: `${depth * 14 + 6}px`, contentVisibility: 'auto', containIntrinsicSize: '0 24px' }}
         className={`flex items-center gap-1 py-1 cursor-pointer transition-colors rounded ${
-          isSelected ? 'bg-clover-blue/10 text-clover-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
+          isSelected ? 'bg-clauday-blue/10 text-clauday-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
         }`}
       >
         <button onClick={(e) => { e.stopPropagation(); onToggle(node.page.id) }} className="flex-shrink-0 w-4 h-4 flex items-center justify-center">

@@ -15,12 +15,12 @@
   white-space: nowrap; flex: none;
 }
 .ds-chip.sq { border-radius: 4px; }
-.ds-chip.blue     { background: rgba(37,99,235,0.12); color: #60A5FA; }
-.ds-chip.orange   { background: rgba(234,88,12,0.12); color: #FB923C; }
-.ds-chip.emerald  { background: rgba(34,197,94,0.14); color: #22C55E; }
-.ds-chip.red      { background: rgba(239,68,68,0.14); color: #F87171; }
-.ds-chip.violet   { background: rgba(167,139,250,0.14); color: #A78BFA; }
-.ds-chip.yellow   { background: rgba(250,204,21,0.14); color: #FACC15; }
+.ds-chip.blue     { background: var(--c-blue-bg);    color: var(--c-blue-fg); }
+.ds-chip.orange   { background: var(--c-orange-bg);  color: var(--c-orange-fg); }
+.ds-chip.emerald  { background: var(--c-emerald-bg); color: var(--c-emerald-fg); }
+.ds-chip.red      { background: var(--c-red-bg);     color: var(--c-red-fg); }
+.ds-chip.violet   { background: var(--c-violet-bg);  color: var(--c-violet-fg); }
+.ds-chip.yellow   { background: var(--c-yellow-bg);  color: var(--c-yellow-fg); }
 .ds-chip.neutral  { background: var(--bg-surface); color: var(--text-secondary); border: 1px solid var(--bg-border); }
 .ds-chip .dot     { width: 5px; height: 5px; border-radius: 999px; background: currentColor; }
 
@@ -51,7 +51,7 @@
   background: linear-gradient(180deg, #1E3A7F 0%, #1E3A7F 100%);
 }
 .ds-btn.ai {
-  background-image: linear-gradient(135deg, var(--clover-orange-light) 0%, var(--clover-blue-light) 100%);
+  background-image: var(--ai-gradient);
   background-color: transparent;
   color: #fff;
   border: 0;
@@ -64,8 +64,8 @@
   filter: none;
 }
 .ds-btn.ai:focus, .ds-btn.ai:focus-visible { outline: none; }
-.ds-btn.success   { background: #10B981; color: #fff; }
-.ds-btn.success:hover   { background: rgba(16,185,129,.88); }
+.ds-btn.success   { background: var(--c-emerald-solid); color: #fff; }
+.ds-btn.success:hover   { background: var(--c-emerald-solid); opacity: 0.88; }
 .ds-btn.secondary { background: var(--bg-surface); color: var(--text-primary); border-color: var(--bg-border); }
 
 /* ---------- Toolbar Buttons (compact, header bar) ----------
@@ -94,33 +94,23 @@
 .ds-btn.secondary:hover { background: var(--bg-surface-hover); }
 .ds-btn.ghost     { color: var(--text-secondary); }
 .ds-btn.ghost:hover     { background: var(--bg-surface-hover); color: var(--text-primary); }
-.ds-btn.danger    { color: #F87171; }
-.ds-btn.danger:hover    { background: rgba(239,68,68,0.10); }
-.ds-btn.orange    { background: var(--clover-orange); color: #fff; }
-.ds-btn.orange:hover    { background: rgba(234,88,12,0.88); }
-/* skill-active: AI 설정 버튼 활성 상태 (테마별 amber 톤) */
+.ds-btn.danger    { color: var(--c-red-fg); }
+.ds-btn.danger:hover    { background: var(--c-red-bg); }
+.ds-btn.orange    { background: var(--c-orange-solid); color: #fff; }
+.ds-btn.orange:hover    { background: var(--c-orange-solid); opacity: 0.88; }
+/* skill-active: AI 설정 버튼 활성 상태 — 모드별 yellow 페어 토큰 사용 */
 .ds-btn.skill-active {
-  background: rgba(245, 158, 11, 0.15);
-  color: #FCD34D;
-  border: 1px solid rgba(251, 191, 36, 0.40);
+  background: var(--c-yellow-bg);
+  color: var(--c-yellow-fg);
+  border: 1px solid color-mix(in oklab, var(--c-yellow-fg) 40%, transparent);
   font-weight: 600;
 }
 .ds-btn.skill-active:hover {
-  background: rgba(245, 158, 11, 0.22);
-  border-color: rgba(251, 191, 36, 0.55);
+  background: var(--c-yellow-bg);
+  border-color: color-mix(in oklab, var(--c-yellow-fg) 55%, transparent);
+  filter: brightness(1.05);
 }
-.ds-btn.skill-active .skill-active-icon { color: #FCD34D; }
-/* 라이트 모드: 흰 바탕에서 amber-300 은 보이지 않으므로 진한 앰버로 */
-[data-theme='light'] .ds-btn.skill-active {
-  background: rgba(217, 119, 6, 0.12);
-  color: #B45309;
-  border-color: rgba(217, 119, 6, 0.45);
-}
-[data-theme='light'] .ds-btn.skill-active:hover {
-  background: rgba(217, 119, 6, 0.20);
-  border-color: rgba(217, 119, 6, 0.60);
-}
-[data-theme='light'] .ds-btn.skill-active .skill-active-icon { color: #B45309; }
+.ds-btn.skill-active .skill-active-icon { color: var(--c-yellow-fg); }
 .ds-btn.sm  { height: 26px; padding: 0 10px; font-size: 11px; border-radius: 6px; }
 .ds-btn.xs  { height: 22px; padding: 0 8px; font-size: 10.5px; border-radius: 5px; }
 .ds-btn.lg  { height: 36px; padding: 0 14px; font-size: 13px; border-radius: 8px; }
@@ -136,7 +126,7 @@
   border-radius: 8px;
   padding: 10px;
 }
-.ds-card.raised { background: var(--bg-surface-raised); box-shadow: var(--shadow-sm); }
+.ds-card.raised { background: var(--bg-surface-raised); box-shadow: var(--elev-1); }
 .ds-card.flat   { background: transparent; border-color: var(--bg-border); }
 
 /* ---------- Inputs ---------- */
@@ -153,7 +143,7 @@
   font-family: inherit;
 }
 .ds-input::placeholder { color: var(--text-tertiary); }
-.ds-input:focus { outline: none; border-color: var(--clover-blue); box-shadow: 0 0 0 3px rgba(37,99,235,0.14); }
+.ds-input:focus { outline: none; border-color: var(--c-blue-solid); box-shadow: var(--ring-focus); }
 .ds-input.sm { height: 24px; font-size: 11px; padding: 0 8px; border-radius: 5px; }
 textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-height: 1.5; }
 
@@ -191,7 +181,7 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
   height: 16px; padding: 0 5px;
   font-size: 9px; font-weight: 700;
   border-radius: 999px;
-  background: var(--clover-orange); color: #fff;
+  background: var(--clauday-orange); color: #fff;
 }
 
 /* ---------- Segmented Tabs (ds-btn 기본 32px와 동일 높이로 정렬) ---------- */
@@ -217,15 +207,16 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
   transition: background 120ms ease, color 120ms ease;
 }
 .ds-seg .seg-item:hover {
-  color: var(--clover-orange, #fb923c);
-  background: rgba(251, 146, 60, 0.08);
+  color: var(--c-orange-fg);
+  background: color-mix(in oklab, var(--c-orange-bg) 60%, transparent);
 }
 .ds-seg .seg-item.active {
-  background: rgba(251, 146, 60, 0.16);
-  color: var(--clover-orange, #fb923c);
+  background: var(--c-orange-bg);
+  color: var(--c-orange-fg);
 }
 .ds-seg .seg-item.active:hover {
-  background: rgba(251, 146, 60, 0.22);
+  background: var(--c-orange-bg);
+  filter: brightness(1.05);
 }
 
 /* ---------- Modal / Dialog ---------- */
@@ -240,9 +231,24 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
   background: var(--bg-surface-raised);
   border: 1px solid var(--bg-border);
   border-radius: 10px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--elev-3);
   overflow: hidden;
   animation: ds-modalIn .18s cubic-bezier(.2,.9,.2,1);
+}
+/* 사용자 리사이즈 가능 — 우하단 모서리 드래그 */
+.ds-modal.ds-modal-resize {
+  resize: both;
+  min-width: 360px;
+  min-height: 140px;
+  max-width: 92vw;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  height: auto; /* 콘텐츠 fit — 사용자가 드래그할 때만 늘어남 */
+}
+.ds-modal.ds-modal-resize .m-body {
+  flex: 1 1 auto;
+  overflow: auto;
 }
 @keyframes ds-modalIn {
   from { opacity: 0; transform: translateY(8px) scale(.98); }
@@ -275,17 +281,17 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
   min-width: 260px; max-width: 360px;
   background: var(--bg-surface-raised);
   border: 1px solid var(--bg-border);
-  border-left: 3px solid var(--clover-blue);
+  border-left: 3px solid var(--c-blue-solid);
   border-radius: 7px;
   padding: 8px 10px 8px 12px;
   display: flex; align-items: flex-start; gap: 8px;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--elev-2);
   animation: ds-toastIn .22s cubic-bezier(.2,.8,.2,1);
 }
-.ds-toast.success { border-left-color: #22C55E; }
-.ds-toast.error   { border-left-color: #EF4444; }
-.ds-toast.warn    { border-left-color: #FBBF24; }
-.ds-toast.ai      { border-left-color: var(--clover-orange); }
+.ds-toast.success { border-left-color: var(--c-emerald-solid); }
+.ds-toast.error   { border-left-color: var(--c-red-solid); }
+.ds-toast.warn    { border-left-color: var(--c-yellow-solid); }
+.ds-toast.ai      { border-left-color: var(--c-orange-solid); }
 .ds-toast .t-title { font-size: 12px; font-weight: 600; color: var(--text-primary); }
 .ds-toast .t-body  { font-size: 11px; color: var(--text-secondary); margin-top: 2px; line-height: 1.4; }
 .ds-toast .t-close { color: var(--text-tertiary); background: none; border: 0; cursor: pointer; }
@@ -309,7 +315,7 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
   background: var(--bg-surface-raised);
   border: 1px solid var(--bg-border);
   border-radius: 10px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--elev-3);
   overflow: hidden;
   animation: ds-modalIn .18s cubic-bezier(.2,.9,.2,1);
 }
@@ -357,7 +363,7 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
   background: var(--bg-surface-raised);
   border: 1px solid var(--bg-border);
   border-radius: 7px;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--elev-2);
   padding: 4px;
   z-index: 50;
   animation: ds-modalIn .14s cubic-bezier(.2,.9,.2,1);
@@ -370,8 +376,8 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
   cursor: pointer;
 }
 .ds-menu-item:hover { background: var(--bg-surface-hover); }
-.ds-menu-item.danger { color: #F87171; }
-.ds-menu-item.danger:hover { background: rgba(239,68,68,0.10); }
+.ds-menu-item.danger { color: var(--c-red-fg); }
+.ds-menu-item.danger:hover { background: var(--c-red-bg); }
 .ds-menu-item .mi-hint { margin-left: auto; font-size: 10px; color: var(--text-tertiary); }
 .ds-menu-sep {
   height: 1px; background: var(--bg-border); margin: 4px 0;
@@ -401,11 +407,30 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
 .ds-spinner {
   width: 18px; height: 18px;
   border: 2px solid var(--bg-border);
-  border-top-color: var(--clover-blue);
+  border-top-color: var(--c-blue-solid);
   border-radius: 999px;
   animation: ds-spin 0.8s linear infinite;
 }
 @keyframes ds-spin { to { transform: rotate(360deg); } }
+
+/* 캘린더 월 라벨 전환 */
+@keyframes ds-monthLabelIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+.ds-month-label-anim { animation: ds-monthLabelIn 260ms ease-out; }
+
+/* 캘린더 월 페이지 전환 (구글 캘린더 스타일) */
+@keyframes ds-monthInNext {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes ds-monthInPrev {
+  from { opacity: 0; transform: translateY(-14px); }
+  to   { opacity: 1; transform: none; }
+}
+.ds-month-in-next { animation: ds-monthInNext 280ms cubic-bezier(.2,.7,.2,1); }
+.ds-month-in-prev { animation: ds-monthInPrev 280ms cubic-bezier(.2,.7,.2,1); }
 
 /* ---------- Code block (design-system style) ---------- */
 .ds-codeblock {
@@ -425,8 +450,8 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
   font-family: var(--font-ui); font-size: 10px;
 }
 .ds-codeblock pre { margin: 0; padding: 8px 10px; overflow-x: auto; line-height: 1.55; }
-.ds-diff-add { background: rgba(34,197,94,0.12); color: #86EFAC; display: block; }
-.ds-diff-del { background: rgba(239,68,68,0.12); color: #FCA5A5; display: block; }
+.ds-diff-add { background: var(--c-emerald-bg); color: var(--c-emerald-fg); display: block; }
+.ds-diff-del { background: var(--c-red-bg);     color: var(--c-red-fg);     display: block; }
 .ds-diff-ctx { color: var(--text-secondary); display: block; }
 
 /* ---------- Time ---------- */
@@ -476,8 +501,8 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
   font-family: inherit;
 }
 .ds-tab:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
-.ds-tab.active { background: rgba(37,99,235,0.12); color: var(--clover-blue); }
+.ds-tab.active { background: var(--c-blue-bg); color: var(--c-blue-fg); }
 .ds-tab.ai.active {
-  background: linear-gradient(90deg, rgba(234,88,12,0.18), rgba(37,99,235,0.18));
+  background: linear-gradient(90deg, var(--c-orange-bg), var(--c-blue-bg));
   color: var(--text-primary);
 }

@@ -1,5 +1,16 @@
 import { WikiService } from './WikiService'
 
+/** 두레이 API 는 body 를 string 또는 { mimeType, content } 객체 양쪽으로 줌 — 둘 다 처리. */
+function extractBodyText(body: unknown): string {
+  if (!body) return ''
+  if (typeof body === 'string') return body
+  if (typeof body === 'object' && body !== null) {
+    const o = body as { content?: unknown }
+    if (typeof o.content === 'string') return o.content
+  }
+  return ''
+}
+
 export type WikiStorageKind = 'skills' | 'mcps'
 
 interface WikiStorageItem {
@@ -151,19 +162,35 @@ export class WikiStorageService {
       this.store.delete(this.storeKey(wikiId, kind))
       return []
     }
-    return children
-      .filter((p) => !(p.subject || '').startsWith('[DELETED]'))
-      .map((p) => ({
-        pageId: p.id,
-        name: p.subject || '',
-        content: p.body || '',
-        updatedAt: p.updatedAt ? new Date(p.updatedAt).getTime() : 0
-      }))
+    const visible = children.filter((p) => !(p.subject || '').startsWith('[DELETED]'))
+
+    // 두레이 위키 list 응답에 body 가 inline 으로 안 들어와 카드의 description / 모달 본문이 비는 문제.
+    // 각 페이지의 body 를 wiki.get 으로 병렬 fetch 해서 채워준다. 위키 한 컨테이너의 페이지 수가 보통 < 50 이라
+    // N+1 호출 부담이 크지 않음. 실패한 페이지는 빈 본문으로 두고 결과에서 제외하지는 않음.
+    const bodies = await Promise.all(
+      visible.map(async (p) => {
+        const inline = extractBodyText(p.body)
+        if (inline) return inline
+        try {
+          const full = await this.wiki.get(wikiId, p.id)
+          return extractBodyText((full as { body?: unknown }).body)
+        } catch {
+          return ''
+        }
+      })
+    )
+
+    return visible.map((p, i) => ({
+      pageId: p.id,
+      name: p.subject || '',
+      content: bodies[i],
+      updatedAt: p.updatedAt ? new Date(p.updatedAt).getTime() : 0
+    }))
   }
 
   async get(wikiId: string, pageId: string): Promise<{ name: string; content: string }> {
     const page = await this.wiki.get(wikiId, pageId)
-    return { name: page.subject || '', content: page.body || '' }
+    return { name: page.subject || '', content: extractBodyText((page as { body?: unknown }).body) }
   }
 
   async upload(params: { wikiId: string; kind: WikiStorageKind; name: string; content: string; parentPageIdHint?: string }): Promise<{ pageId: string; updated: boolean }> {
@@ -189,24 +216,23 @@ export class WikiStorageService {
   }
 
   /**
-   * 위키 페이지 hard delete. Dooray 는 서버 사이드에서 작성자(또는 관리자)만 삭제 허용 — 권한 없으면 403.
-   * 405 (DELETE 미지원) 같은 케이스에는 [DELETED] 접두사 soft-delete 로 폴백.
-   * (메서드 이름은 backward-compat 으로 softDelete 유지.)
+   * 위키 페이지 hard delete. Dooray 서버 사이드에서 작성자(또는 관리자)만 삭제 허용 — 권한 없으면 403.
+   * **이전 버전의 soft-delete([DELETED] prefix) 폴백은 제거됨** (Clauday 정책: 모든 delete 는 hard delete).
+   * DELETE 가 막혀있으면 에러를 그대로 노출해서 사용자가 두레이 권한/지원 여부를 직접 확인하도록 한다.
+   * (메서드 이름은 backward-compat 으로 softDelete 유지 — 호출자가 많아 즉시 rename 안 함.)
    */
   async softDelete(wikiId: string, pageId: string): Promise<void> {
     try {
       await this.wiki.deletePage(wikiId, pageId)
-      return
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       if (msg.includes('(403)') || msg.includes('(401)')) {
         throw new Error('본인이 작성한 페이지만 삭제할 수 있습니다.')
       }
-      // 그 외 (405 등) — soft delete fallback
+      if (msg.includes('(405)')) {
+        throw new Error('이 위키는 두레이 측에서 DELETE 를 지원하지 않습니다. 두레이에서 직접 삭제해주세요.')
+      }
+      throw err
     }
-    const page = await this.wiki.get(wikiId, pageId)
-    const oldTitle = page.subject || ''
-    if (oldTitle.startsWith('[DELETED]')) return
-    await this.wiki.renameTitle(wikiId, pageId, `[DELETED] ${oldTitle}`)
   }
 }

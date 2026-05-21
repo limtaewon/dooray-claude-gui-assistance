@@ -33,11 +33,11 @@ export function useToast(): ToastApi {
 }
 
 const ICONS: Record<ToastTone, { Icon: typeof CheckCircle; color: string }> = {
-  success: { Icon: CheckCircle, color: '#22C55E' },
-  error:   { Icon: AlertCircle, color: '#EF4444' },
-  warn:    { Icon: AlertTriangle, color: '#FBBF24' },
-  ai:      { Icon: Sparkles, color: 'var(--clover-orange)' as string },
-  default: { Icon: Info, color: 'var(--clover-blue)' as string }
+  success: { Icon: CheckCircle, color: 'var(--c-emerald-solid)' },
+  error:   { Icon: AlertCircle, color: 'var(--c-red-solid)' },
+  warn:    { Icon: AlertTriangle, color: 'var(--c-yellow-solid)' },
+  ai:      { Icon: Sparkles, color: 'var(--clauday-orange)' as string },
+  default: { Icon: Info, color: 'var(--clauday-blue)' as string }
 }
 
 function ToastHost({ children }: { children: ReactNode }): JSX.Element {

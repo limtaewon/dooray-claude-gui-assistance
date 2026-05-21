@@ -160,14 +160,14 @@ function PreviewMockup({ palette, active, onPick }: {
   return (
     <button onClick={onPick}
       className={`relative text-left rounded-2xl overflow-hidden transition-all ${
-        active ? 'ring-2 ring-clover-blue ring-offset-2 ring-offset-bg-primary' : 'hover:opacity-90'
+        active ? 'ring-2 ring-clauday-blue ring-offset-2 ring-offset-bg-primary' : 'hover:opacity-90'
       }`}
       style={{ border: `1px solid ${v['--bg-border']}` }}>
       {/* 상단 헤더 */}
       <div className="px-4 pt-3 pb-2" style={{ background: v['--bg-base'] }}>
         <div className="flex items-center justify-between">
           <span className="text-sm font-semibold" style={{ color: v['--text-primary'] }}>{palette.name}</span>
-          {active && <span className="flex items-center gap-1 text-[10px] text-clover-blue"><Check size={11} /> 적용됨</span>}
+          {active && <span className="flex items-center gap-1 text-[10px] text-clauday-blue"><Check size={11} /> 적용됨</span>}
         </div>
         <p className="text-[10px] mt-0.5" style={{ color: v['--text-tertiary'] }}>{palette.description}</p>
       </div>
@@ -237,8 +237,8 @@ function ThemePicker(): JSX.Element {
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-clover-blue/10 border border-clover-blue/30">
-          <PaletteIcon size={14} className="text-clover-blue" />
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-clauday-blue/10 border border-clauday-blue/30">
+          <PaletteIcon size={14} className="text-clauday-blue" />
         </div>
         <div>
           <h3 className="text-sm font-semibold text-text-primary">라이트 팔레트 고르기</h3>

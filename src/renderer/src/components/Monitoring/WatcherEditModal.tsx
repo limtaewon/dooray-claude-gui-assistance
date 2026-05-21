@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
-  X, Sparkles, Loader2, Check, AlertCircle, Radar, Search, Hash, Lock
+  X, Sparkles, Loader2, Check, AlertCircle, Radar, Search, Hash, Lock, Plus
 } from 'lucide-react'
 import type { Watcher, FilterRule } from '../../../../shared/types/watcher'
 import type { DoorayChannel } from '../../../../shared/types/messenger'
@@ -91,8 +91,8 @@ function WatcherEditModal({ watcher, onClose, onSaved }: Props): JSX.Element {
         style={{ background: 'var(--bg-primary)', border: '1px solid var(--bg-border)' }}>
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-bg-border flex-shrink-0">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-clover-orange/15 border border-clover-orange/30">
-            <Radar size={15} className="text-clover-orange" />
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-clauday-orange/15 border border-clauday-orange/30">
+            <Radar size={15} className="text-clauday-orange" />
           </div>
           <div className="flex-1">
             <h2 className="text-sm font-bold text-text-primary">{isEdit ? '와처 수정' : '새 와처 만들기'}</h2>
@@ -110,7 +110,7 @@ function WatcherEditModal({ watcher, onClose, onSaved }: Props): JSX.Element {
             <label className="text-[11px] font-semibold text-text-secondary block mb-1.5">와처 이름</label>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)}
               placeholder="예) 배포 알림, 장애 감지"
-              className="w-full px-3 py-2 rounded-lg bg-bg-surface border border-bg-border text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-orange"
+              className="w-full px-3 py-2 rounded-lg bg-bg-surface border border-bg-border text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-orange"
             />
           </div>
 
@@ -121,38 +121,55 @@ function WatcherEditModal({ watcher, onClose, onSaved }: Props): JSX.Element {
             </label>
             <textarea value={instruction} onChange={(e) => setInstruction(e.target.value)}
               placeholder="예) 배포, 릴리즈, deploy 관련 메시지. 단 테스트 환경은 제외&#10;예) 장애, 오류, error, fail이 포함된 메시지만"
-              className="w-full min-h-[80px] px-3 py-2 rounded-lg bg-bg-surface border border-bg-border text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-orange resize-y"
+              className="w-full min-h-[80px] px-3 py-2 rounded-lg bg-bg-surface border border-bg-border text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-orange resize-y"
             />
             <div className="flex items-center justify-between mt-2">
               <span className="text-[10px] text-text-tertiary">
                 자연어로 작성하면 AI가 키워드/정규식/제외 규칙을 자동 생성합니다
               </span>
-              <button onClick={handleGenerate} disabled={generating || !instruction.trim()}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-clover-orange to-clover-blue disabled:opacity-40 hover:opacity-90">
-                {generating ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                {generating ? 'AI 생성 중...' : filter ? '다시 생성' : 'AI로 규칙 만들기'}
-              </button>
+              <div className="flex items-center gap-1.5">
+                {!filter && (
+                  <button onClick={() => setFilter({ description: '직접 작성한 규칙', anyOf: [], allOf: [], regex: [], exclude: [], excludeRegex: [] })}
+                    className="px-2.5 py-1.5 rounded-lg text-xs text-text-secondary border border-bg-border hover:text-text-primary hover:border-clauday-orange">
+                    직접 만들기
+                  </button>
+                )}
+                <button onClick={handleGenerate} disabled={generating || !instruction.trim()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-clauday-orange to-clauday-blue disabled:opacity-40 hover:opacity-90">
+                  {generating ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                  {generating ? 'AI 생성 중...' : filter ? '다시 생성' : 'AI로 규칙 만들기'}
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* 생성된 규칙 미리보기 */}
+          {/* 생성된 규칙 — 직접 편집/추가/삭제 가능 */}
           {filter && (
-            <div className="rounded-xl bg-clover-orange/5 border border-clover-orange/30 p-3 space-y-2">
-              <div className="flex items-center gap-1.5 mb-1">
-                <Check size={11} className="text-clover-orange" />
-                <span className="text-[11px] font-semibold text-text-primary">{filter.description}</span>
+            <div className="rounded-xl bg-clauday-orange/5 border border-clauday-orange/30 p-3 space-y-2">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-1.5">
+                  <Check size={11} className="text-clauday-orange" />
+                  <span className="text-[11px] font-semibold text-text-primary">{filter.description}</span>
+                </div>
+                <button onClick={() => setFilter(null)}
+                  className="text-[10px] text-text-tertiary hover:text-red-400">
+                  규칙 비우기
+                </button>
               </div>
               <div className="grid grid-cols-2 gap-2 text-[10px]">
-                <RuleSection label="포함 (OR)" items={filter.anyOf} color="text-emerald-400" />
-                <RuleSection label="모두 포함 (AND)" items={filter.allOf} color="text-clover-blue" />
-                <RuleSection label="정규식" items={filter.regex} color="text-purple-400" mono />
-                <RuleSection label="제외" items={filter.exclude} color="text-red-400" />
-                {filter.excludeRegex && filter.excludeRegex.length > 0 && (
-                  <RuleSection label="제외 정규식" items={filter.excludeRegex} color="text-red-400" mono />
-                )}
+                <EditableRuleSection label="포함 (OR)" items={filter.anyOf} color="text-emerald-400"
+                  onChange={(items) => setFilter({ ...filter, anyOf: items })} />
+                <EditableRuleSection label="모두 포함 (AND)" items={filter.allOf} color="text-clauday-blue"
+                  onChange={(items) => setFilter({ ...filter, allOf: items })} />
+                <EditableRuleSection label="정규식" items={filter.regex} color="text-purple-400" mono
+                  onChange={(items) => setFilter({ ...filter, regex: items })} />
+                <EditableRuleSection label="제외" items={filter.exclude} color="text-red-400"
+                  onChange={(items) => setFilter({ ...filter, exclude: items })} />
+                <EditableRuleSection label="제외 정규식" items={filter.excludeRegex} color="text-red-400" mono
+                  onChange={(items) => setFilter({ ...filter, excludeRegex: items })} />
               </div>
               <p className="text-[9px] text-text-tertiary pt-1 border-t border-bg-border/50">
-                💡 결과가 맞지 않으면 지시사항을 수정하고 "다시 생성"
+                💡 칩의 × 로 삭제, 아래 입력란으로 직접 추가. AI 결과 전체를 바꾸려면 지시사항 수정 후 "다시 생성"
               </p>
             </div>
           )}
@@ -167,7 +184,7 @@ function WatcherEditModal({ watcher, onClose, onSaved }: Props): JSX.Element {
               <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
               <input type="text" value={channelSearch} onChange={(e) => setChannelSearch(e.target.value)}
                 placeholder="채널 검색..."
-                className="w-full pl-7 pr-3 py-1.5 rounded-lg text-xs bg-bg-surface border border-bg-border text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clover-orange"
+                className="w-full pl-7 pr-3 py-1.5 rounded-lg text-xs bg-bg-surface border border-bg-border text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-orange"
               />
             </div>
             <div className="max-h-48 overflow-y-auto rounded-lg border border-bg-border divide-y divide-bg-border/50">
@@ -179,12 +196,12 @@ function WatcherEditModal({ watcher, onClose, onSaved }: Props): JSX.Element {
                 return (
                   <label key={c.id}
                     className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors ${
-                      selected ? 'bg-clover-orange/10' : 'hover:bg-bg-surface-hover'
+                      selected ? 'bg-clauday-orange/10' : 'hover:bg-bg-surface-hover'
                     }`}>
                     <input type="checkbox" checked={selected} onChange={() => toggleChannel(c.id)}
-                      className="accent-clover-orange" />
-                    <Icon size={11} className={selected ? 'text-clover-orange' : 'text-text-tertiary'} />
-                    <span className={`text-xs truncate ${selected ? 'text-clover-orange font-medium' : 'text-text-primary'}`}>
+                      className="accent-clauday-orange" />
+                    <Icon size={11} className={selected ? 'text-clauday-orange' : 'text-text-tertiary'} />
+                    <span className={`text-xs truncate ${selected ? 'text-clauday-orange font-medium' : 'text-text-primary'}`}>
                       {c.displayName || c.title}
                     </span>
                   </label>
@@ -207,7 +224,7 @@ function WatcherEditModal({ watcher, onClose, onSaved }: Props): JSX.Element {
             취소
           </button>
           <button onClick={handleSave} disabled={saving}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-clover-orange hover:bg-clover-orange/90 disabled:opacity-40">
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-clauday-orange hover:bg-clauday-orange/90 disabled:opacity-40">
             {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
             {saving ? '저장 중...' : isEdit ? '수정 완료' : '와처 만들기'}
           </button>
@@ -217,18 +234,58 @@ function WatcherEditModal({ watcher, onClose, onSaved }: Props): JSX.Element {
   )
 }
 
-function RuleSection({ label, items, color, mono }: { label: string; items?: string[]; color: string; mono?: boolean }): JSX.Element | null {
-  if (!items || items.length === 0) return null
+function EditableRuleSection({ label, items, color, mono, onChange }: {
+  label: string
+  items?: string[]
+  color: string
+  mono?: boolean
+  onChange: (items: string[]) => void
+}): JSX.Element {
+  const [draft, setDraft] = useState('')
+  const list = items || []
+  const removeAt = (i: number): void => {
+    onChange(list.filter((_, idx) => idx !== i))
+  }
+  const add = (): void => {
+    const v = draft.trim()
+    if (!v) return
+    if (list.includes(v)) { setDraft(''); return }
+    onChange([...list, v])
+    setDraft('')
+  }
   return (
     <div>
       <div className={`text-[9px] font-bold mb-0.5 ${color}`}>{label}</div>
-      <div className="flex flex-wrap gap-1">
-        {items.map((t, i) => (
+      <div className="flex flex-wrap gap-1 mb-1">
+        {list.map((t, i) => (
           <span key={i}
-            className={`px-1.5 py-0.5 rounded text-[10px] bg-bg-surface border border-bg-border text-text-primary ${mono ? 'font-mono' : ''}`}>
+            className={`group inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-bg-surface border border-bg-border text-text-primary ${mono ? 'font-mono' : ''}`}>
             {t}
+            <button onClick={() => removeAt(i)}
+              aria-label={`${t} 삭제`}
+              className="opacity-50 group-hover:opacity-100 hover:text-red-400 transition-opacity">
+              <X size={9} />
+            </button>
           </span>
         ))}
+      </div>
+      <div className="flex items-center gap-1">
+        <input
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing || e.keyCode === 229) return
+            if (e.key === 'Enter') { e.preventDefault(); add() }
+          }}
+          placeholder="직접 추가"
+          className={`flex-1 min-w-0 px-1.5 py-0.5 rounded text-[10px] bg-bg-surface border border-bg-border text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-orange ${mono ? 'font-mono' : ''}`}
+        />
+        <button onClick={add} disabled={!draft.trim()}
+          aria-label={`${label} 항목 추가`}
+          className="p-0.5 rounded text-text-tertiary hover:text-clauday-orange disabled:opacity-30">
+          <Plus size={11} />
+        </button>
       </div>
     </div>
   )

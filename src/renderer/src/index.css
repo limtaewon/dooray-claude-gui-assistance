@@ -16,12 +16,12 @@
 
 /* -------- brand (테마 무관) -------- */
 :root {
-  --clover-orange:        #EA580C;   /* Dooray */
-  --clover-orange-light:  #FB923C;
-  --clover-orange-soft:   #FBE4D5;
-  --clover-blue:          #2563EB;   /* Claude */
-  --clover-blue-light:    #3B82F6;
-  --clover-blue-soft:     #DCE6FB;
+  --clauday-orange:        #EA580C;   /* Dooray */
+  --clauday-orange-light:  #FB923C;
+  --clauday-orange-soft:   #FBE4D5;
+  --clauday-blue:          #2563EB;   /* Claude */
+  --clauday-blue-light:    #3B82F6;
+  --clauday-blue-soft:     #DCE6FB;
 
   /* 시맨틱 */
   --success:  #22C55E;
@@ -64,78 +64,161 @@
   /* app font scaling hook (useFontSettings에서 덮어씀) */
   --app-font-scale: 1;
   --app-font-family: var(--font-ui);
+
+  /* AI gradient — 모드 무관 single source of truth (v2) */
+  --ai-gradient:            linear-gradient(135deg, var(--clauday-orange-light) 0%, var(--clauday-blue-light) 100%);
+  --ai-gradient-horizontal: linear-gradient(90deg, var(--clauday-orange) 0%, var(--clauday-blue) 100%);
 }
 
 /* ============================================================
-   THEME — light default (Cool Minimal)
+   THEME — light default (Paper-like, surface=흰색)
    ============================================================ */
 :root,
 [data-theme='light'] {
-  /* 배경 레이어 (4단 계단) */
-  --bg-sidebar:        #E9ECF2;
-  --bg-base:           #EFF1F5;
-  --bg-surface:        #F6F7FA;
-  --bg-surface-raised: #FCFCFD;
+  /* 배경 레이어 — surface는 순백으로 끌어올려 elevation 살림 */
+  --bg-sidebar:        #ECEEF2;
+  --bg-base:           #F4F5F8;
+  --bg-surface:        #FFFFFF;
+  --bg-surface-raised: #FFFFFF;
   --bg-primary:        var(--bg-base);
-  --bg-surface-hover:  #E3E6EC;
-  --bg-subtle:         #E6E9EF;
-  --bg-hover:          #E3E6EC;
-  --bg-active:         #D8DCE3;
-  --bg-border:         #DFE2E8;
-  --bg-border-light:   #C7CBD3;
-  --bg-border-strong:  #C7CBD3;
+  --bg-surface-hover:  #EAECF0;
+  --bg-subtle:         #EEF0F4;
+  --bg-hover:          #EAECF0;
+  --bg-active:         #DDE0E6;
+  --bg-border:         #DDE0E6;
+  --bg-border-light:   #C5C9D2;
+  --bg-border-strong:  #A4ABB8;
 
   /* 텍스트 (3단) */
-  --text-primary:      #1C2130;
-  --text-secondary:    #4F5769;
-  --text-tertiary:     #8A91A1;
+  --text-primary:      #161A22;
+  --text-secondary:    #525A6B;
+  --text-tertiary:     #8A91A0;
 
   /* 액센트 — 라이트 컨텍스트 */
-  --accent-blue:         var(--clover-blue);
-  --accent-blue-light:   var(--clover-blue-light);
-  --accent-blue-soft:    var(--clover-blue-soft);
+  --accent-blue:         var(--clauday-blue);
+  --accent-blue-light:   var(--clauday-blue-light);
+  --accent-blue-soft:    var(--clauday-blue-soft);
   --accent-blue-fg:      #1E3A8A;
-  --accent-orange:       var(--clover-orange);
-  --accent-orange-light: var(--clover-orange-light);
-  --accent-orange-soft:  var(--clover-orange-soft);
+  --accent-orange:       var(--clauday-orange);
+  --accent-orange-light: var(--clauday-orange-light);
+  --accent-orange-soft:  var(--clauday-orange-soft);
+
+  /* Mode-aware semantic — LIGHT (dark fg on pale bg)
+     bg = 배경 tint, fg = 그 위 텍스트, solid = 단색 사용(버튼/dot) */
+  --c-blue-bg:       #E1EBFC;
+  --c-blue-fg:       #1D4ED8;
+  --c-blue-solid:    #2563EB;
+  --c-orange-bg:     #FCEADA;
+  --c-orange-fg:     #B45309;
+  --c-orange-solid:  #EA580C;
+  --c-red-bg:        #FCE5E5;
+  --c-red-fg:        #B91C1C;
+  --c-red-solid:     #DC2626;
+  --c-emerald-bg:    #DCFCE7;
+  --c-emerald-fg:    #15803D;
+  --c-emerald-solid: #16A34A;
+  --c-violet-bg:     #EDE9FE;
+  --c-violet-fg:     #5B21B6;
+  --c-violet-solid:  #7C3AED;
+  --c-yellow-bg:     #FEF3C7;
+  --c-yellow-fg:     #92400E;
+  --c-yellow-solid:  #CA8A04;
+  --c-neutral-bg:    #EEF0F4;
+  --c-neutral-fg:    #525A6B;
+  --c-neutral-solid: #8A91A0;
 
   /* 기타 */
-  --link:                var(--clover-blue);
+  --link:                var(--c-blue-fg);
   --code-bg:             #EDEFF4;
   --code-text:           #A14A10;
   --mark-bg:             #FEF3C7;
   --mark-text:           #92400E;
-  --scrollbar-track:     #E9ECF2;
-  --scrollbar-thumb:     #C7CBD3;
-  --scrollbar-thumb-hover: #8A91A1;
+  --scrollbar-track:     #ECEEF2;
+  --scrollbar-thumb:     #C5C9D2;
+  --scrollbar-thumb-hover: #8A91A0;
   --overlay-bg:          rgba(17,24,39,0.40);
 
-  --shadow-sm:      0 1px 2px rgba(17,24,39,0.04), 0 1px 3px rgba(17,24,39,0.03);
-  --shadow-md:      0 2px 4px rgba(17,24,39,0.05), 0 8px 24px rgba(17,24,39,0.06);
+  --shadow-sm:      0 1px 2px rgba(17,24,39,0.05);
+  --shadow-md:      0 4px 14px rgba(17,24,39,0.07);
   --shadow-lg:      0 12px 40px rgba(17,24,39,0.10), 0 4px 12px rgba(17,24,39,0.06);
   --shadow-raised:  var(--shadow-md);
+
+  /* ---------- v2 신규 ---------- */
+
+  /* Elevation 시맨틱 별칭 */
+  --elev-0: none;
+  --elev-1: var(--shadow-sm);     /* card, raised tile */
+  --elev-2: var(--shadow-md);     /* dropdown, popover, sticky bar */
+  --elev-3: var(--shadow-lg);     /* modal, command palette */
+
+  /* Focus / selection rings */
+  --ring-focus-color:    rgba(37,99,235,0.30);
+  --ring-focus:          0 0 0 3px var(--ring-focus-color);
+  --ring-error-color:    rgba(220,38,38,0.25);
+  --ring-error:          0 0 0 3px var(--ring-error-color);
+  --ring-selected-color: rgba(234,88,12,0.65);
+  --ring-selected:       0 0 0 2px var(--ring-selected-color);
+
+  /* Disabled */
+  --bg-disabled:     #EEF0F4;
+  --text-disabled:   #B0B6C2;
+  --border-disabled: #DDE0E6;
+
+  /* Workflow status — 두레이 워크플로 색상 매핑 */
+  --wf-backlog-bg:    var(--c-neutral-bg); --wf-backlog-fg:    var(--c-neutral-fg);  --wf-backlog-dot:    #8A91A0;
+  --wf-registered-bg: var(--c-orange-bg);  --wf-registered-fg: var(--c-orange-fg);   --wf-registered-dot: #EA580C;
+  --wf-working-bg:    var(--c-blue-bg);    --wf-working-fg:    var(--c-blue-fg);     --wf-working-dot:    #2563EB;
+  --wf-resolved-bg:   var(--c-emerald-bg); --wf-resolved-fg:   var(--c-emerald-fg);  --wf-resolved-dot:   #16A34A;
+  --wf-closed-bg:     #E5E7EB;             --wf-closed-fg:     #6B7280;              --wf-closed-dot:     #9CA3AF;
+  --wf-overdue-bg:    var(--c-red-bg);     --wf-overdue-fg:    var(--c-red-fg);      --wf-overdue-dot:    #DC2626;
+
+  /* Chart — series & chrome */
+  --chart-1: #2563EB;
+  --chart-2: #EA580C;
+  --chart-3: #16A34A;
+  --chart-4: #7C3AED;
+  --chart-5: #DC2626;
+  --chart-6: #CA8A04;
+  --chart-grid:           #E2E8F0;
+  --chart-tick:           #64748B;
+  --chart-axis:           #CBD5E1;
+  --chart-tooltip-bg:     #FFFFFF;
+  --chart-tooltip-border: #DCE3ED;
+  --chart-tooltip-text:   #0F172A;
+  --chart-area-opacity:   0.12;
+
+  /* Avatar 8색 페어 — bg/fg 모두 AA 보장 */
+  --avatar-1-bg: #E1EBFC; --avatar-1-fg: #1D4ED8;
+  --avatar-2-bg: #FCE5E5; --avatar-2-fg: #B91C1C;
+  --avatar-3-bg: #DCFCE7; --avatar-3-fg: #15803D;
+  --avatar-4-bg: #FEF3C7; --avatar-4-fg: #92400E;
+  --avatar-5-bg: #EDE9FE; --avatar-5-fg: #5B21B6;
+  --avatar-6-bg: #CFFAFE; --avatar-6-fg: #0E7490;
+  --avatar-7-bg: #FCEADA; --avatar-7-fg: #9A3412;
+  --avatar-8-bg: #ECFCCB; --avatar-8-fg: #4D7C0F;
 }
 
 /* ============================================================
-   THEME — dark
+   THEME — dark (warmer neutral, 덜 푸르게)
    ============================================================ */
 [data-theme='dark'] {
-  --bg-sidebar:        #111A2A;
-  --bg-base:           #162032;
-  --bg-surface:        #1f2940;
-  --bg-surface-raised: #25304b;
+  --bg-sidebar:        #0F1115;
+  --bg-base:           #15181E;
+  --bg-surface:        #1C2027;
+  --bg-surface-raised: #232831;
   --bg-primary:        var(--bg-base);
-  --bg-surface-hover:  #2a3553;
-  --bg-subtle:         #1a2436;
-  --bg-hover:          #2a3553;
-  --bg-active:         #34406a;
-  --bg-border:         #3a4566;
-  --bg-border-light:   #4b5773;
-  --bg-border-strong:  #4b5773;
+  --bg-surface-hover:  #262C36;
+  --bg-subtle:         #1A1D24;
+  --bg-hover:          #262C36;
+  --bg-active:         #2E343F;
+  --bg-border:         #2E343F;
+  --bg-border-light:   #3A4150;
+  --bg-border-strong:  #4A5160;
 
-  --text-primary:      #F9FAFB;
-  --text-secondary:    #B4BCCE;
-  --text-tertiary:     #7A869E;
+  /* 순백 대신 한 단계 낮춰 눈 피로 감소 */
+  --text-primary:      #ECEEF2;
+  --text-secondary:    #A9AEBA;
+  --text-tertiary:     #6B7180;
 
   --accent-blue:         #3B82F6;
   --accent-blue-light:   #60A5FA;
@@ -145,8 +228,31 @@
   --accent-orange-light: #FDBA74;
   --accent-orange-soft:  rgba(251,146,60,0.18);
 
-  --link:              #60A5FA;
-  --code-bg:           #1f2940;
+  /* Mode-aware semantic — DARK (밝은 fg on dark tint bg) */
+  --c-blue-bg:       rgba(59,130,246,0.16);
+  --c-blue-fg:       #93C5FD;
+  --c-blue-solid:    #3B82F6;
+  --c-orange-bg:     rgba(251,146,60,0.16);
+  --c-orange-fg:     #FDBA74;
+  --c-orange-solid:  #FB923C;
+  --c-red-bg:        rgba(248,113,113,0.16);
+  --c-red-fg:        #FCA5A5;
+  --c-red-solid:     #F87171;
+  --c-emerald-bg:    rgba(34,197,94,0.16);
+  --c-emerald-fg:    #86EFAC;
+  --c-emerald-solid: #22C55E;
+  --c-violet-bg:     rgba(167,139,250,0.16);
+  --c-violet-fg:     #C4B5FD;
+  --c-violet-solid:  #A78BFA;
+  --c-yellow-bg:     rgba(250,204,21,0.16);
+  --c-yellow-fg:     #FDE68A;
+  --c-yellow-solid:  #EAB308;
+  --c-neutral-bg:    rgba(148,163,184,0.14);
+  --c-neutral-fg:    #CBD5E1;
+  --c-neutral-solid: #94A3B8;
+
+  --link:              var(--c-blue-fg);
+  --code-bg:           #1C2027;
   --code-text:         #FDBA74;
   --mark-bg:           rgba(251,146,60,0.25);
   --mark-text:         #FDBA74;
@@ -155,10 +261,57 @@
   --scrollbar-thumb-hover: rgba(148,148,155,0.5);
   --overlay-bg:        rgba(0,0,0,0.6);
 
-  --shadow-sm:      0 1px 2px rgba(0,0,0,0.2);
-  --shadow-md:      0 4px 12px rgba(0,0,0,0.3);
-  --shadow-lg:      0 10px 24px rgba(0,0,0,0.4);
-  --shadow-raised:  0 4px 16px rgba(0,0,0,0.35);
+  --shadow-sm:      0 1px 2px rgba(0,0,0,0.30);
+  --shadow-md:      0 4px 14px rgba(0,0,0,0.36);
+  --shadow-lg:      0 10px 24px rgba(0,0,0,0.45);
+  --shadow-raised:  0 4px 16px rgba(0,0,0,0.40);
+
+  /* ---------- v2 신규 ---------- */
+  --elev-0: none;
+  --elev-1: var(--shadow-sm);
+  --elev-2: var(--shadow-md);
+  --elev-3: var(--shadow-lg);
+
+  --ring-focus-color:    rgba(96,165,250,0.40);
+  --ring-focus:          0 0 0 3px var(--ring-focus-color);
+  --ring-error-color:    rgba(248,113,113,0.35);
+  --ring-error:          0 0 0 3px var(--ring-error-color);
+  --ring-selected-color: rgba(251,146,60,0.75);
+  --ring-selected:       0 0 0 2px var(--ring-selected-color);
+
+  --bg-disabled:     #1A1D24;
+  --text-disabled:   #4A5160;
+  --border-disabled: #2E343F;
+
+  --wf-backlog-bg:    var(--c-neutral-bg);      --wf-backlog-fg:    var(--c-neutral-fg);  --wf-backlog-dot:    #94A3B8;
+  --wf-registered-bg: var(--c-orange-bg);       --wf-registered-fg: var(--c-orange-fg);   --wf-registered-dot: #FB923C;
+  --wf-working-bg:    var(--c-blue-bg);         --wf-working-fg:    var(--c-blue-fg);     --wf-working-dot:    #60A5FA;
+  --wf-resolved-bg:   var(--c-emerald-bg);      --wf-resolved-fg:   var(--c-emerald-fg);  --wf-resolved-dot:   #4ADE80;
+  --wf-closed-bg:     rgba(148,163,184,0.10);   --wf-closed-fg:     #6B7180;              --wf-closed-dot:     #6B7180;
+  --wf-overdue-bg:    var(--c-red-bg);          --wf-overdue-fg:    var(--c-red-fg);      --wf-overdue-dot:    #F87171;
+
+  --chart-1: #60A5FA;
+  --chart-2: #FB923C;
+  --chart-3: #4ADE80;
+  --chart-4: #C4B5FD;
+  --chart-5: #FCA5A5;
+  --chart-6: #FDE68A;
+  --chart-grid:           #2D3148;
+  --chart-tick:           #94A3B8;
+  --chart-axis:           #3A4150;
+  --chart-tooltip-bg:     #1C1F2E;
+  --chart-tooltip-border: #2D3148;
+  --chart-tooltip-text:   #F1F5F9;
+  --chart-area-opacity:   0.20;
+
+  --avatar-1-bg: rgba(96,165,250,0.18);  --avatar-1-fg: #93C5FD;
+  --avatar-2-bg: rgba(248,113,113,0.18); --avatar-2-fg: #FCA5A5;
+  --avatar-3-bg: rgba(74,222,128,0.18);  --avatar-3-fg: #86EFAC;
+  --avatar-4-bg: rgba(253,224,71,0.18);  --avatar-4-fg: #FDE68A;
+  --avatar-5-bg: rgba(196,181,253,0.18); --avatar-5-fg: #C4B5FD;
+  --avatar-6-bg: rgba(103,232,249,0.18); --avatar-6-fg: #67E8F9;
+  --avatar-7-bg: rgba(253,186,116,0.18); --avatar-7-fg: #FDBA74;
+  --avatar-8-bg: rgba(190,242,100,0.18); --avatar-8-fg: #BEF264;
 }
 
 /* ============================================================
@@ -166,36 +319,37 @@
    Activate via  [data-theme='light'][data-palette='<id>']
    (ThemePicker에서 data-palette 속성 또는 인라인 style로 주입)
    ============================================================ */
+/* 5개 라이트 팔레트 변형 — surface는 모두 흰색으로 끌어올려 elevation 살림 */
 [data-theme='light'][data-palette='cool-minimal'] {
-  --bg-sidebar: #E9ECF2;  --bg-base: #EFF1F5;  --bg-surface: #F6F7FA;  --bg-surface-raised: #FCFCFD;
-  --bg-primary: #EFF1F5;  --bg-surface-hover: #E3E6EC;  --bg-subtle: #E6E9EF;
-  --bg-hover: #E3E6EC;  --bg-active: #D7DBE3;  --bg-border: #D8DCE4;
-  --bg-border-light: #BFC4CE;  --bg-border-strong: #BFC4CE;
-  --text-primary: #0F172A;  --text-secondary: #334155;  --text-tertiary: #64748B;
+  --bg-sidebar: #ECEEF2;  --bg-base: #F4F5F8;  --bg-surface: #FFFFFF;  --bg-surface-raised: #FFFFFF;
+  --bg-primary: #F4F5F8;  --bg-surface-hover: #EAECF0;  --bg-subtle: #EEF0F4;
+  --bg-hover: #EAECF0;  --bg-active: #DDE0E6;  --bg-border: #DDE0E6;
+  --bg-border-light: #C5C9D2;  --bg-border-strong: #C5C9D2;
+  --text-primary: #161A22;  --text-secondary: #525A6B;  --text-tertiary: #8A91A0;
 }
 [data-theme='light'][data-palette='crisp-white'] {
-  --bg-sidebar: #F5F6F8;  --bg-base: #FAFAFB;  --bg-surface: #FFFFFF;  --bg-surface-raised: #FFFFFF;
-  --bg-primary: #FAFAFB;  --bg-surface-hover: #F0F1F3;  --bg-subtle: #F3F4F6;
-  --bg-hover: #F0F1F3;  --bg-active: #E5E7EB;  --bg-border: #E5E7EB;
-  --bg-border-light: #D1D5DB;  --bg-border-strong: #D1D5DB;
-  --text-primary: #111827;  --text-secondary: #4B5563;  --text-tertiary: #9CA3AF;
+  --bg-sidebar: #F2F3F5;  --bg-base: #F7F8FA;  --bg-surface: #FFFFFF;  --bg-surface-raised: #FFFFFF;
+  --bg-primary: #F7F8FA;  --bg-surface-hover: #EEF0F3;  --bg-subtle: #F1F2F5;
+  --bg-hover: #EEF0F3;  --bg-active: #E1E4E9;  --bg-border: #E1E4E9;
+  --bg-border-light: #CDD1D8;  --bg-border-strong: #CDD1D8;
+  --text-primary: #111827;  --text-secondary: #4B5563;  --text-tertiary: #8A91A0;
 }
 [data-theme='light'][data-palette='soft-blue'] {
-  --bg-sidebar: #E2E6EE;  --bg-base: #E9EDF3;  --bg-surface: #F2F4F8;  --bg-surface-raised: #FBFCFD;
-  --bg-primary: #E9EDF3;  --bg-surface-hover: #DCE0E9;  --bg-subtle: #DFE3EB;
-  --bg-hover: #DCE0E9;  --bg-active: #CED4DE;  --bg-border: #D1D6DE;
-  --bg-border-light: #B6BCC6;  --bg-border-strong: #B6BCC6;
-  --text-primary: #101828;  --text-secondary: #414D5F;  --text-tertiary: #798396;
+  --bg-sidebar: #E4E8F0;  --bg-base: #EDF0F5;  --bg-surface: #FFFFFF;  --bg-surface-raised: #FFFFFF;
+  --bg-primary: #EDF0F5;  --bg-surface-hover: #E0E4EC;  --bg-subtle: #E5E9F0;
+  --bg-hover: #E0E4EC;  --bg-active: #D2D7E1;  --bg-border: #D5DAE2;
+  --bg-border-light: #BCC2CD;  --bg-border-strong: #BCC2CD;
+  --text-primary: #101828;  --text-secondary: #414D5F;  --text-tertiary: #8A91A0;
 }
 [data-theme='light'][data-palette='graphite'] {
-  --bg-sidebar: #DEE2EA;  --bg-base: #E6E9EF;  --bg-surface: #F0F2F6;  --bg-surface-raised: #FAFBFC;
-  --bg-primary: #E6E9EF;  --bg-surface-hover: #D9DCE4;  --bg-subtle: #DCDFE7;
-  --bg-hover: #D9DCE4;  --bg-active: #CBCFD9;  --bg-border: #CDD2DB;
-  --bg-border-light: #B0B6C2;  --bg-border-strong: #B0B6C2;
-  --text-primary: #0F172A;  --text-secondary: #334155;  --text-tertiary: #64748B;
+  --bg-sidebar: #E2E5EB;  --bg-base: #EBEDF2;  --bg-surface: #FFFFFF;  --bg-surface-raised: #FFFFFF;
+  --bg-primary: #EBEDF2;  --bg-surface-hover: #DEE1E8;  --bg-subtle: #E2E5EB;
+  --bg-hover: #DEE1E8;  --bg-active: #D0D4DD;  --bg-border: #D3D7DF;
+  --bg-border-light: #B6BBC6;  --bg-border-strong: #B6BBC6;
+  --text-primary: #161A22;  --text-secondary: #525A6B;  --text-tertiary: #8A91A0;
 }
 [data-theme='light'][data-palette='paper'] {
-  --bg-sidebar: #EEEEEE;  --bg-base: #F4F4F4;  --bg-surface: #FAFAFA;  --bg-surface-raised: #FFFFFF;
+  --bg-sidebar: #ECECEC;  --bg-base: #F4F4F4;  --bg-surface: #FFFFFF;  --bg-surface-raised: #FFFFFF;
   --bg-primary: #F4F4F4;  --bg-surface-hover: #E8E8E8;  --bg-subtle: #EBEBEB;
   --bg-hover: #E8E8E8;  --bg-active: #DCDCDC;  --bg-border: #E0E0E0;
   --bg-border-light: #C4C4C4;  --bg-border-strong: #C4C4C4;
@@ -216,10 +370,19 @@
 .num-xl { font-size: var(--t-24); font-weight: 700; color: var(--text-primary); line-height: 1.1; }
 .num-lg { font-size: var(--t-20); font-weight: 700; color: var(--text-primary); line-height: 1.1; }
 
-/* AI gradient text/BG (강조 스팟) */
-.ai-gradient-bg   { background: linear-gradient(90deg, var(--clover-orange), var(--clover-blue)); color:#fff; }
-.ai-gradient-text { background: linear-gradient(90deg, var(--clover-orange), var(--clover-blue));
+/* AI gradient text/BG (강조 스팟) — v2 토큰 사용 */
+.ai-gradient-bg   { background: var(--ai-gradient-horizontal); color:#fff; }
+.ai-gradient-text { background: var(--ai-gradient-horizontal);
                     -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* v2 가이드 호환 utility 클래스 (.text-* 별칭 — 점진적 마이그레이션용) */
+.t-title   { font-size: var(--t-18); font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; }
+.t-section { font-size: var(--t-14); font-weight: 600; color: var(--text-primary); }
+.t-body    { font-size: var(--t-12); font-weight: 400; color: var(--text-primary); }
+.t-meta    { font-size: var(--t-11); font-weight: 400; color: var(--text-secondary); }
+.t-caption { font-size: var(--t-10); font-weight: 400; color: var(--text-tertiary); }
+.t-label   { font-size: var(--t-10); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); }
+.t-mono    { font-family: var(--font-mono); }
 
 /* ============================================================
    xterm.js base styles

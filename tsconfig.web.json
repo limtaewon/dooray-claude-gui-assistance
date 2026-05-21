@@ -18,11 +18,16 @@
     "paths": {
       "@/*": ["src/renderer/src/*"],
       "@shared/*": ["src/shared/*"]
-    }
+    },
+    "types": ["vitest/globals", "@testing-library/jest-dom"]
   },
   "include": [
     "src/renderer/src/**/*.ts",
     "src/renderer/src/**/*.tsx",
-    "src/shared/**/*.ts"
+    "src/shared/**/*.ts",
+    "src/preload/**/*.ts",
+    "src/main/claude/ClaudeSessionService.ts",
+    "test/**/*.ts",
+    "test/**/*.tsx"
   ]
 }

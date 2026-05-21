@@ -18,7 +18,7 @@ function TitleBar({ onOpenCommandPalette }: TitleBarProps): JSX.Element {
       style={{ paddingLeft: 82 }}  /* 신호등 자리 */
     >
       <div className="flex items-center gap-1.5 no-drag relative z-10">
-        <Clover size={15} className="text-clover-orange" />
+        <Clover size={15} className="text-clauday-orange" />
         <span className="text-[12px] font-semibold text-text-primary leading-none">Clauday</span>
         <span className="text-[10px] text-text-secondary leading-none ml-0.5">Claude Code GUI</span>
       </div>

@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plus, Save, Sparkles, Search, X, Download, Upload, User, Loader2, RefreshCw, Trash2, CheckSquare, Square } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import SkillCard from './SkillCard'
 import SharedSkillCard from './SharedSkillCard'
 import SkillEditor from './SkillEditor'
@@ -14,6 +16,16 @@ import WikiStoragePicker from '../common/WikiStoragePicker'
 type FilterTab = 'mine' | 'wiki'
 
 interface WikiStorageEntry { pageId: string; name: string; content: string; updatedAt: number }
+
+/** SKILL.md frontmatter 의 description 만 추출. 카드 노출용. */
+function extractFrontmatterDescription(body: string): string | undefined {
+  if (!body) return undefined
+  const m = body.match(/^\s*---\r?\n([\s\S]*?)\r?\n---/)
+  if (!m) return undefined
+  const d = m[1].match(/^\s*description\s*:\s*(.+?)\s*$/m)
+  if (!d) return undefined
+  return d[1].trim().replace(/^["']|["']$/g, '')
+}
 
 function SkillsManager(): JSX.Element {
   const toast = useToast()
@@ -342,7 +354,8 @@ function SkillsManager(): JSX.Element {
   }
 
   const handleOpenSharedPreview = async (shared: SharedSkill): Promise<void> => {
-    // 본문이 비어있으면 상세 조회 — 먼저 모달 열고 로딩 상태 표시
+    // 본문이 비어있으면 상세 조회 — 먼저 모달 열고 로딩 상태 표시.
+    // fetch 실패해도 모달은 닫지 말고 "본문 없음" 으로 두기 — 예전엔 즉시 닫혀서 사용자가 "클릭이 안 됨" 으로 체감.
     setPreviewShared(shared)
     if (!shared.content) {
       setPreviewLoading(true)
@@ -351,7 +364,7 @@ function SkillsManager(): JSX.Element {
         setPreviewShared(full)
       } catch (err) {
         toast.error(err instanceof Error ? err.message : '상세 조회 실패')
-        setPreviewShared(null)
+        // 모달은 유지 — content 비어있더라도 frontmatter description / 메타라도 보이도록.
       } finally {
         setPreviewLoading(false)
       }
@@ -496,9 +509,9 @@ function SkillsManager(): JSX.Element {
   return (
     <div className="h-full overflow-y-auto">
       {uploadProgress && (
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-2xl border border-clover-blue/40"
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-2xl border border-clauday-blue/40"
           style={{ background: 'var(--bg-surface-raised)' }}>
-          <Loader2 size={14} className="animate-spin text-clover-blue" />
+          <Loader2 size={14} className="animate-spin text-clauday-blue" />
           <div className="flex flex-col">
             <span className="text-[12px] text-text-primary font-medium">
               {uploadProgress.wikiName} 에 업로드 중 ({uploadProgress.current}/{uploadProgress.total})
@@ -510,7 +523,7 @@ function SkillsManager(): JSX.Element {
       <div className="px-5 py-4 space-y-3">
         {/* PageHeader */}
         <div className="flex items-center gap-3 flex-wrap">
-          <Sparkles size={18} className="text-clover-blue" />
+          <Sparkles size={18} className="text-clauday-blue" />
           <h2 className="text-[14px] font-semibold text-text-primary">Claude 스킬</h2>
           <span className="ds-chip neutral">
             {tab === 'mine' ? `${skills.length}개` : `${wikiItems.length}개 공유됨`}
@@ -572,7 +585,7 @@ function SkillsManager(): JSX.Element {
 
         {/* 다중 선택 액션바 — mine / wiki 탭 별도 액션 */}
         {selectMode && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-clover-orange/8 border border-clover-orange/30">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-clauday-orange/8 border border-clauday-orange/30">
             <span className="text-xs text-text-primary font-medium">{selected.size}개 선택됨</span>
             <button
               type="button"
@@ -581,7 +594,7 @@ function SkillsManager(): JSX.Element {
                 if (selected.size === all.length) setSelected(new Set())
                 else setSelected(new Set(all))
               }}
-              className="text-[11px] text-clover-orange hover:underline"
+              className="text-[11px] text-clauday-orange hover:underline"
             >
               {(() => {
                 const all = tab === 'mine' ? filteredSkills.length : wikiItems.length
@@ -690,11 +703,27 @@ function SkillsManager(): JSX.Element {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {wikiItems.map((item) => {
                 const isSelected = selectMode && selected.has(item.pageId)
+                const description = extractFrontmatterDescription(item.content)
+                const openPreview = (): void => {
+                  // WikiStorageEntry → SharedSkill 어댑트해서 기존 preview 모달 재사용.
+                  // author 정보는 storageList 응답에 없어서 빈 문자열 — fetch 시점 추가 보강은 후속.
+                  setPreviewShared({
+                    postId: item.pageId,
+                    filename: item.name,
+                    name: item.name,
+                    content: item.content,
+                    description,
+                    authorName: '',
+                    createdAt: '',
+                    updatedAt: item.updatedAt ? new Date(item.updatedAt).toISOString() : '',
+                    isMine: false
+                  })
+                }
                 return (
                   <div
                     key={item.pageId}
-                    onClick={selectMode ? () => toggleSelected(item.pageId) : undefined}
-                    className={`ds-card transition-all ${selectMode ? 'cursor-pointer' : ''}`}
+                    onClick={selectMode ? () => toggleSelected(item.pageId) : openPreview}
+                    className={`ds-card cursor-pointer transition-all hover:border-clauday-blue/40`}
                     style={{
                       padding: '12px 14px',
                       ...(isSelected
@@ -703,12 +732,17 @@ function SkillsManager(): JSX.Element {
                     }}
                   >
                     <div className="flex items-start gap-2.5">
-                      <div className="w-7 h-7 rounded-[6px] flex-none flex items-center justify-center bg-clover-blue/10">
-                        <Sparkles size={15} className="text-clover-blue" />
+                      <div className="w-7 h-7 rounded-[6px] flex-none flex items-center justify-center bg-clauday-blue/10">
+                        <Sparkles size={15} className="text-clauday-blue" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-[13px] font-semibold text-text-primary truncate">{item.name}</div>
-                        <div className="text-[10px] text-text-tertiary mt-0.5">
+                        {description ? (
+                          <div className="text-[11px] text-text-secondary mt-0.5 leading-relaxed line-clamp-2">
+                            {description}
+                          </div>
+                        ) : null}
+                        <div className="text-[10px] text-text-tertiary mt-1">
                           {item.updatedAt ? new Date(item.updatedAt).toLocaleString('ko-KR') : '날짜 없음'}
                         </div>
                       </div>
@@ -717,7 +751,7 @@ function SkillsManager(): JSX.Element {
                       <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-bg-border/60">
                         <div className="flex-1" />
                         <button onClick={(e) => { e.stopPropagation(); handleDownloadFromWiki(item) }}
-                          className="flex items-center gap-1 text-[11px] text-text-secondary hover:text-clover-blue">
+                          className="flex items-center gap-1 text-[11px] text-text-secondary hover:text-clauday-blue">
                           <Download size={11} /> 내려받기
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); handleDeleteFromWiki(item) }}
@@ -743,7 +777,7 @@ function SkillsManager(): JSX.Element {
         open={!!activeSkill}
         onClose={closeEditor}
         width="min(1000px, 92vw)"
-        icon={<Sparkles size={14} className="text-clover-blue" />}
+        icon={<Sparkles size={14} className="text-clauday-blue" />}
         title={activeSkill?.name}
         footer={
           <>
@@ -776,7 +810,7 @@ function SkillsManager(): JSX.Element {
         open={!!previewShared}
         onClose={() => setPreviewShared(null)}
         width="min(900px, 92vw)"
-        icon={<Sparkles size={14} className="text-clover-blue" />}
+        icon={<Sparkles size={14} className="text-clauday-blue" />}
         title={previewShared?.name}
         footer={
           <>
@@ -807,14 +841,20 @@ function SkillsManager(): JSX.Element {
         {previewShared && (
           previewLoading ? (
             <div className="flex items-center justify-center gap-2 py-16 text-[12px] text-text-tertiary">
-              <Loader2 size={14} className="animate-spin text-clover-blue" />
+              <Loader2 size={14} className="animate-spin text-clauday-blue" />
               스킬 내용 불러오는 중...
             </div>
+          ) : !previewShared.content ? (
+            <div className="text-[12px] text-text-tertiary py-8 text-center">(본문 없음)</div>
           ) : (
-            <pre className="font-mono text-[11.5px] leading-relaxed text-text-primary whitespace-pre-wrap break-words"
+            // #1 마크다운으로 렌더 — 기존 <pre> raw 보다 가독성 ↑
+            // 스킬은 frontmatter(---) + 마크다운 본문 형식이라 GFM 가 자연스럽게 처리
+            <div className="markdown-body text-[12px] leading-relaxed text-text-primary"
               style={{ maxHeight: '60vh', overflow: 'auto' }}>
-              {previewShared.content || '(본문 없음)'}
-            </pre>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {previewShared.content}
+              </ReactMarkdown>
+            </div>
           )
         )}
       </Modal>
@@ -849,7 +889,7 @@ function SkillsManager(): JSX.Element {
                   className="w-full flex items-center gap-2 px-4 py-2 text-left text-[12px] text-text-secondary hover:bg-bg-surface-hover transition-colors"
                   type="button"
                 >
-                  <Sparkles size={12} className="text-clover-blue" />
+                  <Sparkles size={12} className="text-clauday-blue" />
                   <span className="flex-1">{w.wikiName || w.wikiId}</span>
                 </button>
               ))}

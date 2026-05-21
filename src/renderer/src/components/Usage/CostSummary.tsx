@@ -26,21 +26,21 @@ function CostSummary({ totalCost, totalInput, totalOutput, byModel }: CostSummar
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-bg-surface border border-bg-border rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <DollarSign size={14} className="text-clover-orange" />
+            <DollarSign size={14} className="text-clauday-orange" />
             <span className="text-xs text-text-secondary">총 비용</span>
           </div>
           <p className="text-xl font-semibold text-text-primary">${totalCost.toFixed(2)}</p>
         </div>
         <div className="bg-bg-surface border border-bg-border rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <ArrowUpRight size={14} className="text-clover-blue" />
+            <ArrowUpRight size={14} className="text-clauday-blue" />
             <span className="text-xs text-text-secondary">입력 토큰</span>
           </div>
           <p className="text-xl font-semibold text-text-primary">{formatTokens(totalInput)}</p>
         </div>
         <div className="bg-bg-surface border border-bg-border rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <ArrowDownRight size={14} className="text-clover-orange" />
+            <ArrowDownRight size={14} className="text-clauday-orange" />
             <span className="text-xs text-text-secondary">출력 토큰</span>
           </div>
           <p className="text-xl font-semibold text-text-primary">{formatTokens(totalOutput)}</p>
@@ -59,7 +59,7 @@ function CostSummary({ totalCost, totalInput, totalOutput, byModel }: CostSummar
               <div className="flex items-center gap-4 text-xs text-text-secondary">
                 <span>{formatTokens(m.inputTokens)} 입력</span>
                 <span>{formatTokens(m.outputTokens)} 출력</span>
-                <span className="text-clover-orange font-medium">${m.costUsd.toFixed(4)}</span>
+                <span className="text-clauday-orange font-medium">${m.costUsd.toFixed(4)}</span>
               </div>
             </div>
           ))}

@@ -40,7 +40,7 @@ export interface ErrorViewProps {
 export function ErrorView({ title = '문제가 발생했어요', body, onRetry }: ErrorViewProps): JSX.Element {
   return (
     <div className="ds-state-view">
-      <div className="ds-state-icon" style={{ color: '#F87171' }}>
+      <div className="ds-state-icon" style={{ color: 'var(--c-red-fg)' }}>
         <AlertCircle size={20} />
       </div>
       <div className="ds-state-title">{title}</div>

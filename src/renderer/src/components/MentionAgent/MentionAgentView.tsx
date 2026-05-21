@@ -84,7 +84,7 @@ function MentionAgentView(): JSX.Element {
             <div className="text-center max-w-md">
               <p className="text-sm text-text-primary font-medium mb-1">에이전트 대기 중</p>
               <p className="text-xs text-text-secondary leading-relaxed">
-                두레이 채팅방에서 본인이 <code className="px-1 rounded bg-bg-surface text-clover-blue">@clauday</code> 라고
+                두레이 채팅방에서 본인이 <code className="px-1 rounded bg-bg-surface text-clauday-blue">@clauday</code> 라고
                 호출하면, 그 채널 전용 작업 폴더와 세션이 자동으로 시작됩니다.
               </p>
               <p className="text-[10px] text-text-tertiary mt-3">

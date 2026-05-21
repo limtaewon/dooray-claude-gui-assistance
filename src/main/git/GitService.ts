@@ -86,34 +86,12 @@ export class GitService {
     return branches
   }
 
-  /** 워크트리 목록 */
-  async listWorktrees(repoPath: string): Promise<GitWorktree[]> {
-    const raw = await git(['worktree', 'list', '--porcelain'], repoPath)
+  /** worktree porcelain 출력 → GitWorktree[] 변환 */
+  private parseWorktrees(raw: string): GitWorktree[] {
     const worktrees: GitWorktree[] = []
     let current: Partial<GitWorktree> = {}
-
-    for (const line of raw.split('\n')) {
-      if (line.startsWith('worktree ')) {
-        current.path = line.substring('worktree '.length)
-      } else if (line.startsWith('HEAD ')) {
-        current.head = line.substring('HEAD '.length)
-      } else if (line.startsWith('branch ')) {
-        current.branch = line.substring('branch '.length).replace('refs/heads/', '')
-      } else if (line === 'bare') {
-        current.isBare = true
-      } else if (line === '' && current.path) {
-        worktrees.push({
-          path: current.path,
-          branch: current.branch || '(detached)',
-          head: current.head || '',
-          isMain: worktrees.length === 0,
-          isBare: current.isBare || false
-        })
-        current = {}
-      }
-    }
-
-    if (current.path) {
+    const push = (): void => {
+      if (!current.path) return
       worktrees.push({
         path: current.path,
         branch: current.branch || '(detached)',
@@ -121,9 +99,35 @@ export class GitService {
         isMain: worktrees.length === 0,
         isBare: current.isBare || false
       })
+      current = {}
     }
-
+    for (const line of raw.split('\n')) {
+      if (line.startsWith('worktree ')) current.path = line.substring('worktree '.length)
+      else if (line.startsWith('HEAD ')) current.head = line.substring('HEAD '.length)
+      else if (line.startsWith('branch ')) current.branch = line.substring('branch '.length).replace('refs/heads/', '')
+      else if (line === 'bare') current.isBare = true
+      else if (line === '') push()
+    }
+    push()
     return worktrees
+  }
+
+  /**
+   * 워크트리 목록.
+   * 외부 (터미널 등) 에서 worktree 가 삭제됐을 경우 git 은 stale 한 entry 를 그대로 들고 있어서
+   * UI 가 그 path 로 status 갱신/remove 시도하다 ENOENT throw 가 발생 (Issue #8).
+   * → main worktree 아닌 entry 중 fs 가 비어있는 게 보이면 자동 prune 후 재 list.
+   */
+  async listWorktrees(repoPath: string): Promise<GitWorktree[]> {
+    const raw = await git(['worktree', 'list', '--porcelain'], repoPath)
+    let parsed = this.parseWorktrees(raw)
+    const hasStale = parsed.some((w) => !w.isMain && !w.isBare && w.path && !existsSync(w.path))
+    if (hasStale) {
+      await git(['worktree', 'prune'], repoPath).catch(() => { /* prune 실패는 무시 — 다음 호출에서 재시도 */ })
+      const raw2 = await git(['worktree', 'list', '--porcelain'], repoPath).catch(() => raw)
+      parsed = this.parseWorktrees(raw2)
+    }
+    return parsed
   }
 
   /** 워크트리 생성 */
@@ -167,16 +171,37 @@ export class GitService {
     return created
   }
 
-  /** 워크트리 삭제 */
+  /** 워크트리 삭제 — 외부에서 이미 fs 가 삭제된 경우 prune 으로 fallback (Issue #8) */
   async removeWorktree(params: GitWorktreeRemoveParams): Promise<void> {
+    if (!existsSync(params.worktreePath)) {
+      // fs 가 비어있으면 git worktree remove 가 "is not a working tree" 로 실패 — prune 만으로 metadata 정리.
+      await git(['worktree', 'prune'], params.repoPath).catch(() => { /* 이미 prune 됐을 수 있음 */ })
+      return
+    }
     const args = ['worktree', 'remove']
     if (params.force) args.push('--force')
     args.push('--', params.worktreePath)
-    await git(args, params.repoPath)
+    try {
+      await git(args, params.repoPath)
+    } catch (err) {
+      const msg = String(err)
+      // 외부에서 .git/worktrees 만 부분 손상된 경우 등 — prune 으로 graceful fallback
+      if (msg.includes('is not a working tree') || msg.includes('does not exist') || msg.includes('not a directory')) {
+        await git(['worktree', 'prune'], params.repoPath).catch(() => { /* ok */ })
+        return
+      }
+      throw err
+    }
   }
 
-  /** 워크트리 상태 (변경파일 수, ahead/behind) */
+  /**
+   * 워크트리 상태 (변경파일 수, ahead/behind).
+   * worktreePath 가 외부에서 이미 삭제된 경우 git status 가 ENOENT throw 하므로 zero 반환 (Issue #8).
+   */
   async getWorktreeStatus(worktreePath: string): Promise<Omit<GitWorktreeStatus, 'worktree'>> {
+    if (!existsSync(worktreePath)) {
+      return { modifiedFiles: 0, untrackedFiles: 0, aheadBehind: { ahead: 0, behind: 0 } }
+    }
     const [statusRaw, aheadBehindRaw] = await Promise.all([
       git(['status', '--porcelain'], worktreePath),
       git(['rev-list', '--left-right', '--count', 'HEAD...@{upstream}'], worktreePath).catch(() => '0\t0')

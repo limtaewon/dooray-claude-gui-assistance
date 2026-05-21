@@ -19,15 +19,59 @@ interface ClaudeCliResult {
 const BRIEFING_SYSTEM_PROMPT = `두레이 업무 브리핑을 생성하세요. 3가지 데이터가 제공됩니다:
 1. 내 담당 태스크 (toMemberIds)
 2. 내가 참조/멘션된 태스크 (ccMemberIds) — 내가 알아야 할 상황
-3. 이번 주 캘린더 일정
+3. 이번 주 캘린더 일정 — 각 항목의 \`source\` 필드로 종류 구분
+   - \`caldav\`: 두레이 회사 캘린더의 회의/일정 (외부 의무)
+   - \`local\`: 사용자가 Clauday 의 "빠른 할 일" 로 직접 등록한 todo (자기 의지)
+   - \`holiday\`: 한국 공휴일 (참고용)
 
-분석 관점:
-- 긴급: 마감 임박, 오류/실패 키워드, 오래 방치된 working 태스크
-- 오늘 집중: working 상태이거나 오늘 마감인 담당 태스크
-- 멘션됨: CC 태스크 중 내가 확인/대응해야 할 것 (진행중/등록 상태만)
-- 착수 필요: registered 상태로 3일 이상 된 담당 태스크
-- 오늘 일정: 캘린더 이벤트
-- AI 추천: 위 분석에서 도출되는 행동 제안 (우선순위, 리스크, 놓치기 쉬운 것)
+분석 관점 (각 카테고리는 서로 배타적 — 한 태스크는 한 곳에만):
+- **urgent (긴급)**: 다음 중 하나만 해당. 추측 금지.
+  · dueDate 가 오늘 또는 향후 3일 이내 (= 마감 임박 — 가장 우선)
+  · dueDate 가 이미 지나간 working/registered (= 지연)
+  · subject/workflowName 에 "오류", "실패", "장애", "버그" 키워드 명시
+  ⚠️ "오래된 working" 은 urgent 에 넣지 말고 stale 에. 매일 같은 항목이 urgent 로 떠서 무뎌짐.
+- **focus (오늘 집중)**: workflowClass=working 인 담당 태스크 중 오늘 진척시킬 가치가 있는 것. registered 는 원칙적으로 focus 에 넣지 말 것. local 일정과 연계되는 항목 우선.
+- **stale (방치/장기)**: 다음 중 하나만.
+  · registered 가 3일 이상 (착수 필요)
+  · workflowName 이 "잠정 보류" / "개발 대기" 인 working (실질 멈춤)
+  · working 인데 createdAt 14일 이상 경과 (장기화)
+  daysSinceCreated 값 필수.
+- **mentioned (멘션됨)**: CC 태스크 전용. 본인이 실제로 액션해야 할 명확한 이유가 있는 것만 (보통 0~5개). 단순 CC 만으로는 부족 — 사용자 정의 스킬의 매칭 패턴이 있으면 적용.
+- **todayEvents (오늘 일정)**: 오늘 진행되는 이벤트만 (시작이 오늘 끝나기 전 AND 끝이 오늘 시작 이후). holiday source 는 종일 단순 표기.
+- **recommendations (AI 추천)**: 3~6개. 회의 사이 빈 시간 + 로컬 todo 연계, 우선순위 충돌, 휴가/마감 충돌, 놓치기 쉬운 것.
+
+**분류 강제 규칙 (반드시)**:
+1. urgent / focus / stale 의 taskId 는 [내 담당 태스크] 또는 [오늘 마감 태스크] 에만 있어야 함. CC id 금지.
+2. mentioned 의 taskId 는 [내가 참조/멘션된 태스크] 에만. 담당 id 금지.
+3. **한 taskId 는 하나의 카테고리에만 등장**. 같은 id 가 urgent+stale 또는 focus+stale 에 동시 등장 금지. 우선순위: urgent > focus > stale > mentioned.
+4. **subject 필드 = 원본 그대로**. 두레이 데이터의 subject 를 그대로 사용. emoji, "[프로젝트]", "🚀" 같은 prefix 를 subject 에 붙이지 말 것.
+5. **reason 에는 사용자 스킬의 출력 형식을 적극 활용**. 사용자 스킬에 "🔄 [NEON] ... 잠정 보류 N일째", "🚀 [재무서비스-배포] ...", "📋 [NEON-기획] ..." 같은 출력 형식이 정의되어 있으면 그 emoji + prefix + 톤을 **reason 의 앞부분에 넣을 것**. 그래야 사용자가 어떤 패턴/스킬이 적용됐는지 한 눈에 보임. 사용자 스킬에 출력 형식이 없는 경우는 평이한 텍스트로.
+6. 완료(closed) 태스크는 어떤 카테고리에도 등장 금지.
+
+**구체성 가드** — 모든 reason / recommendation 에 적용:
+- "확인", "검토", "점검", "재확인", "파악", "자문 가능성", "영향도 확인" 같은 막연한 표현 단독 사용 금지. 무엇을 어떻게 할지 명시.
+- 모든 추천은 [구체 동사 + 대상 + 기한/시각] 형태. 시각 anchor 가 없으면 "오전/오후/미팅 전/EOD" 같은 시간대 anchor 필수.
+- reason 도 데이터의 실제 값 인용: 마감일·workflowName·daysSinceCreated·subject 키워드 등.
+- "~필요할 가능성", "~수 있음" 같은 추측 표현은 데이터에서 직접 도출되는 경우만 사용. 근거가 없으면 mentioned 에 넣지 말 것.
+
+**에이전틱 행동** — 두레이 데이터만 정리하지 말고 외부 시스템 상태를 적극 fetch 하라:
+
+오늘 캘린더 일정/todo(특히 \`source=local\`) 가 외부 시스템 상태를 암시하면, 사용 가능한 도구로 **직접 grounding data 를 fetch** 한 뒤 recommendations 에 실제 항목·번호·URL 을 인용하라. 막연한 "확인하세요" 대신 구체적인 데이터로 답한다.
+
+사용 가능한 도구 (사용자 환경에 따라 일부는 동작 안 할 수 있음 — 실패하면 조용히 skip):
+- \`Bash\` — 사용자 셸 명령. 사용자가 "사용자 정의 규칙(스킬)" 섹션에서 권장한 명령을 우선 활용.
+- \`WebSearch\` / \`WebFetch\` — 외부 정보·뉴스·릴리스 노트 조회.
+- \`mcp__dooray-mcp__*\` — 두레이 태스크/위키/캘린더/멤버 추가 조회.
+
+**사용자 스킬을 항상 먼저 확인하라.** 아래 "사용자 정의 규칙" 섹션에 사용자가 정의한 도메인별 명령/패턴(예: PR 조회, 배포 상태, 사내 시스템 등)이 있으면 그것이 가장 신뢰할 수 있는 가이드다. 캘린더/todo 키워드와 사용자 스킬의 트리거를 매칭해서 도구 호출.
+
+**호출을 망설이지 말 것**:
+- "두레이 데이터에 이미 있으니 됐다" 는 잘못된 판단. 두레이와 외부 시스템(VCS, CI, 모니터링, 메신저 등)은 별개 — 둘 다 봐야 완전한 그림.
+- 도구 결과가 비거나 에러 → 조용히 skip, 다른 도구 시도. 실패 명령을 사용자에게 노출하지 않는다.
+- 같은 도구를 같은 인자로 두 번 호출 금지.
+- 결과가 있으면 recommendations 에 **URL 그대로 포함** (UI 가 자동으로 링크화함). 예: "리뷰 대기 PR 3건: https://... , https://... , https://..."
+- 호출 횟수 권장: 외부 트리거 있으면 **3~8회**, 트리거 없으면 0회.
+- **최종 응답은 반드시 아래 JSON 만**. 도구 호출 사이에 텍스트 설명 추가 금지.
 
 반드시 아래 JSON 형식으로만 응답하세요:
 {
@@ -37,7 +81,7 @@ const BRIEFING_SYSTEM_PROMPT = `두레이 업무 브리핑을 생성하세요. 3
   "mentioned": [{"taskId": "...", "subject": "...", "reason": "왜 내가 알아야 하는지"}],
   "stale": [{"taskId": "...", "subject": "...", "daysSinceCreated": 3}],
   "todayEvents": [{"subject": "...", "time": "14:00-15:00"}],
-  "recommendations": ["구체적 행동 제안 1", "구체적 행동 제안 2", "구체적 행동 제안 3"]
+  "recommendations": ["구체적 행동 제안 1 (도구로 확인한 실제 데이터 인용)", "구체적 행동 제안 2", "..."]
 }`
 
 /**
@@ -134,27 +178,54 @@ function buildArgs(prompt: string, opts: {
   noTools?: boolean
   /** 웹 조사만 허용 (WebSearch + WebFetch). MCP/파일/Bash 등은 차단. 에이전틱 정리 용도 */
   webOnly?: boolean
+  /** Read tool 추가 허용 — 이미지/파일 분석용 */
+  allowRead?: boolean
+  /**
+   * 에이전틱 모드 — 캘린더 일정/태스크 컨텍스트를 보고 LLM 이 외부 grounding data 를
+   * 직접 fetch 해서 진짜 비서 같은 브리핑을 만들도록 광범위 도구 허용.
+   * 허용: Bash, WebSearch, WebFetch, Read + mcpServers (지정 시) 또는 기본 MCP 셋.
+   * 차단: Edit, Write, TodoWrite, Task (브리핑은 read-only 작업).
+   */
+  agentic?: boolean
 }): string[] {
   const args = [
     '-p', prompt,
     '--output-format', 'json',
     '--model', opts.model || 'sonnet',
     '--no-session-persistence',
-    '--effort', opts.effort || 'low'
+    '--effort', opts.effort || 'low',
+    // Claude CLI 자체 skill 카탈로그(115개)를 system prompt 에서 제거.
+    // 사용자 brief 스킬 4개가 노이즈에 묻히던 문제. --bare 는 keychain auth 도 끊어서 사용 X
+    // (사용자가 ANTHROPIC_API_KEY env 설정 안 했으면 "Not logged in" 발생).
+    '--disable-slash-commands',
+    // 머신별 동적 섹션 (cwd, env info, memory paths, git status) 을 system prompt 에서 분리.
+    // 캐시 hit 률 ↑, system prompt 깨끗.
+    '--exclude-dynamic-system-prompt-sections'
   ]
   if (opts.systemPrompt) args.push('--append-system-prompt', opts.systemPrompt)
   if (opts.maxBudget) args.push('--max-budget-usd', opts.maxBudget)
+  // allowedTools 는 단일 push — 여러 분기에서 합쳐서 push
+  const allowed: string[] = []
   if (opts.noTools) {
     args.push('--disallowedTools', 'mcp__*,Bash,Edit,Write,Read,TodoWrite,WebFetch,WebSearch,Task')
+  } else if (opts.agentic) {
+    // 에이전틱 — 광범위 read-only 권한. 쓰기 도구는 명시적으로 차단.
+    allowed.push('Bash', 'WebSearch', 'WebFetch', 'Read')
+    if (opts.mcpServers && opts.mcpServers.length > 0) {
+      for (const name of opts.mcpServers) allowed.push(`mcp__${name}__*`)
+    } else {
+      allowed.push('mcp__dooray-mcp__*', 'mcp__mcp-clickhouse__*', 'mcp__mysql-nfi__*')
+    }
+    args.push('--disallowedTools', 'Edit,Write,TodoWrite,Task')
   } else if (opts.webOnly) {
-    // 웹 조사만 허용 — MCP/파일/터미널 등은 차단
-    args.push('--allowedTools', 'WebSearch,WebFetch')
+    allowed.push('WebSearch', 'WebFetch')
   } else if (opts.mcpServers && opts.mcpServers.length > 0) {
-    const patterns = opts.mcpServers.map((name) => `mcp__${name}__*`).join(',')
-    args.push('--allowedTools', patterns)
+    for (const name of opts.mcpServers) allowed.push(`mcp__${name}__*`)
   } else if (opts.allowMcp) {
-    args.push('--allowedTools', 'mcp__dooray-mcp__*,mcp__mcp-clickhouse__*,mcp__mysql-nfi__*')
+    allowed.push('mcp__dooray-mcp__*', 'mcp__mcp-clickhouse__*', 'mcp__mysql-nfi__*')
   }
+  if (opts.allowRead && !opts.noTools && !opts.agentic) allowed.push('Read')
+  if (allowed.length > 0) args.push('--allowedTools', allowed.join(','))
   return args
 }
 
@@ -326,7 +397,14 @@ ${skillBlock}`
         '--verbose'
       )
 
-      const proc = spawn(CLAUDE_CLI, cleaned, { env: enrichedEnv() })
+      // Windows 호환 (Issue #11): claude 가 .cmd 면 Node 의 spawn 이 자동 추론 못함 → shell:true.
+      // windowsVerbatimArguments 로 cmd codepage 변환 차단 (한글 prompt 깨짐 방지).
+      const isWindows = process.platform === 'win32'
+      const proc = spawn(CLAUDE_CLI, cleaned, {
+        env: enrichedEnv(),
+        shell: isWindows,
+        windowsVerbatimArguments: isWindows
+      })
       let buffer = ''
       let finalResult: ClaudeCliResult | null = null
       let accumulated = ''
@@ -452,6 +530,22 @@ ${skillBlock}`
             total_cost_usd: 0
           })
         } else {
+          // Issue #11 — exit 0 인데 결과가 없는 경우: stderr 가 Warning: 류 비치명 메시지일 가능성이 큼.
+          // claude 가 `-p` 모드에서 출력하는 "Warning: no stdin data received in 3s, proceeding without it"
+          // 같은 메시지는 정상 동작 중 발생하는 경고라 사용자에게 에러로 노출하면 혼란.
+          const stderrLines = (stderrBuf || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+          const onlyWarnings = stderrLines.length > 0 && stderrLines.every((l) => /^warning:/i.test(l))
+          if (code === 0 && onlyWarnings) {
+            resolve({
+              type: 'result',
+              result: '',
+              duration_ms: 0,
+              session_id: '',
+              is_error: false,
+              total_cost_usd: 0
+            })
+            return
+          }
           reject(wrapClaudeError(stderrBuf || `Claude CLI 종료 코드 ${code}`, stderrBuf))
         }
       })
@@ -460,7 +554,12 @@ ${skillBlock}`
 
   isAvailable(): boolean {
     try {
-      execFileSync(CLAUDE_CLI, ['--version'], { timeout: 5000, env: enrichedEnv() })
+      // Windows: .cmd 추론을 위해 shell:true. `--version` 만 받으므로 codepage 변환 영향 없음.
+      execFileSync(CLAUDE_CLI, ['--version'], {
+        timeout: 5000,
+        env: enrichedEnv(),
+        shell: process.platform === 'win32'
+      })
       return true
     } catch {
       return false
@@ -473,7 +572,7 @@ ${skillBlock}`
    */
   async ask(
     prompt: string,
-    opts?: { systemPrompt?: string; model?: AIModelName; maxBudget?: string; requestId?: string; feature?: keyof AIModelConfig; mcpServers?: string[] }
+    opts?: { systemPrompt?: string; model?: AIModelName; maxBudget?: string; requestId?: string; feature?: keyof AIModelConfig; mcpServers?: string[]; imagePaths?: string[] }
   ): Promise<string> {
     const feature = opts?.feature
     const defaultModel = opts?.model || 'sonnet'
@@ -489,7 +588,6 @@ ${skillBlock}`
       summarizeTask: 'task',
       briefing: 'briefing',
       report: 'report',
-      meetingNote: 'calendar',
       calendarAnalysis: 'calendar',
       sessionSummary: 'insights',
       generateSkill: 'all',
@@ -500,12 +598,19 @@ ${skillBlock}`
     const baseSystem = opts?.systemPrompt || '당신은 유용한 한국어 AI 비서입니다.'
     const mergedSystem = target ? this.buildSystemPrompt(baseSystem, target) : baseSystem
 
-    const args = buildArgs(prompt, {
+    // 이미지 첨부 — prompt 에 절대경로를 명시하고 Read tool 을 허용. CLI 가 이미지 파일을 직접 분석.
+    const images = (opts?.imagePaths || []).filter((p) => !!p && p.trim().length > 0)
+    const finalPrompt = images.length > 0
+      ? `[첨부 이미지 — Read tool 로 읽어서 시각적 내용을 분석에 활용하세요. ${images.length}장]\n${images.map((p) => `- ${p}`).join('\n')}\n\n${prompt}`
+      : prompt
+
+    const args = buildArgs(finalPrompt, {
       model,
       systemPrompt: mergedSystem,
       maxBudget: opts?.maxBudget || '0.3',
       mcpServers: opts?.mcpServers,
-      allowMcp: false
+      allowMcp: false,
+      allowRead: images.length > 0
     })
 
     const result = await this.runWithProgress(opts?.requestId, '✨ AI 응답 생성 중...', args)
@@ -535,7 +640,9 @@ ${skillBlock}`
     ccTasks?: DoorayTask[],
     dueTodayTasks?: DoorayTask[],
     requestId?: string,
-    mcpServers?: string[]
+    mcpServers?: string[],
+    /** 위임 모드 여부 — true 면 task 데이터는 AI 가 MCP 로 직접 수집. sourceMeta 에 표시. */
+    delegated?: boolean
   ): Promise<AIBriefing> {
     const started = Date.now()
     this.emitProgress(requestId, 'collecting', '브리핑 데이터 준비 중...', started)
@@ -544,7 +651,10 @@ ${skillBlock}`
       year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
     })
 
-    const taskData = tasks.slice(0, 50).map((t) => ({
+    // closed 는 브리핑에 무의미 — 토큰 낭비 + LLM 혼선 (실제 데이터에서 50개 중 31개가 closed 인 케이스 발견).
+    // registered + working 만 남긴 뒤 50개 slice.
+    const activeTasks = tasks.filter((t) => t.workflowClass !== 'closed')
+    const taskData = activeTasks.slice(0, 50).map((t) => ({
       id: t.id, subject: t.subject, status: t.workflowClass,
       workflowName: t.workflow?.name, project: t.projectCode,
       tags: t.tags?.map((tag) => tag.name).filter(Boolean),
@@ -552,12 +662,22 @@ ${skillBlock}`
       dueDate: t.dueDateAt, created: t.createdAt
     }))
 
+    // 일정 source 라벨링 — getEventsLegacy 가 id 에 "${source}:${id}" 형식으로 prefix.
+    // LLM 이 "내가 등록한 todo (local)" vs "두레이 회의 (caldav)" vs "공휴일 (holiday)" 를 구분해 우선순위/추천에 반영.
+    const inferSource = (id?: string): 'local' | 'caldav' | 'holiday' | 'unknown' => {
+      if (!id) return 'unknown'
+      if (id.startsWith('local:')) return 'local'
+      if (id.startsWith('holiday:')) return 'holiday'
+      if (id.startsWith('caldav:')) return 'caldav'
+      return 'unknown'
+    }
     const eventData = events.map((e) => ({
       subject: e.subject,
       start: e.startedAt || e.startAt,
       end: e.endedAt || e.endAt,
       location: e.location,
-      allDay: e.wholeDayFlag
+      allDay: e.wholeDayFlag,
+      source: inferSource(e.id)
     }))
 
     const ccData = (ccTasks || []).slice(0, 30).map((t) => ({
@@ -598,17 +718,31 @@ ${JSON.stringify(eventData)}`
     const args = buildArgs(prompt, {
       model: this.pickModel('briefing', 'opus'),
       systemPrompt: this.buildSystemPrompt(BRIEFING_SYSTEM_PROMPT, 'briefing'),
-      // 위임 모드는 MCP 다중 호출 → 토큰 소비 ↑, 여유있게 설정
-      maxBudget: allEmpty ? '2.0' : '0.3',
-      effort: allEmpty ? 'medium' : 'low',
+      // 에이전틱 — 캘린더 일정 보고 LLM 이 사용자 스킬의 명령/MCP/web 으로 grounding data 직접 fetch.
+      // 도구 호출 라운드트립 고려해서 budget/effort 여유있게.
+      maxBudget: allEmpty ? '3.0' : '2.5',
+      effort: 'high',
       mcpServers,
-      allowMcp: false
+      agentic: true
     })
 
     this.emitProgress(requestId, 'thinking', `🤖 Claude (${this.pickModel('briefing', 'opus')}) 시작 중...`, started)
+    // 에이전틱 모드 — 도구 호출 라운드트립이 있어 5분까지 허용. allEmpty 는 그대로 무제한.
+    const probes: Array<{ name: string; summary?: string }> = []
     const result = await this.runClaudeStream(args, (chunk) => {
       this.emitProgress(requestId, 'streaming', '✨ 응답 생성 중...', started, chunk)
-    }, allEmpty ? { timeoutMs: null } : {})
+      // chunk 에서 도구 호출 라인 캡처 — runClaudeStream 이 "\n🔧 toolName {input}\n" 형식으로 emit
+      const match = chunk.match(/🔧 ([\w-]+(?:__[\w-]+)?)\s+(\{[^\n]*\})/)
+      if (match) {
+        const name = match[1]
+        const inputStr = match[2]
+        const summary = inputStr.length > 100 ? inputStr.slice(0, 97) + '...' : inputStr
+        // 같은 (name, summary) 중복 제거
+        if (!probes.some((p) => p.name === name && p.summary === summary)) {
+          probes.push({ name, summary })
+        }
+      }
+    }, allEmpty ? { timeoutMs: null } : { timeoutMs: 300000 })
     this.emitProgress(requestId, 'parsing', '결과 정리 중...', started)
 
     // JSON 추출 — 마크다운 코드블록(```json ... ```) 처리 및 에러 명확화
@@ -630,14 +764,105 @@ ${JSON.stringify(eventData)}`
     }
     try {
       const briefing = JSON.parse(jsonMatch[0]) as AIBriefing
+      // 이번주 일정 범위 라벨 — "5/20~5/27" 형식
+      const fmtMD = (d: Date): string => `${d.getMonth() + 1}/${d.getDate()}`
+      const evStart = new Date()
+      const startOfDay = new Date(evStart.getFullYear(), evStart.getMonth(), evStart.getDate())
+      const endOfWeek = new Date(startOfDay.getTime() + 7 * 24 * 60 * 60 * 1000)
+
+      // 분류 누수 정정:
+      //  1) focus/urgent/stale 에 CC id 섞이면 → mentioned 로 이동, 모르는 id 면 drop
+      //  2) closed 태스크 id 가 어디든 들어오면 drop
+      //  3) cross-category dedup — 한 taskId 가 여러 카테고리에 있으면 우선순위 (urgent > focus > stale > mentioned) 만 유지
+      //  4) subject 는 두레이 원본으로 강제 교체 (LLM 이 emoji/prefix 붙이는 누수 방지)
+      const myIds = new Set([
+        ...tasks.filter((t) => t.workflowClass !== 'closed').map((t) => t.id),
+        ...(dueTodayTasks || []).map((t) => t.id)
+      ])
+      const ccIds = new Set((ccTasks || []).map((t) => t.id))
+      const subjectById = new Map<string, string>()
+      for (const t of tasks) subjectById.set(t.id, t.subject)
+      for (const t of (dueTodayTasks || [])) subjectById.set(t.id, t.subject)
+      for (const t of (ccTasks || [])) subjectById.set(t.id, t.subject)
+
+      type Item = { taskId: string; subject: string; reason?: string; daysSinceCreated?: number }
+      const movedToMentioned: Item[] = []
+      const filterMyOnly = <T extends Item>(arr: T[] | undefined): T[] => {
+        if (!Array.isArray(arr)) return []
+        const out: T[] = []
+        for (const it of arr) {
+          if (!it?.taskId) { out.push(it); continue }
+          if (myIds.has(it.taskId)) out.push(it)
+          else if (ccIds.has(it.taskId)) movedToMentioned.push({ taskId: it.taskId, subject: it.subject, reason: it.reason || '참조된 항목' })
+          // 모르는 id (closed 등) 는 drop
+        }
+        return out
+      }
+      let urgent = filterMyOnly(briefing.urgent)
+      let focus = filterMyOnly(briefing.focus)
+      let stale = filterMyOnly(briefing.stale)
+
+      // cross-category dedup — 우선순위 높은 카테고리에 이미 있으면 낮은 카테고리에서 제거
+      const usedInHigher = new Set<string>()
+      const dedupAgainst = <T extends Item>(arr: T[]): T[] => {
+        const out: T[] = []
+        for (const it of arr) {
+          if (it?.taskId && usedInHigher.has(it.taskId)) continue
+          out.push(it)
+          if (it?.taskId) usedInHigher.add(it.taskId)
+        }
+        return out
+      }
+      urgent = dedupAgainst(urgent)
+      focus = dedupAgainst(focus)
+      stale = dedupAgainst(stale)
+
+      const mentionedRaw = Array.isArray(briefing.mentioned) ? briefing.mentioned : []
+      const mentionedFiltered = mentionedRaw.filter((m) => !m?.taskId || ccIds.has(m.taskId))
+      const mentionedSeen = new Set<string>()
+      const mentioned = [...mentionedFiltered, ...movedToMentioned].filter((m) => {
+        if (!m?.taskId) return true
+        // higher 카테고리에 이미 있으면 mentioned 에서도 제거 (담당으로 분류된 게 또 mentioned 에 오면 의미 없음)
+        if (usedInHigher.has(m.taskId)) return false
+        if (mentionedSeen.has(m.taskId)) return false
+        mentionedSeen.add(m.taskId)
+        return true
+      })
+
+      // subject 원본 강제 교체 — LLM 이 "🚀 [재무서비스-배포] 21주차 배포 취합" 처럼 prefix 붙이는 누수 방지
+      const restoreSubject = <T extends Item>(arr: T[]): T[] => arr.map((it) => {
+        if (!it?.taskId) return it
+        const orig = subjectById.get(it.taskId)
+        return orig ? { ...it, subject: orig } : it
+      })
+      urgent = restoreSubject(urgent)
+      focus = restoreSubject(focus)
+      stale = restoreSubject(stale)
+      // mentioned 는 AIBriefing 의 strict shape 으로 좁히기 — reason 누락 시 기본 문구 채움
+      const mentionedFinal = restoreSubject(mentioned).map((m) => ({
+        taskId: m.taskId,
+        subject: m.subject,
+        reason: m.reason || '참조된 항목'
+      }))
+
       const safe: AIBriefing = {
         greeting: briefing.greeting || '오늘도 좋은 하루 보내세요!',
-        urgent: Array.isArray(briefing.urgent) ? briefing.urgent : [],
-        focus: Array.isArray(briefing.focus) ? briefing.focus : [],
-        mentioned: Array.isArray(briefing.mentioned) ? briefing.mentioned : [],
-        stale: Array.isArray(briefing.stale) ? briefing.stale : [],
+        urgent: urgent as AIBriefing['urgent'],
+        focus: focus as AIBriefing['focus'],
+        mentioned: mentionedFinal,
+        stale: stale as AIBriefing['stale'],
         todayEvents: Array.isArray(briefing.todayEvents) ? briefing.todayEvents : [],
-        recommendations: Array.isArray(briefing.recommendations) ? briefing.recommendations : []
+        recommendations: Array.isArray(briefing.recommendations) ? briefing.recommendations : [],
+        sourceMeta: {
+          taskCount: tasks.length,
+          ccTaskCount: (ccTasks || []).length,
+          dueTodayCount: (dueTodayTasks || []).length,
+          eventCount: events.length,
+          eventRange: `${fmtMD(startOfDay)}~${fmtMD(endOfWeek)}`,
+          collectedAt: new Date(started).toISOString(),
+          delegated: !!delegated,
+          probes: probes.length > 0 ? probes : undefined
+        }
       }
       this.emitProgress(requestId, 'done', '완료', started)
       return safe
@@ -683,19 +908,61 @@ ${JSON.stringify(eventData)}`
 
     const args = buildArgs(prompt, {
       model: this.pickModel('report', 'opus'),
-      systemPrompt: this.buildSystemPrompt('업무 보고서 전문 작성 AI. 간결하고 명확한 마크다운 보고서를 생성합니다. 한국어로 작성.', 'report'),
-      maxBudget: allEmpty ? '2.0' : '0.3',
-      effort: allEmpty ? 'medium' : 'low',
-      mcpServers
+      systemPrompt: this.buildSystemPrompt(
+        `업무 보고서 전문 작성 AI. 간결하고 명확한 마크다운 보고서를 생성합니다. 한국어로 작성.
+
+구체성 가드:
+- "확인", "검토", "점검", "재확인" 같은 막연한 동사 단독 사용 금지
+- 각 항목은 [동사 + 대상 + (가능하면) 일시/상태] 형태
+- 진행중 항목은 현재 워크플로 상태/마감일을 본문에 인용
+
+**에이전틱 행동** — 두레이 데이터만 정리하지 말고 외부 시스템 상태를 적극 fetch 하라:
+- 보고서 기간 안의 일정/태스크가 외부 시스템(PR, CI, 배포, 모니터링, 메신저 등) 상태를 암시하면 사용 가능한 도구로 직접 grounding data 를 가져와 본문에 인용한다.
+- 사용 가능한 도구: \`Bash\` (사용자 셸 명령), \`WebSearch\` / \`WebFetch\`, \`mcp__dooray-mcp__*\`, 기타 활성 MCP.
+- 사용자가 "사용자 정의 규칙(스킬)" 섹션에서 지시한 명령/패턴이 있으면 그것을 우선 활용.
+- 결과 URL 은 마크다운 링크 형태로 본문에 그대로 포함. UI 가 자동 렌더링한다.
+- "이미 두레이에 있으니 됐다"는 잘못된 판단 — 외부 시스템은 별개. 둘 다 봐야 완전한 그림.
+- 도구 결과가 비거나 에러여도 다른 카테고리는 계속 작성. 실패 명령을 사용자에게 노출하지 않는다.
+- 같은 도구를 같은 인자로 두 번 호출 금지.`,
+        'report'
+      ),
+      // 에이전틱 — Bash + Web + MCP 광범위 허용. 보고서는 깊이 있는 분석이라 budget/effort 여유있게.
+      maxBudget: allEmpty ? '3.5' : '3.0',
+      effort: 'high',
+      mcpServers,
+      agentic: true
     })
 
     this.emitProgress(requestId, 'thinking', `${period} 보고서 작성 중...`, started)
+    const probes: Array<{ name: string; summary?: string }> = []
     const result = await this.runClaudeStream(args, (chunk) => {
       this.emitProgress(requestId, 'streaming', `${period} 보고서 작성 중...`, started, chunk)
-    }, allEmpty ? { timeoutMs: null } : {})
+      // 도구 호출 라인 캡처 — 브리핑과 동일 패턴
+      const match = chunk.match(/🔧 ([\w-]+(?:__[\w-]+)?)\s+(\{[^\n]*\})/)
+      if (match) {
+        const name = match[1]
+        const inputStr = match[2]
+        const summary = inputStr.length > 100 ? inputStr.slice(0, 97) + '...' : inputStr
+        if (!probes.some((p) => p.name === name && p.summary === summary)) {
+          probes.push({ name, summary })
+        }
+      }
+    }, allEmpty ? { timeoutMs: null } : { timeoutMs: 300000 })
     this.emitProgress(requestId, 'done', '완료', started)
 
-    return { title: `${period} 업무 보고서 - ${today}`, content: result.result, generatedAt: new Date().toISOString() }
+    return {
+      title: `${period} 업무 보고서 - ${today}`,
+      content: result.result,
+      generatedAt: new Date().toISOString(),
+      sourceMeta: {
+        taskCount: tasks.length,
+        ccTaskCount: 0,
+        dueTodayCount: 0,
+        eventCount: events.length,
+        collectedAt: new Date(started).toISOString(),
+        probes: probes.length > 0 ? probes : undefined
+      }
+    }
   }
 
   async wikiProofread(title: string, content: string, requestId?: string): Promise<string> {
@@ -1070,14 +1337,4 @@ ${mcpBlock}
     return final
   }
 
-  async generateMeetingNote(eventSubject: string, eventDescription?: string, attendees?: string[], requestId?: string): Promise<string> {
-    const prompt = `회의록 템플릿을 마크다운으로 생성.\n회의명: ${eventSubject}\n${eventDescription ? '설명: ' + eventDescription : ''}\n${attendees?.length ? '참석자: ' + attendees.join(', ') : ''}`
-
-    const result = await this.runWithProgress(requestId, '회의록 생성 중...', buildArgs(prompt, {
-      model: this.pickModel('meetingNote', 'haiku'),
-      systemPrompt: this.buildSystemPrompt('회의록 템플릿 생성 AI. 구조화된 회의록을 작성합니다.', 'calendar'),
-      maxBudget: '0.1'
-    }))
-    return result.result
-  }
 }

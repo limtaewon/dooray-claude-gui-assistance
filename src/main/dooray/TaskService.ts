@@ -387,13 +387,20 @@ export class TaskService {
     return allTasks.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
   }
 
-  // 오늘 마감 태스크 (전체 프로젝트)
-  async listDueTodayTasks(): Promise<DoorayTask[]> {
+  // 오늘 마감 태스크 — projectIds 지정 시 그 프로젝트만, 안 주면 전체 (위험 — 두레이 quota 압박).
+  // 브리핑/대시보드는 토글된 pinnedProjects 만 전달해서 호출량 제한.
+  async listDueTodayTasks(projectIds?: string[]): Promise<DoorayTask[]> {
     const memberId = await this.getMyMemberId()
-    const projects = await this.listMyProjects()
+    let targets: Array<{ id: string; code?: string }>
+    if (projectIds && projectIds.length > 0) {
+      targets = projectIds.map((id) => ({ id, code: this.projectCache.get(id)?.code }))
+    } else {
+      const projects = await this.listMyProjects()
+      targets = projects.map((p) => ({ id: p.id, code: p.code }))
+    }
     const allTasks: DoorayTask[] = []
     const results = await mapWithConcurrency(
-      projects.slice(0, 20),
+      targets.slice(0, 20),
       TaskService.MAX_CONCURRENT,
       async (p) => {
         try {
@@ -590,13 +597,14 @@ export class TaskService {
     return Array.from(map.entries()).map(([id, v]) => ({ id, name: v.name, color: v.color }))
   }
 
-  /** 태스크(커뮤니티 게시글) 생성 */
+  /** 태스크(커뮤니티 게시글) 생성. templateId 가 있으면 두레이가 해당 템플릿 lineage 로 저장한다 (UI 에서 "템플릿 적용됨" 표시). */
   async createTask(params: {
     projectId: string
     subject: string
     body: string
     assigneeIds?: string[] // 기본: 자기 자신
     tagIds?: string[]      // 일부 프로젝트는 태그 필수 — 호출자가 선택해 전달
+    templateId?: string    // 빠른 태스크에서 템플릿을 골라 시작한 경우 그 id 를 함께 기록
   }): Promise<{ id: string }> {
     const myId = await this.getMyMemberId()
     const to = (params.assigneeIds && params.assigneeIds.length > 0
@@ -612,6 +620,9 @@ export class TaskService {
     }
     if (params.tagIds && params.tagIds.length > 0) {
       payload.tagIdList = params.tagIds
+    }
+    if (params.templateId) {
+      payload.templateId = params.templateId
     }
 
     const res = await this.client.request<DoorayItemResponse<{ id: string }>>(

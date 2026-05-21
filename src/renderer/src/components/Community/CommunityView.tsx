@@ -38,16 +38,16 @@ function getInitials(name: string): string {
   return name.slice(0, 2).toUpperCase()
 }
 
-/** 이름 기반 결정론적 색상 — rgba tint로 라이트/다크 모두 대응 */
+/** 이름 기반 결정론적 색상 — v2 avatar 페어 토큰. 라이트/다크 자동 전환 */
 const AVATAR_COLORS = [
-  { bg: 'rgba(59,130,246,0.15)', text: '#2563eb', ring: '#3b82f6' },
-  { bg: 'rgba(239,68,68,0.15)',  text: '#dc2626', ring: '#ef4444' },
-  { bg: 'rgba(34,197,94,0.15)',  text: '#16a34a', ring: '#22c55e' },
-  { bg: 'rgba(245,158,11,0.15)', text: '#d97706', ring: '#f59e0b' },
-  { bg: 'rgba(168,85,247,0.15)', text: '#9333ea', ring: '#a855f7' },
-  { bg: 'rgba(6,182,212,0.15)',  text: '#0891b2', ring: '#06b6d4' },
-  { bg: 'rgba(249,115,22,0.15)', text: '#ea580c', ring: '#f97316' },
-  { bg: 'rgba(132,204,22,0.15)', text: '#65a30d', ring: '#84cc16' }
+  { bg: 'var(--avatar-1-bg)', text: 'var(--avatar-1-fg)', ring: 'var(--avatar-1-fg)' },
+  { bg: 'var(--avatar-2-bg)', text: 'var(--avatar-2-fg)', ring: 'var(--avatar-2-fg)' },
+  { bg: 'var(--avatar-3-bg)', text: 'var(--avatar-3-fg)', ring: 'var(--avatar-3-fg)' },
+  { bg: 'var(--avatar-4-bg)', text: 'var(--avatar-4-fg)', ring: 'var(--avatar-4-fg)' },
+  { bg: 'var(--avatar-5-bg)', text: 'var(--avatar-5-fg)', ring: 'var(--avatar-5-fg)' },
+  { bg: 'var(--avatar-6-bg)', text: 'var(--avatar-6-fg)', ring: 'var(--avatar-6-fg)' },
+  { bg: 'var(--avatar-7-bg)', text: 'var(--avatar-7-fg)', ring: 'var(--avatar-7-fg)' },
+  { bg: 'var(--avatar-8-bg)', text: 'var(--avatar-8-fg)', ring: 'var(--avatar-8-fg)' }
 ]
 
 function avatarColor(name: string): { bg: string; text: string; ring: string } {
@@ -138,8 +138,8 @@ function CommunityView({ active = true }: { active?: boolean } = {}): JSX.Elemen
       <div className="px-5 pt-4 pb-3 border-b border-bg-border flex-shrink-0">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-clover-blue/10 border border-clover-blue/30">
-              <Users size={14} className="text-clover-blue" />
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-clauday-blue/10 border border-clauday-blue/30">
+              <Users size={14} className="text-clauday-blue" />
             </div>
             <div>
               <h2 className="text-sm font-bold text-text-primary leading-tight">커뮤니티</h2>
@@ -147,7 +147,7 @@ function CommunityView({ active = true }: { active?: boolean } = {}): JSX.Elemen
             </div>
             {!loading && posts.length > 0 && (
               <span className="ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold"
-                style={{ background: 'rgba(59,130,246,0.15)', color: 'var(--accent-blue)', border: '1px solid rgba(59,130,246,0.3)' }}>
+                style={{ background: 'var(--c-blue-bg)', color: 'var(--c-blue-fg)', border: '1px solid color-mix(in oklab, var(--c-blue-fg) 30%, transparent)' }}>
                 {posts.length}
               </span>
             )}
@@ -259,7 +259,7 @@ function PostCard({
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = 'var(--accent-blue)'
-        e.currentTarget.style.boxShadow = '0 4px 12px rgba(59,130,246,0.15)'
+        e.currentTarget.style.boxShadow = '0 4px 12px var(--c-blue-bg)'
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = 'var(--bg-border)'
@@ -279,15 +279,15 @@ function PostCard({
       <div className="flex gap-3">
         {/* Left: Dooray task number */}
         <div className="flex-shrink-0 flex flex-col items-center pt-0.5">
-          <div className="min-w-7 h-6 px-1.5 rounded-md flex items-center justify-center text-[11px] font-bold text-clover-blue group-hover:bg-clover-blue group-hover:text-white transition-colors"
-            style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)' }}>
+          <div className="min-w-7 h-6 px-1.5 rounded-md flex items-center justify-center text-[11px] font-bold text-clauday-blue group-hover:bg-clauday-blue group-hover:text-white transition-colors"
+            style={{ background: 'var(--c-blue-bg)', border: '1px solid color-mix(in oklab, var(--c-blue-fg) 25%, transparent)' }}>
             {post.number ?? '·'}
           </div>
         </div>
 
         {/* Main content */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-text-primary group-hover:text-clover-blue transition-colors leading-snug pr-2">
+          <p className="text-sm font-semibold text-text-primary group-hover:text-clauday-blue transition-colors leading-snug pr-2">
             {post.subject}
           </p>
           {preview && (
@@ -321,7 +321,7 @@ function PostCard({
 
         {/* Right arrow hint */}
         <div className="flex-shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity">
-          <ChevronLeft size={14} className="rotate-180 text-clover-blue" />
+          <ChevronLeft size={14} className="rotate-180 text-clauday-blue" />
         </div>
       </div>
     </div>
@@ -443,7 +443,7 @@ function PostDetail({
                   </div>
                 </div>
                 <div className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium"
-                  style={{ background: 'rgba(59,130,246,0.15)', color: 'var(--accent-blue)', border: '1px solid rgba(59,130,246,0.25)' }}>
+                  style={{ background: 'var(--c-blue-bg)', color: 'var(--c-blue-fg)', border: '1px solid color-mix(in oklab, var(--c-blue-fg) 25%, transparent)' }}>
                   <Hash size={9} />
                   커뮤니티
                 </div>
@@ -476,16 +476,16 @@ function PostDetail({
           {/* Comments section header */}
           <div className="flex items-center gap-2 mb-3">
             <div className="flex items-center gap-1.5">
-              <MessageSquare size={13} className="text-clover-blue" />
+              <MessageSquare size={13} className="text-clauday-blue" />
               <span className="text-xs font-bold text-text-primary">댓글</span>
               {comments.length > 0 && (
                 <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold"
-                  style={{ background: 'rgba(59,130,246,0.15)', color: 'var(--accent-blue)' }}>
+                  style={{ background: 'var(--c-blue-bg)', color: 'var(--c-blue-fg)' }}>
                   {comments.length}
                 </span>
               )}
             </div>
-            <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, #3a4566 0%, transparent 100%)' }} />
+            <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, var(--bg-border) 0%, transparent 100%)' }} />
           </div>
 
           {/* Comments thread */}
@@ -648,7 +648,7 @@ function CommentComposer({ postId, onPosted }: { postId: string; onPosted: () =>
       style={{
         border: focused ? '1px solid var(--accent-blue)' : '1px solid var(--bg-border)',
         background: 'var(--bg-surface)',
-        boxShadow: focused ? '0 0 0 3px rgba(59,130,246,0.08)' : 'none'
+        boxShadow: focused ? '0 0 0 3px var(--c-blue-bg)' : 'none'
       }}>
       {/* Tab bar */}
       <div className="flex items-center px-3 pt-2.5 gap-1">
@@ -656,7 +656,7 @@ function CommentComposer({ postId, onPosted }: { postId: string; onPosted: () =>
           onClick={() => setTab('write')}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all"
           style={tab === 'write'
-            ? { background: 'rgba(59,130,246,0.15)', color: 'var(--accent-blue)', border: '1px solid rgba(59,130,246,0.3)' }
+            ? { background: 'var(--c-blue-bg)', color: 'var(--c-blue-fg)', border: '1px solid color-mix(in oklab, var(--c-blue-fg) 30%, transparent)' }
             : { color: 'var(--text-secondary)', border: '1px solid transparent' }
           }
         >
@@ -668,7 +668,7 @@ function CommentComposer({ postId, onPosted }: { postId: string; onPosted: () =>
           disabled={!text.trim()}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all disabled:opacity-40"
           style={tab === 'preview'
-            ? { background: 'rgba(59,130,246,0.15)', color: 'var(--accent-blue)', border: '1px solid rgba(59,130,246,0.3)' }
+            ? { background: 'var(--c-blue-bg)', color: 'var(--c-blue-fg)', border: '1px solid color-mix(in oklab, var(--c-blue-fg) 30%, transparent)' }
             : { color: 'var(--text-secondary)', border: '1px solid transparent' }
           }
         >
@@ -678,7 +678,7 @@ function CommentComposer({ postId, onPosted }: { postId: string; onPosted: () =>
         <label
           className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium cursor-pointer transition-colors"
           style={{ color: 'var(--text-secondary)', border: '1px solid transparent' }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#f9fafb'; (e.currentTarget as HTMLElement).style.background = 'var(--bg-border)' }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; (e.currentTarget as HTMLElement).style.background = 'var(--bg-border)' }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'; (e.currentTarget as HTMLElement).style.background = 'transparent' }}
         >
           <ImageIcon size={10} />
@@ -744,7 +744,7 @@ function CommentComposer({ postId, onPosted }: { postId: string; onPosted: () =>
           onClick={submit}
           disabled={!text.trim() || posting}
           className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-white text-xs font-semibold transition-all hover:opacity-90 disabled:opacity-40 active:scale-95"
-          style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)', boxShadow: text.trim() ? '0 2px 8px rgba(59,130,246,0.3)' : 'none' }}
+          style={{ background: 'linear-gradient(135deg, var(--c-blue-solid), var(--c-blue-solid))', boxShadow: text.trim() ? '0 2px 8px var(--c-blue-bg)' : 'none' }}
         >
           {posting ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
           {posting ? '작성 중...' : '댓글 작성'}
@@ -886,8 +886,8 @@ ${body || '(빈 내용. 제목을 보고 초안을 작성해줘.)'}
         <div className="flex items-center justify-between px-5 py-3.5"
           style={{ borderBottom: '1px solid var(--bg-border)', background: 'var(--bg-primary)' }}>
           <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-clover-orange/15 border border-clover-orange/30">
-              <Plus size={13} className="text-clover-orange" />
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-clauday-orange/15 border border-clauday-orange/30">
+              <Plus size={13} className="text-clauday-orange" />
             </div>
             <h3 className="text-sm font-bold text-text-primary">새 글 쓰기</h3>
             <span className="text-[10px] px-1.5 py-0.5 rounded-full text-text-tertiary"
@@ -923,7 +923,7 @@ ${body || '(빈 내용. 제목을 보고 초안을 작성해줘.)'}
               onClick={() => setTab('write')}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
               style={tab === 'write'
-                ? { background: 'rgba(59,130,246,0.15)', color: 'var(--accent-blue)', border: '1px solid rgba(59,130,246,0.4)' }
+                ? { background: 'var(--c-blue-bg)', color: 'var(--c-blue-fg)', border: '1px solid color-mix(in oklab, var(--c-blue-fg) 40%, transparent)' }
                 : { color: 'var(--text-secondary)', border: '1px solid var(--bg-border)' }
               }
             >
@@ -935,7 +935,7 @@ ${body || '(빈 내용. 제목을 보고 초안을 작성해줘.)'}
               disabled={!body.trim()}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all disabled:opacity-40"
               style={tab === 'preview'
-                ? { background: 'rgba(59,130,246,0.15)', color: 'var(--accent-blue)', border: '1px solid rgba(59,130,246,0.4)' }
+                ? { background: 'var(--c-blue-bg)', color: 'var(--c-blue-fg)', border: '1px solid color-mix(in oklab, var(--c-blue-fg) 40%, transparent)' }
                 : { color: 'var(--text-secondary)', border: '1px solid var(--bg-border)' }
               }
             >
@@ -1023,7 +1023,7 @@ ${body || '(빈 내용. 제목을 보고 초안을 작성해줘.)'}
 
           {error && (
             <div className="mx-5 mb-4 px-3 py-2 rounded-lg text-[11px] text-red-400"
-              style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)' }}>
+              style={{ background: 'var(--c-red-bg)', border: '1px solid color-mix(in oklab, var(--c-red-fg) 25%, transparent)' }}>
               {error}
             </div>
           )}
@@ -1048,8 +1048,8 @@ ${body || '(빈 내용. 제목을 보고 초안을 작성해줘.)'}
               disabled={!subject.trim() || !body.trim() || posting}
               className="flex items-center gap-1.5 px-5 py-1.5 rounded-lg text-white text-xs font-bold transition-all hover:opacity-90 disabled:opacity-40 active:scale-95"
               style={{
-                background: 'linear-gradient(135deg, #fb923c 0%, #3b82f6 100%)',
-                boxShadow: subject.trim() && body.trim() ? '0 2px 12px rgba(251,146,60,0.3)' : 'none'
+                background: 'linear-gradient(135deg, var(--c-orange-solid) 0%, var(--c-blue-solid) 100%)',
+                boxShadow: subject.trim() && body.trim() ? '0 2px 12px var(--c-orange-bg)' : 'none'
               }}
             >
               {posting ? <Loader2 size={12} className="animate-spin" /> : <ArrowUp size={12} />}

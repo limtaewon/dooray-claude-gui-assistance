@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   Calendar as CalendarIcon, Terminal as TerminalIcon, GitBranch, Users, Server, Sparkles,
-  MessageSquare, BarChart3, BookOpen, Settings as SettingsIcon, Radar, Moon, Sun, Lightbulb
+  MessageSquare, BarChart3, BookOpen, Settings as SettingsIcon, Radar, Moon, Sun, Lightbulb, Bot,
+  LayoutDashboard, ListTodo, MessageCircle, FileText
 } from 'lucide-react'
 import Sidebar from './components/Layout/Sidebar'
 import TitleBar from './components/Layout/TitleBar'
@@ -25,6 +26,23 @@ import { ToastHost, CommandPalette, type CommandGroup, type CommandItem } from '
 import { useTheme } from './hooks/useTheme'
 
 type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent'
+
+/** Cmd+E 최근 뷰 LRU 항목 — sub 가 있으면 같은 view 안의 sub-tab 별로 별개 entry */
+interface RecentViewItem {
+  view: View
+  /** 현재는 두레이 대시보드의 sub-tab(dashboard|tasks|wiki|calendar|messenger|briefing|report) 만 사용 */
+  sub?: string
+}
+
+const DOORAY_SUBTAB_LABELS: Record<string, string> = {
+  dashboard: '대시보드',
+  tasks: '태스크',
+  wiki: '위키',
+  calendar: '캘린더',
+  messenger: '메신저',
+  briefing: '브리핑',
+  report: '보고서'
+}
 
 function App(): JSX.Element {
   const [activeView, setActiveView] = useState<View>('dooray')
@@ -60,18 +78,126 @@ function App(): JSX.Element {
     dwellStartRef.current = { view: activeView, at: Date.now() }
   }, [activeView])
 
-  // ⌘K 글로벌 단축키
+  // ⌘K 글로벌 단축키 + Shift 2회 (IntelliJ "Search Everywhere" 식) 단축키
   useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
+    const DOUBLE_SHIFT_MS = 400
+    let lastShiftAt = 0
+    let shiftCorrupted = false // Shift 누른 동안 다른 키 같이 눌렀으면 "쉬프트만 두 번" 패턴 아님
+
+    const onKeyDown = (e: KeyboardEvent): void => {
       const meta = e.metaKey || e.ctrlKey
       if (meta && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         setCmdOpen((o) => !o)
+        return
+      }
+      // Shift 외 다른 키가 같이 눌렸으면 더블 Shift 후보 무효화
+      if (e.shiftKey && e.key !== 'Shift') {
+        shiftCorrupted = true
       }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    const onKeyUp = (e: KeyboardEvent): void => {
+      if (e.key !== 'Shift') return
+      // Shift+다른키 조합이었으면 카운트 안 함
+      if (shiftCorrupted) {
+        shiftCorrupted = false
+        lastShiftAt = 0
+        return
+      }
+      const now = Date.now()
+      if (lastShiftAt && now - lastShiftAt < DOUBLE_SHIFT_MS) {
+        // 입력 필드에서 Shift 두 번 눌러도 글자가 안 들어가니 그대로 트리거
+        setCmdOpen((o) => !o)
+        lastShiftAt = 0
+      } else {
+        lastShiftAt = now
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+    }
   }, [])
+
+  // #4 메뉴 이동 — Cmd+E "최근 뷰" 팝업.
+  //   activeView/dooraySubTab 변경마다 recentItems LRU 의 맨 앞으로 옮김.
+  //   두레이 같이 sub-tab 이 있는 뷰는 sub 별로 별개 entry — "두레이 - 캘린더" 식.
+  //   ⌘E: 팝업 열기 + index=1(직전) 자동 highlight. 이미 열려있으면 다음 항목으로 cycle.
+  //   ↑↓ 탐색, Enter 선택, Esc 닫기. (예전엔 ⌘ 떼면 자동 확정이었으나 사용자 피드백으로 모달 유지)
+  const [doorayTab, setDoorayTab] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    const onSub = (e: Event): void => {
+      const tab = (e as CustomEvent<{ tab?: string }>).detail?.tab
+      if (tab) setDoorayTab(tab)
+    }
+    window.addEventListener('dooray-subtab', onSub as EventListener)
+    return () => window.removeEventListener('dooray-subtab', onSub as EventListener)
+  }, [])
+
+  const [recentItems, setRecentItems] = useState<RecentViewItem[]>([{ view: activeView }])
+  const [recentPaletteOpen, setRecentPaletteOpen] = useState(false)
+  const [recentIndex, setRecentIndex] = useState(0)
+
+  useEffect(() => {
+    const sub = activeView === 'dooray' ? doorayTab : undefined
+    setRecentItems((prev) => {
+      const next = [{ view: activeView, sub }, ...prev.filter((it) => !(it.view === activeView && (it.sub ?? '') === (sub ?? '')))]
+      return next.slice(0, 10)
+    })
+  }, [activeView, doorayTab])
+
+  const applyRecent = useCallback((targetIdx: number): void => {
+    setRecentPaletteOpen(false)
+    setRecentItems((prev) => {
+      const target = prev[targetIdx]
+      if (!target) return prev
+      if (target.view !== activeView) setActiveView(target.view)
+      if (target.view === 'dooray' && target.sub) {
+        // 두레이 sub-tab 점프 — DoorayAssistant 가 listen 해서 setActiveTab
+        window.dispatchEvent(new CustomEvent('goto-dooray-subtab', { detail: { tab: target.sub } }))
+      }
+      return prev
+    })
+  }, [activeView])
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      const meta = e.metaKey || e.ctrlKey
+      if (meta && e.key.toLowerCase() === 'e') {
+        e.preventDefault()
+        setRecentPaletteOpen((wasOpen) => {
+          if (!wasOpen) {
+            setRecentIndex(Math.min(1, recentItems.length - 1))
+            return true
+          }
+          setRecentIndex((i) => {
+            const max = Math.max(recentItems.length - 1, 0)
+            return i >= max ? 0 : i + 1
+          })
+          return true
+        })
+        return
+      }
+      if (!recentPaletteOpen) return
+      if (e.key === 'Escape') { e.preventDefault(); setRecentPaletteOpen(false) }
+      else if (e.key === 'Enter') {
+        e.preventDefault()
+        setRecentIndex((i) => { applyRecent(i); return i })
+      }
+      else if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setRecentIndex((i) => Math.min(i + 1, recentItems.length - 1))
+      }
+      else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setRecentIndex((i) => Math.max(i - 1, 0))
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [recentPaletteOpen, recentItems.length, applyRecent])
 
   // 다른 화면(Claude 채팅 등)에서 인앱 터미널로 이동 요청
   useEffect(() => {
@@ -80,13 +206,32 @@ function App(): JSX.Element {
     return () => window.removeEventListener('goto-terminal', onGoto)
   }, [])
 
+  // 다른 화면에서 설정으로 이동 요청
+  useEffect(() => {
+    const onGoto = (): void => setActiveView('settings')
+    window.addEventListener('goto-settings', onGoto)
+    return () => window.removeEventListener('goto-settings', onGoto)
+  }, [])
+
+  // #7 OS 알림 클릭 → AI 추천 화면. preload 가 ipc 받아 콜백으로 라우팅.
+  useEffect(() => {
+    return window.api.aiRecommendNotify.onGoto(() => setActiveView('ai-recommend'))
+  }, [])
+
   // 커맨드 팔레트 그룹 구성
   const commandGroups = useMemo<CommandGroup[]>(() => [
     {
       label: '이동',
       items: [
-        { id: 'go-dooray', label: '두레이 대시보드', icon: <CalendarIcon size={13} />, hint: '⌘1' },
+        { id: 'go-dooray:dashboard', label: '두레이 — 대시보드', icon: <LayoutDashboard size={13} />, hint: '⌘1' },
+        { id: 'go-dooray:tasks', label: '두레이 — 태스크', icon: <ListTodo size={13} /> },
+        { id: 'go-dooray:wiki', label: '두레이 — 위키', icon: <BookOpen size={13} /> },
+        { id: 'go-dooray:calendar', label: '두레이 — 캘린더', icon: <CalendarIcon size={13} /> },
+        { id: 'go-dooray:messenger', label: '두레이 — 메신저', icon: <MessageCircle size={13} /> },
+        { id: 'go-dooray:briefing', label: '두레이 — AI 브리핑', icon: <Sparkles size={13} /> },
+        { id: 'go-dooray:report', label: '두레이 — AI 보고서', icon: <FileText size={13} /> },
         { id: 'go-monitoring', label: '모니터링', icon: <Radar size={13} />, hint: '⌘2' },
+        { id: 'go-agent', label: '에이전트', icon: <Bot size={13} /> },
         { id: 'go-terminal', label: '터미널', icon: <TerminalIcon size={13} />, hint: '⌘3' },
         { id: 'go-git', label: '브랜치 작업', icon: <GitBranch size={13} />, hint: '⌘4' },
         { id: 'go-community', label: '커뮤니티', icon: <Users size={13} /> },
@@ -114,8 +259,15 @@ function App(): JSX.Element {
 
   const runCommand = (item: CommandItem): void => {
     if (item.id.startsWith('go-')) {
-      const view = item.id.slice(3) as View
+      const target = item.id.slice(3) // e.g. "dooray:tasks" or "monitoring"
+      const [view, subTab] = target.split(':') as [View, string | undefined]
       setActiveView(view)
+      if (view === 'dooray' && subTab) {
+        // DoorayAssistant 가 listen — 약간의 지연(렌더 후) 보장 위해 microtask 로 dispatch
+        Promise.resolve().then(() => {
+          window.dispatchEvent(new CustomEvent('goto-dooray-subtab', { detail: { tab: subTab } }))
+        })
+      }
       return
     }
     if (item.id === 'toggle-theme') toggleTheme()
@@ -182,8 +334,101 @@ function App(): JSX.Element {
           groups={commandGroups}
           onRun={runCommand}
         />
+        <RecentViewsPalette
+          open={recentPaletteOpen}
+          items={recentItems}
+          index={recentIndex}
+          onHover={setRecentIndex}
+          onPick={applyRecent}
+          onClose={() => setRecentPaletteOpen(false)}
+        />
       </div>
     </ToastHost>
+  )
+}
+
+/**
+ * Cmd+E 최근 뷰 팝업.
+ * 0번째는 현재 활성 항목 (옅게). 1번째부터가 직전 뷰들.
+ * sub 가 있으면 "두레이 - 캘린더" 식 라벨로 분리 표시.
+ * Esc 또는 backdrop 클릭으로만 닫힘 (예전엔 ⌘ 떼면 자동 확정이었으나 사용자 피드백으로 모달 유지).
+ */
+function RecentViewsPalette({ open, items, index, onHover, onPick, onClose }: {
+  open: boolean
+  items: RecentViewItem[]
+  index: number
+  onHover: (i: number) => void
+  onPick: (i: number) => void
+  onClose: () => void
+}): JSX.Element | null {
+  if (!open) return null
+  const labelOf = (it: RecentViewItem): { label: string; icon: JSX.Element } => {
+    const v = it.view
+    const base = ((): { label: string; icon: JSX.Element } => {
+      switch (v) {
+        case 'dooray': return { label: '두레이', icon: <CalendarIcon size={13} /> }
+        case 'monitoring': return { label: '모니터링', icon: <Radar size={13} /> }
+        case 'terminal': return { label: '터미널', icon: <TerminalIcon size={13} /> }
+        case 'git': return { label: '브랜치 작업', icon: <GitBranch size={13} /> }
+        case 'community': return { label: '커뮤니티', icon: <Users size={13} /> }
+        case 'mcp': return { label: 'MCP 서버', icon: <Server size={13} /> }
+        case 'skills': return { label: 'Claude 스킬', icon: <Sparkles size={13} /> }
+        case 'ai-recommend': return { label: 'AI 추천', icon: <Lightbulb size={13} /> }
+        case 'sessions': return { label: '세션', icon: <MessageSquare size={13} /> }
+        case 'usage': return { label: '사용량', icon: <BarChart3 size={13} /> }
+        case 'manual': return { label: '매뉴얼', icon: <BookOpen size={13} /> }
+        case 'settings': return { label: '설정', icon: <SettingsIcon size={13} /> }
+        case 'agent': return { label: '에이전트', icon: <Bot size={13} /> }
+        default: return { label: v, icon: <BookOpen size={13} /> }
+      }
+    })()
+    if (it.sub && v === 'dooray') {
+      const subLabel = DOORAY_SUBTAB_LABELS[it.sub] ?? it.sub
+      return { label: `${base.label} · ${subLabel}`, icon: base.icon }
+    }
+    return base
+  }
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-start justify-center pt-[18vh] bg-black/30 backdrop-blur-[2px]"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-[380px] rounded-xl shadow-2xl overflow-hidden"
+        style={{ background: 'var(--bg-surface-raised)', border: '1px solid var(--bg-border)' }}
+      >
+        <div className="px-3 py-2 border-b border-bg-border flex items-center gap-2">
+          <span className="text-[10px] font-semibold text-text-secondary">최근 뷰</span>
+          <span className="text-[10px] text-text-tertiary">⌘E 다음 · ↑↓ 이동 · Enter 선택 · Esc 닫기</span>
+        </div>
+        <div className="py-1 max-h-[60vh] overflow-y-auto">
+          {items.map((it, i) => {
+            const { label, icon } = labelOf(it)
+            const hi = i === index
+            const isCurrent = i === 0
+            return (
+              <button
+                key={`${it.view}:${it.sub ?? ''}-${i}`}
+                onMouseEnter={() => onHover(i)}
+                onClick={() => onPick(i)}
+                className={`w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors ${
+                  hi ? 'bg-clauday-blue/15' : 'hover:bg-bg-surface-hover'
+                }`}
+              >
+                <span className={hi ? 'text-clauday-blue' : isCurrent ? 'text-text-tertiary' : 'text-text-secondary'}>
+                  {icon}
+                </span>
+                <span className={`text-[12px] flex-1 truncate ${hi ? 'text-text-primary font-medium' : isCurrent ? 'text-text-tertiary' : 'text-text-primary'}`}>
+                  {label}
+                </span>
+                {isCurrent && <span className="text-[9px] text-text-tertiary">현재</span>}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
   )
 }
 

@@ -18,7 +18,19 @@ function fmt(n: number): string {
   return n.toString()
 }
 
-const COLORS = ['#3B82F6', '#FB923C', '#22C55E', '#A78BFA', '#F472B6', '#FBBF24']
+// v2 --chart-* 토큰과 동일한 값. recharts SVG props 호환 위해 hex 유지.
+const CHART_PALETTE = {
+  dark: {
+    grid: '#2D3148', tick: '#94A3B8',
+    tooltipBg: '#1C1F2E', tooltipBorder: '#2D3148', tooltipText: '#F1F5F9',
+    series: ['#60A5FA', '#FB923C', '#4ADE80', '#C4B5FD', '#FCA5A5', '#FDE68A']
+  },
+  light: {
+    grid: '#E2E8F0', tick: '#64748B',
+    tooltipBg: '#FFFFFF', tooltipBorder: '#DCE3ED', tooltipText: '#0F172A',
+    series: ['#2563EB', '#EA580C', '#16A34A', '#7C3AED', '#DC2626', '#CA8A04']
+  }
+}
 
 function UsageDashboard(): JSX.Element {
   const { theme } = useTheme()
@@ -28,14 +40,9 @@ function UsageDashboard(): JSX.Element {
   const [insightReport, setInsightReport] = useState<string | null>(null)
   const [insightLoading, setInsightLoading] = useState(false)
 
-  // 차트 축/그리드/툴팁 색상 — 테마별
-  const chart = useMemo(() => theme === 'dark' ? {
-    grid: '#374151', tick: '#9CA3AF',
-    tooltipBg: '#1F2937', tooltipBorder: '#374151', tooltipText: '#F9FAFB'
-  } : {
-    grid: '#E2E8F0', tick: '#64748B',
-    tooltipBg: '#FFFFFF', tooltipBorder: '#DCE3ED', tooltipText: '#0F172A'
-  }, [theme])
+  // 차트 색상 — v2 chart 토큰과 일치, 테마별 자동 전환
+  const chart = useMemo(() => theme === 'dark' ? CHART_PALETTE.dark : CHART_PALETTE.light, [theme])
+  const COLORS = chart.series
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -106,14 +113,14 @@ function UsageDashboard(): JSX.Element {
               } finally { setInsightLoading(false) }
             }}
             disabled={insightLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-clover-orange to-clover-blue text-white text-xs font-medium hover:opacity-90 disabled:opacity-50">
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-clauday-orange to-clauday-blue text-white text-xs font-medium hover:opacity-90 disabled:opacity-50">
             {insightLoading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
             {insightLoading ? '분석 중...' : 'AI 인사이트'}
           </button>
           {(['day', 'week', 'month'] as Period[]).map((p) => (
             <button key={p} onClick={() => setPeriod(p)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                period === p ? 'bg-clover-blue text-white' : 'bg-bg-surface border border-bg-border text-text-secondary hover:text-text-primary'
+                period === p ? 'bg-clauday-blue text-white' : 'bg-bg-surface border border-bg-border text-text-secondary hover:text-text-primary'
               }`}>
               {{ day: '24시간', week: '7일', month: '30일' }[p]}
             </button>
@@ -128,9 +135,9 @@ function UsageDashboard(): JSX.Element {
       {/* AI 인사이트 리포트 */}
       {insightReport && (
         <div className="mb-6 bg-bg-surface border border-bg-border rounded-xl overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-bg-border bg-gradient-to-r from-clover-orange/10 to-clover-blue/10">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-bg-border bg-gradient-to-r from-clauday-orange/10 to-clauday-blue/10">
             <div className="flex items-center gap-1.5">
-              <Sparkles size={13} className="text-clover-orange" />
+              <Sparkles size={13} className="text-clauday-orange" />
               <span className="text-xs font-semibold text-text-primary">AI 사용 인사이트 (한국어)</span>
             </div>
             <button onClick={() => setInsightReport(null)} className="text-[9px] text-text-tertiary hover:text-text-secondary">닫기</button>
@@ -143,9 +150,9 @@ function UsageDashboard(): JSX.Element {
 
       {/* 요약 카드 6개 */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        <StatCard icon={DollarSign} iconColor="text-clover-orange" label="총 비용" value={`$${summary.totalCostUsd.toFixed(2)}`} />
+        <StatCard icon={DollarSign} iconColor="text-clauday-orange" label="총 비용" value={`$${summary.totalCostUsd.toFixed(2)}`} />
         <StatCard icon={TrendingUp} iconColor="text-emerald-400" label="일 평균 비용" value={`$${avgCostPerDay}`} />
-        <StatCard icon={Zap} iconColor="text-clover-blue" label="총 토큰" value={fmt(totalTokens)} />
+        <StatCard icon={Zap} iconColor="text-clauday-blue" label="총 토큰" value={fmt(totalTokens)} />
         <StatCard icon={Cpu} iconColor="text-purple-400" label="API 호출" value={`${summary.records.length}회`} />
         <StatCard icon={BarChart3} iconColor="text-amber-400" label="캐시 히트율" value={`${cacheHitRate}%`} />
         <StatCard icon={Clock} iconColor="text-sky-400" label="세션 수" value={`${summary.totalSessions}`} />
@@ -162,9 +169,9 @@ function UsageDashboard(): JSX.Element {
               <YAxis tick={{ fill: chart.tick, fontSize: 10 }} tickFormatter={fmt} />
               <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => fmt(v)} />
               <Legend wrapperStyle={{ fontSize: 10 }} />
-              <Bar dataKey="입력" fill="#3B82F6" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="출력" fill="#FB923C" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="캐시" fill="#22C55E" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="입력" fill={COLORS[0]} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="출력" fill={COLORS[1]} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="캐시" fill={COLORS[2]} radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -178,7 +185,7 @@ function UsageDashboard(): JSX.Element {
               <XAxis dataKey="date" tick={{ fill: chart.tick, fontSize: 10 }} />
               <YAxis tick={{ fill: chart.tick, fontSize: 10 }} tickFormatter={(v) => `$${v}`} />
               <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => `$${v}`} />
-              <Area type="monotone" dataKey="비용" stroke="#FB923C" fill="#FB923C" fillOpacity={0.15} strokeWidth={2} />
+              <Area type="monotone" dataKey="비용" stroke={COLORS[1]} fill={COLORS[1]} fillOpacity={theme === 'dark' ? 0.20 : 0.12} strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -208,7 +215,7 @@ function UsageDashboard(): JSX.Element {
               <XAxis dataKey="시간" tick={{ fill: chart.tick, fontSize: 9 }} interval={2} />
               <YAxis tick={{ fill: chart.tick, fontSize: 10 }} />
               <Tooltip contentStyle={tooltipStyle} />
-              <Bar dataKey="호출수" fill="#A78BFA" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="호출수" fill={COLORS[3]} radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -238,10 +245,10 @@ function UsageDashboard(): JSX.Element {
                     {m.name}
                   </td>
                   <td className="text-right py-2 px-3 text-text-secondary">{m.호출수}</td>
-                  <td className="text-right py-2 px-3 text-clover-blue">{fmt(m.토큰 * 0.7 | 0)}</td>
-                  <td className="text-right py-2 px-3 text-clover-orange">{fmt(m.토큰 * 0.3 | 0)}</td>
+                  <td className="text-right py-2 px-3 text-clauday-blue">{fmt(m.토큰 * 0.7 | 0)}</td>
+                  <td className="text-right py-2 px-3 text-clauday-orange">{fmt(m.토큰 * 0.3 | 0)}</td>
                   <td className="text-right py-2 px-3 text-text-primary font-medium">{fmt(m.토큰)}</td>
-                  <td className="text-right py-2 px-3 text-clover-orange font-medium">${m.비용.toFixed(2)}</td>
+                  <td className="text-right py-2 px-3 text-clauday-orange font-medium">${m.비용.toFixed(2)}</td>
                   <td className="text-right py-2 px-3 text-text-secondary">
                     {summary.totalCostUsd > 0 ? ((m.비용 / summary.totalCostUsd) * 100).toFixed(1) : 0}%
                   </td>

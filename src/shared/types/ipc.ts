@@ -20,6 +20,21 @@ export const IPC_CHANNELS = {
   // Usage
   USAGE_QUERY: 'usage:query',
 
+  // Shell — OS 기본 핸들러로 path/URL 열기 (#6 터미널 path cmd+클릭 등)
+  SHELL_OPEN_PATH: 'shell:open-path',
+  /** 이미지 파일을 data URL 로 변환 (#2 터미널 이미지 사이드 패널 썸네일) */
+  SHELL_READ_IMAGE_DATAURL: 'shell:read-image-dataurl',
+  /** 파일의 부모 폴더를 OS 파일 탐색기에서 열고 해당 파일 highlight (Warp 식 Show in Finder) */
+  SHELL_SHOW_IN_FOLDER: 'shell:show-in-folder',
+
+  // CLAUDE.md 카탈로그 (#3) — 앱 내장 템플릿 목록 + 사용자가 고른 폴더에 적용
+  CLAUDE_MD_TEMPLATES_LIST: 'claude-md:templates:list',
+  CLAUDE_MD_TEMPLATES_APPLY: 'claude-md:templates:apply',
+
+  // AI 추천 새 글 OS 알림 (#7) — 1시간 폴링 + silent hours. 사용자 토글.
+  AI_RECOMMEND_NOTIFY_GET_ENABLED: 'ai-recommend:notify:get-enabled',
+  AI_RECOMMEND_NOTIFY_SET_ENABLED: 'ai-recommend:notify:set-enabled',
+
   // Dooray
   DOORAY_TOKEN_SET: 'dooray:token:set',
   DOORAY_TOKEN_GET: 'dooray:token:get',
@@ -44,6 +59,26 @@ export const IPC_CHANNELS = {
   DOORAY_WIKI_UPDATE: 'dooray:wiki:update',
   DOORAY_CALENDAR_LIST: 'dooray:calendar:list',
   DOORAY_CALENDAR_EVENTS: 'dooray:calendar:events',
+  // CalDAV (v1.5) — 두레이 CalDAV 통합
+  CALDAV_TEST_CONNECT: 'caldav:test-connect',
+  CALDAV_SAVE_CREDENTIALS: 'caldav:save-credentials',
+  CALDAV_STATUS: 'caldav:status',
+  CALDAV_DISCONNECT: 'caldav:disconnect',
+  CALDAV_LIST_CALENDARS: 'caldav:list-calendars',
+  CALDAV_LIST_EVENTS: 'caldav:list-events',
+  CALDAV_CREATE_EVENT: 'caldav:create-event',
+  CALDAV_DELETE_EVENT: 'caldav:delete-event',
+  CALDAV_FULL_SYNC: 'caldav:full-sync',
+  CALDAV_INCREMENTAL_SYNC: 'caldav:incremental-sync',
+  // Calendar (v1.5) — CalDAV + 로컬 통합 인터페이스
+  CALENDAR_LIST_CALENDARS: 'calendar:list-calendars',
+  CALENDAR_LIST_EVENTS: 'calendar:list-events',
+  CALENDAR_CREATE_EVENT: 'calendar:create-event',
+  CALENDAR_UPDATE_EVENT_DATETIME: 'calendar:update-event-datetime',
+  CALENDAR_DELETE_EVENT: 'calendar:delete-event',
+  LOCAL_CALENDAR_CREATE: 'local-calendar:create',
+  LOCAL_CALENDAR_UPDATE: 'local-calendar:update',
+  LOCAL_CALENDAR_DELETE: 'local-calendar:delete',
   DOORAY_PROJECT_INFO: 'dooray:project:info',
   DOORAY_TASKS_PARTIAL: 'dooray:tasks:partial',
   DOORAY_FILE_FETCH: 'dooray:file:fetch',
@@ -146,7 +181,6 @@ export const IPC_CHANNELS = {
   AI_SUMMARIZE_TASK: 'ai:summarize-task',
   AI_GENERATE_REPORT: 'ai:generate-report',
   AI_GENERATE_WIKI: 'ai:generate-wiki',
-  AI_GENERATE_MEETING_NOTE: 'ai:generate-meeting-note',
   AI_PROGRESS: 'ai:progress',
   AI_MODEL_CONFIG_GET: 'ai:model-config:get',
   AI_MODEL_CONFIG_SET: 'ai:model-config:set',
@@ -162,12 +196,12 @@ export const IPC_CHANNELS = {
   SETTINGS_GET_CUSTOM_PROJECTS: 'settings:get-custom-projects',
   SETTINGS_SET_CUSTOM_PROJECTS: 'settings:set-custom-projects',
 
-  // Clover Skills
-  CLOVER_SKILLS_LIST: 'clover-skills:list',
-  CLOVER_SKILLS_GET: 'clover-skills:get',
-  CLOVER_SKILLS_SAVE: 'clover-skills:save',
-  CLOVER_SKILLS_DELETE: 'clover-skills:delete',
-  CLOVER_SKILLS_FOR_TARGET: 'clover-skills:for-target',
+  // Clauday Skills (target 별 파일시스템 스킬)
+  CLAUDAY_SKILLS_LIST: 'clauday-skills:list',
+  CLAUDAY_SKILLS_GET: 'clauday-skills:get',
+  CLAUDAY_SKILLS_SAVE: 'clauday-skills:save',
+  CLAUDAY_SKILLS_DELETE: 'clauday-skills:delete',
+  CLAUDAY_SKILLS_FOR_TARGET: 'clauday-skills:for-target',
 
   // Shared Skills (Dooray 공개 프로젝트 기반 공유소)
   SHARED_SKILLS_LIST: 'shared-skills:list',

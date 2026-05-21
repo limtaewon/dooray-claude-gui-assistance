@@ -21,20 +21,20 @@ type Tab = 'posts' | 'recommend'
 type Category = 'immediate' | 'reference' | 'covered'
 
 const CATEGORY_META: Record<Category, { label: string; color: string; bg: string; border: string }> = {
-  immediate: { label: '즉시 도입 가치', color: '#F87171', bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.25)' },
-  reference: { label: '참고할만한 사례', color: '#FBBF24', bg: 'rgba(251,191,36,0.08)', border: 'rgba(251,191,36,0.25)' },
-  covered:   { label: '이미 보유/유사', color: '#34D399', bg: 'rgba(52,211,153,0.08)', border: 'rgba(52,211,153,0.25)' }
+  immediate: { label: '즉시 도입 가치', color: 'var(--c-red-fg)', bg: 'var(--c-red-bg)', border: 'color-mix(in oklab, var(--c-red-fg) 30%, transparent)' },
+  reference: { label: '참고할만한 사례', color: 'var(--c-yellow-fg)', bg: 'var(--c-yellow-bg)', border: 'color-mix(in oklab, var(--c-yellow-fg) 30%, transparent)' },
+  covered:   { label: '이미 보유/유사', color: 'var(--c-emerald-fg)', bg: 'var(--c-emerald-bg)', border: 'color-mix(in oklab, var(--c-emerald-fg) 30%, transparent)' }
 }
 
 const AVATAR_COLORS = [
-  { bg: 'rgba(59,130,246,0.15)', text: '#2563eb', ring: '#3b82f6' },
-  { bg: 'rgba(239,68,68,0.15)',  text: '#dc2626', ring: '#ef4444' },
-  { bg: 'rgba(34,197,94,0.15)',  text: '#16a34a', ring: '#22c55e' },
-  { bg: 'rgba(245,158,11,0.15)', text: '#d97706', ring: '#f59e0b' },
-  { bg: 'rgba(168,85,247,0.15)', text: '#9333ea', ring: '#a855f7' },
-  { bg: 'rgba(6,182,212,0.15)',  text: '#0891b2', ring: '#06b6d4' },
-  { bg: 'rgba(249,115,22,0.15)', text: '#ea580c', ring: '#f97316' },
-  { bg: 'rgba(132,204,22,0.15)', text: '#65a30d', ring: '#84cc16' }
+  { bg: 'var(--avatar-1-bg)', text: 'var(--avatar-1-fg)', ring: 'var(--avatar-1-fg)' },
+  { bg: 'var(--avatar-2-bg)', text: 'var(--avatar-2-fg)', ring: 'var(--avatar-2-fg)' },
+  { bg: 'var(--avatar-3-bg)', text: 'var(--avatar-3-fg)', ring: 'var(--avatar-3-fg)' },
+  { bg: 'var(--avatar-4-bg)', text: 'var(--avatar-4-fg)', ring: 'var(--avatar-4-fg)' },
+  { bg: 'var(--avatar-5-bg)', text: 'var(--avatar-5-fg)', ring: 'var(--avatar-5-fg)' },
+  { bg: 'var(--avatar-6-bg)', text: 'var(--avatar-6-fg)', ring: 'var(--avatar-6-fg)' },
+  { bg: 'var(--avatar-7-bg)', text: 'var(--avatar-7-fg)', ring: 'var(--avatar-7-fg)' },
+  { bg: 'var(--avatar-8-bg)', text: 'var(--avatar-8-fg)', ring: 'var(--avatar-8-fg)' }
 ]
 
 function avatarColor(name: string): { bg: string; text: string; ring: string } {
@@ -101,7 +101,7 @@ function ItemCard({ item, category }: { item: AIRecommendItem; category: Categor
         </div>
         <button
           type="button"
-          className="flex-none flex items-center gap-1 text-[11px] text-clover-blue hover:text-clover-blue/80"
+          className="flex-none flex items-center gap-1 text-[11px] text-clauday-blue hover:text-clauday-blue/80"
           title="두레이에서 열기"
           onClick={(e) => { e.stopPropagation(); window.open(item.url, '_blank', 'noopener,noreferrer') }}
         >
@@ -150,7 +150,7 @@ function PostCard({ post, onSelect }: { post: DoorayTask; onSelect: () => void }
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = 'var(--accent-blue)'
-        e.currentTarget.style.boxShadow = '0 4px 12px rgba(59,130,246,0.15)'
+        e.currentTarget.style.boxShadow = '0 4px 12px var(--c-blue-bg)'
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = 'var(--bg-border)'
@@ -159,13 +159,13 @@ function PostCard({ post, onSelect }: { post: DoorayTask; onSelect: () => void }
     >
       <div className="flex gap-3">
         <div className="flex-shrink-0 flex flex-col items-center pt-0.5">
-          <div className="min-w-7 h-6 px-1.5 rounded-md flex items-center justify-center text-[11px] font-bold text-clover-blue group-hover:bg-clover-blue group-hover:text-white transition-colors"
-            style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)' }}>
+          <div className="min-w-7 h-6 px-1.5 rounded-md flex items-center justify-center text-[11px] font-bold text-clauday-blue group-hover:bg-clauday-blue group-hover:text-white transition-colors"
+            style={{ background: 'var(--c-blue-bg)', border: '1px solid color-mix(in oklab, var(--c-blue-fg) 25%, transparent)' }}>
             {post.number ?? '·'}
           </div>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-text-primary group-hover:text-clover-blue transition-colors leading-snug pr-2">{post.subject}</p>
+          <p className="text-sm font-semibold text-text-primary group-hover:text-clauday-blue transition-colors leading-snug pr-2">{post.subject}</p>
           {preview && <p className="text-[11px] text-text-tertiary mt-1 line-clamp-2 leading-relaxed">{preview}</p>}
           <div className="flex items-center gap-3 mt-2">
             <div className="flex items-center gap-1.5">
@@ -183,7 +183,7 @@ function PostCard({ post, onSelect }: { post: DoorayTask; onSelect: () => void }
           </div>
         </div>
         <div className="flex-shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity">
-          <ChevronLeft size={14} className="rotate-180 text-clover-blue" />
+          <ChevronLeft size={14} className="rotate-180 text-clauday-blue" />
         </div>
       </div>
     </button>
@@ -271,7 +271,7 @@ function PostDetail({ post, onBack }: { post: DoorayTask; onBack: () => void }):
                   </div>
                 </div>
                 <div className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium"
-                  style={{ background: 'rgba(251,146,60,0.15)', color: 'var(--clover-orange)', border: '1px solid rgba(251,146,60,0.25)' }}>
+                  style={{ background: 'var(--c-orange-bg)', color: 'var(--c-orange-fg)', border: '1px solid color-mix(in oklab, var(--c-orange-fg) 30%, transparent)' }}>
                   <Hash size={9} />
                   AI 공유
                 </div>
@@ -296,16 +296,16 @@ function PostDetail({ post, onBack }: { post: DoorayTask; onBack: () => void }):
           {/* 댓글 (읽기 전용) */}
           <div className="flex items-center gap-2 mb-3">
             <div className="flex items-center gap-1.5">
-              <MessageSquare size={13} className="text-clover-blue" />
+              <MessageSquare size={13} className="text-clauday-blue" />
               <span className="text-xs font-bold text-text-primary">댓글</span>
               {comments.length > 0 && (
                 <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold"
-                  style={{ background: 'rgba(59,130,246,0.15)', color: 'var(--accent-blue)' }}>
+                  style={{ background: 'var(--c-blue-bg)', color: 'var(--c-blue-fg)' }}>
                   {comments.length}
                 </span>
               )}
             </div>
-            <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, #3a4566 0%, transparent 100%)' }} />
+            <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, var(--bg-border) 0%, transparent 100%)' }} />
           </div>
 
           {loadingComments ? (
@@ -468,14 +468,14 @@ function CommentComposer({ postId, onPosted }: { postId: string; onPosted: () =>
       style={{
         border: focused ? '1px solid var(--accent-blue)' : '1px solid var(--bg-border)',
         background: 'var(--bg-surface)',
-        boxShadow: focused ? '0 0 0 3px rgba(59,130,246,0.08)' : 'none'
+        boxShadow: focused ? '0 0 0 3px var(--c-blue-bg)' : 'none'
       }}>
       <div className="flex items-center px-3 pt-2.5 gap-1">
         <button
           onClick={() => setTab('write')}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all"
           style={tab === 'write'
-            ? { background: 'rgba(59,130,246,0.15)', color: 'var(--accent-blue)', border: '1px solid rgba(59,130,246,0.3)' }
+            ? { background: 'var(--c-blue-bg)', color: 'var(--c-blue-fg)', border: '1px solid color-mix(in oklab, var(--c-blue-fg) 30%, transparent)' }
             : { color: 'var(--text-secondary)', border: '1px solid transparent' }
           }
         >
@@ -487,7 +487,7 @@ function CommentComposer({ postId, onPosted }: { postId: string; onPosted: () =>
           disabled={!text.trim()}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all disabled:opacity-40"
           style={tab === 'preview'
-            ? { background: 'rgba(59,130,246,0.15)', color: 'var(--accent-blue)', border: '1px solid rgba(59,130,246,0.3)' }
+            ? { background: 'var(--c-blue-bg)', color: 'var(--c-blue-fg)', border: '1px solid color-mix(in oklab, var(--c-blue-fg) 30%, transparent)' }
             : { color: 'var(--text-secondary)', border: '1px solid transparent' }
           }
         >
@@ -558,7 +558,7 @@ function CommentComposer({ postId, onPosted }: { postId: string; onPosted: () =>
           onClick={submit}
           disabled={!text.trim() || posting}
           className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-white text-xs font-semibold transition-all hover:opacity-90 disabled:opacity-40 active:scale-95"
-          style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)', boxShadow: text.trim() ? '0 2px 8px rgba(59,130,246,0.3)' : 'none' }}
+          style={{ background: 'linear-gradient(135deg, var(--c-blue-solid), var(--c-blue-solid))', boxShadow: text.trim() ? '0 2px 8px var(--c-blue-bg)' : 'none' }}
         >
           {posting ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
           {posting ? '작성 중...' : '댓글 작성'}
@@ -681,7 +681,7 @@ function AIRecommendView(): JSX.Element {
       <div className="px-5 py-4 space-y-4">
         {/* PageHeader */}
         <div className="flex items-center gap-3 flex-wrap">
-          <Lightbulb size={18} className="text-clover-orange" />
+          <Lightbulb size={18} className="text-clauday-orange" />
           <h2 className="text-[14px] font-semibold text-text-primary">AI 추천</h2>
           {tab === 'posts' && posts.length > 0 && <span className="ds-chip neutral">{posts.length}개</span>}
           {tab === 'recommend' && result && <span className="ds-chip neutral">{totalRec}건</span>}
@@ -765,8 +765,8 @@ function AIRecommendView(): JSX.Element {
           <>
             <div className="ds-card flex items-center justify-center" style={{ padding: '14px 16px' }}>
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-[8px] flex-none flex items-center justify-center bg-clover-blue/10">
-                  <Sparkles size={16} className="text-clover-blue" />
+                <div className="w-8 h-8 rounded-[8px] flex-none flex items-center justify-center bg-clauday-blue/10">
+                  <Sparkles size={16} className="text-clauday-blue" />
                 </div>
                 <div className="text-[12px] text-text-secondary leading-relaxed text-center">
                   <strong className="text-text-primary">AI 활용 사례 공유 프로젝트</strong>의 최신 사례를
@@ -778,14 +778,14 @@ function AIRecommendView(): JSX.Element {
 
             {analyzing && (
               <div className="ds-card flex items-center gap-3" style={{ padding: '12px 14px' }}>
-                <Loader2 size={16} className="animate-spin text-clover-blue flex-none" />
+                <Loader2 size={16} className="animate-spin text-clauday-blue flex-none" />
                 <div className="text-[12px] text-text-secondary flex-1">분석 중...</div>
               </div>
             )}
 
             {analyzeError && !analyzing && (
               <div className="ds-card flex items-start gap-3"
-                style={{ padding: '12px 14px', borderColor: 'rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.06)' }}>
+                style={{ padding: '12px 14px', borderColor: 'color-mix(in oklab, var(--c-red-fg) 30%, transparent)', background: 'var(--c-red-bg)' }}>
                 <AlertCircle size={16} className="text-red-400 flex-none mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <div className="text-[12px] font-semibold text-red-400 mb-1">분석 실패</div>

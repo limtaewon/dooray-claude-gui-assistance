@@ -8,6 +8,8 @@ export interface SharedSkill {
   name: string
   /** 스킬 본문 (frontmatter + 마크다운) — 목록 조회 시에는 비어있을 수 있음 */
   content: string
+  /** frontmatter 의 description 필드 — list 단계에서 카드에 노출용. 본문 fetch 없이 보이도록 list 시점에 미리 추출. */
+  description?: string
   /** 공유자 */
   authorName: string
   authorId?: string

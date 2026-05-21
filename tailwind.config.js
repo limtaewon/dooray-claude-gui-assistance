@@ -5,7 +5,8 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        clover: {
+        // 'clover-blue' / 'clover-orange' 였던 초기 브랜드 명을 Clauday 로 통일.
+        clauday: {
           blue: 'var(--accent-blue)',
           'blue-light': 'var(--accent-blue-light)',
           orange: 'var(--accent-orange)',
