@@ -1,6 +1,6 @@
 {
   "name": "clauday",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "description": "Claude Code CLI GUI wrapper with Dooray integration",
   "main": "./out/main/index.js",
   "author": "",

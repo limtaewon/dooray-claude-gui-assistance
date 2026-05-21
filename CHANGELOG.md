@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.5.4] - Windows stream-json 미수신 fallback
+
+v1.5.3 의 오류 리포트로 들어온 첫 진단: 윈도우 사용자가 같은 claude CLI 버전임에도 stdout 으로 stream-json 이 아니라 평문 마크다운을 흘리는 케이스 확인. claude 는 응답을 정상 생성했는데 우리 파서가 stream-json 의 `type:"result"` 라인만 기다리다 빈 결과로 처리 → `AI 응답에서 JSON을 찾지 못했습니다` 로 간접 실패. 원인 종류 무관한 방어 패치.
+
+### 버그 수정
+- **raw stdout fallback** — `runClaudeStream` 종료 시 `finalResult`/`accumulated` 둘 다 비어있고 raw stdout 에 텍스트가 있으면 그 raw 를 result 로 사용. 정상 stream-json 모드에서는 이 분기 진입 자체가 없으므로 회귀 위험 없음. 200KB 까지 누적.
+- **briefing 의 JSON 미발견 → textFallback 일반화** — 기존엔 `allEmpty` 일 때만 raw 텍스트를 greeting 으로 폴백했는데, 데이터가 있는 일반 케이스도 raw 본문을 살려서 보여줌 (구조화된 urgent/focus 카테고리는 못 얻지만 사용자가 본문을 볼 수 있음).
+
+### 진단 강화
+- **`claude --version` 자동 기록** — 앱 부팅 시 한 번 캐싱 → 모든 cliLogger 엔트리와 오류 리포트 본문에 자동 포함. 사용자별 버전 차이를 즉시 비교 가능.
+
 ## [1.5.3] - 오류 리포트 인프라
 
 v1.5.2 윈도우 핫픽스가 여전히 일부 환경에서 실패하는 보고가 들어와, **비개발자 사용자도 한 번에 제보할 수 있는 인프라** 를 먼저 깔았다. 다음 사이클에 정확한 윈도우 픽스를 박기 위한 진단 데이터 확보 목적.

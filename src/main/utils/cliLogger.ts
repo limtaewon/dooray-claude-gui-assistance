@@ -17,6 +17,7 @@ export interface CliLogEntry {
   at: string                    // ISO timestamp
   feature?: string              // 'briefing' | 'summarizeTask' | etc.
   bin: string                   // CLAUDE_CLI 경로
+  claudeVersion?: string        // `claude --version` 결과 — 앱 부팅 시 한 번 캐싱
   argvSummary: string           // 주요 옵션 dump (prompt 본문 제외)
   promptHead: string            // prompt 처음 500자
   promptLength: number          // 원본 prompt 길이
@@ -27,6 +28,15 @@ export interface CliLogEntry {
   stderrLength: number
   errorMessage?: string         // 우리쪽에서 reject 한 사유
   durationMs: number
+}
+
+/** 앱 부팅 시점 또는 첫 호출 시점에 한 번 캐싱되는 claude --version 결과. */
+let cachedClaudeVersion: string | undefined
+export function setClaudeVersion(version: string | undefined): void {
+  cachedClaudeVersion = version
+}
+export function getClaudeVersion(): string | undefined {
+  return cachedClaudeVersion
 }
 
 const MAX_ENTRIES = 50
@@ -91,6 +101,7 @@ export function startCliCall(args: {
       recordCliCall({
         feature: args.feature,
         bin: args.bin,
+        claudeVersion: cachedClaudeVersion,
         argvSummary: summarizeArgv(args.argv),
         promptHead: args.prompt ? args.prompt.slice(0, PROMPT_HEAD) : '',
         promptLength: args.prompt ? args.prompt.length : 0,

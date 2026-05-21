@@ -143,7 +143,25 @@ const CLAUDE_CLI = resolveClaudePath()
 export function getClaudeBin(): string { return CLAUDE_CLI }
 
 import { decodeProcessText, isBenignStderr } from '../utils/procText'
-import { startCliCall } from '../utils/cliLogger'
+import { startCliCall, setClaudeVersion } from '../utils/cliLogger'
+
+/**
+ * 앱 부팅 시 claude --version 한 번 캐싱.
+ * 같은 claude 바이너리를 매번 호출할 필요 없고, 진단 로그에 자동 첨부되어
+ * 사용자별 버전 차이를 즉시 비교 가능.
+ */
+function captureClaudeVersion(): void {
+  try {
+    const out = execFileSync(CLAUDE_CLI, ['--version'], {
+      timeout: 5000,
+      env: { ...process.env, DISABLE_OMC: '1' },
+      shell: process.platform === 'win32',
+      encoding: 'utf-8'
+    })
+    setClaudeVersion(out.toString().trim() || undefined)
+  } catch { /* 미설치 또는 PATH 문제 — isAvailable() 에서 처리 */ }
+}
+captureClaudeVersion()
 
 /**
  * Claude CLI 오류를 사용자 친화적 메시지로 변환.
@@ -455,9 +473,18 @@ ${skillBlock}`
         reject(new Error(`Claude CLI 타임아웃 (${Math.round(timeoutMs / 1000)}초)`))
       }, timeoutMs) : null
 
+      // raw stdout 누적 — stream-json 라인이 안 들어오는 환경(특정 Windows 머신에서 claude 가
+      // 평문으로 응답하는 케이스 — v1.5.3 의 진단으로 확인됨) 에서 응답이 통째로 사라지는 것을
+      // 방지하기 위한 fallback. close 핸들러에서 finalResult/accumulated 둘 다 비어있고
+      // rawStdout 에 텍스트가 있으면 그걸 result 로 사용.
+      let rawStdout = ''
+      const RAW_STDOUT_CAP = 200 * 1024  // 200KB — 평문 응답이라도 보통 이 안쪽
+
       proc.stdout.on('data', (data: Buffer) => {
-        diag.appendStdout(data.toString('utf-8'))
-        buffer += data.toString('utf-8')
+        const chunk = data.toString('utf-8')
+        diag.appendStdout(chunk)
+        if (rawStdout.length < RAW_STDOUT_CAP) rawStdout += chunk
+        buffer += chunk
         let idx: number
         while ((idx = buffer.indexOf('\n')) >= 0) {
           const line = buffer.substring(0, idx).trim()
@@ -573,6 +600,28 @@ ${skillBlock}`
             total_cost_usd: 0
           })
         } else {
+          // raw stdout fallback — stream-json 라인이 안 들어왔지만 stdout 에 평문 응답이 있는 경우.
+          // v1.5.3 진단에서 일부 Windows 사용자가 같은 claude 버전임에도 stream-json 이 아니라
+          // 평문 마크다운을 stdout 으로 흘리는 케이스 발견. 응답 본문이 살아있으니 폐기하지 말고
+          // 통째로 result 로 사용. 정상 stream-json 모드에서는 finalResult/accumulated 가 먼저
+          // 잡히므로 이 분기 진입 자체가 없음 → 회귀 위험 없음.
+          const rawTrimmed = rawStdout.trim()
+          if (rawTrimmed.length > 0) {
+            diag.complete({
+              exitCode: code,
+              errorMessage: `stream-json 라인 미수신 → raw stdout fallback (${rawTrimmed.length} chars)`
+            })
+            resolve({
+              type: 'result',
+              result: rawTrimmed,
+              duration_ms: 0,
+              session_id: '',
+              is_error: false,
+              total_cost_usd: 0
+            })
+            return
+          }
+
           // Issue #11 — exit 0 인데 결과가 없는 경우: stderr 가 Warning: 류 비치명 메시지일 가능성이 큼.
           // claude 가 `-p` 모드에서 출력하는 "Warning: no stdin data received in 3s, proceeding without it"
           // 같은 메시지는 정상 동작 중 발생하는 경고라 사용자에게 에러로 노출하면 혼란.
@@ -805,7 +854,10 @@ ${JSON.stringify(eventData)}`
       }
     }
     if (!jsonMatch) {
-      if (allEmpty) return textFallback(raw)
+      // raw 에 텍스트가 있으면 무조건 textFallback — 구조화된 카테고리는 못 얻지만
+      // 본문은 살아남아 사용자가 결과를 볼 수 있음. 일부 Windows 사용자처럼
+      // stream-json 이 평문으로 떨어지는 환경 (v1.5.4 fallback 으로 raw 가 살아온 경우) 도 포함.
+      if (raw) return textFallback(raw)
       this.emitProgress(requestId, 'done', '완료', started)
       throw new Error(`AI 응답에서 JSON을 찾지 못했습니다.\n\n응답: ${raw.substring(0, 400)}`)
     }

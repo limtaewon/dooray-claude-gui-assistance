@@ -131,6 +131,18 @@ describe('AIService.ask (스트리밍)', () => {
     await promise
   })
 
+  it('raw stdout fallback — stream-json 라인이 없어도 평문 stdout 을 result 로 사용 (Windows 일부 환경 회복)', async () => {
+    const svc = new AIService()
+    const promise = svc.ask('안녕')
+    await Promise.resolve()
+    // claude 가 stream-json 이 아닌 평문 마크다운으로 응답한 케이스 시뮬레이션
+    lastSpawn!.stdout.emit('data', Buffer.from('## 📋 오늘의 요약\n\n- 항목 1\n- 항목 2\n', 'utf8'))
+    lastSpawn!.emitClose(0)
+    const result = await promise
+    expect(result).toContain('오늘의 요약')
+    expect(result).toContain('항목 1')
+  })
+
   it('runClaudeStream 통합 — final result 가 result 필드 반환', async () => {
     const svc = new AIService()
     const promise = svc.ask('hello')

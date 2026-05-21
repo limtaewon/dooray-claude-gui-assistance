@@ -1,6 +1,6 @@
 import { app, clipboard } from 'electron'
 import { release, hostname, platform, arch } from 'os'
-import { readRecentCliLogs, getCliLogPath, type CliLogEntry } from '../utils/cliLogger'
+import { readRecentCliLogs, getCliLogPath, getClaudeVersion, type CliLogEntry } from '../utils/cliLogger'
 import type { TaskService } from '../dooray/TaskService'
 
 /** Clauday 커뮤니티 프로젝트 — community/CommunityView.tsx 의 ID 와 일치. */
@@ -35,12 +35,14 @@ export class ErrorReportService {
     const latest = recentLogs[recentLogs.length - 1]
     const lines: string[] = []
 
+    const claudeVersion = getClaudeVersion()
     lines.push('## 시스템 정보')
     lines.push('')
     lines.push(`- Clauday: v${app.getVersion()}`)
     lines.push(`- OS: ${platform()} ${release()} (${arch()})`)
     lines.push(`- Node: ${process.versions.node}`)
     lines.push(`- Electron: ${process.versions.electron}`)
+    lines.push(`- Claude CLI: ${claudeVersion || '(미감지)'}`)
     lines.push(`- Host: ${hostname()}`)
     lines.push('')
 
