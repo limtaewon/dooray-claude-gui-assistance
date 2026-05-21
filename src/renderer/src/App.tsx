@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   Calendar as CalendarIcon, Terminal as TerminalIcon, GitBranch, Users, Server, Sparkles,
   MessageSquare, BarChart3, BookOpen, Settings as SettingsIcon, Radar, Moon, Sun, Lightbulb, Bot,
-  LayoutDashboard, ListTodo, MessageCircle, FileText
+  LayoutDashboard, ListTodo, MessageCircle, FileText, CheckSquare
 } from 'lucide-react'
 import Sidebar from './components/Layout/Sidebar'
 import TitleBar from './components/Layout/TitleBar'
@@ -22,6 +22,7 @@ import ImageLightbox from './components/common/ImageLightbox'
 import CommunityView from './components/Community/CommunityView'
 import MonitoringView from './components/Monitoring/MonitoringView'
 import AIRecommendView from './components/AIRecommend/AIRecommendView'
+import QuickTodoModal from './components/Dooray/QuickTodoModal'
 import { ToastHost, CommandPalette, type CommandGroup, type CommandItem } from './components/common/ds'
 import { useTheme } from './hooks/useTheme'
 
@@ -48,6 +49,7 @@ function App(): JSX.Element {
   const [activeView, setActiveView] = useState<View>('dooray')
   const [doorayConfigured, setDoorayConfigured] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
+  const [quickTodoOpen, setQuickTodoOpen] = useState(false)
   const { theme, toggle: toggleTheme } = useTheme()
 
   // 앱 시작 시 startupView 설정 적용
@@ -89,6 +91,12 @@ function App(): JSX.Element {
       if (meta && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         setCmdOpen((o) => !o)
+        return
+      }
+      // ⌘/Ctrl+Shift+T — 어디서든 오늘 할 일 빠른 추가
+      if (meta && e.shiftKey && e.key.toLowerCase() === 't') {
+        e.preventDefault()
+        setQuickTodoOpen(true)
         return
       }
       // Shift 외 다른 키가 같이 눌렸으면 더블 Shift 후보 무효화
@@ -248,6 +256,12 @@ function App(): JSX.Element {
       label: '명령',
       items: [
         {
+          id: 'quick-todo',
+          label: '오늘 할 일 빠른 추가',
+          icon: <CheckSquare size={13} className="text-emerald-500" />,
+          hint: '⌘⇧T'
+        },
+        {
           id: 'toggle-theme',
           label: theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환',
           icon: theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />,
@@ -271,6 +285,7 @@ function App(): JSX.Element {
       return
     }
     if (item.id === 'toggle-theme') toggleTheme()
+    if (item.id === 'quick-todo') setQuickTodoOpen(true)
   }
 
   // 뷰별 visibility — 항상 마운트
@@ -342,6 +357,7 @@ function App(): JSX.Element {
           onPick={applyRecent}
           onClose={() => setRecentPaletteOpen(false)}
         />
+        <QuickTodoModal open={quickTodoOpen} onClose={() => setQuickTodoOpen(false)} />
       </div>
     </ToastHost>
   )
