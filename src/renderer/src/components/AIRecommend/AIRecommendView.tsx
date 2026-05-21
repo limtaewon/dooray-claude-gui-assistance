@@ -514,8 +514,8 @@ function CommentComposer({ postId, onPosted }: { postId: string; onPosted: () =>
             onPaste={handlePaste}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && e.metaKey) submit() }}
-            placeholder="댓글을 작성하세요... (이미지 붙여넣기 / ⌘+Enter 전송)"
+            onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit() }}
+            placeholder="댓글을 작성하세요... (이미지 붙여넣기 / ⌘·Ctrl+Enter 전송)"
             rows={3}
             className="w-full bg-transparent text-xs text-text-primary placeholder-text-tertiary focus:outline-none resize-y leading-relaxed"
           />

@@ -2,7 +2,15 @@
 
 ## [1.5.1] - 윈도우 핫픽스
 
-윈도우 사용자가 브리핑/스킬 생성/Claude 채팅/브랜치 작업을 돌릴 때 깨진 문자(◇◇◇) 에러가 뜨거나, 정상 동작인데 OMC 플러그인의 SessionEnd 훅 노이즈 때문에 거짓 실패로 표시되던 문제 핫픽스.
+윈도우 사용자가 브리핑/스킬 생성/Claude 채팅/브랜치 작업을 돌릴 때 깨진 문자(◇◇◇) 에러가 뜨거나, 정상 동작인데 OMC 플러그인의 SessionEnd 훅 노이즈 때문에 거짓 실패로 표시되던 문제 핫픽스 + 윈도우 키보드 단축키/복붙 호환.
+
+### 윈도우 키보드 호환
+- **터미널 복붙** — 윈도우에서는 Cmd 가 없어 기존 Mac 단축키가 동작 안 함. **Ctrl+Shift+C** (복사) / **Ctrl+Shift+V** (붙여넣기, 텍스트·이미지 모두) / **Ctrl+Insert** (복사, 레거시) 추가. 기존 Shift+Insert(붙여넣기)도 유지. 일반 Ctrl+C 는 PTY 의 SIGINT 와 충돌하므로 Shift 필수 (윈도우 터미널 표준 패턴).
+- **앱 단축키 Cmd → Ctrl 동등 대응** — 기존엔 `e.metaKey` 만 체크해 Mac 전용으로 동작하던 단축키들을 `metaKey || ctrlKey` 로 변경:
+  - **Ctrl+T** (새 터미널 탭), **Ctrl+W** (탭 닫기), **Ctrl+1~9** (탭 전환) — `TerminalView`
+  - **Ctrl+Enter** (메시지 전송) — `CommunityView`, `AIRecommendView`
+  - **Ctrl+K** (커맨드 팔레트), **Ctrl+E** (최근 뷰), **Ctrl+F** (터미널 검색) 등은 이미 양쪽 지원이라 표기/매뉴얼만 통일
+- **앱 메뉴 accelerator 명시** — Electron 의 Edit submenu role 만 두면 윈도우에서 단축키가 등록 안 되는 케이스가 있어 `Ctrl+Z/X/C/V/A` 를 명시. `pasteAndMatchStyle` 의 기본 `Ctrl+Shift+V` 는 터미널 paste 와 충돌 방지를 위해 미할당.
 
 ### 버그 수정
 - **윈도우 한국어 에러 mojibake (전 범위)** — Claude CLI / git 등이 한국 Windows 콘솔에서 cp949(euc-kr) 로 stderr 를 출력하는 경우 utf-8 로만 디코드해 `�������� �ʹ� ��ϴ�` 같이 깨져 보이던 문제. 공용 `decodeProcessText` 헬퍼(`src/main/utils/procText.ts`) 신설 — raw Buffer 누적 후 utf-8 디코드 → U+FFFD 가 검출되면 euc-kr 로 재디코드해 어느 쪽이 덜 깨졌는지로 선택 (Electron full-ICU 번들). 적용 범위:

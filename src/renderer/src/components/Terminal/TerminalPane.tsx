@@ -296,6 +296,48 @@ function TerminalPane({ sessionId, isActive, initialOutput }: TerminalPaneProps)
         // ===== Windows / Linux 단축키 =====
         // Ctrl+A/E/K/U/W · Home/End · Ctrl+←→ 등은 이미 readline 표준이라 native pass-through 로 동작.
         // 다만 Ctrl+Backspace / Ctrl+Delete 는 기본 키 신호가 미흡해서 직접 word-delete 로 매핑.
+
+        // Ctrl+Shift+C — 선택 영역 복사 (Windows 터미널 표준).
+        // 일반 Ctrl+C 는 PTY 에 SIGINT (\x03) 가 가야 해서 hijack 금지 — shift 필수.
+        if (ctrl && shift && !alt && (k === 'c' || k === 'C')) {
+          e.preventDefault()
+          const sel = terminal.getSelection()
+          if (sel) navigator.clipboard.writeText(sel).catch(() => { /* ok */ })
+          return false
+        }
+        // Ctrl+Shift+V — 클립보드 → PTY paste (텍스트/이미지).
+        if (ctrl && shift && !alt && (k === 'v' || k === 'V')) {
+          e.preventDefault()
+          ;(async () => {
+            try {
+              if (navigator.clipboard.read) {
+                const items = await navigator.clipboard.read()
+                for (const it of items) {
+                  const imgType = it.types.find((t) => t.startsWith('image/'))
+                  if (imgType) {
+                    const blob = await it.getType(imgType)
+                    const ext = imgType.split('/')[1] || 'png'
+                    const file = new File([blob], `clipboard-${Date.now()}.${ext}`, { type: imgType })
+                    await sendFileAsPath(file)
+                    return
+                  }
+                }
+              }
+              const text = await navigator.clipboard.readText()
+              if (text) send(text)
+            } catch {
+              navigator.clipboard.readText().then((t) => { if (t) send(t) }).catch(() => { /* ok */ })
+            }
+          })()
+          return false
+        }
+        // Ctrl+Insert — 복사 (Windows 레거시 표준)
+        if (ctrl && !alt && !shift && k === 'Insert') {
+          e.preventDefault()
+          const sel = terminal.getSelection()
+          if (sel) navigator.clipboard.writeText(sel).catch(() => { /* ok */ })
+          return false
+        }
         if (ctrl && !meta && !alt) {
           switch (k) {
             case 'Backspace':  e.preventDefault(); send('\x17'); return false   // 한 단어 삭제 (Ctrl-W)

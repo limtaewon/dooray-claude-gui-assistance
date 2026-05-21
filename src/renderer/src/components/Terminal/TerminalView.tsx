@@ -96,10 +96,12 @@ function TerminalView(): JSX.Element {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
-      if (e.metaKey && e.key === 't') { e.preventDefault(); createSession() }
-      if (e.metaKey && e.key === 'w') { e.preventDefault(); if (activeId) closeSession(activeId) }
-      // Cmd+1~9로 탭 전환
-      if (e.metaKey && e.key >= '1' && e.key <= '9') {
+      // Mac Cmd / Windows·Linux Ctrl 양쪽 수용
+      const mod = e.metaKey || e.ctrlKey
+      if (mod && e.key === 't') { e.preventDefault(); createSession() }
+      if (mod && e.key === 'w') { e.preventDefault(); if (activeId) closeSession(activeId) }
+      // Cmd/Ctrl + 1~9 로 탭 전환
+      if (mod && e.key >= '1' && e.key <= '9') {
         e.preventDefault()
         const idx = parseInt(e.key) - 1
         if (idx < entries.length) setActiveId(entries[idx].session.id)
