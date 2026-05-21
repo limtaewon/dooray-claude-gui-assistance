@@ -143,6 +143,25 @@ const CLAUDE_CLI = resolveClaudePath()
 export function getClaudeBin(): string { return CLAUDE_CLI }
 
 /**
+ * Claude CLI 가 윈도우에서 한국어 에러를 cp949(euc-kr) 로 출력하는 경우가 있다.
+ * utf-8 디코드 시 U+FFFD 가 다수 발생하면 euc-kr 로 재시도해서 본문을 살린다.
+ * (Electron 은 full-ICU 가 번들돼 있어 TextDecoder('euc-kr') 사용 가능)
+ */
+function decodeProcessText(buf: Buffer | undefined | null): string {
+  if (!buf || buf.length === 0) return ''
+  const utf8 = new TextDecoder('utf-8').decode(buf)
+  if (process.platform !== 'win32' || !utf8.includes('�')) return utf8
+  try {
+    const euckr = new TextDecoder('euc-kr', { fatal: false }).decode(buf)
+    const utf8Bad = (utf8.match(/�/g) || []).length
+    const euckrBad = (euckr.match(/�/g) || []).length
+    return euckrBad < utf8Bad ? euckr : utf8
+  } catch {
+    return utf8
+  }
+}
+
+/**
  * Claude CLI 오류를 사용자 친화적 메시지로 변환.
  * "Not logged in" 같은 원인 불분명 에러에 복구 가이드 첨부.
  */
@@ -346,9 +365,14 @@ ${skillBlock}`
         {
           maxBuffer: 1024 * 1024 * 5,
           timeout: 120000,
-          env: enrichedEnv()
+          env: enrichedEnv(),
+          // Windows cp949 mojibake 방지 — raw Buffer 로 받아 decodeProcessText 가
+          // utf-8/euc-kr 자동 판별 후 디코드.
+          encoding: 'buffer'
         },
-        (error, stdout, stderr) => {
+        (error, stdoutBuf, stderrBuf) => {
+          const stdout = decodeProcessText(stdoutBuf as Buffer)
+          const stderr = decodeProcessText(stderrBuf as Buffer)
           if (error && !stdout) {
             reject(wrapClaudeError(error.message, stderr))
             return
@@ -408,7 +432,9 @@ ${skillBlock}`
       let buffer = ''
       let finalResult: ClaudeCliResult | null = null
       let accumulated = ''
-      let stderrBuf = ''
+      // Windows cp949 mojibake 방지를 위해 raw Buffer 누적 — 사용 시점에서 디코드.
+      const stderrChunks: Buffer[] = []
+      const readStderr = (): string => decodeProcessText(Buffer.concat(stderrChunks))
 
       // timeoutMs === null이면 타임아웃 없음(장시간 MCP 작업용). 미지정이면 120초.
       const timeoutMs = options.timeoutMs === undefined ? 120000 : options.timeoutMs
@@ -507,12 +533,12 @@ ${skillBlock}`
       })
 
       proc.stderr.on('data', (data: Buffer) => {
-        stderrBuf += data.toString('utf-8')
+        stderrChunks.push(data)
       })
 
       proc.on('error', (err) => {
         if (timeout) clearTimeout(timeout)
-        reject(wrapClaudeError(err.message, stderrBuf))
+        reject(wrapClaudeError(err.message, readStderr()))
       })
 
       proc.on('close', (code) => {
@@ -533,9 +559,18 @@ ${skillBlock}`
           // Issue #11 — exit 0 인데 결과가 없는 경우: stderr 가 Warning: 류 비치명 메시지일 가능성이 큼.
           // claude 가 `-p` 모드에서 출력하는 "Warning: no stdin data received in 3s, proceeding without it"
           // 같은 메시지는 정상 동작 중 발생하는 경고라 사용자에게 에러로 노출하면 혼란.
-          const stderrLines = (stderrBuf || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
-          const onlyWarnings = stderrLines.length > 0 && stderrLines.every((l) => /^warning:/i.test(l))
-          if (code === 0 && onlyWarnings) {
+          const stderrText = readStderr()
+          const stderrLines = stderrText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+          // 비치명 메시지 패턴 — 사용자에게 에러로 노출 X.
+          //  1) "Warning: no stdin data received..." 같은 일반 경고
+          //  2) "If piping from a slow command, redirect stdin..." 같은 위 경고의 멀티라인 뒷부분
+          //  3) "SessionEnd hook [...] failed: Hook cancelled" — OMC 류 플러그인의 종료 훅 노이즈
+          //  4) "SessionStart hook ..." / "PreToolUse hook ..." 같은 다른 훅 실패 (claude 본 응답에는 영향 없음)
+          const BENIGN = /^(warning:|if piping from|sessionend hook |sessionstart hook |pretooluse hook |posttooluse hook |stop hook )/i
+          const onlyBenign = stderrLines.length > 0 && stderrLines.every((l) => BENIGN.test(l))
+          // exit code 0 + benign → 빈 결과로 통과 (기존 동작)
+          // exit code 비-0 이어도 benign 만이면 사용자 작업 흐름 끊지 말고 빈 결과로 통과 (Windows OMC 훅 false-fatal 방지)
+          if (onlyBenign) {
             resolve({
               type: 'result',
               result: '',
@@ -546,7 +581,7 @@ ${skillBlock}`
             })
             return
           }
-          reject(wrapClaudeError(stderrBuf || `Claude CLI 종료 코드 ${code}`, stderrBuf))
+          reject(wrapClaudeError(stderrText || `Claude CLI 종료 코드 ${code}`, stderrText))
         }
       })
     })

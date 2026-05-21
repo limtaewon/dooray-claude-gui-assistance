@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.1] - 윈도우 핫픽스
+
+윈도우 사용자가 브리핑/스킬 생성을 돌릴 때 깨진 문자(◇◇◇) 에러가 뜨거나, 정상 동작인데 OMC 플러그인의 SessionEnd 훅 노이즈 때문에 거짓 실패로 표시되던 문제 핫픽스.
+
+### 버그 수정
+- **윈도우 한국어 에러 mojibake** — claude CLI 가 한국 Windows 콘솔에서 cp949(euc-kr) 로 stderr 를 출력하는 경우가 있는데, 우리가 utf-8 로만 디코드해 `�������� �ʹ� ��ϴ�` 같이 깨져 보이던 문제. `decodeProcessText` 헬퍼로 raw Buffer 누적 후 utf-8 디코드 → U+FFFD 가 검출되면 euc-kr 로 재디코드해 어느 쪽이 덜 깨졌는지로 선택. Electron 의 full-ICU 번들 사용. (`runClaude`/`runClaudeStream` 양쪽 적용)
+- **벤긴(benign) stderr 노이즈를 fatal 로 오인하던 문제** — 기존엔 `^warning:` 만 비치명으로 인식했는데, OMC 류 플러그인이 출력하는 `SessionEnd hook [...] failed: Hook cancelled` 등은 매칭이 안 돼 실제 응답이 정상이어도 사용자에게 에러로 노출. `SessionEnd/SessionStart/PreToolUse/PostToolUse/Stop hook ... failed` 패턴과 `If piping from...` 같은 멀티라인 경고 뒷부분도 비치명에 포함. exit code 비-0 인 경우에도 stderr 가 전부 비치명이면 사용자 작업 흐름 끊지 않고 빈 결과로 통과.
+
 ## [1.5.0] - CalDAV 자체 캘린더 + 에이전틱 브리핑/보고서
 
 v1.5는 두 가지 큰 축이 있습니다. 첫째, 두레이 캘린더를 CalDAV 로 자체 수집해 구글 캘린더 스타일 월간 뷰까지 연결한 캘린더 도메인 자립. 둘째, AI 브리핑과 보고서가 두레이 데이터만 정리하던 단계를 넘어 사용자 셸 명령(gh, git, npm 등) · 웹 검색 · MCP 도구를 직접 호출해 외부 시스템 상태(PR, CI, 배포, 이슈)를 fetch 한 뒤 결과 URL 까지 브리핑 본문에 인용하는 에이전틱 모드. 부차적으로 디자인 시스템 v2 시맨틱 토큰, 라이트 모드 가독성 패치, 광범위한 단위/통합 테스트(700+) 와 CI 게이트(typecheck, coverage 70%) 정착 등 안정화 기반이 정비됐습니다.
