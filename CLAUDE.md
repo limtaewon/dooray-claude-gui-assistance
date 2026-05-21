@@ -83,6 +83,44 @@ npm run icons        # scripts/generate-icons.mjs
 - **캘린더 (v1.5)**: 두레이 네이티브 API 대신 CalDAV(`tsdav`) 로 전환. `UnifiedCalendarService` 가 원격(CalDAV) + 로컬(`LocalEventStore`) 통합. `CTagPoller` 로 변경 감지.
 - **AI 모델 라우팅** (`src/main/ai/AIService.ts`): 기능별 모델 선택. 짧은 요약은 Haiku, 브리핑/위키 분석은 Sonnet, 추천/설계는 Opus.
 
+## ⚠️ AIService.runClaudeStream — Windows / macOS 분기 가이드
+
+`AIService.runClaudeStream` 은 플랫폼별로 **의도적으로 다른 경로** 를 탄다. 한쪽만 보고 양쪽에 동일 변경을 적용하면 다른 쪽이 회귀로 깨진다. 변경 전 반드시 양쪽 영향을 점검하고, 가능하면 회귀 테스트도 양쪽 케이스 모두 작성.
+
+### Mac / Linux 경로 (정상 동작 중)
+- `spawn(CLAUDE_CLI, argv, { shell: false })` — 직접 실행
+- `windowsVerbatimArguments: false`
+- argv 에 `--append-system-prompt <content>` 로 system prompt 그대로 전달. claude 가 시스템 프롬프트 캐싱 적용
+- `-p` 의 prompt 본문만 stdin 으로 분리 (argv 길이 한계 회피 — 양쪽 공통 적용)
+- 결과: stream-json 정상 수신 → JSON 응답 → BriefingPanel/ReportGenerator 의 구조화 카드 표시
+
+### Windows 경로
+- `spawn(CLAUDE_CLI, argv, { shell: true, windowsVerbatimArguments: true })` — `claude.cmd` 가 .cmd 라 shell 경유 필요
+- `windowsVerbatimArguments: true` 로 cmd 의 codepage 변환 차단 (한글 mojibake 방지)
+- argv 에서 **`--append-system-prompt` 도 제거하고 stdin 으로 합쳐 보낸다** — Mac 과 다른 핵심 분기:
+  ```
+  [시스템 지시 — 반드시 준수]
+  {system prompt}
+
+  ---
+
+  [사용자 요청]
+  {user prompt}
+  ```
+- Why: v1.5.4 진단 데이터에서 system prompt 본문(3000+ chars) 내 공백/개행이 cmd 의 인자 파싱과 충돌해 뒤의 `--output-format stream-json` 옵션이 잘려나가는 케이스 확인 (claude 가 평문으로 응답).
+- 트레이드오프: system prompt 가 user prompt 로 흡수되어 claude 의 시스템 프롬프트 캐싱 효과는 못 받음. 하지만 응답 자체는 정상 수신.
+
+### 자주 무너지는 함정
+1. **"양쪽 일관성" 의 함정** — "이게 더 깔끔하니까 Mac 도 stdin 으로 통일하자" 같은 생각은 Mac 의 캐싱 이점을 깨뜨림. Windows 와 Mac 은 서로 다른 동기로 다른 경로를 탄다.
+2. **테스트 한쪽만** — `process.platform` 분기 코드는 vitest 에서 Mac 으로만 도는 한 Windows 경로가 검증 안 됨. 테스트에 양쪽 케이스를 직접 명시 (`Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })` 등).
+3. **shell:true 의존성** — Windows 의 `shell: true` 는 cmd.exe 가 끼는데, 그게 다시 codepage / 명령줄 한계 / argv escape 문제를 만든다. shell 옵션 변경은 영향 광범위 — 그쪽 손대지 말고 대신 stdin 사용량을 늘리는 방향으로.
+4. **진단 로그 잊기** — 모든 호출은 `cliLogger` 로 진단 로그 남김. 새 분기 추가 시 platform/argv 가 로그에 자연스럽게 남는지 확인.
+
+### 관련 변경 이력
+- v1.5.2: prompt 본문 → stdin (양쪽 공통, 명령줄 8KB 한계 회피)
+- v1.5.4: raw stdout fallback (stream-json 못 받아도 본문 살림)
+- v1.5.5: Windows 한정 `--append-system-prompt` → stdin combine (이 가이드 작성 계기)
+
 ## 코드 컨벤션
 
 - TypeScript strict, 타입은 `shared/types/` 에 우선 정의 후 main/renderer 양쪽에서 import.

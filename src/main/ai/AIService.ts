@@ -435,9 +435,37 @@ ${skillBlock}`
         cleaned.splice(pIdx + 1, 1)
       }
 
+      const isWindows = process.platform === 'win32'
+
+      // ⚠️ Windows 한정 분기 — Mac/Linux 는 절대 건드리지 말 것.
+      // CLAUDE.md 의 "AIService.runClaudeStream Windows/Mac 분기 가이드" 참고.
+      //
+      // 증상: v1.5.4 진단 데이터에서 Windows 사용자가 같은 claude 버전(2.1.146)임에도
+      // stdout 으로 stream-json 이 아닌 평문 마크다운을 흘림 → 우리 파서가 빈 결과로 처리.
+      //
+      // 원인 가설: `--append-system-prompt <3775 chars>` 의 큰 값이 windowsVerbatimArguments
+      // 모드 + cmd 의 인자 파싱과 충돌해 system prompt 본문 내 공백/개행이 인자 구분자로
+      // 잘못 해석되며 뒤의 `--output-format stream-json` 등이 잘려나감.
+      //
+      // 회피: Windows 에서만 system prompt 를 argv 에서 빼서 stdin prompt 의 prefix 로 합침.
+      // Mac 은 정상 동작 중이므로 기존 argv 경로 유지 (system prompt 캐싱 효과 보존).
+      if (isWindows) {
+        const aspIdx = cleaned.indexOf('--append-system-prompt')
+        if (aspIdx >= 0 && aspIdx + 1 < cleaned.length) {
+          const systemContent = cleaned[aspIdx + 1]
+          cleaned.splice(aspIdx, 2)
+          stdinPrompt = `[시스템 지시 — 반드시 준수]
+${systemContent}
+
+---
+
+[사용자 요청]
+${stdinPrompt ?? ''}`
+        }
+      }
+
       // Windows 호환 (Issue #11): claude 가 .cmd 면 Node 의 spawn 이 자동 추론 못함 → shell:true.
       // windowsVerbatimArguments 로 cmd codepage 변환 차단 (한글 prompt 깨짐 방지).
-      const isWindows = process.platform === 'win32'
       const proc = spawn(CLAUDE_CLI, cleaned, {
         env: enrichedEnv(),
         shell: isWindows,

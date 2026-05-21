@@ -131,6 +131,59 @@ describe('AIService.ask (스트리밍)', () => {
     await promise
   })
 
+  it('Mac/Linux 경로 — system prompt 는 argv 의 --append-system-prompt 로 그대로 (캐싱 보존)', async () => {
+    const orig = process.platform
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+    try {
+      const svc = new AIService()
+      const promise = svc.ask('hello', { systemPrompt: '시스템 룰 본문' })
+      await Promise.resolve()
+      const cp = (await import('child_process')).spawn as unknown as { mock: { calls: unknown[][] } }
+      const argv = cp.mock.calls[cp.mock.calls.length - 1][1] as string[]
+      const aspIdx = argv.indexOf('--append-system-prompt')
+      expect(aspIdx).toBeGreaterThanOrEqual(0)
+      expect(argv[aspIdx + 1]).toBe('시스템 룰 본문')
+      // stdin 으로는 prompt 만, 시스템 프롬프트 prefix 없이
+      expect(lastSpawn!.stdin.write).toHaveBeenCalledWith('hello', 'utf8')
+      lastSpawn!.stdout.emit('data', Buffer.from(JSON.stringify({
+        type: 'result', result: 'ok', duration_ms: 0, session_id: '', is_error: false, total_cost_usd: 0
+      }) + '\n', 'utf8'))
+      lastSpawn!.emitClose(0)
+      await promise
+    } finally {
+      Object.defineProperty(process, 'platform', { value: orig, configurable: true })
+    }
+  })
+
+  it('Windows 경로 — system prompt 가 argv 에서 빠지고 stdin prompt 의 prefix 로 합쳐짐 (cmd argv escape 회피)', async () => {
+    const orig = process.platform
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+    try {
+      const svc = new AIService()
+      const promise = svc.ask('hello', { systemPrompt: '시스템 룰 본문' })
+      await Promise.resolve()
+      const cp = (await import('child_process')).spawn as unknown as { mock: { calls: unknown[][] } }
+      const argv = cp.mock.calls[cp.mock.calls.length - 1][1] as string[]
+      // argv 에 --append-system-prompt 와 그 값이 모두 없어야 함
+      expect(argv.indexOf('--append-system-prompt')).toBe(-1)
+      expect(argv.indexOf('시스템 룰 본문')).toBe(-1)
+      // stdin 에는 시스템 prefix + 사용자 prompt 가 합쳐서 들어가야 함
+      const writeCall = (lastSpawn!.stdin.write as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]
+      const stdinText = writeCall[0] as string
+      expect(stdinText).toContain('[시스템 지시 — 반드시 준수]')
+      expect(stdinText).toContain('시스템 룰 본문')
+      expect(stdinText).toContain('[사용자 요청]')
+      expect(stdinText).toContain('hello')
+      lastSpawn!.stdout.emit('data', Buffer.from(JSON.stringify({
+        type: 'result', result: 'ok', duration_ms: 0, session_id: '', is_error: false, total_cost_usd: 0
+      }) + '\n', 'utf8'))
+      lastSpawn!.emitClose(0)
+      await promise
+    } finally {
+      Object.defineProperty(process, 'platform', { value: orig, configurable: true })
+    }
+  })
+
   it('raw stdout fallback — stream-json 라인이 없어도 평문 stdout 을 result 로 사용 (Windows 일부 환경 회복)', async () => {
     const svc = new AIService()
     const promise = svc.ask('안녕')

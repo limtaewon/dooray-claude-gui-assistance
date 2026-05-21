@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.5.5] - Windows stream-json 정상 수신 — system prompt 도 stdin 합치기
+
+v1.5.4 의 raw stdout fallback 으로 응답은 살렸지만 윈도우 사용자는 여전히 마크다운 평문이 greeting 한 줄로 흘러서 mac 처럼 예쁜 카드(긴급/오늘 집중/AI 추천)가 안 보임. 진단 데이터 추적 결과, `--append-system-prompt` 의 큰 값(3000+ chars)이 argv 로 전달되면서 cmd 의 인자 파싱과 충돌해 뒤의 `--output-format stream-json` 옵션이 잘려나가는 게 본질.
+
+### 버그 수정 — Windows 한정
+- **`--append-system-prompt` → stdin combine** — Windows 에서만 system prompt 본문을 argv 에서 빼서 stdin prompt 의 prefix 로 합쳐 보냄. argv 가 짧고 깨끗해져서 cmd 의 잘못된 파싱을 피하고 `--output-format stream-json` 이 제대로 전달됨. 결과: Windows 도 mac 처럼 stream-json 정상 수신 → 구조화된 카드(긴급/오늘 집중/AI 추천) 표시 회복.
+
+### Mac/Linux 동작
+- **변경 없음.** 기존 argv 의 `--append-system-prompt` 경로 그대로 (시스템 프롬프트 캐싱 효과 보존). `process.platform === 'win32'` 분기로 격리.
+
+### 문서
+- `CLAUDE.md` 에 **AIService.runClaudeStream — Windows/macOS 분기 가이드** 섹션 추가. 양쪽 경로가 의도적으로 다르다는 점, 함정(양쪽 일관성 시도, shell:true 의존성, 테스트 한쪽만 등), 관련 변경 이력 명시. 미래 개선이 한 플랫폼만 보고 다른 쪽을 깨뜨리는 회귀를 막기 위함.
+
+### 테스트
+- `Mac/Linux 경로` 케이스 — argv 에 `--append-system-prompt` 가 살아있는지 검증
+- `Windows 경로` 케이스 — argv 에서 빠지고 stdin 에 "[시스템 지시]" prefix 가 합쳐졌는지 검증
+- 739 tests pass, typecheck clean.
+
 ## [1.5.4] - Windows stream-json 미수신 fallback
 
 v1.5.3 의 오류 리포트로 들어온 첫 진단: 윈도우 사용자가 같은 claude CLI 버전임에도 stdout 으로 stream-json 이 아니라 평문 마크다운을 흘리는 케이스 확인. claude 는 응답을 정상 생성했는데 우리 파서가 stream-json 의 `type:"result"` 라인만 기다리다 빈 결과로 처리 → `AI 응답에서 JSON을 찾지 못했습니다` 로 간접 실패. 원인 종류 무관한 방어 패치.
