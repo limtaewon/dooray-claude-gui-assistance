@@ -24,6 +24,7 @@ import MonitoringView from './components/Monitoring/MonitoringView'
 import AIRecommendView from './components/AIRecommend/AIRecommendView'
 import QuickTodoModal from './components/Dooray/QuickTodoModal'
 import { ToastHost, CommandPalette, type CommandGroup, type CommandItem } from './components/common/ds'
+import ErrorReportProvider from './components/ErrorReport/ErrorReportProvider'
 import { useTheme } from './hooks/useTheme'
 
 type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent'
@@ -298,6 +299,7 @@ function App(): JSX.Element {
 
   return (
     <ToastHost>
+      <ErrorReportProvider>
       <div className="flex flex-col h-full bg-bg-primary">
         <TitleBar onOpenCommandPalette={() => setCmdOpen(true)} />
         <div className="flex flex-1 overflow-hidden">
@@ -363,6 +365,7 @@ function App(): JSX.Element {
         />
         <QuickTodoModal open={quickTodoOpen} onClose={() => setQuickTodoOpen(false)} />
       </div>
+      </ErrorReportProvider>
     </ToastHost>
   )
 }

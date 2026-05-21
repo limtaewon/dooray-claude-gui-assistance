@@ -1,4 +1,4 @@
-import { Loader2, AlertCircle, Inbox, RefreshCw } from 'lucide-react'
+import { Loader2, AlertCircle, Inbox, RefreshCw, Bug } from 'lucide-react'
 
 interface LoadingViewProps {
   message?: string
@@ -18,23 +18,36 @@ export function LoadingView({ message = '불러오는 중...', className = '' }:
 interface ErrorViewProps {
   message: string
   onRetry?: () => void
+  /** 오류 리포트 버튼 — 클릭 시 ErrorReportProvider 의 open() 등을 호출하도록 호출자가 주입 */
+  onReport?: () => void
   className?: string
 }
 
-/** 에러 상태 (아이콘 + 메시지 + 재시도 버튼) */
-export function ErrorView({ message, onRetry, className = '' }: ErrorViewProps): JSX.Element {
+/** 에러 상태 (아이콘 + 메시지 + 재시도 / 리포트 버튼) */
+export function ErrorView({ message, onRetry, onReport, className = '' }: ErrorViewProps): JSX.Element {
   return (
     <div className={`flex flex-col items-center justify-center gap-2 py-10 ${className}`}>
       <AlertCircle size={24} className="text-red-400" />
       <p className="text-xs text-red-400 text-center max-w-md px-4 whitespace-pre-wrap">{message}</p>
-      {onRetry && (
-        <button
-          onClick={onRetry}
-          className="mt-1 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-surface border border-bg-border text-[11px] text-text-primary hover:border-clauday-blue/50 transition-colors"
-        >
-          <RefreshCw size={11} /> 다시 시도
-        </button>
-      )}
+      <div className="flex items-center gap-2 mt-1">
+        {onRetry && (
+          <button
+            onClick={onRetry}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-surface border border-bg-border text-[11px] text-text-primary hover:border-clauday-blue/50 transition-colors"
+          >
+            <RefreshCw size={11} /> 다시 시도
+          </button>
+        )}
+        {onReport && (
+          <button
+            onClick={onReport}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-surface border border-bg-border text-[11px] text-text-primary hover:border-clauday-blue/50 transition-colors"
+            title="진단 정보와 함께 오류를 제보합니다"
+          >
+            <Bug size={11} /> 오류 리포트
+          </button>
+        )}
+      </div>
     </div>
   )
 }

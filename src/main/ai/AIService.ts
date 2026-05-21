@@ -143,6 +143,7 @@ const CLAUDE_CLI = resolveClaudePath()
 export function getClaudeBin(): string { return CLAUDE_CLI }
 
 import { decodeProcessText, isBenignStderr } from '../utils/procText'
+import { startCliCall } from '../utils/cliLogger'
 
 /**
  * Claude CLI 오류를 사용자 친화적 메시지로 변환.
@@ -389,7 +390,7 @@ ${skillBlock}`
   private runClaudeStream(
     args: string[],
     onChunk: (text: string) => void,
-    options: { timeoutMs?: number | null } = {}
+    options: { timeoutMs?: number | null; feature?: string } = {}
   ): Promise<ClaudeCliResult> {
     return new Promise((resolve, reject) => {
       // --output-format {json} 제거 후 stream-json 옵션 추가
@@ -437,14 +438,25 @@ ${skillBlock}`
       const stderrChunks: Buffer[] = []
       const readStderr = (): string => decodeProcessText(Buffer.concat(stderrChunks))
 
+      // 진단 로그 누적 — 호출 끝나면 userData/logs/claude-cli.log 에 한 줄 추가.
+      // 사용자가 오류 제보할 때 같이 보낼 데이터.
+      const diag = startCliCall({
+        feature: options.feature,
+        bin: CLAUDE_CLI,
+        argv: cleaned,
+        prompt: stdinPrompt
+      })
+
       // timeoutMs === null이면 타임아웃 없음(장시간 MCP 작업용). 미지정이면 120초.
       const timeoutMs = options.timeoutMs === undefined ? 120000 : options.timeoutMs
       const timeout = timeoutMs !== null ? setTimeout(() => {
         proc.kill()
+        diag.complete({ exitCode: null, errorMessage: `타임아웃 ${Math.round(timeoutMs / 1000)}초` })
         reject(new Error(`Claude CLI 타임아웃 (${Math.round(timeoutMs / 1000)}초)`))
       }, timeoutMs) : null
 
       proc.stdout.on('data', (data: Buffer) => {
+        diag.appendStdout(data.toString('utf-8'))
         buffer += data.toString('utf-8')
         let idx: number
         while ((idx = buffer.indexOf('\n')) >= 0) {
@@ -534,11 +546,13 @@ ${skillBlock}`
       })
 
       proc.stderr.on('data', (data: Buffer) => {
+        diag.appendStderr(data.toString('utf-8'))
         stderrChunks.push(data)
       })
 
       proc.on('error', (err) => {
         if (timeout) clearTimeout(timeout)
+        diag.complete({ exitCode: null, errorMessage: `spawn error: ${err.message}` })
         reject(wrapClaudeError(err.message, readStderr()))
       })
 
@@ -546,8 +560,10 @@ ${skillBlock}`
         if (timeout) clearTimeout(timeout)
         if (finalResult) {
           if (!finalResult.result && accumulated) finalResult.result = accumulated
+          diag.complete({ exitCode: code })
           resolve(finalResult)
         } else if (accumulated) {
+          diag.complete({ exitCode: code })
           resolve({
             type: 'result',
             result: accumulated,
@@ -564,6 +580,7 @@ ${skillBlock}`
           // 비치명 stderr (Warning, OMC 훅 실패 등) 만이면 사용자 작업 흐름 끊지 말고 빈 결과로 통과.
           // 패턴/판정 로직은 src/main/utils/procText.ts 의 isBenignStderr 가 일관 관리.
           if (isBenignStderr(stderrText)) {
+            diag.complete({ exitCode: code, errorMessage: 'benign stderr — 빈 결과로 통과' })
             resolve({
               type: 'result',
               result: '',
@@ -574,7 +591,9 @@ ${skillBlock}`
             })
             return
           }
-          reject(wrapClaudeError(stderrText || `Claude CLI 종료 코드 ${code}`, stderrText))
+          const msg = stderrText || `Claude CLI 종료 코드 ${code}`
+          diag.complete({ exitCode: code, errorMessage: msg })
+          reject(wrapClaudeError(msg, stderrText))
         }
       })
     })
@@ -641,7 +660,7 @@ ${skillBlock}`
       allowRead: images.length > 0
     })
 
-    const result = await this.runWithProgress(opts?.requestId, '✨ AI 응답 생성 중...', args)
+    const result = await this.runWithProgress(opts?.requestId, '✨ AI 응답 생성 중...', args, { feature: feature || 'ask' })
     return result.result
   }
 
@@ -650,7 +669,7 @@ ${skillBlock}`
     requestId: string | undefined,
     stageMessage: string,
     args: string[],
-    options: { timeoutMs?: number | null } = {}
+    options: { timeoutMs?: number | null; feature?: string } = {}
   ): Promise<ClaudeCliResult> {
     const started = Date.now()
     this.emitProgress(requestId, 'thinking', stageMessage, started)
@@ -770,7 +789,7 @@ ${JSON.stringify(eventData)}`
           probes.push({ name, summary })
         }
       }
-    }, allEmpty ? { timeoutMs: null } : { timeoutMs: 300000 })
+    }, allEmpty ? { timeoutMs: null, feature: 'briefing' } : { timeoutMs: 300000, feature: 'briefing' })
     this.emitProgress(requestId, 'parsing', '결과 정리 중...', started)
 
     // JSON 추출 — 마크다운 코드블록(```json ... ```) 처리 및 에러 명확화
@@ -908,7 +927,7 @@ ${JSON.stringify(eventData)}`
       model: this.pickModel('summarizeTask', 'haiku'),
       systemPrompt: this.buildSystemPrompt('두레이 태스크를 간결하게 분석하는 AI. 한국어로 3줄 이내 요약.', 'task'),
       maxBudget: '0.1'
-    }))
+    }), { feature: 'summarizeTask' })
 
     return result.result || '요약을 생성할 수 없습니다.'
   }
@@ -975,7 +994,7 @@ ${JSON.stringify(eventData)}`
           probes.push({ name, summary })
         }
       }
-    }, allEmpty ? { timeoutMs: null } : { timeoutMs: 300000 })
+    }, allEmpty ? { timeoutMs: null, feature: 'report' } : { timeoutMs: 300000, feature: 'report' })
     this.emitProgress(requestId, 'done', '완료', started)
 
     return {
@@ -1004,7 +1023,7 @@ ${JSON.stringify(eventData)}`
 - HTML 태그(<br>, <table> 등)도 그대로 유지
 - 교정된 전체 문서를 마크다운으로 출력 (설명 없이 결과만)`, 'wiki'),
       maxBudget: '1'
-    }))
+    }), { feature: 'wikiProofread' })
     return result.result
   }
 
@@ -1020,7 +1039,7 @@ ${JSON.stringify(eventData)}`
 - 마크다운 형식으로 개선된 전체 문서 출력 (설명 없이 결과만)
 - HTML 태그(<br>, <table> 등)도 유지`, 'wiki'),
       maxBudget: '1'
-    }))
+    }), { feature: 'wikiImprove' })
     return result.result
   }
 
@@ -1065,7 +1084,7 @@ ${instruction}
       maxBudget: '0.5',
       effort: 'medium',
       webOnly: true
-    }), { timeoutMs: 180000 })
+    }), { timeoutMs: 180000, feature: 'messengerCompose' })
     return result.result
   }
 
@@ -1115,7 +1134,7 @@ ${instruction}
       model: 'sonnet',
       systemPrompt: '메시지 필터 규칙 생성 전문가. 항상 유효한 JSON만 응답합니다.',
       maxBudget: '0.1'
-    }))
+    }), { feature: 'filterRule' })
 
     const text = result.result.trim()
     // JSON 추출 (``` 코드블록 제거)
@@ -1142,7 +1161,7 @@ ${instruction}
       model: this.pickModel('wikiDraft', 'sonnet'),
       systemPrompt: this.buildSystemPrompt('두레이 위키 문서 전문 작성 AI. 개발 문서를 구조화된 마크다운으로 작성합니다.', 'wiki'),
       maxBudget: '0.2'
-    }))
+    }), { feature: 'wikiDraft' })
     return result.result
   }
 
@@ -1197,7 +1216,7 @@ ${useMcp ? `
 - 조회 결과를 스킬 content에 하드코딩하여 런타임에 다시 조회할 필요 없게 만들기
 - 도구 호출은 꼭 필요한 만큼만, 최소한으로` : ''}`,
       maxBudget: useMcp ? '1.0' : '0.3'
-    }))
+    }), { feature: 'generateSkill' })
 
     try {
       const jsonMatch = result.result.match(/\{[\s\S]*\}/)
@@ -1325,7 +1344,7 @@ ${mcpBlock}
     // MCP tool call이 여러 번 일어날 수 있어 타임아웃 해제 (사용자가 재분석 버튼으로만 종료 의도 표현)
     const result = await this.runClaudeStream(args, (chunk) => {
       this.emitProgress(requestId, 'streaming', '분석 중...', started, chunk)
-    }, { timeoutMs: null })
+    }, { timeoutMs: null, feature: 'recommend' })
     this.emitProgress(requestId, 'parsing', '결과 정리 중...', started)
 
     const raw = (result.result || '').trim()

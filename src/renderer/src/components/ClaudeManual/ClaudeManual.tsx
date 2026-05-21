@@ -9,6 +9,21 @@ interface Section { id: string; icon: typeof Book; title: string; content: strin
 
 const SECTIONS: Section[] = [
   {
+    id: 'whats-new-v153', icon: Zap, title: 'v1.5.3 변경사항',
+    content: `# v1.5.3 — 오류 리포트 인프라
+
+AI 호출(브리핑·AI 채우기·요약·보고서 등)이 실패하면 **🐞 리포트 버튼** 이 토스트 또는 에러 화면에 같이 표시됩니다. 클릭하면:
+
+- **진단 정보 자동 수집** — Claude CLI 호출 로그(최근 5건의 prompt·stdout·stderr·exit code) + 시스템 정보(OS / 앱·Node·Electron 버전) 가 자동으로 채워집니다.
+- **편집 후 보내기** — 민감정보가 있으면 직접 지우고 보낼 수 있습니다.
+- **두 가지 게시처**:
+  - 🌐 **커뮤니티에 게시** — Clauday 두레이 커뮤니티에 본인 계정으로 글 등록. 같은 문제 다른 사용자도 보고 워크어라운드 공유 가능
+  - 📋 **클립보드 복사** — 직접 두레이 메신저에 붙여넣기
+
+자동 진단 로그는 \`<userData>/logs/claude-cli.log\` (JSONL, ring buffer 50건) 에 저장됩니다. Windows 기준 \`%APPDATA%\\clauday\\logs\\claude-cli.log\`.
+`
+  },
+  {
     id: 'whats-new-v15', icon: Zap, title: 'v1.5 변경사항',
     content: `# v1.5 변경사항
 

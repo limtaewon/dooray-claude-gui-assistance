@@ -256,6 +256,11 @@ export const IPC_CHANNELS = {
   // Dialog
   DIALOG_SELECT_FOLDER: 'dialog:select-folder',
 
+  // Error report (Claude CLI 호출 진단 + 사용자 제보)
+  ERROR_REPORT_COLLECT: 'error-report:collect',
+  ERROR_REPORT_SUBMIT_COMMUNITY: 'error-report:submit-community',
+  ERROR_REPORT_COPY_CLIPBOARD: 'error-report:copy-clipboard',
+
   // Config
   CONFIG_CHANGED: 'config:changed'
 } as const

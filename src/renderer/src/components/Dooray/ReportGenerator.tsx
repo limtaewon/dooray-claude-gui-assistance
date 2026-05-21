@@ -6,9 +6,10 @@ import rehypeRaw from 'rehype-raw'
 import type { AIReport } from '../../../../shared/types/ai'
 import SkillQuickToggle from './SkillQuickToggle'
 import AIToolsPopover from '../common/AIToolsPopover'
-import { Button } from '../common/ds'
+import { Button, useToast } from '../common/ds'
 import { useAIProgress } from '../../hooks/useAIProgress'
 import AIProgressIndicator from '../common/AIProgressIndicator'
+import { useErrorReport } from '../ErrorReport/ErrorReportProvider'
 
 function ReportGenerator(): JSX.Element {
   const [report, setReport] = useState<AIReport | null>(null)
@@ -19,6 +20,8 @@ function ReportGenerator(): JSX.Element {
   const [editMode, setEditMode] = useState(false)
   const [editContent, setEditContent] = useState('')
   const { progress, start, done, isActive } = useAIProgress()
+  const toast = useToast()
+  const errorReport = useErrorReport()
 
   // 히스토리 로드
   const loadHistory = useCallback(async () => {
@@ -47,10 +50,15 @@ function ReportGenerator(): JSX.Element {
       setHistory(updated)
       window.api.analytics.track('ai.report.success', { durationMs: Date.now() - t0, success: true, meta: { type: reportType } })
     } catch (err) {
+      const msg = err instanceof Error ? err.message : '보고서 생성에 실패했습니다.'
       setReport({
         title: '오류',
-        content: err instanceof Error ? err.message : '보고서 생성에 실패했습니다.',
+        content: msg,
         generatedAt: new Date().toISOString()
+      })
+      toast.error('보고서 생성 실패', msg.substring(0, 200), {
+        label: '🐞 리포트',
+        onClick: errorReport.open
       })
       window.api.analytics.track('ai.report.error', { durationMs: Date.now() - t0, success: false })
     } finally {

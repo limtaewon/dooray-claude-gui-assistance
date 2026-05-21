@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.5.3] - 오류 리포트 인프라
+
+v1.5.2 윈도우 핫픽스가 여전히 일부 환경에서 실패하는 보고가 들어와, **비개발자 사용자도 한 번에 제보할 수 있는 인프라** 를 먼저 깔았다. 다음 사이클에 정확한 윈도우 픽스를 박기 위한 진단 데이터 확보 목적.
+
+### 신규 기능
+- **🐞 오류 리포트 버튼** — AI 호출(브리핑 / AI 채우기 / 요약 / 보고서 / 추천 / 스킬 생성 등) 실패 시 토스트 또는 에러 화면에 같이 표시. 클릭하면 진단 정보 자동 수집 + 모달에서 편집 가능. 보낼 곳 선택:
+  - 🌐 **커뮤니티에 게시** — Clauday 두레이 커뮤니티 채널에 본인 계정으로 글 등록. 같은 문제 다른 사용자도 보고 워크어라운드 공유 가능
+  - 📋 **클립보드 복사** — 두레이 메신저에 직접 붙여넣기
+
+### 내부 인프라
+- **Claude CLI 진단 로그** — \`<userData>/logs/claude-cli.log\` (JSONL, ring buffer 50건). \`runClaudeStream\` 의 모든 호출이 자동 기록: feature 명, argv 요약(시스템 프롬프트 본문은 길이만), prompt 첫 500자, stdout/stderr 첫 2KB, exit code, duration, 우리쪽 에러 사유. 사용자 제보 시 자동 첨부됨. Windows: \`%APPDATA%\\clauday\\logs\\claude-cli.log\`.
+- **ErrorReportService** — main process. 진단 정보 수집(\`collect\`), 두레이 커뮤니티 게시(\`submitCommunity\`), 클립보드 복사(\`copyToClipboard\`) IPC 제공. 두레이 커뮤니티 프로젝트(ID \`4312559241344624232\`) 의 \`tasks.create\` 재사용.
+- **ErrorReportProvider** — renderer 글로벌 컨텍스트. \`useErrorReport()\` 훅으로 어디서든 모달 호출 가능.
+- **Toast 시스템에 액션 버튼 지원** — \`ToastInput.action: { label, onClick }\` 추가. 액션 버튼이 있는 토스트는 8초 노출(기본 3.6초의 두 배).
+- **ErrorView 에 onReport 옵션** — 인라인 에러 화면에서도 리포트 버튼 노출 가능.
+
+### 기록 범위
+- 모든 AI 기능 호출이 진단 로그를 남김: \`briefing\`, \`report\`, \`ask\`, \`summarizeTask\`, \`wikiProofread\`, \`wikiImprove\`, \`wikiDraft\`, \`messengerCompose\`, \`filterRule\`, \`generateSkill\`, \`recommend\`
+- benign stderr (Warning, OMC 훅 실패 등) 으로 빈 결과 반환된 케이스도 \`errorMessage: 'benign stderr — 빈 결과로 통과'\` 로 명시 기록 → 진단 시 "정상 종료인데 결과 없음" 케이스 식별 가능
+
 ## [1.5.2] - 윈도우 AI 호출 핫픽스
 
 윈도우에서 브리핑이 "명령줄이 너무 깁니다" 로 죽고, AI 채우기/요약 등은 "AI 응답에서 JSON을 찾을 수 없습니다" 로 간헐 실패하던 문제를 한 번에 해결.

@@ -13,6 +13,7 @@ import { LoadingView, ErrorView, EmptyView } from '../common/StateViews'
 import { Button, SegTabs, useToast } from '../common/ds'
 import SkillQuickToggle from '../Dooray/SkillQuickToggle'
 import AIToolsPopover from '../common/AIToolsPopover'
+import { useErrorReport } from '../ErrorReport/ErrorReportProvider'
 
 /** Dooray AI 활용 사례 공유 프로젝트 */
 const AI_SHARING_PROJECT_ID = '4138743749699736544'
@@ -572,6 +573,7 @@ function CommentComposer({ postId, onPosted }: { postId: string; onPosted: () =>
 
 function AIRecommendView(): JSX.Element {
   const toast = useToast()
+  const errorReport = useErrorReport()
   const [tab, setTab] = useState<Tab>('posts')
 
   // 글 읽기
@@ -653,7 +655,10 @@ function AIRecommendView(): JSX.Element {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       setAnalyzeError(msg)
-      toast.error('분석 실패')
+      toast.error('분석 실패', msg.length > 0 ? msg.substring(0, 200) : undefined, {
+        label: '🐞 리포트',
+        onClick: errorReport.open
+      })
     } finally {
       setAnalyzing(false)
     }

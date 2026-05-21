@@ -7,6 +7,7 @@ import { useAIProgress } from '../../hooks/useAIProgress'
 import AIProgressIndicator from '../common/AIProgressIndicator'
 import { ErrorView, EmptyView } from '../common/StateViews'
 import { Button, Chip } from '../common/ds'
+import { useErrorReport } from '../ErrorReport/ErrorReportProvider'
 
 type StoredBriefing = AIBriefing & { savedAt: string }
 
@@ -16,6 +17,7 @@ function BriefingPanel(): JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [showHistory, setShowHistory] = useState(false)
   const { progress, start, done, isActive } = useAIProgress()
+  const errorReport = useErrorReport()
 
   // 히스토리 로드
   useEffect(() => {
@@ -174,7 +176,7 @@ function BriefingPanel(): JSX.Element {
 
       {/* 브리핑 내용 */}
       <div className="flex-1 overflow-y-auto">
-        {error && <ErrorView message={error} onRetry={loadBriefing} />}
+        {error && <ErrorView message={error} onRetry={loadBriefing} onReport={errorReport.open} />}
 
         {!briefing && !error && (
           <EmptyView

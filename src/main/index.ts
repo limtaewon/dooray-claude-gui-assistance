@@ -8,6 +8,7 @@ import { ConfigWatcher } from './config/ConfigWatcher'
 import { UsageParser } from './usage/UsageParser'
 import { DoorayClient } from './dooray/DoorayClient'
 import { TaskService } from './dooray/TaskService'
+import { ErrorReportService, type ErrorReportPayload } from './error-report/ErrorReportService'
 import { WikiService } from './dooray/WikiService'
 import { WikiStorageService } from './dooray/WikiStorageService'
 import type { WikiStorageKind } from './dooray/WikiStorageService'
@@ -75,6 +76,7 @@ const configWatcher = new ConfigWatcher()
 const usageParser = new UsageParser()
 const doorayClient = new DoorayClient()
 const taskService = new TaskService(doorayClient)
+const errorReportService = new ErrorReportService(taskService)
 const aiRecommendNotifier = new AiRecommendNotifier(taskService)
 const wikiService = new WikiService(doorayClient)
 // store 초기화는 아래에서 하지만, lambda 들이 method 호출 시점에 평가되므로 문제 없음.
@@ -1578,6 +1580,17 @@ ${data}`,
     })
     return result.canceled ? null : result.filePaths[0]
   })
+
+  // Error report — Claude CLI 호출 진단 + 사용자 제보
+  ipcMain.handle(IPC_CHANNELS.ERROR_REPORT_COLLECT, () => errorReportService.collect())
+  ipcMain.handle(
+    IPC_CHANNELS.ERROR_REPORT_SUBMIT_COMMUNITY,
+    (_, payload: ErrorReportPayload) => errorReportService.submitCommunity(payload)
+  )
+  ipcMain.handle(
+    IPC_CHANNELS.ERROR_REPORT_COPY_CLIPBOARD,
+    (_, payload: ErrorReportPayload) => { errorReportService.copyToClipboard(payload); return true }
+  )
 }
 
 /**

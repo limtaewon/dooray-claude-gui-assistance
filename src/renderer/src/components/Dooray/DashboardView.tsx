@@ -10,6 +10,7 @@ import {
   Button, Chip, Card, Avatar, Input, Textarea, FieldLabel, Kbd,
   EmptyView, LoadingView, useToast, type ChipTone
 } from '../common/ds'
+import { useErrorReport } from '../ErrorReport/ErrorReportProvider'
 
 const CREATE_EXPANDED_KEY = 'dashboard.createExpanded'
 
@@ -61,6 +62,7 @@ function DashboardView(): JSX.Element {
   const [projects, setProjects] = useState<DoorayProject[]>([])
   const [loading, setLoading] = useState(true)
   const toast = useToast()
+  const errorReport = useErrorReport()
 
   // 편집 상태
   const [subject, setSubject] = useState('')
@@ -252,7 +254,10 @@ JSON 형태로만 응답:
       }
       toast.ai('AI가 채웠어요', `제목·본문${parsed.tagIds && parsed.tagIds.length > 0 ? '·태그' : ''}을 확인 후 생성하세요`)
     } catch (err) {
-      toast.error('AI 변환 실패', err instanceof Error ? err.message : String(err))
+      toast.error('AI 변환 실패', err instanceof Error ? err.message : String(err), {
+        label: '🐞 리포트',
+        onClick: errorReport.open
+      })
     } finally {
       setComposing(false)
     }

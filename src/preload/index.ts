@@ -630,6 +630,20 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.DIALOG_SELECT_FOLDER)
   },
 
+  // Error report — Claude CLI 호출 진단 + 사용자 제보
+  errorReport: {
+    collect: (): Promise<{
+      body: string
+      recentLogs: unknown[]
+      logPath: string
+      defaultSubject: string
+    }> => ipcRenderer.invoke(IPC_CHANNELS.ERROR_REPORT_COLLECT),
+    submitCommunity: (payload: { subject?: string; userNote: string; diagnosticsBody: string }): Promise<{ id: string; url: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ERROR_REPORT_SUBMIT_COMMUNITY, payload),
+    copyToClipboard: (payload: { subject?: string; userNote: string; diagnosticsBody: string }): Promise<boolean> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ERROR_REPORT_COPY_CLIPBOARD, payload)
+  },
+
   // Config
   onConfigChanged: (
     callback: (data: { event: string; path: string }) => void

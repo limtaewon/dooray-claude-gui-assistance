@@ -9,6 +9,11 @@ export interface ToastInput {
   body?: ReactNode
   tone?: ToastTone
   duration?: number
+  /** 선택적 액션 버튼. 토스트 우측에 작은 버튼으로 표시. 클릭 시 토스트는 닫힘. */
+  action?: {
+    label: string
+    onClick: () => void
+  }
 }
 
 interface StoredToast extends ToastInput {
@@ -17,11 +22,11 @@ interface StoredToast extends ToastInput {
 
 export interface ToastApi {
   push: (t: ToastInput) => void
-  success: (title: ReactNode, body?: ReactNode) => void
-  error: (title: ReactNode, body?: ReactNode) => void
-  warn: (title: ReactNode, body?: ReactNode) => void
-  ai: (title: ReactNode, body?: ReactNode) => void
-  info: (title: ReactNode, body?: ReactNode) => void
+  success: (title: ReactNode, body?: ReactNode, action?: ToastInput['action']) => void
+  error: (title: ReactNode, body?: ReactNode, action?: ToastInput['action']) => void
+  warn: (title: ReactNode, body?: ReactNode, action?: ToastInput['action']) => void
+  ai: (title: ReactNode, body?: ReactNode, action?: ToastInput['action']) => void
+  info: (title: ReactNode, body?: ReactNode, action?: ToastInput['action']) => void
 }
 
 const ToastCtx = createContext<ToastApi | null>(null)
@@ -46,7 +51,8 @@ function ToastHost({ children }: { children: ReactNode }): JSX.Element {
   const push = useCallback((t: ToastInput): void => {
     const id = Math.random().toString(36).slice(2)
     setToasts((s) => [...s, { id, tone: 'default', ...t }])
-    const duration = t.duration ?? 3600
+    // 액션 버튼이 있는 토스트는 사용자가 누를 시간을 주기 위해 좀 더 오래 띄움.
+    const duration = t.duration ?? (t.action ? 8000 : 3600)
     setTimeout(() => setToasts((s) => s.filter((x) => x.id !== id)), duration)
   }, [])
 
@@ -54,11 +60,11 @@ function ToastHost({ children }: { children: ReactNode }): JSX.Element {
 
   const api: ToastApi = useMemo(() => ({
     push,
-    success: (title, body) => push({ tone: 'success', title, body }),
-    error:   (title, body) => push({ tone: 'error', title, body }),
-    warn:    (title, body) => push({ tone: 'warn', title, body }),
-    ai:      (title, body) => push({ tone: 'ai', title, body }),
-    info:    (title, body) => push({ tone: 'default', title, body })
+    success: (title, body, action) => push({ tone: 'success', title, body, action }),
+    error:   (title, body, action) => push({ tone: 'error', title, body, action }),
+    warn:    (title, body, action) => push({ tone: 'warn', title, body, action }),
+    ai:      (title, body, action) => push({ tone: 'ai', title, body, action }),
+    info:    (title, body, action) => push({ tone: 'default', title, body, action })
   }), [push])
 
   return (
@@ -75,6 +81,14 @@ function ToastHost({ children }: { children: ReactNode }): JSX.Element {
                 <div className="t-title">{t.title}</div>
                 {t.body && <div className="t-body">{t.body}</div>}
               </div>
+              {t.action && (
+                <button
+                  className="t-action"
+                  onClick={() => { try { t.action!.onClick() } finally { dismiss(t.id) } }}
+                >
+                  {t.action.label}
+                </button>
+              )}
               <button className="t-close" onClick={() => dismiss(t.id)} aria-label="닫기">
                 <X size={11} />
               </button>
