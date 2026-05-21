@@ -1,4 +1,16 @@
 import { describe, it, expect, vi } from 'vitest'
+
+// extractText 가 WatcherService 에서 export 되는데, WatcherService 가 electron/electron-store 를
+// import 한다. CI 에서 electron 바이너리 install 실패 시 모듈 로드 자체가 깨지므로 mock 필요.
+vi.mock('electron-store', async () => {
+  const { MemElectronStore } = await import('../../../../test/mocks/electron-store')
+  return { default: MemElectronStore }
+})
+vi.mock('electron', () => ({
+  BrowserWindow: class {},
+  Notification: class { static isSupported(): boolean { return false } on(): void {} show(): void {} }
+}))
+
 import { ContextCollector } from './ContextCollector'
 
 function makeLog(id: string, opts: { text?: string; sender?: string; senderName?: string; sentAt?: string } = {}) {
