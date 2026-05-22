@@ -11,54 +11,69 @@ on:
 
 jobs:
   notify-failure:
+    # 자기 자신이 실패해도 무한 루프 안 돌게 self-exclude
+    if: >-
+      (github.event.workflow_run.conclusion == 'failure' || github.event.check_run.conclusion == 'failure')
+      && github.event.workflow_run.name != 'Notify CI Failure to Ultra Agent'
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'failure' || github.event.check_run.conclusion == 'failure' }}
     steps:
       - name: Send failure notification to Ultra Agent
         uses: actions/github-script@v7
+        env:
+          HOOK_URL: ${{ secrets.DOORAY_ULTRA_HOOK_URL }}
         with:
           script: |
+            const hookUrl = process.env.HOOK_URL;
+            if (!hookUrl) {
+              core.setFailed('DOORAY_ULTRA_HOOK_URL secret 미설정');
+              return;
+            }
+
             const workflow = context.payload.workflow_run || context.payload.check_run;
             const repo = context.repo;
-            
+
             const failureInfo = {
               type: context.payload.workflow_run ? 'workflow' : 'check_run',
-              name: workflow.name || workflow.check_run.name,
+              name: workflow.name || workflow.check_run?.name || '(unknown)',
               status: workflow.status,
               conclusion: workflow.conclusion,
               html_url: workflow.html_url,
               repository: `${repo.owner}/${repo.repo}`,
               branch: workflow.head_branch || context.ref,
-              commit: workflow.head_sha || context.sha,
-              run_started_at: workflow.run_started_at || workflow.started_at,
-              updated_at: workflow.updated_at || workflow.completed_at
+              commit: (workflow.head_sha || context.sha || '').substring(0, 7),
             };
 
-            const webhookUrl = 'https://nhnent.dooray.com/services/3036349505739914786/4337889067242037861/Pt7DhCp0QGSYGHj8RB1yoQ';
-            
-            const message = {
-              text: `## 🚨 CI 실패 알림\n\n` +
-                `**워크플로우**: ${failureInfo.name}\n` +
-                `**상태**: ${failureInfo.status} → ${failureInfo.conclusion}\n` +
-                `**저장소**: ${failureInfo.repository}\n` +
-                `**브랜치**: ${failureInfo.branch}\n` +
-                `**커밋**: ${failureInfo.commit.substring(0, 7)}\n\n` +
-                `**링크**: [실행 상세보기](${failureInfo.html_url})\n\n` +
-                `---\n\n` +
-                `*Ultra Agent 가 자동으로 분석하고 수정 PR 을 생성합니다.*`
+            const text = `CI 실패 — [${failureInfo.repository}] ${failureInfo.name} (${failureInfo.branch} @ ${failureInfo.commit})`;
+            const detail = [
+              `타입: ${failureInfo.type}`,
+              `상태: ${failureInfo.status} → ${failureInfo.conclusion}`,
+              `브랜치: ${failureInfo.branch}`,
+              `커밋: ${failureInfo.commit}`,
+              `링크: ${failureInfo.html_url}`,
+            ].join('\n');
+            const directive = `@ultra 위 CI 실패를 분석한 뒤, 원인이 명확하면 픽스 브랜치 따서 PR 올려주세요. (repo: ${failureInfo.repository})`;
+
+            const payload = {
+              botName: 'CI Failure',
+              botIconImage: 'https://github.githubassets.com/favicons/favicon-failure.png',
+              text,
+              attachments: [
+                { title: '실패 상세', text: detail, color: 'red' },
+                { text: directive, color: 'green' },
+              ],
             };
 
-            console.log('Sending failure notification to Ultra Agent...');
-            console.log(JSON.stringify(message, null, 2));
+            console.log('POST payload:', JSON.stringify(payload, null, 2));
 
-            const response = await fetch(webhookUrl, {
+            const response = await fetch(hookUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(message)
+              body: JSON.stringify(payload),
             });
-            
+
             if (response.ok) {
-              console.log('✅ Ultra Agent 에 알림 발송 완료');
+              console.log('✅ 알림 발송 성공');
             } else {
-              console.error('❌ 웹훅 발송 실패:', await response.text());
+              const errText = await response.text();
+              core.setFailed(`웹훅 발송 실패: ${response.status} ${errText}`);
             }
