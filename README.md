@@ -305,7 +305,7 @@ AI 호출 실패 시 토스트에 🐞 버튼. 클릭하면 진단 정보(Claude
 
 | OS | 파일 |
 |---|---|
-| macOS (Apple Silicon / Intel) | `Clauday-{버전}.dmg` |
+| macOS (Apple Silicon / Intel) | `Clauday-{버전}.dmg` 또는 `Clauday-{버전}-mac.zip` |
 | Windows | `Clauday Setup {버전}.exe` |
 
 ### 처음 켤 때 — 두 가지만 준비
@@ -318,12 +318,18 @@ AI 호출 실패 시 토스트에 🐞 버튼. 클릭하면 진단 정보(Claude
 
 ### macOS 실행 차단 해제
 
-서명 미적용 빌드인 경우:
+**dmg 버전** (서명 미적용 빌드인 경우):
 
 1. Clauday 실행 → 차단 대화상자 **확인**
 2. 시스템 설정 → 개인정보 보호 및 보안
 3. 맨 아래 "Clauday 차단됨" 안내 옆 **그래도 열기**
 4. 패스워드 입력 후 다시 실행
+
+**zip 버전**:
+
+1. `Clauday-{버전}-mac.zip` 다운로드 후 압축 해제
+2. `Clauday.app` 을 `Applications` 폴더로 드래그
+3. 위와 동일한 절차로 Gatekeeper 해제
 
 ---
 
