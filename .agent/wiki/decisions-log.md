@@ -13,6 +13,7 @@
 
 > 아래는 본 워크플로우 도입 *이전* 의 결정들을 후행 재구성. 원본 ADR 파일은 없음 (PR/커밋 메시지 참조).
 
+- 2026-05-22 — **Mac 빌드 zip 포맷 추가 (v1.6.0)** — Gatekeeper 우회 용이한 zip 대안 제공. `build.mac.target` 에 `zip` 추가. 영향: build.
 - 2026-05 — **AIService.runClaudeStream Windows 한정 stdin combine (v1.5.5)** — 큰 system prompt 가 cmd argv 파싱과 충돌해 stream-json 잘림. Windows 에서만 `--append-system-prompt` 를 argv 에서 빼서 stdin prefix 로 합침. 영향: ai-service.
 - 2026-05 — **Raw stdout fallback (v1.5.4)** — 특정 Windows 환경에서 stream-json 미수신 시 평문 rawStdout 을 result 로 통과. 영향: ai-service.
 - 2026-05 — **prompt 본문 → stdin (v1.5.2)** — Mac/Win 공통. argv 8KB 한계 회피. 영향: ai-service.
