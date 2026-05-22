@@ -256,9 +256,9 @@ vi.mock('./git/GitService', () => ({ GitService: makeStubClass() }))
 vi.mock('./analytics/AnalyticsService', () => ({ AnalyticsService: makeStubClass() }))
 
 // ---- path mock (join 등 기본 함수 제공) -------------------------------------
-vi.mock('path', () => {
-  const path = require('path')
-  return path
+vi.mock('path', async () => {
+  const actual = await vi.importActual('path')
+  return actual
 })
 
 describe('main/index.ts IPC 라우터 (channel registration)', () => {
