@@ -11,5 +11,10 @@ release
 .omc
 .playwright-mcp
 .mockups
-.claude
+.claude/*
+# Ultra Agent harness 는 커밋 대상 — 로컬 전용 파일만 제외
+!.claude/agents/
+!.claude/skills/
+!.claude/commands/
 coverage
+.reined-bmad
