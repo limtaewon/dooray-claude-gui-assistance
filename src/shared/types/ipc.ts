@@ -75,6 +75,7 @@ export const IPC_CHANNELS = {
   CALENDAR_LIST_EVENTS: 'calendar:list-events',
   CALENDAR_CREATE_EVENT: 'calendar:create-event',
   CALENDAR_UPDATE_EVENT_DATETIME: 'calendar:update-event-datetime',
+  CALENDAR_UPDATE_EVENT: 'calendar:update-event',
   CALENDAR_DELETE_EVENT: 'calendar:delete-event',
   LOCAL_CALENDAR_CREATE: 'local-calendar:create',
   LOCAL_CALENDAR_UPDATE: 'local-calendar:update',

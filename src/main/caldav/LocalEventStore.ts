@@ -185,5 +185,53 @@ export const LocalEventStore = {
       .filter((r) => r.calendarId === calendarId)
       .map((r) => r.ics)
     return bundleICal(calendar.name, icsList)
+  },
+
+  /**
+   * 일정의 모든 속성을 갱신 - 상세 편집 모달용.
+   * updateEvent 와 달리 undefined 필드를 기존 값으로 유지하지 않고,
+   * 모든 필드를 명시적으로 새 값으로 교체.
+   */
+  updateEventFull(
+    id: string,
+    patch: {
+      summary: string
+      description?: string
+      location?: string
+      start: string
+      end: string
+      allDay: boolean
+    }
+  ): LocalEvent | null {
+    const records = store.get('events')
+    const idx = records.findIndex((r) => r.id === id)
+    if (idx < 0) return null
+    const now = new Date().toISOString()
+    const newIcs = buildICal({
+      uid: id,
+      summary: patch.summary,
+      description: patch.description,
+      location: patch.location,
+      start: patch.start,
+      end: patch.end,
+      allDay: patch.allDay,
+      createdAt: records[idx].createdAt
+    })
+    const next = [...records]
+    next[idx] = { ...records[idx], ics: newIcs, updatedAt: now }
+    store.set('events', next)
+    const parsed = parseICal(newIcs)
+    if (!parsed) return null
+    return {
+      id,
+      calendarId: records[idx].calendarId,
+      summary: parsed.summary,
+      description: parsed.description,
+      location: parsed.location,
+      start: parsed.start,
+      end: parsed.end,
+      allDay: parsed.allDay,
+      createdAt: records[idx].createdAt
+    }
   }
 }

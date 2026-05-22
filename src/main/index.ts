@@ -30,6 +30,7 @@ import type {
 import type {
   UnifiedEventCreate,
   UnifiedEventDateTimeUpdate,
+  UnifiedEventUpdate,
   UnifiedEventQuery,
   LocalCalendarCreate,
   LocalCalendarUpdate
@@ -894,6 +895,9 @@ function registerIpcHandlers(): void {
   )
   ipcMain.handle(IPC_CHANNELS.CALENDAR_UPDATE_EVENT_DATETIME, (_, input: UnifiedEventDateTimeUpdate) =>
     unifiedCalendar.updateEventDateTime(input)
+  )
+  ipcMain.handle(IPC_CHANNELS.CALENDAR_UPDATE_EVENT, (_, input: UnifiedEventUpdate) =>
+    unifiedCalendar.updateEvent(input)
   )
   ipcMain.handle(
     IPC_CHANNELS.CALENDAR_DELETE_EVENT,

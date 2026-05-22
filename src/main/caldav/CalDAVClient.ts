@@ -435,6 +435,63 @@ export class CalDAVClient {
     console.log('[CalDAV DELETE]', absUrl, 'status=', resp.status)
   }
 
+  /**
+   * 일정의 모든 속성을 갱신 — 상세 편집 모달용.
+   * 기존 ICS 를 파싱하여 UID/CREATED 는 보존하고, 나머지 필드를 새 값으로 교체.
+   * 두레이 CalDAV 에 PUT + If-Match (etag) 로 충돌 방지.
+   * @returns 갱신된 etag (서버가 ETag 헤더로 반환). 없으면 undefined.
+   */
+  async updateEvent(input: {
+    href: string
+    etag?: string
+    existingIcs: string
+    summary: string
+    description?: string
+    location?: string
+    start: string
+    end: string
+    allDay: boolean
+  }): Promise<{ etag?: string }> {
+    const parsed = parseICal(input.existingIcs)
+    if (!parsed) throw new Error('기존 ICS 파싱 실패')
+    
+    const newIcs = buildICal({
+      uid: parsed.uid,
+      summary: input.summary,
+      description: input.description,
+      location: input.location,
+      start: input.start,
+      end: input.end,
+      allDay: input.allDay,
+      createdAt: parsed.createdAt, // CREATED 보존
+      rrule: parsed.rrule,
+      attendees: parsed.attendees,
+      organizer: parsed.organizer,
+      alarms: parsed.alarms,
+      status: parsed.status,
+      url: parsed.url
+    })
+    
+    const absUrl = input.href.startsWith('http') ? input.href : SERVER_URL + input.href
+    const auth = basicAuthHeader()
+    const resp = await fetch(absUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: auth,
+        'Content-Type': 'text/calendar; charset=utf-8',
+        ...(input.etag ? { 'If-Match': input.etag } : {})
+      },
+      body: newIcs
+    })
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => '')
+      throw new Error(`CalDAV PUT 실패: ${resp.status} ${body.slice(0, 200)}`)
+    }
+    const newEtag = resp.headers.get('etag') ?? undefined
+    console.log('[CalDAV PUT updateEvent]', absUrl, 'status=', resp.status, 'newEtag=', newEtag)
+    return { etag: newEtag?.replace(/^["']|["']$/g, '') }
+  }
+
   // ─────────────────────────────────────────────────────────────
   // v1.5 Sync — ICS 객체를 디스크에 영구 저장 (CalendarObjectsStore)
   // ─────────────────────────────────────────────────────────────

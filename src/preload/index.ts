@@ -87,6 +87,7 @@ import type {
   UnifiedEvent,
   UnifiedEventCreate,
   UnifiedEventDateTimeUpdate,
+  UnifiedEventUpdate,
   UnifiedEventQuery,
   LocalCalendar,
   LocalCalendarCreate,
@@ -303,6 +304,8 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_CREATE_EVENT, input),
     updateEventDateTime: (input: UnifiedEventDateTimeUpdate): Promise<UnifiedEvent> =>
       ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_UPDATE_EVENT_DATETIME, input),
+    updateEvent: (input: UnifiedEventUpdate): Promise<UnifiedEvent> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_UPDATE_EVENT, input),
     deleteEvent: (p: { source: 'local' | 'caldav'; id: string; calendarId?: string; caldavUrl?: string; etag?: string }): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_DELETE_EVENT, p)
   },

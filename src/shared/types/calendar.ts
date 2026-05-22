@@ -90,6 +90,27 @@ export interface UnifiedEventDateTimeUpdate {
   allDay: boolean
 }
 
+/**
+ * 일정의 모든 속성을 수정할 때 사용 (상세 편집 모달).
+ * source 에 따라 local 은 LocalEventStore, caldav 은 CalDAV 서버로 업데이트.
+ */
+export interface UnifiedEventUpdate {
+  source: 'local' | 'caldav'
+  /** local: 이벤트 ID, caldav: parsedEvent.id (UID) */
+  id: string
+  /** UnifiedCalendar.id — caldav 의 경우 객체 URL 식별에 사용 */
+  calendarId: string
+  /** caldav 의 객체 URL (수정 대상) */
+  caldavUrl?: string
+  etag?: string
+  summary: string
+  description?: string
+  location?: string
+  start: string
+  end: string
+  allDay: boolean
+}
+
 export interface UnifiedEventQuery {
   /** 비어있으면 전체 캘린더 */
   calendarIds?: string[]

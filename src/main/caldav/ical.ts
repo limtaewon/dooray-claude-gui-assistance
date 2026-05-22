@@ -50,6 +50,12 @@ export interface BuildICalInput {
   allDay?: boolean
   /** 기존 일정 갱신 시 CREATED 보존. 미지정 시 DTSTAMP(=현재 시각) 와 동일하게 기록. */
   createdAt?: string
+  rrule?: string
+  attendees?: IcalPerson[]
+  organizer?: IcalPerson
+  alarms?: IcalAlarm[]
+  status?: string
+  url?: string
 }
 
 export function parseICal(data: string): ParsedEvent | null {
@@ -172,7 +178,7 @@ export function buildICal(input: BuildICalInput): string {
   const dtstamp = fmtTimed(new Date().toISOString())
   // CREATED: 신규는 DTSTAMP 와 동일, 업데이트는 입력값 보존
   const created = input.createdAt ? fmtTimed(input.createdAt) : dtstamp
-  const lines = [
+  const lines: string[] = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//Clauday//CalDAV 1.5//EN',
@@ -182,12 +188,40 @@ export function buildICal(input: BuildICalInput): string {
     `CREATED:${created}`,
     dtstart,
     dtend,
-    `SUMMARY:${escapeText(input.summary)}`,
-    input.location ? `LOCATION:${escapeText(input.location)}` : '',
-    input.description ? `DESCRIPTION:${escapeText(input.description)}` : '',
-    'END:VEVENT',
-    'END:VCALENDAR'
-  ].filter(Boolean)
+    `SUMMARY:${escapeText(input.summary)}`
+  ]
+  if (input.location) lines.push(`LOCATION:${escapeText(input.location)}`)
+  if (input.description) lines.push(`DESCRIPTION:${escapeText(input.description)}`)
+  if (input.status) lines.push(`STATUS:${input.status}`)
+  if (input.url) lines.push(`URL:${input.url}`)
+  if (input.rrule) lines.push(`RRULE:${input.rrule}`)
+  if (input.organizer && (input.organizer.name || input.organizer.email)) {
+    const parts: string[] = []
+    if (input.organizer.name) parts.push(`CN=${escapeText(input.organizer.name)}`)
+    if (input.organizer.partstat) parts.push(`PARTSTAT=${input.organizer.partstat}`)
+    if (input.organizer.role) parts.push(`ROLE=${input.organizer.role}`)
+    lines.push(`ORGANIZER${parts.length ? ';'+parts.join(';') : ''}:mailto:${input.organizer.email || ''}`)
+  }
+  if (input.attendees) {
+    for (const att of input.attendees) {
+      if (!att.email && !att.name) continue
+      const parts: string[] = []
+      if (att.name) parts.push(`CN=${escapeText(att.name)}`)
+      if (att.partstat) parts.push(`PARTSTAT=${att.partstat}`)
+      if (att.role) parts.push(`ROLE=${att.role}`)
+      lines.push(`ATTENDEE${parts.length ? ';'+parts.join(';') : ''}:mailto:${att.email || ''}`)
+    }
+  }
+  if (input.alarms) {
+    for (const alm of input.alarms) {
+      lines.push('BEGIN:VALARM')
+      lines.push(`TRIGGER:${alm.trigger}`)
+      if (alm.action) lines.push(`ACTION:${alm.action}`)
+      if (alm.description) lines.push(`DESCRIPTION:${escapeText(alm.description)}`)
+      lines.push('END:VALARM')
+    }
+  }
+  lines.push('END:VEVENT', 'END:VCALENDAR')
   return lines.join('\r\n')
 }
 

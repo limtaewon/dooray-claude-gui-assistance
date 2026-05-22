@@ -4,13 +4,14 @@ import type {
   UnifiedEvent,
   UnifiedEventCreate,
   UnifiedEventDateTimeUpdate,
+  UnifiedEventUpdate,
   UnifiedEventQuery
 } from '../../shared/types/calendar'
 import { CalDAVClient, type SyncProgress } from './CalDAVClient'
 import { CalDAVCredentialStore } from './CredentialStore'
 import { LocalEventStore } from './LocalEventStore'
 import { CalendarObjectsStore } from './CalendarObjectsStore'
-import { parseICal, patchDateTimeInIcs } from './ical'
+import { parseICal, patchDateTimeInIcs, buildICal } from './ical'
 import { HolidayService, HOLIDAY_CALENDAR_ID, HOLIDAY_CALENDAR_NAME } from '../holiday/HolidayService'
 
 /**
@@ -458,5 +459,103 @@ export class UnifiedCalendarService {
     this.emitUpdate()
     // 두레이는 DELETE 직후에도 calendar-query 에 해당 href 를 잠시 더 반환함(서버 캐시).
     // 즉시 incrementalSync 하면 "방금 지운" 객체가 부활하므로 호출하지 않음.
+  }
+
+  /**
+   * 일정의 모든 속성을 갱신 - 상세 편집 모달용.
+   * 제목, 설명, 위치, 시간 등 모든 필드를 수정할 수 있음.
+   */
+  async updateEvent(input: UnifiedEventUpdate): Promise<UnifiedEvent> {
+    this.parsedCache = null
+    if (input.source === 'local') {
+      const updated = LocalEventStore.updateEventFull(input.id, {
+        summary: input.summary,
+        description: input.description,
+        location: input.location,
+        start: input.start,
+        end: input.end,
+        allDay: input.allDay
+      })
+      if (!updated) throw new Error('일정을 찾을 수 없습니다.')
+      this.emitUpdate()
+      return {
+        source: 'local',
+        id: updated.id,
+        calendarId: updated.calendarId,
+        summary: updated.summary,
+        description: updated.description,
+        location: updated.location,
+        start: updated.start,
+        end: updated.end,
+        allDay: updated.allDay,
+        createdAt: updated.createdAt
+      }
+    }
+    // CalDAV
+    if (!input.caldavUrl) throw new Error('CalDAV 일정 수정에 객체 URL 이 필요합니다.')
+    const existing = CalendarObjectsStore.getCalendar(input.calendarId)[input.caldavUrl]
+    if (!existing) throw new Error('수정할 일정이 캐시에 없습니다. 동기화 후 다시 시도해주세요.')
+    
+    const { etag: newEtag } = await this.caldav.updateEvent({
+      href: input.caldavUrl,
+      etag: input.etag ?? existing.etag,
+      existingIcs: existing.ics,
+      summary: input.summary,
+      description: input.description,
+      location: input.location,
+      start: input.start,
+      end: input.end,
+      allDay: input.allDay
+    })
+    
+    // 로컬 ObjectsStore 의 ICS 도 즉시 갱신
+    const parsed = parseICal(existing.ics)
+    const newIcs = buildICal({
+      uid: parsed?.uid || input.id,
+      summary: input.summary,
+      description: input.description,
+      location: input.location,
+      start: input.start,
+      end: input.end,
+      allDay: input.allDay,
+      createdAt: parsed?.createdAt,
+      rrule: parsed?.rrule,
+      attendees: parsed?.attendees,
+      organizer: parsed?.organizer,
+      alarms: parsed?.alarms,
+      status: parsed?.status,
+      url: parsed?.url
+    })
+    
+    CalendarObjectsStore.upsertObject(input.calendarId, input.caldavUrl, {
+      etag: newEtag ?? existing.etag,
+      ics: newIcs
+    })
+    
+    this.parsedCache = null
+    this.emitUpdate()
+    this.incrementalSync().catch(() => { /* 백그라운드 */ })
+    
+    const reparsed = parseICal(newIcs)
+    return {
+      source: 'caldav',
+      id: reparsed?.uid ?? input.id,
+      calendarId: input.calendarId,
+      caldavUrl: input.caldavUrl,
+      etag: newEtag ?? existing.etag,
+      summary: reparsed?.summary ?? input.summary,
+      description: reparsed?.description ?? input.description,
+      location: reparsed?.location ?? input.location,
+      start: reparsed?.start ?? input.start,
+      end: reparsed?.end ?? input.end,
+      allDay: reparsed?.allDay ?? input.allDay,
+      rrule: reparsed?.rrule,
+      status: reparsed?.status,
+      organizer: reparsed?.organizer,
+      attendees: reparsed?.attendees,
+      alarms: reparsed?.alarms,
+      webUrl: reparsed?.url,
+      createdAt: reparsed?.createdAt
+    }
   }
 }
