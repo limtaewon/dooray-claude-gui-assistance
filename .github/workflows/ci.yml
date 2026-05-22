@@ -45,11 +45,17 @@ jobs:
 
       - name: Run unit, component & integration tests
         run: npm run test:run
+        env:
+          # React 18.3+ act() 경고 suppress — vitest 는 production 빌드를 사용하므로
+          # 테스트 환경임을 명시하여 act() 에러를 경고로 완화
+          IS_REACT_ACT_ENVIRONMENT: 'true'
 
       # 커버리지 게이트 — vitest.config.ts 의 coverage.thresholds 가 라인 70% 강제.
       # 임계치 미달 시 비-0 코드로 종료 → PR 머지 차단.
       - name: Run coverage gate
         run: npm run test:coverage
+        env:
+          IS_REACT_ACT_ENVIRONMENT: 'true'
 
       - name: Upload coverage report
         if: always()

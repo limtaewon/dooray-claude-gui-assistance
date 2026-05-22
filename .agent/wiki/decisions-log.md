@@ -13,6 +13,7 @@
 
 > 아래는 본 워크플로우 도입 *이전* 의 결정들을 후행 재구성. 원본 ADR 파일은 없음 (PR/커밋 메시지 참조).
 
+- 2026-05-23 — [사용자 피드백 채널 (두레이 Agent 직접 전달)](../../feature/multi/feedback-to-agent/adr.md) — 피드백 모달, 단축키 (Cmd/Ctrl+Shift+B), 두레이 웹훅 연동, 클립보드 fallback. 영향: feedback, ipc, renderer.
 - 2026-05-22 — [macOS 빌드 로컬 + 수동 업로드](../../feature/mac-build/local-build-manual/adr.md) — GitHub Actions macOS 잡 제거. 매 릴리즈마다 사용자 본인 Mac 에서 `npm run dist` → `gh release upload`. ADR-zip-fallback-01 supersede. 영향: build-release.
 - 2026-05 — **AIService.runClaudeStream Windows 한정 stdin combine (v1.5.5)** — 큰 system prompt 가 cmd argv 파싱과 충돌해 stream-json 잘림. Windows 에서만 `--append-system-prompt` 를 argv 에서 빼서 stdin prefix 로 합침. 영향: ai-service.
 - 2026-05 — **Raw stdout fallback (v1.5.4)** — 특정 Windows 환경에서 stream-json 미수신 시 평문 rawStdout 을 result 로 통과. 영향: ai-service.

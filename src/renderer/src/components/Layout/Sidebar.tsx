@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Server, Sparkles, BarChart3, Calendar, Terminal, BookOpen, MessageSquare, GitBranch, Settings, Users, Radar, Lightbulb, Bot } from 'lucide-react'
+import { Server, Sparkles, BarChart3, Calendar, Terminal, BookOpen, MessageSquare, GitBranch, Settings, Users, Radar, Lightbulb, Bot, MessageSquarePlus } from 'lucide-react'
+import { useFeedback } from '../Feedback/FeedbackProvider'
 
 export type SidebarView = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent'
 // 호환성 유지를 위해 기존 별칭도 export
@@ -96,6 +97,7 @@ function NavButton({
 }
 
 function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
+  const feedback = useFeedback()
   const [monitoringUnread, setMonitoringUnread] = useState(0)
   const [monitoringPulse, setMonitoringPulse] = useState(false)
   const [agentUnread, setAgentUnread] = useState(0)
@@ -174,6 +176,15 @@ function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
       ))}
       <div className="flex-1" />
       <div className="w-7 h-px bg-bg-border/60 my-1" />
+      {/* 피드백 버튼 */}
+      <button
+        onClick={() => feedback.open()}
+        title="피드백"
+        aria-label="피드백"
+        className="w-9 h-9 rounded-[7px] flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover transition-all duration-150"
+      >
+        <MessageSquarePlus size={20} />
+      </button>
       {STANDALONE_ITEMS.map((item) => (
         <NavButton
           key={item.view}

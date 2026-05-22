@@ -25,6 +25,7 @@ import AIRecommendView from './components/AIRecommend/AIRecommendView'
 import QuickTodoModal from './components/Dooray/QuickTodoModal'
 import { ToastHost, CommandPalette, type CommandGroup, type CommandItem } from './components/common/ds'
 import ErrorReportProvider from './components/ErrorReport/ErrorReportProvider'
+import FeedbackProvider from './components/Feedback/FeedbackProvider'
 import { useTheme } from './hooks/useTheme'
 
 type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent'
@@ -98,6 +99,12 @@ function App(): JSX.Element {
       if (meta && !e.shiftKey && (e.key === '/' || e.code === 'Slash')) {
         e.preventDefault()
         setQuickTodoOpen(true)
+        return
+      }
+      // ⌘/Ctrl+Shift+B — 어디서든 피드백 모달
+      if (meta && e.shiftKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault()
+        window.dispatchEvent(new CustomEvent('open-feedback-modal'))
         return
       }
       // Shift 외 다른 키가 같이 눌렸으면 더블 Shift 후보 무효화
@@ -300,6 +307,7 @@ function App(): JSX.Element {
   return (
     <ToastHost>
       <ErrorReportProvider>
+      <FeedbackProvider>
       <div className="flex flex-col h-full bg-bg-primary">
         <TitleBar onOpenCommandPalette={() => setCmdOpen(true)} />
         <div className="flex flex-1 overflow-hidden">
@@ -365,6 +373,7 @@ function App(): JSX.Element {
         />
         <QuickTodoModal open={quickTodoOpen} onClose={() => setQuickTodoOpen(false)} />
       </div>
+      </FeedbackProvider>
       </ErrorReportProvider>
     </ToastHost>
   )

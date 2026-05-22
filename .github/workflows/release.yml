@@ -35,6 +35,8 @@ jobs:
 
       - name: Build Windows exe
         run: npm run dist:win -- --publish never
+        env:
+          VITE_FEEDBACK_HOOK_URL: ${{ secrets.DOORAY_ULTRA_HOOK_URL }}
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2

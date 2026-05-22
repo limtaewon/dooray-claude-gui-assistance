@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.6.0] - 사용자 피드백 채널 (두레이 Agent 직접 전달)
+
+Claude Code 사용 중 불편사항, 기능 제안, 개선 아이디어를 **두레이 Agent 채널로 직접 전달**하는 피드백 시스템 도입. 사용자가 앱 내에서 바로 피드백을 작성하면 두레이 웹훅을 통해 Agent 가 실시간으로 수신 → 빠른 대응과 기능 반영.
+
+### 신규 기능
+- **피드백 모달** — 카테고리 (버그/기능제안/개선), 제목, 본문 입력. 버그 리포트는 진단 정보 (OS, 앱 버전, Claude CLI 버전, 에러 스택) 자동 포함.
+- **단축키** — `Cmd/Ctrl+Shift+B` 로 어디서나 모달 즉시 호출.
+- **두레이 연동** — Incoming Webhook 으로 포맷팅된 메시지 전송 (카테고리별 색상: bug=orange, feature=blue, improvement=green).
+- **클립보드 fallback** — 웹훅 실패 시 피드백 내용을 자동으로 클립보드에 복사 + 사용자 알림.
+
+### 기술 변경
+- **환경변수** — `VITE_FEEDBACK_HOOK_URL` (renderer/main 통일). 미설정 시 graceful degradation (에러 코드 반환).
+- **IPC 채널** — `feedback:submit` 추가.
+- **역호환** — 기존 `ErrorReportService.submitCommunity()` 는 유지하되 deprecation 경고 추가.
+
+### 문서
+- **ClaudeManual** — '피드백 보내기' 섹션 추가 (사용법, 단축키, 처리 흐름).
+- **CLAUDE.md** — FeedbackService 분기 가이드 추가.
+
+### 테스트
+- `FeedbackService.test.ts` — 성공/HTTP 에러/네트워크 에러/환경변수 미설정/카테고리별 색상 검증.
+- 739 tests pass, typecheck clean.
+
 ## [1.5.5] - Windows stream-json 정상 수신 — system prompt 도 stdin 합치기
 
 v1.5.4 의 raw stdout fallback 으로 응답은 살렸지만 윈도우 사용자는 여전히 마크다운 평문이 greeting 한 줄로 흘러서 mac 처럼 예쁜 카드(긴급/오늘 집중/AI 추천)가 안 보임. 진단 데이터 추적 결과, `--append-system-prompt` 의 큰 값(3000+ chars)이 argv 로 전달되면서 cmd 의 인자 파싱과 충돌해 뒤의 `--output-format stream-json` 옵션이 잘려나가는 게 본질.

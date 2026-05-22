@@ -644,6 +644,12 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.ERROR_REPORT_COPY_CLIPBOARD, payload)
   },
 
+  // Feedback (v1.6.0)
+  feedback: {
+    submit: (payload: import('../shared/types/feedback').FeedbackPayload): Promise<import('../shared/types/feedback').FeedbackSubmitResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.FEEDBACK_SUBMIT, payload)
+  },
+
   // Config
   onConfigChanged: (
     callback: (data: { event: string; path: string }) => void

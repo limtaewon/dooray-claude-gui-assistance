@@ -99,8 +99,12 @@ export class ErrorReportService {
     }
   }
 
-  /** 커뮤니티 프로젝트에 task 로 게시. 본인 계정으로 작성. */
+  /**
+   * 커뮤니티 프로젝트에 task 로 게시. 본인 계정으로 작성.
+   * @deprecated v1.6.0 이후 Feedback 으로 통합. 호출 시점에 console.warn
+   */
   async submitCommunity(payload: ErrorReportPayload): Promise<{ id: string; url: string }> {
+    console.warn('[ErrorReport] submitCommunity 는 deprecated. 다음 사이클에 제거 예정.')
     const subject = payload.subject?.trim() || '[오류 리포트] AI 호출 실패'
     const body = [
       payload.userNote.trim() ? `## 사용자 코멘트\n\n${payload.userNote.trim()}\n` : '',

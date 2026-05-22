@@ -9,6 +9,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { installMockWindowApi, resetMockWindowApi } from '../../../../../test/helpers/mockWindowApi'
+
+// Sidebar 가 useFeedback() 으로 FeedbackProvider 의존 — 테스트는 Sidebar 자체 검증이라 hook mock.
+vi.mock('../Feedback/FeedbackProvider', () => ({
+  useFeedback: (): { open: () => void } => ({ open: vi.fn() })
+}))
+
 import Sidebar from './Sidebar'
 
 describe('Sidebar (integration)', () => {

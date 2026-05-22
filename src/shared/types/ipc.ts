@@ -261,6 +261,9 @@ export const IPC_CHANNELS = {
   ERROR_REPORT_SUBMIT_COMMUNITY: 'error-report:submit-community',
   ERROR_REPORT_COPY_CLIPBOARD: 'error-report:copy-clipboard',
 
+  // Feedback (v1.6.0 — Ultra Agent 직결)
+  FEEDBACK_SUBMIT: 'feedback:submit',
+
   // Config
   CONFIG_CHANGED: 'config:changed'
 } as const
