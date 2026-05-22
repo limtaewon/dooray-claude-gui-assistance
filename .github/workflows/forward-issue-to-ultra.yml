@@ -1,0 +1,44 @@
+name: Forward Issue to Ultra Agent
+
+on:
+  issues:
+    types: [opened, labeled]
+
+jobs:
+  forward:
+    runs-on: ubuntu-latest
+    if: contains(github.event.issue.labels.*.name, 'ultra-agent') || github.event.action == 'opened'
+    steps:
+      - name: Send to Ultra Agent
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const message = `## GitHub Issue Forwarded
+
+**Issue**: #${issue.number} — ${issue.title}
+**Author**: @${issue.user.login}
+**URL**: ${issue.html_url}
+
+**Body**:
+${issue.body}
+
+**Labels**: ${issue.labels.map(l => l.name).join(', ')}
+
+---
+
+*This issue was automatically forwarded to Ultra Agent for Clauday development.*`;
+
+            // TODO: Replace with actual Ultra Agent webhook/API call
+            console.log('Forwarding to Ultra Agent:');
+            console.log(message);
+            
+            // Example: HTTP POST to Ultra Agent endpoint
+            // await fetch('https://ultra-agent.webhook.url', {
+            //   method: 'POST',
+            //   headers: { 'Content-Type': 'application/json' },
+            //   body: JSON.stringify({ 
+            //     chat_id: '4304498306184200915',
+            //     message: message 
+            //   })
+            // });
