@@ -21,7 +21,6 @@ jobs:
             const workflow = context.payload.workflow_run || context.payload.check_run;
             const repo = context.repo;
             
-            // 실패한 워크플로우/체크 정보 수집
             const failureInfo = {
               type: context.payload.workflow_run ? 'workflow' : 'check_run',
               name: workflow.name || workflow.check_run.name,
@@ -31,28 +30,10 @@ jobs:
               repository: `${repo.owner}/${repo.repo}`,
               branch: workflow.head_branch || context.ref,
               commit: workflow.head_sha || context.sha,
-              triggered_by: workflow.event || 'push',
               run_started_at: workflow.run_started_at || workflow.started_at,
               updated_at: workflow.updated_at || workflow.completed_at
             };
 
-            // 에러 로그 수집 시도
-            let logs = '로그를 가져올 수 없습니다.';
-            try {
-              if (context.payload.workflow_run) {
-                const logsResponse = await github.rest.actions.downloadWorkflowRunLogs({
-                  owner: repo.owner,
-                  repo: repo.repo,
-                  run_id: workflow.id,
-                  archive_format: 'txt'
-                });
-                logs = '로그 다운로드 가능 (바이너리)';
-              }
-            } catch (e) {
-              logs = `로그 접근 오류: ${e.message}`;
-            }
-
-            // Ultra Agent 웹훅으로 전송
             const webhookUrl = 'https://nhnent.dooray.com/services/3036349505739914786/4337889067242037861/Pt7DhCp0QGSYGHj8RB1yoQ';
             
             const message = {
@@ -61,31 +42,15 @@ jobs:
                 `**상태**: ${failureInfo.status} → ${failureInfo.conclusion}\n` +
                 `**저장소**: ${failureInfo.repository}\n` +
                 `**브랜치**: ${failureInfo.branch}\n` +
-                `**커밋**: ${failureInfo.commit.substring(0, 7)}\n` +
-                `**트리거**: ${failureInfo.triggered_by}\n\n` +
+                `**커밋**: ${failureInfo.commit.substring(0, 7)}\n\n` +
                 `**링크**: [실행 상세보기](${failureInfo.html_url})\n\n` +
                 `---\n\n` +
-                `*Ultra Agent 가 자동으로 분석하고 수정 PR 을 생성합니다.*`,
-              attachments: [
-                {
-                  title: '실패 상세 정보',
-                  data: {
-                    fields: [
-                      { name: 'Type', value: failureInfo.type },
-                      { name: 'Conclusion', value: failureInfo.conclusion },
-                      { name: 'Branch', value: failureInfo.branch },
-                      { name: 'Commit', value: failureInfo.commit }
-                    ]
-                  }
-                }
-              ]
+                `*Ultra Agent 가 자동으로 분석하고 수정 PR 을 생성합니다.*`
             };
 
             console.log('Sending failure notification to Ultra Agent...');
             console.log(JSON.stringify(message, null, 2));
 
-            // 웹훅 발송 (실제 구현 시 uncomment)
-            /*
             const response = await fetch(webhookUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -97,4 +62,3 @@ jobs:
             } else {
               console.error('❌ 웹훅 발송 실패:', await response.text());
             }
-            */

@@ -1,0 +1,49 @@
+name: Forward GitHub Issue to Ultra Agent
+
+on:
+  issues:
+    types: [opened, reopened]
+
+jobs:
+  forward:
+    if: github.event.issue.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST to Dooray Incoming Hook
+        env:
+          HOOK_URL: ${{ secrets.DOORAY_ULTRA_HOOK_URL }}
+          REPO: ${{ github.repository }}
+          NUM: ${{ github.event.issue.number }}
+          TITLE: ${{ github.event.issue.title }}
+          BODY: ${{ github.event.issue.body }}
+          URL: ${{ github.event.issue.html_url }}
+          USER: ${{ github.event.issue.user.login }}
+          LABELS: ${{ join(github.event.issue.labels.*.name, ', ') }}
+        run: |
+          set -euo pipefail
+
+          body_trunc=$(printf '%s' "${BODY:-(본문 없음)}" | head -c 3000)
+          detail=$(printf '작성자: @%s\n라벨: %s\n링크: %s\n\n%s' \
+            "$USER" "${LABELS:-없음}" "$URL" "$body_trunc")
+          directive=$(printf '@ultra 위 GitHub 이슈를 분석한 뒤, 작업이 필요하면 브랜치 따서 수정하고 PR 올려주세요. (repo: %s, issue: #%s)' \
+            "$REPO" "$NUM")
+
+          payload=$(jq -n \
+            --arg botName "GitHub Issue" \
+            --arg botIcon "https://github.githubassets.com/favicons/favicon.png" \
+            --arg text "새 GitHub 이슈 — [${REPO}#${NUM}] ${TITLE}" \
+            --arg detail "$detail" \
+            --arg directive "$directive" \
+            '{
+              botName: $botName,
+              botIconImage: $botIcon,
+              text: $text,
+              attachments: [
+                { title: "이슈 내용", text: $detail, color: "blue" },
+                { text: $directive, color: "green" }
+              ]
+            }')
+
+          curl -sSf -X POST "$HOOK_URL" \
+            -H "Content-Type: application/json" \
+            --data-raw "$payload"
