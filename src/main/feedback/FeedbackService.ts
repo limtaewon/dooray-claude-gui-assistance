@@ -1,4 +1,4 @@
-import type { FeedbackPayload, FeedbackSubmitResult } from '../../shared/types/feedback'
+import type { EnrichedEnrichedFeedbackPayload, FeedbackSubmitResult } from '../../shared/types/feedback'
 
 function getHookUrl(): string {
   const url = process.env.VITE_FEEDBACK_HOOK_URL || process.env.FEEDBACK_HOOK_URL
@@ -30,7 +30,7 @@ function getCategoryColor(category: string): string {
   }
 }
 
-function buildHookPayload(payload: FeedbackPayload): DoorayHookPayload {
+function buildHookPayload(payload: EnrichedFeedbackPayload): DoorayHookPayload {
   const attachments: DoorayAttachment[] = []
 
   // 사용자 정보 — 항상 포함 (ADR 준수). 텍스트만 userEmail 유무에 따라 분기.
@@ -77,7 +77,7 @@ function buildHookPayload(payload: FeedbackPayload): DoorayHookPayload {
 }
 
 export class FeedbackService {
-  async submit(payload: FeedbackPayload): Promise<FeedbackSubmitResult> {
+  async submit(payload: EnrichedFeedbackPayload): Promise<FeedbackSubmitResult> {
     // 환경변수 미설정 체크
     const hookUrl = getHookUrl()
     if (!hookUrl || hookUrl.trim() === '') {

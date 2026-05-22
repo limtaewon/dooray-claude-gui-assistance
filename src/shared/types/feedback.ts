@@ -1,12 +1,22 @@
 export type FeedbackCategory = 'bug' | 'feature' | 'improvement'
 
+/**
+ * Renderer 가 IPC 로 보내는 페이로드. appVersion / platform / userEmail 은 main 이 자동 보강.
+ * (renderer 는 nodeIntegration off 라 process.platform 직접 못 씀)
+ */
 export interface FeedbackPayload {
   category: FeedbackCategory
   subject: string          // 한 줄 제목
   userNote: string         // 사용자 본문
   diagnostic?: string      // bug 카테고리만. ErrorReportService.collect() 의 body
-  appVersion: string       // main 에서 자동 채움
-  platform: NodeJS.Platform  // main 에서 자동
+}
+
+/**
+ * Main 측 송신 시점에 보강된 내부 페이로드.
+ */
+export interface EnrichedFeedbackPayload extends FeedbackPayload {
+  appVersion: string
+  platform: NodeJS.Platform
   userEmail?: string       // 두레이 토큰의 본인 이메일 (있으면)
 }
 

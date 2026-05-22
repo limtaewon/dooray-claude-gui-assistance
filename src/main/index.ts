@@ -10,7 +10,7 @@ import { DoorayClient } from './dooray/DoorayClient'
 import { TaskService } from './dooray/TaskService'
 import { ErrorReportService, type ErrorReportPayload } from './error-report/ErrorReportService'
 import { feedbackService } from './feedback/FeedbackService'
-import type { FeedbackPayload } from '../shared/types/feedback'
+import type { FeedbackPayload, EnrichedFeedbackPayload } from '../shared/types/feedback'
 import { WikiService } from './dooray/WikiService'
 import { WikiStorageService } from './dooray/WikiStorageService'
 import type { WikiStorageKind } from './dooray/WikiStorageService'
@@ -1594,10 +1594,17 @@ ${data}`,
     (_, payload: ErrorReportPayload) => { errorReportService.copyToClipboard(payload); return true }
   )
 
-  // Feedback (v1.6.0)
+  // Feedback (v1.6.0) — renderer payload 에 main 측 정보 (appVersion / platform) 보강 후 송신
   ipcMain.handle(
     IPC_CHANNELS.FEEDBACK_SUBMIT,
-    (_, payload: FeedbackPayload) => feedbackService.submit(payload)
+    (_, payload: FeedbackPayload) => {
+      const enriched: EnrichedFeedbackPayload = {
+        ...payload,
+        appVersion: app.getVersion(),
+        platform: process.platform,
+      }
+      return feedbackService.submit(enriched)
+    }
   )
 }
 

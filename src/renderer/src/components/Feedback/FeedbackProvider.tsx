@@ -95,8 +95,6 @@ function FeedbackProvider({ children }: { children: ReactNode }): JSX.Element {
         subject: subject.trim() || '피드백',
         userNote: userNote.trim() || '(내용 없음)',
         diagnostic: category === 'bug' ? diagnostic : undefined,
-        appVersion: '1.6.0', // TODO: package.json 에서 읽기
-        platform: process.platform as NodeJS.Platform,
       }
 
       const result: FeedbackSubmitResult = await window.api.feedback.submit(payload)
