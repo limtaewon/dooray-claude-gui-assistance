@@ -11,7 +11,8 @@ function getHookUrl(): string {
 
 interface DoorayAttachment {
   title: string
-  description?: string
+  /** Dooray Incoming Hook 의 attachment 본문 필드 — `text` 가 맞음 (`description` 은 무시됨) */
+  text?: string
   color?: string
 }
 
@@ -39,7 +40,7 @@ function buildHookPayload(payload: EnrichedFeedbackPayload): DoorayHookPayload {
     : `Clauday v${payload.appVersion} · ${payload.platform}`
   attachments.push({
     title: '제보자',
-    description: userInfoText,
+    text: userInfoText,
   })
 
   // 콘텐츠 (카테고리별 색상)
@@ -51,7 +52,7 @@ function buildHookPayload(payload: EnrichedFeedbackPayload): DoorayHookPayload {
 
   attachments.push({
     title: categoryLabel,
-    description: payload.subject,
+    text: payload.subject,
     color: getCategoryColor(payload.category),
   })
 
@@ -59,14 +60,15 @@ function buildHookPayload(payload: EnrichedFeedbackPayload): DoorayHookPayload {
   if (payload.category === 'bug' && payload.diagnostic) {
     attachments.push({
       title: '진단 정보',
-      description: payload.diagnostic,
+      text: payload.diagnostic,
     })
   }
 
   // Ultra 지시
   attachments.push({
     title: '처리 안내',
-    description: '이 피드백은 Ultra Agent 가 자동으로 처리합니다. 결과 확인은 GitHub PR/Issue 에서 확인하세요.',
+    text: '@ultra 위 피드백 검토 후 작업 가치 있으면 브랜치 따서 PR 생성해주세요. (카테고리 / 본문 / (bug 면) 진단정보 위 attachment 참조)',
+    color: 'green',
   })
 
   return {
