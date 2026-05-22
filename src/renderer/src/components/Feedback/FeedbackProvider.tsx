@@ -100,7 +100,7 @@ function FeedbackProvider({ children }: { children: ReactNode }): JSX.Element {
       const result: FeedbackSubmitResult = await window.api.feedback.submit(payload)
 
       if (result.ok) {
-        toast.success('피드백이 전달됨', 'Ultra Agent 가 처리합니다. 결과는 PR/Issue 에서 확인하세요')
+        toast.success('피드백이 전달됨', 'Ultra Agent 가 분석 후 PR 생성까지 자동 진행합니다')
         setIsOpen(false)
       } else {
         // 실패 시 클립보드 fallback
