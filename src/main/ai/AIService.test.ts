@@ -121,8 +121,12 @@ describe('AIService.ask (스트리밍)', () => {
     const pIdx = argv.indexOf('-p')
     expect(pIdx).toBeGreaterThanOrEqual(0)
     expect(argv[pIdx + 1]?.startsWith('-')).toBe(true)
-    // prompt 본문은 stdin 으로 write
-    expect(lastSpawn!.stdin.write).toHaveBeenCalledWith(longPrompt, 'utf8')
+    // prompt 본문은 stdin 으로 write. 단, Windows 분기는 system prompt prefix 가 합쳐지므로
+    // longPrompt 를 *포함* 하는지만 검증 (양 플랫폼 호환).
+    const writeCalls = (lastSpawn!.stdin.write as unknown as { mock: { calls: unknown[][] } }).mock.calls
+    expect(writeCalls.length).toBeGreaterThan(0)
+    expect(writeCalls[0][0] as string).toContain(longPrompt)
+    expect(writeCalls[0][1]).toBe('utf8')
     expect(lastSpawn!.stdin.end).toHaveBeenCalled()
     lastSpawn!.stdout.emit('data', Buffer.from(JSON.stringify({
       type: 'result', result: 'ok', duration_ms: 0, session_id: '', is_error: false, total_cost_usd: 0
