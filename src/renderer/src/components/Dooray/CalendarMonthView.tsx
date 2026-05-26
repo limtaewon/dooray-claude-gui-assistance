@@ -400,9 +400,15 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
     calendars.find((c) => c.id === id)?.name ?? '캘린더'
 
   const handleCreate = async (input: UnifiedEventCreate): Promise<void> => {
-    await window.api.calendar.createEvent(input)
-    setNewRange(null)
-    await loadEvents()
+    try {
+      await window.api.calendar.createEvent(input)
+      setNewRange(null)
+      await loadEvents()
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '알 수 없는 오류'
+      alert(`일정 생성 실패: ${msg}`)
+      throw e
+    }
   }
 
   const handleDelete = async (ev: UnifiedEvent): Promise<void> => {

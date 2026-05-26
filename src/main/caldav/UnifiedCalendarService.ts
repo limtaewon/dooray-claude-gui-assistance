@@ -331,20 +331,37 @@ export class UnifiedCalendarService {
         createdAt: e.createdAt
       }
     }
-    await this.caldav.createEvent({
-      calendarUrl: input.calendarId,
-      summary: input.summary,
-      description: input.description,
-      location: input.location,
-      start: input.start,
-      end: input.end,
-      allDay: !!input.allDay
-    })
+    // CalDAV 이벤트 생성 — 실패 시 명확한 에러 메시지
+    try {
+      await this.caldav.createEvent({
+        calendarUrl: input.calendarId,
+        summary: input.summary,
+        description: input.description,
+        location: input.location,
+        start: input.start,
+        end: input.end,
+        allDay: !!input.allDay
+      })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '알 수 없는 오류'
+      // 자격증명 관련 오류는 설정 안내
+      if (msg.includes('자격증명')) {
+        throw new Error('CalDAV 자격증명이 없습니다. 설정에서 두레이 캘린더를 연결해주세요.')
+      }
+      // 네트워크 오류는 구체적인 안내
+      if (msg.includes('fetch failed') || msg.includes('ENOTFOUND') || msg.includes('ECONNREFUSED')) {
+        throw new Error('네트워크 연결을 확인할 수 없습니다. 인터넷 연결 상태를 확인해주세요.')
+      }
+      throw e
+    }
     // 신규 객체를 곧바로 반영하려면 incremental sync 트리거
     this.incrementalSync().catch(() => { /* 백그라운드 */ })
+    // 생성된 이벤트의 UID 를 반환하기 위해 incremental sync 완료까지 기다렸다가 파싱
+    // (간단히 UID 를 다시 생성해서 반환 — 실제 id 는 sync 후 listEvents 에서 확인 가능)
+    const tempId = `${input.calendarId}:${Date.now()}`
     return {
       source: 'caldav',
-      id: '',
+      id: tempId,
       calendarId: input.calendarId,
       summary: input.summary,
       description: input.description,

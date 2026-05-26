@@ -364,17 +364,27 @@ export class CalDAVClient {
   }
 
   async createEvent(input: CalDAVEventCreate): Promise<void> {
-    const c = await this.getClient()
     const allCalendars = await this.getRawCalendars()
     const cal = allCalendars.find((x) => x.url === input.calendarUrl)
     if (!cal) throw new Error('대상 캘린더를 찾을 수 없습니다.')
     const uid = randomUid()
     const ical = buildICal({ uid, ...input })
-    await c.createCalendarObject({
-      calendar: cal,
-      filename: `${uid}.ics`,
-      iCalString: ical
+    // tsdav createCalendarObject 우회 — 직접 HTTP PUT 으로 생성 (fetch failed 오류 방지)
+    const absUrl = cal.url.endsWith('/') ? cal.url + `${uid}.ics` : cal.url + `/${uid}.ics`
+    const auth = basicAuthHeader()
+    const resp = await fetch(absUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: auth,
+        'Content-Type': 'text/calendar; charset=utf-8'
+      },
+      body: ical
     })
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => '')
+      throw new Error(`CalDAV 이벤트 생성 실패: ${resp.status} ${body.slice(0, 200)}`)
+    }
+    console.log('[CalDAV CREATE]', absUrl, 'status=', resp.status)
   }
 
   /**
