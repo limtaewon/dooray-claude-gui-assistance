@@ -4,8 +4,9 @@ import type { DoorayCalendarEvent } from '../../../../shared/types/dooray'
 import { LoadingView, ErrorView, EmptyView } from '../common/StateViews'
 import { Button, Input, SegTabs, useToast } from '../common/ds'
 import CalendarMonthView from './CalendarMonthView'
+import EventEditModal from './EventEditModal'
 import { COLOR_PALETTE, resolveCalendarHex, normalizeHex } from './calendarColors'
-import type { UnifiedCalendar } from '../../../../shared/types/calendar'
+import type { UnifiedCalendar, UnifiedEvent } from '../../../../shared/types/calendar'
 
 type CalendarViewMode = 'month' | 'list'
 
@@ -276,8 +277,13 @@ function safeDate(iso: string): string {
 
 function CalendarAssistant(): JSX.Element {
   const [events, setEvents] = useState<DoorayCalendarEvent[]>([])
+  // 원본 UnifiedEvent 보존 — 편집 모달에서 caldavUrl/etag 가 필요하므로 DoorayCalendarEvent 매핑 전 원본을 별도 유지
+  const [unifiedEventsMap, setUnifiedEventsMap] = useState<Map<string, UnifiedEvent>>(new Map())
   const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // 목록 뷰에서 클릭한 일정 → 편집 모달
+  const [editingEvent, setEditingEvent] = useState<UnifiedEvent | null>(null)
   const [filterIds, setFilterIds] = useState<string[]>([])
   const [filterLoaded, setFilterLoaded] = useState(false)
   const [colorOverrides, setColorOverrides] = useState<Record<string, string>>({})
@@ -392,23 +398,30 @@ function CalendarAssistant(): JSX.Element {
       ])
       const nameById = new Map<string, string>()
       for (const c of (calMeta || [])) nameById.set(c.id, c.name)
-      const merged: DoorayCalendarEvent[] = (unified || []).map((u) => ({
-        id: `${u.source}:${u.id}`,
-        subject: u.summary,
-        startedAt: u.start,
-        endedAt: u.end,
-        location: u.location,
-        description: u.description,
-        wholeDayFlag: u.allDay,
-        calendar: {
-          id: u.calendarId,
-          name: u.source === 'local'
-            ? (nameById.get(u.calendarId) || '내 일정')
-            : u.source === 'holiday' ? '공휴일'
-            : (nameById.get(u.calendarId) || '캘린더')
+      // 원본 UnifiedEvent 를 compositeId(source:id) 로 맵핑 — 편집 모달에 caldavUrl/etag 전달
+      const newMap = new Map<string, UnifiedEvent>()
+      const merged: DoorayCalendarEvent[] = (unified || []).map((u) => {
+        const compositeId = `${u.source}:${u.id}`
+        newMap.set(compositeId, u)
+        return {
+          id: compositeId,
+          subject: u.summary,
+          startedAt: u.start,
+          endedAt: u.end,
+          location: u.location,
+          description: u.description,
+          wholeDayFlag: u.allDay,
+          calendar: {
+            id: u.calendarId,
+            name: u.source === 'local'
+              ? (nameById.get(u.calendarId) || '내 일정')
+              : u.source === 'holiday' ? '공휴일'
+              : (nameById.get(u.calendarId) || '캘린더')
+          }
         }
-      }))
+      })
       console.log('[CalendarAssistant] loaded', merged.length, 'events from unified')
+      setUnifiedEventsMap(newMap)
       setEvents(merged)
     } catch (err) {
       console.error('[CalendarAssistant] loadEvents 실패:', err)
@@ -420,6 +433,24 @@ function CalendarAssistant(): JSX.Element {
 
   useEffect(() => { loadEvents() }, [loadEvents])
   // caldav-updated 구독은 line 307 의 useEffect 에 이미 등록됨 — 중복 listener 가 loadEvents 를 두 번 호출하던 문제 제거.
+
+  /**
+   * 새로고침 버튼 핸들러 — fullSync 로 서버에서 최신 데이터를 받아온 뒤 로컬 캐시를 재로드.
+   * 백그라운드 poller 가 하는 incrementalSync 와 달리 명시적 사용자 액션이므로 fullSync 호출.
+   */
+  const handleRefresh = useCallback(async () => {
+    if (syncing || loading) return
+    setSyncing(true); setError(null)
+    try {
+      await window.api.caldav.fullSync()
+      await loadEvents()
+    } catch (err) {
+      console.error('[CalendarAssistant] handleRefresh 실패:', err)
+      toast.error(err instanceof Error ? err.message : '새로고침 실패')
+    } finally {
+      setSyncing(false)
+    }
+  }, [syncing, loading, loadEvents, toast])
 
   // #9 빠른 할일 추가 — 텍스트 한 줄 → 오늘 종일 로컬 일정 즉시 생성.
   const handleQuickAdd = async (): Promise<void> => {
@@ -512,12 +543,12 @@ function CalendarAssistant(): JSX.Element {
           <span className="text-[10px] text-text-tertiary">{displayEvents.length}개{filterIds.length > 0 ? ` / ${events.length}` : ''}</span>
           <CalendarFilter events={events} filterIds={filterIds} onFilter={setFilterIds} colorOverrides={colorOverrides} onChangeColor={handleChangeColor} />
           <button
-            onClick={loadEvents}
-            disabled={loading}
+            onClick={handleRefresh}
+            disabled={loading || syncing}
             className="ds-btn icon sm text-clauday-blue"
-            title="새로고침"
+            title="서버에서 새로고침"
           >
-            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={15} className={(loading || syncing) ? 'animate-spin' : ''} />
           </button>
         </div>
         <div className="flex items-center gap-2">
@@ -612,8 +643,12 @@ function CalendarAssistant(): JSX.Element {
                     const isUpcoming = !isNaN(evStart.getTime()) && evStart.getTime() > now.getTime()
                     const periodStr = `${safeDate(getStart(event))} ~ ${safeDate(getEnd(event))}`
                     const barColor = resolveCalendarHex(event.calendar?.id || '', unifiedCalendars, colorOverrides)
+                    const unified = unifiedEventsMap.get(event.id)
                     return (
-                      <div key={`long-${event.id || i}`} className="flex items-start gap-3 p-2.5 bg-bg-surface border border-bg-border rounded-lg hover:border-bg-border-light transition-colors">
+                      <div
+                        key={`long-${event.id || i}`}
+                        onClick={() => unified && setEditingEvent(unified)}
+                        className={`flex items-start gap-3 p-2.5 bg-bg-surface border border-bg-border rounded-lg hover:border-bg-border-light transition-colors ${unified ? 'cursor-pointer' : ''}`}>
                         <div className="w-1 min-h-[32px] rounded-full flex-shrink-0" style={{ backgroundColor: barColor }} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -655,8 +690,12 @@ function CalendarAssistant(): JSX.Element {
                     {dayEvents.map((event, i) => {
                       const isAllDay = event.wholeDayFlag || (!safeTime(getStart(event)) && !safeTime(getEnd(event)))
                       const barColor = resolveCalendarHex(event.calendar?.id || '', unifiedCalendars, colorOverrides)
+                      const unified = unifiedEventsMap.get(event.id)
                       return (
-                        <div key={`${event.id || i}-${dateKey}`} className="bg-bg-surface border border-bg-border rounded-lg hover:border-bg-border-light transition-colors">
+                        <div
+                          key={`${event.id || i}-${dateKey}`}
+                          onClick={() => unified && setEditingEvent(unified)}
+                          className={`bg-bg-surface border border-bg-border rounded-lg hover:border-bg-border-light transition-colors ${unified ? 'cursor-pointer' : ''}`}>
                           <div className="flex items-start gap-3 p-2.5">
                             <div className="w-1 min-h-[32px] rounded-full flex-shrink-0" style={{ backgroundColor: barColor }} />
                             <div className="flex-1 min-w-0">
@@ -685,6 +724,14 @@ function CalendarAssistant(): JSX.Element {
         )}
       </div>
       )}
+
+      {/* 일정 편집 모달 — 목록 뷰에서 일정 클릭 시 표시 */}
+      <EventEditModal
+        event={editingEvent}
+        calendars={unifiedCalendars}
+        onClose={() => setEditingEvent(null)}
+        onSaved={loadEvents}
+      />
     </div>
   )
 }

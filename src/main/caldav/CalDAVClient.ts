@@ -364,17 +364,31 @@ export class CalDAVClient {
   }
 
   async createEvent(input: CalDAVEventCreate): Promise<void> {
-    const c = await this.getClient()
     const allCalendars = await this.getRawCalendars()
     const cal = allCalendars.find((x) => x.url === input.calendarUrl)
     if (!cal) throw new Error('대상 캘린더를 찾을 수 없습니다.')
     const uid = randomUid()
     const ical = buildICal({ uid, ...input })
-    await c.createCalendarObject({
-      calendar: cal,
-      filename: `${uid}.ics`,
-      iCalString: ical
+    // tsdav 의 createCalendarObject 는 두레이 CalDAV 응답 파싱에서 `fetch failed` (issue #24) 로 깨짐.
+    // listEvents/update/delete 가 모두 직접 fetch 로 동작하므로 createEvent 도 동일하게 PUT 로 통일.
+    const base = cal.url.endsWith('/') ? cal.url : `${cal.url}/`
+    const objectUrl = `${base}${uid}.ics`
+    const auth = basicAuthHeader()
+    const resp = await fetch(objectUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: auth,
+        'Content-Type': 'text/calendar; charset=utf-8',
+        // 신규 생성이므로 같은 UID 의 기존 객체가 없어야 함 (서버가 지원하면 충돌 방지)
+        'If-None-Match': '*'
+      },
+      body: ical
     })
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => '')
+      throw new Error(`CalDAV 일정 생성 실패: ${resp.status} ${body.slice(0, 200)}`)
+    }
+    console.log('[CalDAV PUT createEvent]', objectUrl, 'status=', resp.status)
   }
 
   /**
@@ -659,6 +673,9 @@ export class CalDAVClient {
       if (!serverMap.has(href)) toDelete.push(href)
     }
 
+    // 진단: 서버 href 수 vs 캐시 href 수 — 불일치가 sync 문제의 1차 단서
+    console.log(`[CalDAV incrementalSyncCalendar] ${calendarUrl.slice(-50)} serverHrefs=${serverMap.size} cachedHrefs=${Object.keys(cached).length} toFetch=${toFetch.length} toDelete=${toDelete.length}`)
+
     // 대량 삭제 가드 — time-range 밖 옛 캐시가 다 삭제로 분류되는 케이스 보호
     if (toDelete.length > 1000) {
       console.warn(`[CalDAV incrementalSync] ${calendarUrl} 삭제 대상 ${toDelete.length}건 → 옛 캐시 흔적으로 판단, 중단`)
@@ -697,10 +714,23 @@ export class CalDAVClient {
     return { added, updated, deleted: toDelete.length }
   }
 
-  /** 모든 캘린더 incremental sync. skipHrefs — 최근 삭제 grace 동안 무시 */
+  /**
+   * 모든 캘린더 incremental sync. skipHrefs — 최근 삭제 grace 동안 무시.
+   *
+   * 호출 시마다 rawCalendarsCache 를 무효화해 tsdav 에 새 PROPFIND 를 강제함.
+   * 이유: 사용자가 두레이에서 새 캘린더를 구독/추가한 경우, 5분 캐시가 남아있으면
+   * 새 캘린더가 sync 대상에 포함되지 않아 일정이 영원히 안 보이는 증상이 생김.
+   * incremental sync 는 이미 180초 간격이므로 매 tick 마다 캘린더 목록도 새로 받는 게 안전.
+   */
   async incrementalSyncAll(skipHrefs?: Set<string>): Promise<{ added: number; updated: number; deleted: number; anyChange: boolean }> {
     if (!CalDAVCredentialStore.has()) return { added: 0, updated: 0, deleted: 0, anyChange: false }
+
+    // 캐시 무효화 — 새로 추가된 공유/구독 캘린더를 매 sync 때 반영
+    this.rawCalendarsCache = null
+
     const cals = await this.getRawCalendars()
+    console.log(`[CalDAV incrementalSyncAll] 시작 — 캘린더 ${cals.length}개`)
+
     // 캘린더 메타 갱신 (sync 안 했어도 캘린더 목록은 항상 최신 유지)
     for (const cal of cals) {
       const dn = (cal as Record<string, unknown>).displayName
@@ -711,9 +741,19 @@ export class CalDAVClient {
       })
     }
     const results = await Promise.all(cals.map(async (cal) => {
-      try { return await this.incrementalSyncCalendar(cal.url, skipHrefs) }
-      catch (e) {
-        console.error('[CalDAV incrementalSync] 실패:', cal.url, e)
+      const dn = (cal as Record<string, unknown>).displayName
+      const calName = extractDisplayName(dn, cal.url)
+      try {
+        const diff = await this.incrementalSyncCalendar(cal.url, skipHrefs)
+        // 변화가 있을 때만 로그 — 조용한 no-change tick 은 spam 방지
+        if (diff.added > 0 || diff.updated > 0 || diff.deleted > 0) {
+          console.log(`[CalDAV incrementalSync] "${calName}" added=${diff.added} updated=${diff.updated} deleted=${diff.deleted}`)
+        } else {
+          console.log(`[CalDAV incrementalSync] "${calName}" — 변경 없음 (서버 href 수: 캐시와 동일)`)
+        }
+        return diff
+      } catch (e) {
+        console.error(`[CalDAV incrementalSync] "${calName}" 실패:`, e)
         return { added: 0, updated: 0, deleted: 0 }
       }
     }))
@@ -722,6 +762,7 @@ export class CalDAVClient {
       updated: acc.updated + r.updated,
       deleted: acc.deleted + r.deleted
     }), { added: 0, updated: 0, deleted: 0 })
+    console.log(`[CalDAV incrementalSyncAll] 완료 — 총 added=${totals.added} updated=${totals.updated} deleted=${totals.deleted}`)
     return { ...totals, anyChange: totals.added + totals.updated + totals.deleted > 0 }
   }
 }

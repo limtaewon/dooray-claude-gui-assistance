@@ -8,6 +8,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import { Modal, Input, Textarea, Button } from '../common/ds'
+import EventEditModal from './EventEditModal'
 import type {
   UnifiedCalendar,
   UnifiedEvent,
@@ -197,6 +198,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<UnifiedEvent | null>(null)
+  const [editingEvent, setEditingEvent] = useState<UnifiedEvent | null>(null)
   const [newRange, setNewRange] = useState<DragRange | null>(null)
   const [moreDate, setMoreDate] = useState<Date | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -872,16 +874,32 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
         width={580}
         resizable
         title={selected && (selected.source === 'local' || selected.source === 'caldav') ? (
-          <button
-            onClick={() => handleDelete(selected)}
-            disabled={deleting}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] text-rose-400 hover:bg-rose-500/10 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
-            {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-            {deleting ? '삭제 중…' : '삭제'}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => { setEditingEvent(selected); setSelected(null) }}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] text-clauday-blue hover:bg-clauday-blue/10 transition-colors">
+              <Edit2 size={12} />
+              편집
+            </button>
+            <button
+              onClick={() => handleDelete(selected)}
+              disabled={deleting}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] text-rose-400 hover:bg-rose-500/10 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+              {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+              {deleting ? '삭제 중…' : '삭제'}
+            </button>
+          </div>
         ) : ''}>
         {selected && <EventDetailBody event={selected} calendarName={calendarName(selected.calendarId)} colorBg={colorStyleFor(selected.calendarId, calendars).barBg} />}
       </Modal>
+
+      {/* 일정 편집 모달 */}
+      <EventEditModal
+        event={editingEvent}
+        calendars={calendars}
+        onClose={() => setEditingEvent(null)}
+        onSaved={async () => { await loadEvents() }}
+      />
 
       {/* 새 일정 모달 */}
       {newRange && (
