@@ -1,55 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseICal, buildICal, bundleICal, patchDateTimeInIcs, patchEventFields } from './ical'
-
-describe('patchEventFields — 편집 필드만 교체하고 원본 보존', () => {
-  const original = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Dooray//EN',
-    'BEGIN:VEVENT',
-    'UID:evt-1',
-    'CREATED:20260101T000000Z',
-    'DTSTAMP:20260101T000000Z',
-    'SEQUENCE:3',
-    'DTSTART:20260619T060000Z',
-    'DTEND:20260619T070000Z',
-    'SUMMARY:TEST',
-    'X-DOORAY-CALENDAR-ID:cal-xyz',
-    'RRULE:FREQ=WEEKLY',
-    'BEGIN:VALARM',
-    'TRIGGER:-PT15M',
-    'ACTION:DISPLAY',
-    'DESCRIPTION:알림',
-    'END:VALARM',
-    'END:VEVENT',
-    'END:VCALENDAR'
-  ].join('\r\n')
-
-  it('SUMMARY 만 바꾸고 두레이 고유 속성/RRULE/VALARM 은 보존한다', () => {
-    const out = patchEventFields(original, {
-      summary: 'TEST2233', start: '2026-06-19T06:00:00Z', end: '2026-06-19T07:00:00Z', allDay: false
-    })
-    expect(out).toContain('SUMMARY:TEST2233')
-    expect(out).not.toContain('SUMMARY:TEST\r')
-    // 두레이 고유 속성 + RRULE 보존
-    expect(out).toContain('X-DOORAY-CALENDAR-ID:cal-xyz')
-    expect(out).toContain('RRULE:FREQ=WEEKLY')
-    expect(out).toContain('UID:evt-1')
-    // VALARM 내부 DESCRIPTION 은 보존 (top-level 교체에 휩쓸리지 않음)
-    expect(out).toContain('BEGIN:VALARM')
-    expect(out).toContain('DESCRIPTION:알림')
-  })
-
-  it('SEQUENCE 를 기존+1 로 올리고 LAST-MODIFIED 를 추가한다', () => {
-    const out = patchEventFields(original, {
-      summary: 'X', start: '2026-06-19T06:00:00Z', end: '2026-06-19T07:00:00Z', allDay: false
-    })
-    expect(out).toContain('SEQUENCE:4')
-    expect(out).toContain('LAST-MODIFIED:')
-    // SEQUENCE 가 중복으로 남지 않음
-    expect(out.match(/SEQUENCE:/g)?.length).toBe(1)
-  })
-})
+import { parseICal, buildICal, bundleICal, patchDateTimeInIcs } from './ical'
 
 describe('parseICal — 기본 VEVENT', () => {
   it('UID/SUMMARY/DTSTART/DTEND 가 있으면 파싱한다', () => {

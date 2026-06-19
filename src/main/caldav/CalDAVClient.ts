@@ -1,7 +1,7 @@
 import { createDAVClient } from 'tsdav'
 import { CalDAVCredentialStore } from './CredentialStore'
 import { CalendarObjectsStore } from './CalendarObjectsStore'
-import { parseICal, buildICal, patchDateTimeInIcs, patchEventFields } from './ical'
+import { parseICal, buildICal, patchDateTimeInIcs } from './ical'
 
 export interface SyncProgress {
   calendarUrl: string
@@ -486,17 +486,26 @@ export class CalDAVClient {
     end: string
     allDay: boolean
   }): Promise<{ etag?: string }> {
-    if (!parseICal(input.existingIcs)) throw new Error('기존 ICS 파싱 실패')
+    const parsed = parseICal(input.existingIcs)
+    if (!parsed) throw new Error('기존 ICS 파싱 실패')
 
-    // buildICal 재구성은 두레이 고유 속성(X-*, VTIMEZONE 등)을 잃어 서버가 변경을 무시함 →
-    // 원본 ICS 를 patch 해서 편집 필드만 교체 (막대 드래그가 동작하는 것과 동일한 보존 방식).
-    const newIcs = patchEventFields(input.existingIcs, {
+    // 깔끔한 표준 VEVENT 로 재구성 — 두레이 고유 X-*/VTIMEZONE 을 그대로 PUT 하면 500 이 남.
+    // (편집이 서버에 안 먹히던 진짜 원인은 If-Match etag 따옴표 누락이었고, 그건 quoteEtag 로 해결.)
+    const newIcs = buildICal({
+      uid: parsed.uid,
       summary: input.summary,
       description: input.description,
       location: input.location,
       start: input.start,
       end: input.end,
-      allDay: input.allDay
+      allDay: input.allDay,
+      createdAt: parsed.createdAt,
+      rrule: parsed.rrule,
+      attendees: parsed.attendees,
+      organizer: parsed.organizer,
+      alarms: parsed.alarms,
+      status: parsed.status,
+      url: parsed.url
     })
     
     const absUrl = input.href.startsWith('http') ? input.href : SERVER_URL + input.href
@@ -526,7 +535,7 @@ export class CalDAVClient {
       const vparsed = parseICal(vtext)
       const vEtag = verify.headers.get('etag') ?? undefined
       console.log('[CalDAV PUT verify] GET status=', verify.status,
-        'serverSummary=', vparsed?.summary, 'serverSeq=', vparsed?.sequence,
+        'serverSummary=', vparsed?.summary,
         'applied=', vparsed?.summary === input.summary, 'etag=', vEtag)
       // PUT 이 etag 를 안 줬으면 GET 의 etag 를 사용 (incrementalSync 가 변경을 감지하도록)
       if (!newEtag && vEtag) newEtag = vEtag

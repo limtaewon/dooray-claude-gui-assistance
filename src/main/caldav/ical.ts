@@ -38,8 +38,6 @@ export interface ParsedEvent {
   url?: string
   /** CREATED 가 있으면 우선, 없으면 DTSTAMP. ISO 8601. */
   createdAt?: string
-  /** RFC 5545 SEQUENCE — 일정 수정 횟수. 갱신 시 +1 해야 서버가 stale 로 무시하지 않음. */
-  sequence?: number
 }
 
 export interface BuildICalInput {
@@ -58,8 +56,6 @@ export interface BuildICalInput {
   alarms?: IcalAlarm[]
   status?: string
   url?: string
-  /** RFC 5545 SEQUENCE. 신규는 0, 갱신은 기존 +1. 미지정 시 0. */
-  sequence?: number
 }
 
 export function parseICal(data: string): ParsedEvent | null {
@@ -100,10 +96,6 @@ export function parseICal(data: string): ParsedEvent | null {
   const createdRaw = getPropRaw(ev, 'CREATED') ?? getPropRaw(ev, 'DTSTAMP')
   const createdAt = createdRaw ? (parseDtRaw(createdRaw)?.iso) : undefined
 
-  // SEQUENCE — 없으면 0. 갱신 시 이 값 +1 로 PUT 해야 서버가 무시하지 않음.
-  const seqRaw = getProp(ev, 'SEQUENCE')
-  const sequence = seqRaw && /^\d+$/.test(seqRaw.trim()) ? parseInt(seqRaw.trim(), 10) : undefined
-
   return {
     uid,
     summary: decodeText(getProp(ev, 'SUMMARY') ?? '(제목 없음)'),
@@ -118,8 +110,7 @@ export function parseICal(data: string): ParsedEvent | null {
     attendees: attendees.length > 0 ? attendees : undefined,
     alarms: alarms.length > 0 ? alarms : undefined,
     url: getProp(ev, 'URL'),
-    createdAt,
-    sequence
+    createdAt
   }
 }
 
@@ -195,10 +186,6 @@ export function buildICal(input: BuildICalInput): string {
     `UID:${input.uid}`,
     `DTSTAMP:${dtstamp}`,
     `CREATED:${created}`,
-    // LAST-MODIFIED + SEQUENCE: 갱신 시 서버가 stale 로 무시하지 않도록 필수.
-    // 두레이 CalDAV 는 SEQUENCE 가 기존보다 크지 않으면 PUT 을 받아도(2xx) 본문 변경을 적용하지 않음.
-    `LAST-MODIFIED:${dtstamp}`,
-    `SEQUENCE:${input.sequence ?? 0}`,
     dtstart,
     dtend,
     `SUMMARY:${escapeText(input.summary)}`
@@ -281,89 +268,6 @@ export function patchDateTimeInIcs(ics: string, input: { start: string; end: str
   out = replaceLine(out, 'DTEND', dtendLine)
   out = replaceLine(out, 'DTSTAMP', dtstampLine)
   return out
-}
-
-/**
- * 기존 VEVENT 의 편집 가능한 스칼라 필드(SUMMARY/DESCRIPTION/LOCATION/DTSTART/DTEND)만 교체하고,
- * 그 외 모든 속성(UID/CREATED/RRULE/ATTENDEE/VALARM/VTIMEZONE/X-DOORAY-* 등)은 **그대로 보존**한다.
- *
- * Why: buildICal 로 ICS 를 처음부터 재구성하면 우리가 모델링하지 않은 두레이 고유 속성(X-*, VTIMEZONE 등)이
- * 사라진다. 두레이 CalDAV 는 이런 lossy PUT 을 2xx 로 받아주면서도 실제 일정에는 변경을 반영하지 않는
- * 케이스가 있다(=수정이 서버에 안 먹힘). 막대 드래그(patchDateTimeInIcs)가 정상 동작하는 이유도 원본 보존이므로,
- * 상세 편집도 동일하게 "원본 patch" 방식으로 처리한다.
- *
- * - 갱신이 stale 로 무시되지 않도록 SEQUENCE +1, LAST-MODIFIED/DTSTAMP 현재 시각으로 교체.
- * - VALARM 내부의 DESCRIPTION 등은 건드리지 않는다(VEVENT top-level 속성만 교체).
- */
-export function patchEventFields(
-  ics: string,
-  input: { summary: string; description?: string; location?: string; start: string; end: string; allDay: boolean }
-): string {
-  const allDay = !!input.allDay
-  const fmtTimed = (iso: string): string => {
-    const d = new Date(iso)
-    return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`
-  }
-  const fmtAllDay = (iso: string, dayOffset = 0): string => {
-    const d = new Date(iso)
-    if (dayOffset !== 0) d.setDate(d.getDate() + dayOffset)
-    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`
-  }
-  const now = fmtTimed(new Date().toISOString())
-  const dtstartLine = allDay ? `DTSTART;VALUE=DATE:${fmtAllDay(input.start)}` : `DTSTART:${fmtTimed(input.start)}`
-  const dtendLine = allDay ? `DTEND;VALUE=DATE:${fmtAllDay(input.end, 1)}` : `DTEND:${fmtTimed(input.end)}`
-
-  const lines = unfoldLines(ics)
-  const TOP_KEYS = ['DTSTART', 'DTEND', 'DTSTAMP', 'LAST-MODIFIED', 'SEQUENCE', 'SUMMARY', 'LOCATION', 'DESCRIPTION']
-  const isTopKey = (l: string): boolean =>
-    TOP_KEYS.some((k) => l === k || l.startsWith(`${k}:`) || l.startsWith(`${k};`))
-
-  // 기존 SEQUENCE (VEVENT top-level) 추출 → +1
-  let seq = 0
-  {
-    let inEvent = false, inAlarm = false
-    for (const l of lines) {
-      if (l === 'BEGIN:VEVENT') inEvent = true
-      else if (l === 'END:VEVENT') inEvent = false
-      else if (l === 'BEGIN:VALARM') inAlarm = true
-      else if (l === 'END:VALARM') inAlarm = false
-      else if (inEvent && !inAlarm && /^SEQUENCE\s*:/.test(l)) {
-        const n = parseInt(l.replace(/^SEQUENCE\s*:/, '').trim(), 10)
-        if (!isNaN(n)) seq = n
-      }
-    }
-  }
-
-  const newProps = [
-    `DTSTAMP:${now}`,
-    `LAST-MODIFIED:${now}`,
-    `SEQUENCE:${seq + 1}`,
-    dtstartLine,
-    dtendLine,
-    `SUMMARY:${escapeText(input.summary)}`
-  ]
-  if (input.location) newProps.push(`LOCATION:${escapeText(input.location)}`)
-  if (input.description) newProps.push(`DESCRIPTION:${escapeText(input.description)}`)
-
-  const out: string[] = []
-  let inEvent = false, inAlarm = false
-  for (const l of lines) {
-    if (l === 'BEGIN:VEVENT') {
-      inEvent = true
-      out.push(l)
-      out.push(...newProps) // VEVENT 시작 직후에 교체 속성 주입
-      continue
-    }
-    if (l === 'END:VEVENT') { inEvent = false; out.push(l); continue }
-    if (l === 'BEGIN:VALARM') { inAlarm = true; out.push(l); continue }
-    if (l === 'END:VALARM') { inAlarm = false; out.push(l); continue }
-    // VEVENT top-level 의 교체 대상 옛 속성만 제거 (VALARM 내부/다른 컴포넌트는 보존)
-    if (inEvent && !inAlarm && isTopKey(l)) continue
-    out.push(l)
-  }
-  // VEVENT 가 없으면 원본 그대로 반환 (이상 케이스)
-  if (!out.includes('BEGIN:VEVENT')) return ics
-  return out.join('\r\n')
 }
 
 /**
