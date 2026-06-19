@@ -24,23 +24,32 @@ describe('patchEventFields — 원본 보존 + VTIMEZONE 제거', () => {
     'END:VCALENDAR'
   ].join('\r\n')
 
-  it('SUMMARY 교체 + X-DOORAY/UID 보존, VTIMEZONE/TZID 제거', () => {
+  it('SUMMARY/DTSTART 만 in-place 교체하고 X-DOORAY/VTIMEZONE/VALARM 은 보존', () => {
     const out = patchEventFields(original, {
       summary: 'TEST232', start: '2026-06-19T06:30:00Z', end: '2026-06-19T07:30:00Z', allDay: false
     })
     expect(out).toContain('SUMMARY:TEST232')
     expect(out).toContain('X-DOORAY-CALENDAR-ID:cal-xyz')
     expect(out).toContain('UID:4358@dooray.com')
-    // VTIMEZONE 컴포넌트 제거 (orphan → 500 방지)
-    expect(out).not.toContain('BEGIN:VTIMEZONE')
-    expect(out).not.toContain('TZID=Asia/Seoul')
-    // 새 DTSTART 는 UTC
+    // 구조 보존 — 드래그와 동일하게 원본을 손대지 않음
+    expect(out).toContain('BEGIN:VTIMEZONE')
+    // 새 DTSTART 는 UTC 로 교체
     expect(out).toContain('DTSTART:20260619T063000Z')
-    // VALARM 내부 DESCRIPTION 은 보존
+    expect(out).not.toContain('DTSTART;TZID=Asia/Seoul')
+    // VALARM 의 DESCRIPTION 은 절대 건드리지 않음 (top-level DESCRIPTION 없음)
     expect(out).toContain('BEGIN:VALARM')
     expect(out).toContain('DESCRIPTION:알림')
-    // SUMMARY 가 중복되지 않음
     expect(out.match(/SUMMARY:/g)?.length).toBe(1)
+  })
+
+  it('top-level DESCRIPTION 은 교체하되 VALARM DESCRIPTION 은 보존', () => {
+    const withDesc = original.replace('SUMMARY:TEST', 'SUMMARY:TEST\r\nDESCRIPTION:원본설명')
+    const out = patchEventFields(withDesc, {
+      summary: 'S', description: '새설명', start: '2026-06-19T06:30:00Z', end: '2026-06-19T07:30:00Z', allDay: false
+    })
+    expect(out).toContain('DESCRIPTION:새설명')
+    expect(out).not.toContain('DESCRIPTION:원본설명')
+    expect(out).toContain('DESCRIPTION:알림') // VALARM 것은 유지
   })
 })
 

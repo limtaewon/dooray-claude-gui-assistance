@@ -271,13 +271,13 @@ export function patchDateTimeInIcs(ics: string, input: { start: string; end: str
 }
 
 /**
- * 상세 편집용 — 원본 ICS 의 편집 필드(SUMMARY/DESCRIPTION/LOCATION/DTSTART/DTEND/DTSTAMP)만 교체하고
- * 두레이 고유 속성(X-DOORAY-* 등)·UID·CREATED·RRULE·ATTENDEE·VALARM 은 보존한다.
+ * 상세 편집용 — 원본 ICS 를 **그대로 두고** 편집 필드(SUMMARY/LOCATION/DESCRIPTION/DTSTART/DTEND/DTSTAMP)
+ * 라인만 정규식으로 in-place 교체한다. 막대 드래그(patchDateTimeInIcs)와 동일한 보존 방식.
  *
- * Why: 두레이 CalDAV 는 buildICal 로 재구성한(=X-DOORAY-* 누락된) 본문을 PUT 하면 200 으로 받아주면서도
- * 실제 일정에는 반영하지 않는다(=수정 안 먹힘). 원본 속성을 보존해야 서버가 어떤 레코드의 갱신인지 매핑한다.
- * 단, 새 DTSTART/DTEND 는 UTC(또는 VALUE=DATE)로 쓰므로 원본의 VTIMEZONE/TZID 는 orphan 이 되어 서버가
- * 500 을 낸다 → VTIMEZONE 컴포넌트를 함께 제거해 ICS 일관성을 유지한다.
+ * Why: buildICal 재구성은 두레이 고유 속성(X-DOORAY-* 등)을 잃어 서버가 200 으로 받고도 반영 안 함.
+ * unfold/재정렬/VTIMEZONE 제거 같은 구조 변경은 두레이가 500 으로 거부. → 드래그가 동작하는
+ * "라인 단위 in-place 교체"를 그대로 따르고 SUMMARY/LOCATION/DESCRIPTION 만 추가로 교체한다.
+ * 폴딩(이어진 줄)·속성 순서·VTIMEZONE 등은 손대지 않는다.
  */
 export function patchEventFields(
   ics: string,
@@ -293,47 +293,40 @@ export function patchEventFields(
     if (dayOffset !== 0) d.setDate(d.getDate() + dayOffset)
     return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`
   }
-  const now = fmtTimed(new Date().toISOString())
   const dtstartLine = allDay ? `DTSTART;VALUE=DATE:${fmtAllDay(input.start)}` : `DTSTART:${fmtTimed(input.start)}`
   const dtendLine = allDay ? `DTEND;VALUE=DATE:${fmtAllDay(input.end, 1)}` : `DTEND:${fmtTimed(input.end)}`
+  const dtstampLine = `DTSTAMP:${fmtTimed(new Date().toISOString())}`
 
-  const lines = unfoldLines(ics)
-  // VEVENT top-level 에서 교체할 키 (VALARM 내부는 제외)
-  const TOP_KEYS = ['DTSTART', 'DTEND', 'DTSTAMP', 'SUMMARY', 'LOCATION', 'DESCRIPTION']
-  const isTopKey = (l: string): boolean =>
-    TOP_KEYS.some((k) => l === k || l.startsWith(`${k}:`) || l.startsWith(`${k};`))
-
-  const newProps = [
-    `DTSTAMP:${now}`,
-    dtstartLine,
-    dtendLine,
-    `SUMMARY:${escapeText(input.summary)}`
-  ]
-  if (input.location) newProps.push(`LOCATION:${escapeText(input.location)}`)
-  if (input.description) newProps.push(`DESCRIPTION:${escapeText(input.description)}`)
-
-  const result: string[] = []
-  let inEvent = false, inAlarm = false, inTz = false
-  for (const l of lines) {
-    // VTIMEZONE 컴포넌트는 통째로 제거 (UTC/DATE 로 쓰므로 orphan → 서버 500 방지)
-    if (l === 'BEGIN:VTIMEZONE') { inTz = true; continue }
-    if (l === 'END:VTIMEZONE') { inTz = false; continue }
-    if (inTz) continue
-
-    if (l === 'BEGIN:VEVENT') {
-      inEvent = true
-      result.push(l)
-      result.push(...newProps) // VEVENT 시작 직후 교체 속성 주입
-      continue
-    }
-    if (l === 'END:VEVENT') { inEvent = false; result.push(l); continue }
-    if (l === 'BEGIN:VALARM') { inAlarm = true; result.push(l); continue }
-    if (l === 'END:VALARM') { inAlarm = false; result.push(l); continue }
-    if (inEvent && !inAlarm && isTopKey(l)) continue // 교체 대상 옛 속성 제거
-    result.push(l)
+  // 짧은 단일 라인 속성 (DTSTART/DTEND/DTSTAMP/SUMMARY 등) in-place 교체. 없으면 BEGIN:VEVENT 뒤 삽입.
+  const replaceLine = (text: string, key: string, newLine: string): string => {
+    const re = new RegExp(`^${key}(?:;[^:\\r\\n]*)?:[^\\r\\n]*`, 'm')
+    if (re.test(text)) return text.replace(re, newLine)
+    return text.replace(/(BEGIN:VEVENT\r?\n)/, `$1${newLine}\r\n`)
   }
-  if (!result.includes('BEGIN:VEVENT')) return ics
-  return result.join('\r\n')
+  // 폴딩 가능한 속성(LOCATION/DESCRIPTION) — 이어진 줄(맨 앞 공백/탭)까지 포함해 교체/제거.
+  const replaceFoldable = (text: string, key: string, newLine: string | null): string => {
+    const re = new RegExp(`^${key}(?:;[^:\\r\\n]*)?:[^\\r\\n]*(?:\\r?\\n[ \\t][^\\r\\n]*)*`, 'm')
+    if (re.test(text)) {
+      if (newLine) return text.replace(re, newLine)
+      // 값이 비면 라인(및 뒤따르는 개행)까지 제거
+      return text.replace(new RegExp(re.source + '\\r?\\n?', 'm'), '')
+    }
+    return newLine ? text.replace(/(BEGIN:VEVENT\r?\n)/, `$1${newLine}\r\n`) : text
+  }
+
+  // VALARM 내부에도 DESCRIPTION 이 있으므로, 교체는 첫 BEGIN:VALARM 이전 구간(VEVENT 본문)으로 한정.
+  const valarmIdx = ics.search(/^BEGIN:VALARM/m)
+  const splitAt = valarmIdx >= 0 ? valarmIdx : ics.length
+  let head = ics.slice(0, splitAt)
+  const tail = ics.slice(splitAt)
+
+  head = replaceLine(head, 'DTSTART', dtstartLine)
+  head = replaceLine(head, 'DTEND', dtendLine)
+  head = replaceLine(head, 'DTSTAMP', dtstampLine)
+  head = replaceFoldable(head, 'SUMMARY', `SUMMARY:${escapeText(input.summary)}`)
+  head = replaceFoldable(head, 'LOCATION', input.location ? `LOCATION:${escapeText(input.location)}` : null)
+  head = replaceFoldable(head, 'DESCRIPTION', input.description ? `DESCRIPTION:${escapeText(input.description)}` : null)
+  return head + tail
 }
 
 /**
