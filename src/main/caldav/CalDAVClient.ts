@@ -501,7 +501,9 @@ export class CalDAVClient {
     
     const absUrl = input.href.startsWith('http') ? input.href : SERVER_URL + input.href
     const auth = basicAuthHeader()
-    console.log('[CalDAV PUT updateEvent] req ifMatch=', !!input.etag, 'summary=', input.summary, 'bodyLen=', newIcs.length)
+    // 진단: 실제 PUT 본문 전체 + 보낸 If-Match 값 로그 (CRLF 는 ⏎ 로 치환해 한 줄로)
+    console.log('[CalDAV PUT updateEvent] ifMatch=', input.etag ? quoteEtag(input.etag) : '(none)', 'bodyLen=', newIcs.length)
+    console.log('[CalDAV PUT updateEvent] BODY>>>\n' + newIcs.replace(/\r\n/g, '\n'))
     const resp = await fetch(absUrl, {
       method: 'PUT',
       headers: {
@@ -513,7 +515,8 @@ export class CalDAVClient {
     })
     const respBody = await resp.text().catch(() => '')
     if (!resp.ok) {
-      throw new Error(`CalDAV PUT 실패: ${resp.status} ${respBody.slice(0, 200)}`)
+      console.error('[CalDAV PUT updateEvent] FAIL status=', resp.status, 'respHeaders=', JSON.stringify(Object.fromEntries(resp.headers.entries())), 'respBody=', respBody)
+      throw new Error(`CalDAV PUT 실패: ${resp.status} ${respBody.slice(0, 300)}`)
     }
     let newEtag = resp.headers.get('etag') ?? undefined
     console.log('[CalDAV PUT updateEvent]', absUrl, 'status=', resp.status, 'etagHdr=', newEtag, 'respBodyLen=', respBody.length)
