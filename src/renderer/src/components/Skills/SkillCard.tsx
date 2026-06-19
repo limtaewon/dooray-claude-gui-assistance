@@ -1,5 +1,4 @@
-import { Sparkles, Play, MoreHorizontal, Pencil, Trash2, Upload, Loader2, CheckSquare, Square, FolderUp } from 'lucide-react'
-import { useState } from 'react'
+import { Sparkles, Play, Pencil, Trash2, Loader2, FolderUp } from 'lucide-react'
 import type { Skill } from '../../../../shared/types/skills'
 
 interface SkillCardProps {
@@ -9,7 +8,6 @@ interface SkillCardProps {
   onOpen: () => void
   onRun?: () => void
   onDelete: () => void
-  onShare?: () => void
   /** 위키 저장소에 올리기 — wikiId 가 설정된 경우만 호출자가 props 로 전달 */
   onUploadToWiki?: () => void
   /** 다중 선택 모드일 때 true. true 이면 onOpen 대신 onToggleSelect 가 클릭 동작이 됨. */
@@ -45,10 +43,9 @@ function formatRelative(ts: number): string {
 }
 
 function SkillCard({
-  skill, uploading, onOpen, onRun, onDelete, onShare, onUploadToWiki,
+  skill, uploading, onOpen, onRun, onDelete, onUploadToWiki,
   selectable, selected, onToggleSelect
 }: SkillCardProps): JSX.Element {
-  const [menuOpen, setMenuOpen] = useState(false)
   const description = extractDescription(skill.content)
 
   return (
@@ -83,45 +80,36 @@ function SkillCard({
             <div className="text-[11px] text-text-secondary truncate mt-0.5">{description}</div>
           )}
         </div>
-        <div className={`relative flex-none ${selectable ? 'invisible' : ''}`}>
-          <button
-            onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v) }}
-            className="ds-btn icon sm opacity-0 group-hover:opacity-100 transition-opacity"
-            aria-label="메뉴"
-          >
-            <MoreHorizontal size={14} />
-          </button>
-          {menuOpen && (
-            <>
-              <div className="fixed inset-0 z-30" onClick={(e) => { e.stopPropagation(); setMenuOpen(false) }} />
-              <div className="ds-menu absolute right-0 top-full mt-1 z-40" style={{ minWidth: 160 }}>
-                <div className="ds-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onOpen() }}>
-                  <Pencil size={12} /> 편집
-                </div>
-                {onShare && (
-                  <div
-                    className={`ds-menu-item ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
-                    onClick={(e) => { e.stopPropagation(); if (uploading) return; setMenuOpen(false); onShare() }}
-                  >
-                    {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-                    {uploading ? '업로드 중...' : '공유 업로드'}
-                  </div>
-                )}
-                {onUploadToWiki && (
-                  <div
-                    className="ds-menu-item"
-                    onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onUploadToWiki() }}
-                  >
-                    <FolderUp size={12} /> 공유에 올리기
-                  </div>
-                )}
-                <div className="ds-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete() }}>
-                  <Trash2 size={12} /> 삭제
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+        {/* MCP 카드와 동일하게 인라인 액션 아이콘을 기본 노출 (편집/공유에 올리기/삭제) */}
+        {!selectable && (
+          <div className="flex items-center gap-0.5 flex-none">
+            <button
+              onClick={(e) => { e.stopPropagation(); onOpen() }}
+              className="ds-btn icon sm"
+              title="편집"
+            >
+              <Pencil size={13} />
+            </button>
+            {onUploadToWiki && (
+              <button
+                onClick={(e) => { e.stopPropagation(); if (uploading) return; onUploadToWiki() }}
+                disabled={uploading}
+                className="ds-btn icon sm"
+                title="공유에 올리기"
+                style={{ color: 'var(--c-blue-fg)' }}
+              >
+                {uploading ? <Loader2 size={13} className="animate-spin" /> : <FolderUp size={13} />}
+              </button>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete() }}
+              className="ds-btn icon sm"
+              title="삭제"
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center mt-2.5 pt-2 border-t border-bg-border/60">

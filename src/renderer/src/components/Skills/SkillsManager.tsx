@@ -36,6 +36,8 @@ function SkillsManager(): JSX.Element {
   const [tab, setTab] = useState<FilterTab>('mine')
   // 공유 탭 — "내 스킬 공유하기" picker 모달 (로컬 스킬을 골라 위키에 업로드)
   const [sharePickerOpen, setSharePickerOpen] = useState(false)
+  // picker 다중 선택 — filename Set
+  const [pickerSelected, setPickerSelected] = useState<Set<string>>(new Set())
 
   // 다중 선택 (내 스킬 탭 한정)
   const [selectMode, setSelectMode] = useState(false)
@@ -477,7 +479,7 @@ function SkillsManager(): JSX.Element {
               >
                 {selectMode ? '선택 종료' : '선택'}
               </Button>
-              <Button variant="primary" onClick={() => setSharePickerOpen(true)} leftIcon={<Upload size={13} />}>
+              <Button variant="primary" onClick={() => { setPickerSelected(new Set()); setSharePickerOpen(true) }} leftIcon={<Upload size={13} />}>
                 내 스킬 공유하기
               </Button>
             </>
@@ -670,17 +672,46 @@ function SkillsManager(): JSX.Element {
         <SkillCreateModal onClose={() => setCreating(false)} onCreated={handleCreated} />
       )}
 
-      {/* 공유 탭 — "내 스킬 공유하기" picker. 로컬 스킬을 골라 위키에 직접 업로드. */}
+      {/* 공유 탭 — "내 스킬 공유하기" picker. 로컬 스킬을 (여러 개) 골라 위키에 업로드. */}
       <Modal
         open={sharePickerOpen}
         onClose={() => setSharePickerOpen(false)}
         width="min(560px, 92vw)"
         icon={<Upload size={14} className="text-clauday-blue" />}
         title="내 스킬 공유하기"
+        footer={skills.length > 0 ? (
+          <div className="flex items-center justify-between w-full gap-2">
+            <button
+              onClick={() => setPickerSelected((prev) =>
+                prev.size === skills.length ? new Set() : new Set(skills.map((s) => s.filename))
+              )}
+              className="text-[11px] text-text-secondary hover:text-text-primary px-2 py-1">
+              {pickerSelected.size === skills.length ? '전체 해제' : '전체 선택'}
+            </button>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="md" onClick={() => setSharePickerOpen(false)} disabled={uploadProgress !== null}>취소</Button>
+              <Button
+                variant="primary"
+                size="md"
+                disabled={pickerSelected.size === 0 || uploadProgress !== null}
+                leftIcon={uploadProgress !== null ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                onClick={async () => {
+                  const targets = skills.filter((s) => pickerSelected.has(s.filename))
+                  if (targets.length === 0) return
+                  await handleShareToWiki(targets)
+                  setSharePickerOpen(false)
+                }}>
+                {uploadProgress !== null
+                  ? `업로드 중… (${uploadProgress.current}/${uploadProgress.total})`
+                  : `선택한 ${pickerSelected.size}개 공유`}
+              </Button>
+            </div>
+          </div>
+        ) : undefined}
       >
         <div className="p-4">
           <p className="text-[11px] text-text-tertiary mb-3">
-            위키에 공유할 내 스킬을 선택하세요. 업로드된 스킬은 동료가 다운로드할 수 있습니다.
+            위키에 공유할 내 스킬을 선택하세요. 여러 개를 한 번에 올릴 수 있습니다.
           </p>
           {skills.length === 0 ? (
             <div className="py-8 text-center text-xs text-text-secondary">공유할 내 스킬이 없습니다.</div>
@@ -689,22 +720,22 @@ function SkillsManager(): JSX.Element {
               {skills.map((skill) => {
                 // 활성 위키에 이미 공유된 스킬인지 확인
                 const alreadyShared = wikiItems.some((i) => i.name === skill.name)
-                const uploading = uploadProgress !== null && uploadProgress.currentName === skill.name
+                const checked = pickerSelected.has(skill.filename)
+                const toggle = (): void => setPickerSelected((prev) => {
+                  const next = new Set(prev)
+                  if (next.has(skill.filename)) next.delete(skill.filename); else next.add(skill.filename)
+                  return next
+                })
                 return (
-                  <div key={skill.filename}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-surface border border-bg-border">
+                  <label key={skill.filename}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer select-none transition-colors ${
+                      checked ? 'bg-clauday-blue/10 border-clauday-blue/40' : 'bg-bg-surface border-bg-border hover:bg-bg-surface-hover'
+                    }`}>
+                    <input type="checkbox" className="accent-clauday-blue flex-shrink-0" checked={checked} onChange={toggle} />
                     <Sparkles size={13} className="text-clauday-blue flex-shrink-0" />
                     <span className="text-sm text-text-primary truncate flex-1" title={skill.name}>{skill.name}</span>
                     {alreadyShared && <span className="ds-chip neutral flex-shrink-0">공유됨</span>}
-                    <Button
-                      variant={alreadyShared ? 'secondary' : 'primary'}
-                      onClick={() => handleShareToWiki([skill])}
-                      disabled={uploadProgress !== null}
-                      leftIcon={uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-                    >
-                      {alreadyShared ? '업데이트' : '공유'}
-                    </Button>
-                  </div>
+                  </label>
                 )
               })}
             </div>
