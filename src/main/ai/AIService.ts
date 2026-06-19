@@ -1028,31 +1028,109 @@ ${JSON.stringify(eventData)}`
     const working = tasks.filter((t) => t.workflowClass === 'working')
     const registered = tasks.filter((t) => t.workflowClass === 'registered')
 
+    // 태스크 정보를 풍부하게 구조화 — 단순 subject 나열이 아닌 맥락 있는 데이터 제공
+    const fmtTask = (t: DoorayTask) => {
+      const parts: string[] = [`[${t.projectCode || '?'}] ${t.subject}`]
+      if (t.workflow?.name) parts.push(`상태: ${t.workflow.name}`)
+      if (t.dueDateAt) parts.push(`마감: ${t.dueDateAt.slice(0, 10)}`)
+      if (t.milestone?.name) parts.push(`마일스톤: ${t.milestone.name}`)
+      if (t.tags && t.tags.length > 0) parts.push(`태그: ${t.tags.map((tag) => tag.name).join(', ')}`)
+      return `- ${parts.join(' | ')}`
+    }
+
     const allEmpty = tasks.length === 0 && events.length === 0
     const prompt = allEmpty
-      ? `${period} 업무 보고서를 마크다운으로 작성.\n오늘: ${today}\n\n데이터가 제공되지 않았습니다. 사용자가 설정한 스킬(system prompt에 포함됨) 지시에 따라 MCP 도구로 필요한 태스크·일정을 직접 조회한 뒤 보고서를 작성하세요.`
-      : `${period} 업무 보고서를 마크다운으로 작성.\n오늘: ${today}\n\n완료(${done.length}개):\n${done.slice(0, 20).map((t) => `- [${t.projectCode}] ${t.subject}`).join('\n') || '없음'}\n\n진행중(${working.length}개):\n${working.slice(0, 20).map((t) => `- [${t.projectCode}] ${t.subject}`).join('\n') || '없음'}\n\n예정(${registered.length}개):\n${registered.slice(0, 10).map((t) => `- [${t.projectCode}] ${t.subject}`).join('\n') || '없음'}\n\n일정(${events.length}개):\n${events.slice(0, 10).map((e) => `- ${e.subject} (${e.startAt})`).join('\n') || '없음'}`
+      ? `${period} 업무 보고서를 작성해주세요.\n작성 기준일: ${today}\n\n데이터가 제공되지 않았습니다. 사용자가 설정한 스킬(system prompt에 포함됨) 지시에 따라 MCP 도구로 필요한 태스크·일정을 직접 조회한 뒤, 아래 지정된 보고서 형식에 맞춰 작성하세요.`
+      : `${period} 업무 보고서를 작성해주세요.\n작성 기준일: ${today}
+
+---
+
+## 완료된 태스크 (${done.length}개)
+${done.length > 0
+  ? done.slice(0, 20).map(fmtTask).join('\n')
+  : '(이 기간 완료된 태스크 없음)'}
+
+## 진행 중인 태스크 (${working.length}개)
+${working.length > 0
+  ? working.slice(0, 20).map(fmtTask).join('\n')
+  : '(진행 중인 태스크 없음)'}
+
+## 예정·등록된 태스크 (${registered.length}개)
+${registered.length > 0
+  ? registered.slice(0, 10).map(fmtTask).join('\n')
+  : '(예정 태스크 없음)'}
+
+## ${type === 'daily' ? '오늘' : '이번 주'} 일정 (${events.length}개)
+${events.length > 0
+  ? events.slice(0, 15).map((e) => {
+      const start = e.startedAt || e.startAt || ''
+      const end = e.endedAt || e.endAt || ''
+      const timeStr = start ? `${start.slice(11, 16)}${end ? '-' + end.slice(11, 16) : ''}` : '종일'
+      return `- ${timeStr} ${e.subject}${e.location ? ` (${e.location})` : ''}`
+    }).join('\n')
+  : '(일정 없음)'}`
+
+    const REPORT_SYSTEM_PROMPT = `당신은 두레이 업무 보고서를 작성하는 전문 비서입니다. 한국어로 자연스럽고 명확한 보고서를 마크다운 형식으로 작성합니다.
+
+## 역할 정의
+- 개인 업무 현황을 임원/팀장/본인이 한눈에 파악할 수 있는 ${period} 보고서 작성
+- 두레이 태스크 데이터를 단순 나열이 아닌 의미 있는 업무 스토리로 재구성
+- 외부 시스템(PR, 배포, CI 등)과 연계되는 항목은 실제 데이터를 조회하여 구체화
+
+## 보고서 구조 (이 순서와 섹션을 반드시 지킬 것)
+
+### 1. 요약 (Executive Summary)
+- 2~4문장. "${period} 핵심 업무 = [완료 N건 + 진행 N건], 주목할 사항: ..."
+- 완료·진행·대기 건수와 가장 중요한 1~2가지 사항만 압축
+
+### 2. 완료 업무
+- 각 태스크별 한 줄 설명: **무엇을** 했고 **결과/상태**가 어떤지
+- 형식: \`[프로젝트] 태스크 제목 — 완료 내용 한 줄\`
+- 여러 관련 태스크는 묶어서 서술 가능
+
+### 3. 진행 중인 업무
+- 형식: \`[프로젝트] 태스크 제목 — 현재 상태 + 다음 액션\`
+- 마감일이 있으면 명시. 블로커가 있으면 명시.
+- 워크플로우명(status)이 있으면 괄호에 표기
+
+### 4. 예정·계획 업무
+- 다음 단계로 착수할 항목
+- 일정과 연계되는 항목 우선 표기
+
+### 5. 리스크 / 이슈 (있을 경우)
+- 마감 임박, 블로커, 의존성 등
+- 없으면 이 섹션 생략
+
+### 6. 외부 연계 조회 결과 (도구 호출 결과가 있을 때만)
+- PR 상태, 배포 현황, CI 결과 등을 조회한 내용
+- URL은 마크다운 링크로 포함
+
+## 작성 원칙
+- **구체성**: "확인", "검토", "점검" 같은 막연한 동사 단독 사용 금지. "결제 API v2 통합 완료 (PR #241 머지)", "사용자 알림 로직 리팩토링 진행 중 (60% 완료, 마감 6/25)" 처럼 대상과 상태가 명확해야 함
+- **간결성**: 섹션당 5~8항목 이내. 없는 항목은 "(없음)" 한 줄로 표시
+- **자연스러운 한국어**: 업무 보고서 톤. 지나치게 격식체(~하였습니다)보다는 간결한 명사형/동사형 마침
+- **계층 구조**: 헤딩(##, ###), 불릿(-), 코드(\`\`)를 목적에 맞게 사용
+
+## 에이전틱 행동 — 외부 시스템 grounding
+태스크 제목이나 일정이 외부 시스템 상태를 암시하면 도구로 직접 확인하라:
+- \`Bash\`: git log, 배포 스크립트, 내부 CLI 명령 (사용자 스킬에 정의된 명령 우선)
+- \`WebSearch\` / \`WebFetch\`: 외부 링크, 릴리스 노트, 이슈 트래커
+- \`mcp__dooray-mcp__*\` 및 기타 활성 MCP: 추가 태스크 세부 정보 조회
+
+도구 호출 원칙:
+- 같은 인자로 동일 도구 두 번 호출 금지
+- 도구 실패 시 해당 항목 조용히 skip, 나머지 보고서 계속 작성
+- 호출 결과 URL 은 마크다운 링크로 포함 (UI 가 자동 렌더링)
+- 사용자 스킬에 명시된 명령이 있으면 그것을 최우선 활용
+
+## 최종 출력 형식
+- 마크다운 문서 하나 (코드블록이나 JSON 감싸기 금지)
+- 위 6개 섹션 순서 유지 (해당 없는 섹션은 간략히 "(없음)")
+- 마지막에 \`---\n*보고서 생성: ${today}*\` 한 줄 추가`
 
     const args = buildArgs(prompt, {
       model: this.pickModel('report', 'opus'),
-      systemPrompt: this.buildSystemPrompt(
-        `업무 보고서 전문 작성 AI. 간결하고 명확한 마크다운 보고서를 생성합니다. 한국어로 작성.
-
-구체성 가드:
-- "확인", "검토", "점검", "재확인" 같은 막연한 동사 단독 사용 금지
-- 각 항목은 [동사 + 대상 + (가능하면) 일시/상태] 형태
-- 진행중 항목은 현재 워크플로 상태/마감일을 본문에 인용
-
-**에이전틱 행동** — 두레이 데이터만 정리하지 말고 외부 시스템 상태를 적극 fetch 하라:
-- 보고서 기간 안의 일정/태스크가 외부 시스템(PR, CI, 배포, 모니터링, 메신저 등) 상태를 암시하면 사용 가능한 도구로 직접 grounding data 를 가져와 본문에 인용한다.
-- 사용 가능한 도구: \`Bash\` (사용자 셸 명령), \`WebSearch\` / \`WebFetch\`, \`mcp__dooray-mcp__*\`, 기타 활성 MCP.
-- 사용자가 "사용자 정의 규칙(스킬)" 섹션에서 지시한 명령/패턴이 있으면 그것을 우선 활용.
-- 결과 URL 은 마크다운 링크 형태로 본문에 그대로 포함. UI 가 자동 렌더링한다.
-- "이미 두레이에 있으니 됐다"는 잘못된 판단 — 외부 시스템은 별개. 둘 다 봐야 완전한 그림.
-- 도구 결과가 비거나 에러여도 다른 카테고리는 계속 작성. 실패 명령을 사용자에게 노출하지 않는다.
-- 같은 도구를 같은 인자로 두 번 호출 금지.`,
-        'report'
-      ),
+      systemPrompt: this.buildSystemPrompt(REPORT_SYSTEM_PROMPT, 'report'),
       // 에이전틱 — Bash + Web + MCP 광범위 허용. 보고서는 깊이 있는 분석이라 budget/effort 여유있게.
       maxBudget: allEmpty ? '3.5' : '3.0',
       effort: 'high',
