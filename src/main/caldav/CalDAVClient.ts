@@ -75,6 +75,19 @@ function basicAuthHeader(): string {
   return 'Basic ' + Buffer.from(`${creds.username}:${creds.password}`, 'utf-8').toString('base64')
 }
 
+/**
+ * If-Match 헤더용 ETag 정규화 — 반드시 큰따옴표로 감싼 형태여야 한다.
+ * 우리는 sync 시 etag 의 따옴표를 벗겨 저장하므로(`99e7...`), PUT 의 If-Match 에는 다시 큰따옴표를 씌운다.
+ * Why: 두레이 CalDAV 는 따옴표 없는 If-Match 를 "불일치"로 보고 PUT 을 200 으로 받아주면서도
+ * 본문 변경을 무시한다(=수정이 서버에 안 먹힘). 따옴표를 씌우면 정상 매칭되어 반영된다.
+ */
+function quoteEtag(etag?: string): string | undefined {
+  if (!etag) return undefined
+  const t = etag.trim()
+  if (!t) return undefined
+  return /^(W\/)?".*"$/.test(t) ? t : `"${t}"`
+}
+
 function fmtCalDavTime(iso: string): string {
   const d = new Date(iso)
   return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`
@@ -417,7 +430,7 @@ export class CalDAVClient {
       headers: {
         Authorization: auth,
         'Content-Type': 'text/calendar; charset=utf-8',
-        ...(input.etag ? { 'If-Match': input.etag } : {})
+        ...(input.etag ? { 'If-Match': quoteEtag(input.etag)! } : {})
       },
       body: newIcs
     })
@@ -425,7 +438,14 @@ export class CalDAVClient {
       const body = await resp.text().catch(() => '')
       throw new Error(`CalDAV PUT 실패: ${resp.status} ${body.slice(0, 200)}`)
     }
-    const newEtag = resp.headers.get('etag') ?? undefined
+    let newEtag = resp.headers.get('etag') ?? undefined
+    // 두레이는 PUT 응답에 ETag 를 안 주는 경우가 있어 직후 GET 으로 보정 (incrementalSync 변경 감지용)
+    if (!newEtag) {
+      try {
+        const v = await fetch(absUrl, { method: 'GET', headers: { Authorization: auth } })
+        newEtag = v.headers.get('etag') ?? undefined
+      } catch { /* ok */ }
+    }
     console.log('[CalDAV PUT]', absUrl, 'status=', resp.status, 'newEtag=', newEtag)
     return { etag: newEtag?.replace(/^["']|["']$/g, '') }
   }
@@ -487,7 +507,7 @@ export class CalDAVClient {
       headers: {
         Authorization: auth,
         'Content-Type': 'text/calendar; charset=utf-8',
-        ...(input.etag ? { 'If-Match': input.etag } : {})
+        ...(input.etag ? { 'If-Match': quoteEtag(input.etag)! } : {})
       },
       body: newIcs
     })
