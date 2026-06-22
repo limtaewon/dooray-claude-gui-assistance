@@ -22,6 +22,7 @@ import { UnifiedCalendarService } from './caldav/UnifiedCalendarService'
 import { CTagPoller } from './caldav/CTagPoller'
 import { CalendarObjectsStore } from './caldav/CalendarObjectsStore'
 import { HolidayService } from './holiday/HolidayService'
+import { HarnessService } from './harness/HarnessService'
 import type {
   CalDAVEventCreate,
   CalDAVEventQuery,
@@ -293,10 +294,11 @@ const analyticsService = new AnalyticsService()
 
 // Harness Studio (v1.7) — HarnessService 인스턴스화는 app.getPath('userData') 가 필요하므로
 // createWindow() 내부 또는 app.whenReady() 이후에 생성한다. 여기서는 지연 초기화용 레퍼런스만 선언.
-let _harnessService: import('./harness/HarnessService').HarnessService | null = null
-function getHarnessService(): import('./harness/HarnessService').HarnessService {
+// 정적 import 로 번들에 포함시키고(electron-vite 단일 번들에서 동적 require 는 해소 불가),
+// 인스턴스화만 app.getPath('userData') 가 준비된 이후로 지연한다.
+let _harnessService: HarnessService | null = null
+function getHarnessService(): HarnessService {
   if (!_harnessService) {
-    const { HarnessService } = require('./harness/HarnessService') as typeof import('./harness/HarnessService')
     _harnessService = new HarnessService(app.getPath('userData'), aiService)
   }
   return _harnessService
