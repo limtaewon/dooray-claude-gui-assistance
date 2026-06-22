@@ -11,7 +11,7 @@ domain: ai-service, electron-ipc
 
 ## 컨텍스트
 
-번들 정규화(Sonnet)와 레벨 추정(Haiku)은 AI 호출이라 지연·비용이 있다. PRD §5·§8은 "번들 해시 캐시(재오픈 0초)", "태스크 해시 캐시"를 명시한다. Clauday는 이미 `electron-store`(JSON) 와 `<userData>` 파일을 둘 다 쓴다. 어디에 어떤 키로 캐시할지 결정이 필요하다.
+번들 정규화(Opus)와 레벨 추정(Haiku)은 AI 호출이라 지연·비용이 있다. PRD §5·§8은 "번들 해시 캐시(재오픈 0초)", "태스크 해시 캐시"를 명시한다. Clauday는 이미 `electron-store`(JSON) 와 `<userData>` 파일을 둘 다 쓴다. 어디에 어떤 키로 캐시할지 결정이 필요하다.
 
 캐시 대상: ① HarnessModel(번들당, 수~수십 KB) ② DryRunResult(태스크당, 작음). 무효화 조건: 번들 파일 변경 / 태스크 텍스트 변경 / HarnessModel 스키마 변경.
 

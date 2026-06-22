@@ -272,7 +272,7 @@ export const IPC_CHANNELS = {
   HARNESS_SCAN: 'harness:scan',
   /** ~/.claude/skills/* 를 정적으로 스캔해 발견된 번들 목록 반환 */
   HARNESS_DISCOVER: 'harness:discover',
-  /** 번들 경로를 AI(Sonnet)로 정규화해 HarnessModel 반환 — 캐시 hit 시 즉시, force=true 면 재정규화 */
+  /** 번들 경로를 AI(Opus)로 정규화해 HarnessModel 반환 — 캐시 hit 시 즉시, force=true 면 재정규화 */
   HARNESS_NORMALIZE: 'harness:normalize',
   /** 태스크 평문을 받아 레벨 추정 + 경로 계산 DryRunResult 반환 — taskHash 캐시 */
   HARNESS_DRYRUN: 'harness:dryrun',

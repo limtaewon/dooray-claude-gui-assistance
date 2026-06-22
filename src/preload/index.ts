@@ -683,7 +683,7 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.HARNESS_DISCOVER),
 
     /**
-     * 번들 경로를 AI(Sonnet) 로 정규화해 HarnessModel 을 반환한다.
+     * 번들 경로를 AI(Opus) 로 정규화해 HarnessModel 을 반환한다.
      * 캐시 hit 시 즉시, force=true 면 재정규화.
      * requestId 를 지정하면 AI_PROGRESS 이벤트로 진행률을 받을 수 있다.
      */

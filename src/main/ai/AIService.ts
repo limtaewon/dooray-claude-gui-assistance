@@ -1345,7 +1345,7 @@ ${useMcp ? `
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
-   * 번들 정적 스켈레톤을 AI(Sonnet)로 보강해 완전한 HarnessModel 을 반환한다.
+   * 번들 정적 스켈레톤을 AI(Opus)로 보강해 완전한 HarnessModel 을 반환한다.
    *
    * Windows/Mac 플랫폼 분기는 runClaudeStream 내부에서 처리된다.
    * 이 메서드는 argv/stdin 구성 후 runClaudeStream 을 재사용할 뿐,
@@ -1367,7 +1367,9 @@ ${useMcp ? `
     rawBundleText: string,
     requestId?: string
   ): Promise<HarnessModel> {
-    const model = this.pickModel('harnessNormalize', 'sonnet')
+    // 정규화는 1회성(번들 해시 캐시) + 품질 핵심(HarnessModel 이 8뷰 전체의 단일 진실 소스)이라
+    // 기본 Opus. 빈도가 낮고 캐시되므로 비용 영향은 작고 정확도 이득이 크다.
+    const model = this.pickModel('harnessNormalize', 'opus')
     const systemPrompt = buildNormalizeSystemPrompt()
     const userPrompt = buildNormalizeUserPrompt(skeleton, rawBundleText)
 

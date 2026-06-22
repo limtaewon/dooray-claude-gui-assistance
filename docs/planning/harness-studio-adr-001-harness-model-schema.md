@@ -22,7 +22,7 @@ domain: ai-service, electron-ipc, renderer-only
 `src/shared/types/harness.ts` 에 단일 `HarnessModel` 스키마를 정의하고, **모든 필드에 출처(FieldSource: static|ai|inferred|absent)를 동반하는 `provenance` 맵을 포함**한다. 채우는 책임을 다음으로 고정한다:
 
 1. **정적 스캐너(`BundleScanner`, AI 없음)가 먼저** [S] 필드(meta 기본/agents id·tools·model(frontmatter 있을 때)·artifact 템플릿·gate phase·ruleCodes·hook 파일)로 *스켈레톤* 을 만든다.
-2. **AI 정규화기(`HarnessNormalizer`, Sonnet)는 비어있는 [AI] 필드만** JSON 으로 산출해 머지한다. **AI는 [S] 필드를 덮어쓰지 못한다**(정적이 더 신뢰도 높음). `model:` 이 frontmatter에 없으면 `_core/models.md` 매트릭스를 정적 파싱 시도 → 그래도 없으면 AI/`unknown` + provenance 기록.
+2. **AI 정규화기(`HarnessNormalizer`, Opus)는 비어있는 [AI] 필드만** JSON 으로 산출해 머지한다. **AI는 [S] 필드를 덮어쓰지 못한다**(정적이 더 신뢰도 높음). `model:` 이 frontmatter에 없으면 `_core/models.md` 매트릭스를 정적 파싱 시도 → 그래도 없으면 AI/`unknown` + provenance 기록.
 3. degradation 시 `warnings[]` + provenance 로 신뢰도를 항상 UI에 노출한다.
 
 스키마는 `schemaVersion` 필드를 가지며, 변경 시 캐시는 버전 비교로 자동 무효화된다.

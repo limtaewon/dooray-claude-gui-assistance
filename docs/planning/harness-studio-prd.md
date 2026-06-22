@@ -54,7 +54,7 @@
 | 태스크 | 두레이 URL / 평문 | Dry-run 입력 |
 | 부분 스킬 zip | `SKILL.md`/agent frontmatter만 | 풀 흐름 없이 에이전트 카탈로그 (degradation) |
 
-**Import 단계 UX (4-step 위저드)**: ① 소스(드롭/자동발견/연결) → ② 구조 인식(정적 스캔, AI 없음) → ③ AI 정규화(HarnessModel 추출, Sonnet, 번들 해시 캐시) → ④ 확정·개인화(오버레이/용어번역 토글).
+**Import 단계 UX (4-step 위저드)**: ① 소스(드롭/자동발견/연결) → ② 구조 인식(정적 스캔, AI 없음) → ③ AI 정규화(HarnessModel 추출, Opus, 번들 해시 캐시) → ④ 확정·개인화(오버레이/용어번역 토글).
 
 ## 6. 데이터 모델 — `HarnessModel`
 
@@ -107,7 +107,7 @@ HarnessModel {
 
 | 용도 | 모델 | 비고 |
 |---|---|---|
-| 번들 마크다운 → HarnessModel 정규화 | Sonnet | 번들 해시 캐시 (재오픈 0초) |
+| 번들 마크다운 → HarnessModel 정규화 | Opus | 번들 해시 캐시 (재오픈 0초) |
 | 태스크 → 레벨 추정 | Haiku | 태스크 해시 캐시 |
 | 개인화 설명/용어 번역 | Sonnet | 온디맨드 |
 

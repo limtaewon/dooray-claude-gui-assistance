@@ -6,7 +6,7 @@
 
 ### 신규 기능
 
-- **Import 위저드 (4단계)** — 번들 폴더 지정 → 구조 인식(정적) → AI 정규화(Sonnet) → 오버레이 반영 후 Harness Studio 열기
+- **Import 위저드 (4단계)** — 번들 폴더 지정 → 구조 인식(정적) → AI 정규화(Opus) → 오버레이 반영 후 Harness Studio 열기
 - **Flow Canvas 탭** — react-flow 기반 에이전트 그래프. L0~L3 레벨 토글, 노드별 역할 색상(analyst/pm/architect/dev/security 등), 모델 배지(haiku/sonnet/opus), 핸드오프 엣지에 산출물 라벨, 오버레이(비활성/모델 override) 반영, Agent Inspector 패널(역할·도구·위험·AI 설명)
 - **Dry-run 탭** — 태스크 설명 입력 → 예상 레벨·에이전트 경로·단계 추정 (Haiku)
 - **Skills/Blocks 탭** — 에이전트별 역할 카드·도구 목록

@@ -281,7 +281,7 @@ export function checkScoreCoverage(model: HarnessModel): CheckResult {
   if (!model.score) {
     return {
       key, title, severity: 'WARN',
-      detail: '6축 점수가 없습니다. 하네스를 다시 가져와 AI 정규화를 실행하면 Sonnet이 점수를 추정합니다.',
+      detail: '6축 점수가 없습니다. 하네스를 다시 가져와 AI 정규화를 실행하면 Opus가 점수를 추정합니다.',
       items: []
     }
   }

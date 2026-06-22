@@ -2,7 +2,7 @@
  * Harness Studio — HarnessModel 스키마 및 IPC 보조 타입
  *
  * 정적 스캐너(BundleScanner)가 채우는 [S] 필드와
- * AI 정규화기(HarnessNormalizer, Sonnet)가 채우는 [AI] 필드를
+ * AI 정규화기(HarnessNormalizer, Opus)가 채우는 [AI] 필드를
  * provenance 맵으로 구분한다. 렌더러는 번들 종류와 무관하게
  * HarnessModel 하나만 그린다(번들-agnostic).
  *
@@ -413,7 +413,7 @@ export interface HarnessOverlay {
  * 번들 하나를 정규화한 결과 — Harness Studio 의 핵심 데이터 모델.
  *
  * 정적 스캐너(BundleScanner)가 [S] 필드로 스켈레톤을 먼저 채우고,
- * AI 정규화기(HarnessNormalizer, Sonnet)가 비어있는 [AI] 필드만 채운다.
+ * AI 정규화기(HarnessNormalizer, Opus)가 비어있는 [AI] 필드만 채운다.
  * AI 는 [S] 필드를 절대 덮어쓰지 않는다(ADR-001).
  *
  * schemaVersion 은 캐시 무효화에 사용된다 — 스키마 변경 시 반드시 올린다.

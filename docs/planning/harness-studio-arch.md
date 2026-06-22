@@ -259,7 +259,7 @@ CHANGELOG.md                                                # v1.7 항목
    ▼
 [main] HarnessCache.get(bundleHash) ── hit → 즉시 반환(재오픈 0초)
    │  miss ▼
-[main] HarnessNormalizer  ── AIService.normalizeHarness(rawBundle, Sonnet)
+[main] HarnessNormalizer  ── AIService.normalizeHarness(rawBundle, Opus)
    │      (정적스켈레톤 + AI보강 머지, provenance 기록)
    │  → HarnessModel  → HarnessCache.set(bundleHash, model)
    ▼

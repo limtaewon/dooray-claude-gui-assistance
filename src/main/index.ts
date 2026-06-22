@@ -1649,7 +1649,7 @@ ${data}`,
   })
 
   /**
-   * HARNESS_NORMALIZE — 번들 경로 AI 정규화. 캐시 hit 시 즉시, miss 시 Sonnet 호출.
+   * HARNESS_NORMALIZE — 번들 경로 AI 정규화. 캐시 hit 시 즉시, miss 시 Opus 호출.
    * { path: string; force?: boolean; requestId?: string }
    */
   ipcMain.handle(
