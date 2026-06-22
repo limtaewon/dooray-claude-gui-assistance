@@ -1,102 +1,94 @@
 ---
-task: harness-studio-m5
-agent: renderer-engineer
-date: 2026-06-19
+task: harness-studio-edit-m5
+agent: main-process-engineer
+date: 2026-06-22
 ---
 
-# Impl Log — Harness Studio M5: Flow Canvas + Agent Inspector
+# Impl Log — Harness Studio 편집 M5: IPC 배선 (main + preload)
 
 ## 변경한 파일
 
-### 신규 (순수 함수 / 테마)
-- `src/renderer/src/components/HarnessStudio/shared/PhaseColor.ts`
-  — `phaseTokens(phaseClass)` → DS CSS 변수 토큰 반환. `PHASE_TOKEN_MAP` 10개 phaseClass 정의. `isKnownPhaseClass()` 타입 가드.
-- `src/renderer/src/components/HarnessStudio/flow/buildGraph.ts`
-  — `buildGraph(model, levelId) → { nodes, edges }`. 활성 체인 active/dimmed 분리, 병렬 그룹 컬럼 배치, QA RETURN 루프 엣지, 게이트 노드 삽입, 산출물 라벨 엣지. react-flow 독립 순수함수.
-- `src/renderer/src/components/HarnessStudio/flow/flowTheme.ts`
-  — `getFlowTheme()` / `getFlowCSSVarOverrides()`. react-flow CSS 변수를 DS 토큰으로 바인딩. useTheme 전환 시 재렌더 불필요(CSS 변수 상속).
-
-### 신규 (React 컴포넌트)
-- `src/renderer/src/components/HarnessStudio/flow/nodes/AgentNode.tsx`
-  — phaseClass 배경색(PhaseColor), 모델 배지(haiku/sonnet/opus 색 구분), riskNote 위험 아이콘, AI 출처 ProvenanceBadge.
-- `src/renderer/src/components/HarnessStudio/flow/nodes/GateNode.tsx`
-  — blocking 잠금 아이콘, 규칙코드 칩 목록(최대 3+N), DS 빨강/초록 토큰.
-- `src/renderer/src/components/HarnessStudio/flow/edges/HandoffEdge.tsx`
-  — 산출물 라벨(EdgeLabelRenderer), 점선(conditional), 노란 RETURN 루프 곡선 + 라벨.
-- `src/renderer/src/components/HarnessStudio/flow/FlowCanvas.tsx`
-  — props: `{ model, highlightPath?, onSelectAgent? }`. L0~L3 SegTabs 토글, react-flow 줌·팬·미니맵·컨트롤, 노드 클릭 → AgentInspector 우측 패널 통합. `highlightPath` M7 Dry-run 연동 자리 예약(현재 무시).
-- `src/renderer/src/components/HarnessStudio/inspector/AgentInspector.tsx`
-  — 모델/역할/도구/reads/writes/riskNote/에스컬레이션/signals 패널. FlowCanvas 내부에 통합되어 노드 클릭 시 토글.
-
-### 신규 (테스트)
-- `src/renderer/src/components/HarnessStudio/__tests__/PhaseColor.test.ts` — 14개 케이스
-- `src/renderer/src/components/HarnessStudio/__tests__/buildGraph.test.ts` — 23개 케이스
-
-### 수정
-- `src/renderer/src/components/ClaudeManual/ClaudeManual.tsx`
-  — `harness-studio` 섹션에 Flow Canvas(M5) 항목 추가: L0~L3 토글, PhaseColor 색상 규칙, Agent Inspector 사용법, 핸드오프 엣지 표기, 줌·팬.
+- `src/main/index.ts` (HarnessEditService import + lazy 인스턴스 + 6개 ipcMain.handle 등록 + HARNESS_SCAN registerBundle 추가)
+- `src/preload/index.ts` (harness-edit 타입 import + api.harness.edit.* 6개 노출)
 
 ## 결정 사항
 
-### buildGraph — 타입 확장
-- `AgentNodeData`, `GateNodeData`, `EdgeData` 에 `extends Record<string, unknown>` 추가.
-  이유: `@xyflow/react` v12 의 `Node<T>` / `Edge<T>` 제네릭이 `T extends Record<string, unknown>` 제약을 가짐. 순수함수 테스트에서는 react-flow 타입에 의존하지 않으면서도 FlowCanvas 에서 타입 안전하게 캐스팅 가능하도록.
+### HarnessEditService lazy 인스턴스 패턴
+- `getHarnessService()` 와 동일한 lazy init 패턴으로 `getHarnessEditService()` 구현.
+- `HarnessService` 인스턴스는 중복 생성 없이 `getHarnessService()` 반환값을 재주입. `AIService` 도 기존 `aiService` 전역 인스턴스 재사용.
 
-### FlowCanvas — 노드/엣지 변환
-- `buildGraph` 반환값을 FlowCanvas 내에서 `as unknown as Node[]` / `as unknown as Edge[]` 로 캐스팅.
-  이유: 커스텀 data 타입이 react-flow 내부 `Record<string, unknown>` 제약을 직접 만족시키지 못하는 타입 시스템 한계. 런타임은 정상 동작하며, 커스텀 노드/엣지 컴포넌트에서 `data as unknown as AgentNodeData` 역캐스팅으로 타입 복원.
+### HARNESS_SCAN 에 registerBundle 추가
+- 스캔 성공 후 `getHarnessEditService().registerBundle(realBundlePath)` 호출로 편집 allowlist 에 번들 경로 등록.
+- 스캔이 선행되지 않은 번들은 readFile/diff/apply 호출 시 `HarnessPathDeniedError` 가 발생하므로 UX 흐름 상 반드시 스캔 먼저.
+- allowlist 등록 실패(fs.realpath 불가 등)는 `catch` 로 조용히 처리 — 이후 서비스 내부에서 재검증.
 
-### AgentNode — lucide title prop
-- `AlertTriangle` 에 `title` prop 을 직접 전달할 수 없음(lucide-react `IntrinsicAttributes` 미포함).
-  `<span title={riskNote}>` 래퍼로 해결.
+### HARNESS_AI_EDIT 핸들러 — 파일 읽기 조율
+- AIService.proposeEdit 시그니처는 `{ relPath, content }[]` 를 받음.
+- IPC 핸들러가 `targetRelPaths` 를 받아 디스크에서 파일 내용을 읽어 배열로 조립한 뒤 위임.
+- 파일 읽기 실패(존재하지 않는 relPath 등) 시 해당 항목을 warn 로그 후 스킵 — 전체 실패 방지.
+- 40KB 상한 초과는 AIService 내부에서 throw — 핸들러는 try/catch 로 표면화.
 
-### flowTheme — CSS 변수 오버라이드 방식
-- react-flow 기본 배경/컨트롤/미니맵 색상은 `--xy-*` 내부 변수로 관리됨.
-  `getFlowCSSVarOverrides()` 가 이 변수들을 DS 토큰으로 덮어써 다크/라이트 자동 반영.
-  `useTheme` 구독 불필요 — CSS 변수 상속 체계가 처리.
+### 핸들러는 얇은 어댑터
+- 입력 검증·경로 게이트·백업·원자 쓰기는 모두 HarnessEditService(M3) 에 위임.
+- 핸들러 역할: try/catch + console.error 로 에러 표면화, 결과 반환.
 
-### AgentInspector — provenance 키 탐색
-- provenance 맵 키 형식이 `"agents[N].model"` 처럼 배열 인덱스를 포함함.
-  에이전트 ID 와 필드명을 포함하는 키를 `Object.keys().find()` 로 탐색하는 `findProvenanceKey` 헬퍼로 처리.
-  인덱스 기반 조회보다 안전 (에이전트 순서 변동에 내성).
+### preload api.harness.edit 네임스페이스
+- 기존 `api.harness` 객체에 `edit` 서브 객체를 추가하는 방식(확장 친화적).
+- 시그니처는 IPC 상수 주석의 요청/응답 타입과 정확히 일치시킴.
 
 ## 제약 (하지 말 것)
 
-- **`HarnessStudioView.tsx` 수정 금지** — M6 배선 영역. `TabPlaceholder` 교체는 M6 에서.
-- **Dry-run 로직 구현 금지** — `highlightPath` prop 자리만 예약. M7 영역.
-- **`views/` 디렉터리 컴포넌트 생성 금지** — M6 영역.
-- **main/preload 수정 금지** — 이미 M3 에서 IPC 핸들러 등록 완료.
+- `src/renderer/**` 수정 금지 — M6 영역.
+- `AIService.runClaudeStream` 분기 수정 금지 — Mac/Windows 플랫폼 분기는 의도적.
+- HarnessEditService 내부 게이트 우회 코드 추가 금지 — 이유: security-reviewer 리뷰 대상(M7).
+- `getHarnessEditService()` 에 AIService 직접 주입 금지 — proposeEdit 는 IPC 핸들러에서 aiService 직접 호출로 조율.
 
-## FlowCanvas export 시그니처 (M6 배선 참고)
+## 검증 결과
+
+- `npm run typecheck` : tsc 양쪽 통과 (exit 0)
+- `npm run test:run` : 103 파일, 1493 테스트 전량 통과
+- `npm run build` : main 446KB / preload 41KB / renderer 3848KB 빌드 성공
+
+## 노출된 window.api.harness.edit.* 시그니처
 
 ```ts
-export interface FlowCanvasProps {
-  model: HarnessModel
-  highlightPath?: string[]      // M7 Dry-run 연동 자리 — 현재 무시
-  onSelectAgent?: (agentId: string) => void
-}
+window.api.harness.edit.readFile(
+  path: string,
+  relPath: string
+): Promise<{ content: string; sourceMap?: AgentSourceMap }>
 
-export function FlowCanvas(props: FlowCanvasProps): JSX.Element
-export default FlowCanvas
+window.api.harness.edit.diff(
+  path: string,
+  draft: HarnessDraft
+): Promise<DraftDiffSummary>
+
+window.api.harness.edit.apply(
+  path: string,
+  draft: HarnessDraft
+): Promise<{ applied: string[]; backupDir: string; model: HarnessModel }>
+
+window.api.harness.edit.aiPropose(
+  path: string,
+  command: string,
+  targetRelPaths: string[],
+  requestId?: string
+): Promise<{ proposals: AIEditProposal[] }>
+
+window.api.harness.edit.listBackups(
+  path: string
+): Promise<BackupEntry[]>
+
+window.api.harness.edit.restore(
+  path: string,
+  backupDir: string
+): Promise<{ restored: string[]; model: HarnessModel }>
 ```
-
-AgentInspector 는 FlowCanvas 내부 통합(우측 패널, 노드 클릭 토글). 별도 배선 불필요.
-
-`HarnessStudioView.tsx` 의 `TabPlaceholder` 교체 시:
-```tsx
-// activeTab === 'flow' 분기에서
-<FlowCanvas model={model} />
-```
-
-## 테스트 결과
-
-- 전체: 86 파일, 1112 테스트 통과 (실패 0)
-- 신규 M5: PhaseColor (14개) + buildGraph (23개) = 37개
-- typecheck: `tsc --noEmit` 양쪽 통과 (exit 0)
 
 ## 참조
 
-- `docs/planning/harness-studio-arch.md` §5 (react-flow 통합방식)
-- `docs/planning/harness-studio-adr-003-react-flow.md` (커스텀 노드/엣지/테마)
-- M4: ImportWizard 4-step + HarnessStudioView 셸
-- M3: IPC 핸들러 등록 (HARNESS_SCAN/NORMALIZE/DISCOVER/LIST_CACHED/CACHE_CLEAR)
+- `docs/planning/harness-studio-edit-plan.md` M5 체크리스트
+- `docs/planning/harness-studio-edit-arch.md` IPC 절
+- ADR-harness-studio-edit-001/002/003
+- M3: HarnessEditService (HarnessEditService.ts, pathGate.ts, backup.ts, draftDiff.ts)
+- M4: AIService.proposeEdit, harnessEditPrompt.ts
+- M0: IPC 상수 (harness:edit:*), harness-edit.ts 타입

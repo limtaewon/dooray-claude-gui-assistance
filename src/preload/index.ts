@@ -68,6 +68,13 @@ import type {
   DiscoveredHarness,
   CachedHarnessEntry
 } from '../shared/types/harness'
+import type {
+  HarnessDraft,
+  DraftDiffSummary,
+  AIEditProposal,
+  BackupEntry,
+  AgentSourceMap
+} from '../shared/types/harness-edit'
 import type { Skill, SkillSaveRequest } from '../shared/types/skills'
 import type { UsageQueryParams, UsageSummary } from '../shared/types/usage'
 import type {
@@ -732,7 +739,92 @@ const api = {
      * @returns { markdown: string }
      */
     explain: (args: { path: string; topic: string; requestId?: string }): Promise<{ markdown: string }> =>
-      ipcRenderer.invoke(IPC_CHANNELS.HARNESS_EXPLAIN, args)
+      ipcRenderer.invoke(IPC_CHANNELS.HARNESS_EXPLAIN, args),
+
+    /**
+     * Harness Studio 편집(저작) 기능 (v1.8).
+     * 네임스페이스: api.harness.edit.*
+     *
+     * AI_PROGRESS 진행률은 기존 api.ai.onProgress 재사용 (requestId 로 구분).
+     */
+    edit: {
+      /**
+       * 번들 내 단일 파일 원본 내용 + AgentSourceMap 반환.
+       * 게이트: 번들이 HARNESS_SCAN 으로 등록되어 있어야 한다.
+       *
+       * @param path - 번들 루트 절대경로
+       * @param relPath - 번들 루트 기준 파일 상대경로
+       * @returns { content: string; sourceMap?: AgentSourceMap }
+       */
+      readFile: (path: string, relPath: string): Promise<{ content: string; sourceMap?: AgentSourceMap }> =>
+        ipcRenderer.invoke(IPC_CHANNELS.HARNESS_READ_FILE, { path, relPath }),
+
+      /**
+       * draft 와 디스크 현재 내용을 대조해 DraftDiffSummary 를 반환한다.
+       * 쓰기 없음. 적용 전 미리보기 및 stale 감지 용도.
+       *
+       * @param path - 번들 루트 절대경로
+       * @param draft - 편집 세션 draft 전체
+       * @returns DraftDiffSummary
+       */
+      diff: (path: string, draft: HarnessDraft): Promise<DraftDiffSummary> =>
+        ipcRenderer.invoke(IPC_CHANNELS.HARNESS_DIFF_DRAFT, { path, draft }),
+
+      /**
+       * draft 를 파일에 원자적으로 적용한다 (백업 + 쓰기 + 재정규화).
+       *
+       * 처리 순서: 경로 게이트 → stale 대조 → 백업 → temp-write+rename → cache clear → normalize(force=true).
+       * stale 또는 경로 위반 시 에러를 throw 한다 (부분 적용 없음).
+       *
+       * @param path - 번들 루트 절대경로
+       * @param draft - 편집 세션 draft 전체
+       * @returns { applied: string[]; backupDir: string; model: HarnessModel }
+       */
+      apply: (path: string, draft: HarnessDraft): Promise<{ applied: string[]; backupDir: string; model: HarnessModel }> =>
+        ipcRenderer.invoke(IPC_CHANNELS.HARNESS_APPLY_DRAFT, { path, draft }),
+
+      /**
+       * 자연어 명령을 AI 에 보내 파일 변경안을 제안받는다 (자동 쓰기 없음).
+       *
+       * proposals 는 사용자 승인 후 draft 에 반영한다.
+       * 진행률은 api.ai.onProgress 로 구독 (requestId 로 구분).
+       *
+       * @param path - 번들 루트 절대경로
+       * @param command - 사용자 자연어 명령 (예: "보안검토자를 opus 로 바꿔줘")
+       * @param targetRelPaths - 편집 대상 파일 상대경로 목록 (화이트리스트)
+       * @param requestId - 진행률 이벤트 구분 ID (optional)
+       * @returns { proposals: AIEditProposal[] }
+       */
+      aiPropose: (
+        path: string,
+        command: string,
+        targetRelPaths: string[],
+        requestId?: string
+      ): Promise<{ proposals: AIEditProposal[] }> =>
+        ipcRenderer.invoke(IPC_CHANNELS.HARNESS_AI_EDIT, { path, command, targetRelPaths, requestId }),
+
+      /**
+       * 번들의 백업 목록을 반환한다 (최신 백업 우선 정렬).
+       *
+       * @param path - 번들 루트 절대경로
+       * @returns BackupEntry[]
+       */
+      listBackups: (path: string): Promise<BackupEntry[]> =>
+        ipcRenderer.invoke(IPC_CHANNELS.HARNESS_LIST_BACKUPS, { path }),
+
+      /**
+       * 지정한 백업 디렉터리의 파일을 번들로 복원한다.
+       *
+       * backupDir 은 <userData>/harness-backups/ 하위여야 한다 (경로 주입 방어).
+       * 복원 후 HarnessService.normalize(force=true) 로 재정규화한다.
+       *
+       * @param path - 번들 루트 절대경로
+       * @param backupDir - 복원 대상 백업 디렉터리 절대경로 (BackupEntry.backupDir)
+       * @returns { restored: string[]; model: HarnessModel }
+       */
+      restore: (path: string, backupDir: string): Promise<{ restored: string[]; model: HarnessModel }> =>
+        ipcRenderer.invoke(IPC_CHANNELS.HARNESS_RESTORE_BACKUP, { path, backupDir })
+    }
   }
 }
 

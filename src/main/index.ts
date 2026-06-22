@@ -23,6 +23,10 @@ import { CTagPoller } from './caldav/CTagPoller'
 import { CalendarObjectsStore } from './caldav/CalendarObjectsStore'
 import { HolidayService } from './holiday/HolidayService'
 import { HarnessService } from './harness/HarnessService'
+import { HarnessEditService } from './harness/HarnessEditService'
+import type { HarnessDraft } from '../shared/types/harness-edit'
+import { promises as editFs } from 'fs'
+import * as editPath from 'path'
 import type {
   CalDAVEventCreate,
   CalDAVEventQuery,
@@ -302,6 +306,16 @@ function getHarnessService(): HarnessService {
     _harnessService = new HarnessService(app.getPath('userData'), aiService)
   }
   return _harnessService
+}
+
+// Harness Studio 편집 서비스 (v1.8) — HarnessService 와 동일한 lazy 패턴.
+// HarnessService 인스턴스를 재사용(중복 생성 금지) + AIService 도 동일 인스턴스.
+let _harnessEditService: HarnessEditService | null = null
+function getHarnessEditService(): HarnessEditService {
+  if (!_harnessEditService) {
+    _harnessEditService = new HarnessEditService(app.getPath('userData'), getHarnessService())
+  }
+  return _harnessEditService
 }
 
 // (이전에는 브리핑/보고서 사이에 cachedTasks를 공유했지만, 두레이 측에서 상태가
@@ -1638,7 +1652,18 @@ ${data}`,
       bundlePath = result.filePaths[0]
     }
     if (!bundlePath) return null
-    return getHarnessService().scan(bundlePath)
+    const scanResult = await getHarnessService().scan(bundlePath)
+    // 스캔 성공 시 HarnessEditService allowlist 에 번들 등록 (편집 IPC 사용 전제)
+    if (scanResult && bundlePath) {
+      try {
+        const { realpath: realpathFn } = await import('fs/promises')
+        const realBundlePath = await realpathFn(bundlePath).catch(() => bundlePath!)
+        getHarnessEditService().registerBundle(realBundlePath)
+      } catch {
+        // allowlist 등록 실패는 치명적이지 않음 — 이후 readFile/diff/apply 에서 재검증
+      }
+    }
+    return scanResult
   })
 
   /**
@@ -1704,6 +1729,139 @@ ${data}`,
     IPC_CHANNELS.HARNESS_EXPLAIN,
     async (_, args: { path: string; topic: string; requestId?: string }) => {
       return getHarnessService().explain(args.path, args.topic, args.requestId)
+    }
+  )
+
+  // ── Harness Studio — 편집(저작) 기능 (v1.8) ───────────────────────────────
+
+  /**
+   * HARNESS_READ_FILE — 번들 내 단일 파일 원본 내용 반환.
+   * 요청: { path: string; relPath: string }
+   * 응답: { content: string; sourceMap?: AgentSourceMap }
+   *
+   * 핸들러는 얇은 어댑터 — 게이트/검증은 HarnessEditService 내부에서 수행.
+   * HARNESS_SCAN 이 선행되어 번들이 등록된 경우를 전제한다.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.HARNESS_READ_FILE,
+    async (_, args: { path: string; relPath: string }) => {
+      try {
+        return await getHarnessEditService().readFile(args.path, args.relPath)
+      } catch (err) {
+        console.error('[HARNESS_READ_FILE] 실패:', (err as Error).message)
+        throw err
+      }
+    }
+  )
+
+  /**
+   * HARNESS_DIFF_DRAFT — draft 와 디스크 현재 내용 대조 → DraftDiffSummary 반환.
+   * 요청: { path: string; draft: HarnessDraft }
+   * 응답: DraftDiffSummary
+   *
+   * 쓰기 없음. stale 감지 전용.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.HARNESS_DIFF_DRAFT,
+    async (_, args: { path: string; draft: HarnessDraft }) => {
+      try {
+        return await getHarnessEditService().diff(args.path, args.draft)
+      } catch (err) {
+        console.error('[HARNESS_DIFF_DRAFT] 실패:', (err as Error).message)
+        throw err
+      }
+    }
+  )
+
+  /**
+   * HARNESS_APPLY_DRAFT — draft 를 파일에 원자적으로 적용한다 (백업 + 쓰기 + 재정규화).
+   * 요청: { path: string; draft: HarnessDraft }
+   * 응답: { applied: string[]; backupDir: string; model: HarnessModel }
+   *
+   * 처리 순서: 경로 게이트 → stale 대조 → 백업 → temp-write+rename → cache clear → normalize(force=true).
+   * 충돌(stale) 또는 경로 위반 시 에러 반환 (부분 적용 없음).
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.HARNESS_APPLY_DRAFT,
+    async (_, args: { path: string; draft: HarnessDraft }) => {
+      try {
+        return await getHarnessEditService().apply(args.path, args.draft)
+      } catch (err) {
+        console.error('[HARNESS_APPLY_DRAFT] 실패:', (err as Error).message)
+        throw err
+      }
+    }
+  )
+
+  /**
+   * HARNESS_AI_EDIT — 자연어 명령을 받아 AI 가 파일 변경안을 제안한다 (자동 쓰기 없음).
+   * 요청: { path: string; command: string; targetRelPaths: string[]; requestId?: string }
+   * 응답: { proposals: AIEditProposal[] }
+   *
+   * 처리 흐름:
+   * 1. targetRelPaths 의 파일 내용을 디스크에서 읽는다.
+   * 2. AIService.proposeEdit(command, targetFiles, requestId) 위임.
+   * 3. 진행률은 기존 AI_PROGRESS 채널 재사용 (requestId 로 구분).
+   *
+   * proposals 는 자동 적용되지 않는다. 사용자 승인 후 draft 에 반영.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.HARNESS_AI_EDIT,
+    async (_, args: { path: string; command: string; targetRelPaths: string[]; requestId?: string }) => {
+      try {
+        // targetRelPaths 의 파일 내용을 읽어 AIService.proposeEdit 에 전달
+        const targetFiles: { relPath: string; content: string }[] = []
+        for (const relPath of args.targetRelPaths) {
+          const absPath = editPath.join(args.path, relPath)
+          try {
+            const content = await editFs.readFile(absPath, 'utf-8')
+            targetFiles.push({ relPath, content })
+          } catch (readErr) {
+            console.warn(`[HARNESS_AI_EDIT] 파일 읽기 실패 (스킵): ${relPath}`, (readErr as Error).message)
+          }
+        }
+        return await aiService.proposeEdit(args.command, targetFiles, args.requestId)
+      } catch (err) {
+        console.error('[HARNESS_AI_EDIT] 실패:', (err as Error).message)
+        throw err
+      }
+    }
+  )
+
+  /**
+   * HARNESS_LIST_BACKUPS — 번들의 백업 목록 반환.
+   * 요청: { path: string }
+   * 응답: BackupEntry[] (최신 백업 우선 정렬)
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.HARNESS_LIST_BACKUPS,
+    async (_, args: { path: string }) => {
+      try {
+        return await getHarnessEditService().listBackups(args.path)
+      } catch (err) {
+        console.error('[HARNESS_LIST_BACKUPS] 실패:', (err as Error).message)
+        throw err
+      }
+    }
+  )
+
+  /**
+   * HARNESS_RESTORE_BACKUP — 지정한 백업 디렉터리의 파일을 번들로 복원한다.
+   * 요청: { path: string; backupDir: string }
+   * 응답: { restored: string[]; model: HarnessModel }
+   *
+   * backupDir 은 <userData>/harness-backups/ 하위여야 한다 (경로 주입 방어).
+   * 복원 후 HarnessService.normalize(force=true) 로 재정규화.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.HARNESS_RESTORE_BACKUP,
+    async (_, args: { path: string; backupDir: string }) => {
+      try {
+        return await getHarnessEditService().restore(args.path, args.backupDir)
+      } catch (err) {
+        console.error('[HARNESS_RESTORE_BACKUP] 실패:', (err as Error).message)
+        throw err
+      }
     }
   )
 }
