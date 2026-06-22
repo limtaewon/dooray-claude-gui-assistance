@@ -13,6 +13,7 @@ import { SkillsBlocksPanel } from './views/SkillsBlocksPanel'
 import { GatesPanel } from './views/GatesPanel'
 import { ArtifactsPanel } from './views/ArtifactsPanel'
 import { ScorePanel } from './views/ScorePanel'
+import { DryRunPanel } from './views/DryRunPanel'
 
 interface HarnessStudioViewProps {
   active?: boolean
@@ -53,6 +54,8 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
   const [model, setModel] = useState<HarnessModel | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<StudioTab>('flow')
+  // Dry-run 결과 경로 — Flow 탭의 highlightPath 로 전달된다(M7).
+  const [dryRunHighlight, setDryRunHighlight] = useState<string[] | undefined>(undefined)
   const [cachedList, setCachedList] = useState<CachedHarnessEntry[] | null>(null)
   const [cachedLoading, setCachedLoading] = useState(false)
   const [cachedError, setCachedError] = useState<string | null>(null)
@@ -98,6 +101,7 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
   const handleReset = useCallback(() => {
     setModel(null)
     setActiveTab('flow')
+    setDryRunHighlight(undefined)
     void loadCached()
   }, [loadCached])
 
@@ -240,7 +244,13 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
 
       {/* 탭 본체 */}
       <div className="flex-1 min-h-0 overflow-hidden">
-        <TabContent tab={activeTab} model={model} />
+        <TabContent
+          tab={activeTab}
+          model={model}
+          highlightPath={dryRunHighlight}
+          onHighlight={setDryRunHighlight}
+          onGoToFlow={() => setActiveTab('flow')}
+        />
       </div>
     </div>
   )
@@ -253,12 +263,30 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
  * - skills/gates/artifacts/score: 정적 패널(자체 스크롤).
  * - dryrun: M7 미구현 — placeholder.
  */
-function TabContent({ tab, model }: { tab: StudioTab; model: HarnessModel }): JSX.Element {
+function TabContent({
+  tab,
+  model,
+  highlightPath,
+  onHighlight,
+  onGoToFlow
+}: {
+  tab: StudioTab
+  model: HarnessModel
+  highlightPath?: string[]
+  onHighlight?: (path: string[]) => void
+  onGoToFlow?: () => void
+}): JSX.Element {
   switch (tab) {
     case 'flow':
       return (
         <div className="w-full h-full">
-          <FlowCanvas model={model} />
+          <FlowCanvas model={model} highlightPath={highlightPath} />
+        </div>
+      )
+    case 'dryrun':
+      return (
+        <div className="w-full h-full overflow-y-auto">
+          <DryRunPanel model={model} onHighlight={onHighlight} onGoToFlow={onGoToFlow} />
         </div>
       )
     case 'skills':
@@ -269,7 +297,6 @@ function TabContent({ tab, model }: { tab: StudioTab; model: HarnessModel }): JS
       return <div className="w-full h-full overflow-y-auto"><ArtifactsPanel model={model} /></div>
     case 'score':
       return <div className="w-full h-full overflow-y-auto"><ScorePanel model={model} /></div>
-    case 'dryrun':
     default:
       return (
         <div className="w-full h-full flex items-center justify-center">

@@ -14,6 +14,11 @@
  * QA RETURN 루프 규칙:
  * - controlFlow.loops 에 "RETURN" 키워드가 포함된 루프가 있으면
  *   qa → dev (또는 체인 첫 번째 노드) 방향으로 복귀 엣지를 생성한다.
+ *
+ * highlightPath 규칙 (M7 Dry-run 연동):
+ * - highlightPath 가 주어지면 해당 에이전트 노드는 highlighted=true,
+ *   나머지 활성 체인 노드는 dimmed=true 로 처리한다(강조/흐림 대비).
+ * - highlightPath 가 비어있거나 undefined 이면 기존 dimmed 로직만 동작한다.
  */
 
 import type { HarnessModel, HarnessAgent, HarnessGate, HarnessLevelId } from '@shared/types/harness'
@@ -34,6 +39,12 @@ export interface AgentNodeData extends Record<string, unknown> {
   riskNote?: string
   escalation?: string
   dimmed: boolean
+  /**
+   * Dry-run 하이라이트 경로에 포함된 에이전트 여부 (M7).
+   * true 이면 강조, 나머지 비하이라이트 활성 에이전트는 dimmed=true 처리된다.
+   * highlightPath 가 없으면 항상 false.
+   */
+  highlighted: boolean
 }
 
 export interface GateNodeData extends Record<string, unknown> {
@@ -197,12 +208,19 @@ function hasReturnLoop(model: HarnessModel): boolean {
  * - 활성 체인에 없는 에이전트도 dimmed=true 로 포함해 전체 구조를 표시한다.
  * - 게이트 노드는 blocking 게이트만 활성 체인 phase 에이전트 다음에 삽입한다.
  * - levelId 가 null/undefined 이거나 해당 레벨이 없으면 모든 에이전트를 dimmed 처리한다.
+ * - highlightPath 가 주어지면 해당 에이전트만 highlighted=true,
+ *   나머지 활성 체인 에이전트는 dimmed=true 로 처리(Dry-run 경로 강조).
  *
  * @param model - 정규화된 HarnessModel
  * @param levelId - 활성화할 레벨 식별자
+ * @param highlightPath - Dry-run 결과 에이전트 ID 배열 (M7, optional)
  * @returns react-flow 노드/엣지 배열
  */
-export function buildGraph(model: HarnessModel, levelId: HarnessLevelId | null): BuildGraphResult {
+export function buildGraph(
+  model: HarnessModel,
+  levelId: HarnessLevelId | null,
+  highlightPath?: string[]
+): BuildGraphResult {
   // 빈 에이전트 체인 degradation
   if (model.agents.length === 0) {
     return { nodes: [], edges: [] }
@@ -212,6 +230,15 @@ export function buildGraph(model: HarnessModel, levelId: HarnessLevelId | null):
   const activeChain: string[] = level?.agentChain ?? []
   const parallelInChain = level?.parallelInChain ?? []
   const activeChainSet = new Set(activeChain)
+
+  // ── 하이라이트 경로 집합 ──
+
+  // highlightPath 가 주어지면 해당 에이전트만 highlighted=true,
+  // 나머지 활성 체인 노드는 dimmed=true(흐림) 처리.
+  // highlightPath 가 없거나 비어있으면 기존 로직(활성=밝음, 비활성=흐림).
+  const highlightSet = highlightPath && highlightPath.length > 0
+    ? new Set(highlightPath)
+    : null
 
   // ── 노드 생성 ──
 
@@ -229,6 +256,11 @@ export function buildGraph(model: HarnessModel, levelId: HarnessLevelId | null):
     const col = chainColMap.get(agentId) ?? 0
     const row = chainRowMap.get(agentId) ?? 0
 
+    // highlightPath 가 있으면: 경로 포함=highlighted, 나머지=dimmed
+    // highlightPath 없으면: 모두 활성(dimmed=false)
+    const highlighted = highlightSet !== null ? highlightSet.has(agentId) : false
+    const dimmed = highlightSet !== null ? !highlightSet.has(agentId) : false
+
     nodes.push({
       id: agentId,
       type: 'agentNode',
@@ -236,7 +268,7 @@ export function buildGraph(model: HarnessModel, levelId: HarnessLevelId | null):
         x: START_X + col * COL_WIDTH,
         y: START_Y + row * ROW_HEIGHT
       },
-      data: agentToNodeData(agent, false)
+      data: agentToNodeData(agent, dimmed, highlighted)
     })
   }
 
@@ -295,7 +327,7 @@ export function buildGraph(model: HarnessModel, levelId: HarnessLevelId | null):
         x: START_X + (dimmedStartCol + Math.floor(idx / 3)) * COL_WIDTH,
         y: START_Y + (idx % 3) * ROW_HEIGHT
       },
-      data: agentToNodeData(agent, true)
+      data: agentToNodeData(agent, true, false)
     })
   })
 
@@ -416,7 +448,7 @@ export function buildGraph(model: HarnessModel, levelId: HarnessLevelId | null):
 // 내부 헬퍼
 // ─────────────────────────────────────────────
 
-function agentToNodeData(agent: HarnessAgent, dimmed: boolean): AgentNodeData {
+function agentToNodeData(agent: HarnessAgent, dimmed: boolean, highlighted: boolean): AgentNodeData {
   return {
     type: 'agent',
     agentId: agent.id,
@@ -428,7 +460,8 @@ function agentToNodeData(agent: HarnessAgent, dimmed: boolean): AgentNodeData {
     tools: agent.tools,
     riskNote: agent.riskNote,
     escalation: agent.escalation,
-    dimmed
+    dimmed,
+    highlighted
   }
 }
 
