@@ -44,8 +44,9 @@ function AgentNode({ data, selected }: NodeProps): JSX.Element {
       style={{
         opacity,
         background: tokens.bg,
-        border: `1.5px solid ${selected ? 'var(--c-blue-solid)' : tokens.border}`,
-        boxShadow: selected ? 'var(--ring-focus)' : undefined,
+        border: `1px solid ${selected ? 'var(--c-blue-solid)' : tokens.border}`,
+        borderLeft: `4px solid ${tokens.accent}`,
+        boxShadow: selected ? 'var(--ring-focus)' : '0 1px 2px rgba(0,0,0,0.25)',
         borderRadius: '8px',
         padding: '8px 10px',
         minWidth: '160px',
@@ -66,8 +67,18 @@ function AgentNode({ data, selected }: NodeProps): JSX.Element {
         style={{ background: tokens.border, border: 'none', width: 8, height: 8 }}
       />
 
-      {/* 헤더 행: 이름 + 위험 아이콘 + 모델 배지 */}
+      {/* 헤더 행: 페이즈 점 + 이름 + 위험 아이콘 + 모델 배지 */}
       <div className="flex items-center gap-1.5 mb-1">
+        <span
+          aria-hidden
+          style={{
+            flexShrink: 0,
+            width: 7,
+            height: 7,
+            borderRadius: 999,
+            background: tokens.accent
+          }}
+        />
         <span
           className="text-xs font-semibold truncate flex-1"
           style={{ color: tokens.fg }}

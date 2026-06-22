@@ -20,34 +20,55 @@ export type PhaseClass =
   | 'other'
 
 export interface PhaseTokens {
-  /** 노드 배경 CSS 변수 표현 */
+  /** 노드 배경 — 불투명 surface 에 페이즈 색을 살짝 섞은 값(어두운 캔버스에서도 또렷) */
   bg: string
-  /** 노드 전경(텍스트/아이콘) CSS 변수 표현 */
+  /** 노드 전경(텍스트) — 가독성 위해 기본 텍스트색 사용 */
   fg: string
   /** 노드 테두리 CSS 변수 표현 */
   border: string
+  /** 페이즈 강조색(좌측 액센트 바·점·아이콘) — solid 토큰 */
+  accent: string
 }
 
-/** phaseClass → DS 시맨틱 토큰 맵. export 하여 테스트에서 직접 검증 가능. */
+/**
+ * solid 색 토큰명으로 PhaseTokens 를 합성한다.
+ * - bg: 불투명 surface-raised 에 solid 를 14% 섞어 가독성 유지하면서 페이즈 구분.
+ * - border: solid 32% + 기본 border.
+ * - accent: solid 원색(좌측 바/점).
+ * - fg: text-primary(이름 가독성). 페이즈 색은 accent 로만 표현.
+ */
+function fromSolid(colorVar: string): PhaseTokens {
+  return {
+    bg: `color-mix(in oklab, ${colorVar} 14%, var(--bg-surface-raised))`,
+    fg: 'var(--text-primary)',
+    border: `color-mix(in oklab, ${colorVar} 32%, var(--bg-border))`,
+    accent: colorVar
+  }
+}
+
+/**
+ * phaseClass → DS 시맨틱 토큰 맵. export 하여 테스트에서 직접 검증 가능.
+ *
+ * 색 배정(6 hue + neutral 로 10 페이즈를 커버하므로 일부 공유):
+ * analyst=violet · pm=orange · architect=blue · sm=yellow · dev=emerald ·
+ * qa=blue(architect 와 공유) · security=red · release=emerald · orchestrator=violet · other=neutral.
+ * 공유 페이즈는 이름 라벨로 구분되며, 좌측 accent 바로 색 차이를 노출한다.
+ */
 export const PHASE_TOKEN_MAP: Record<PhaseClass, PhaseTokens> = {
-  analyst:      { bg: 'var(--c-violet-bg)',  fg: 'var(--c-violet-fg)',  border: 'color-mix(in oklab, var(--c-violet-fg) 30%, transparent)' },
-  pm:           { bg: 'var(--c-orange-bg)',  fg: 'var(--c-orange-fg)',  border: 'color-mix(in oklab, var(--c-orange-fg) 30%, transparent)' },
-  architect:    { bg: 'var(--c-blue-bg)',    fg: 'var(--c-blue-fg)',    border: 'color-mix(in oklab, var(--c-blue-fg) 30%, transparent)' },
-  sm:           { bg: 'var(--c-yellow-bg)',  fg: 'var(--c-yellow-fg)',  border: 'color-mix(in oklab, var(--c-yellow-fg) 30%, transparent)' },
-  dev:          { bg: 'var(--c-emerald-bg)', fg: 'var(--c-emerald-fg)', border: 'color-mix(in oklab, var(--c-emerald-fg) 30%, transparent)' },
-  qa:           { bg: 'var(--c-blue-bg)',    fg: 'var(--c-blue-fg)',    border: 'color-mix(in oklab, var(--c-blue-fg) 30%, transparent)' },
-  security:     { bg: 'var(--c-red-bg)',     fg: 'var(--c-red-fg)',     border: 'color-mix(in oklab, var(--c-red-fg) 30%, transparent)' },
-  release:      { bg: 'var(--c-emerald-bg)', fg: 'var(--c-emerald-fg)', border: 'color-mix(in oklab, var(--c-emerald-fg) 30%, transparent)' },
-  orchestrator: { bg: 'var(--c-orange-bg)',  fg: 'var(--c-orange-fg)',  border: 'color-mix(in oklab, var(--c-orange-fg) 30%, transparent)' },
-  other:        { bg: 'var(--bg-surface)',   fg: 'var(--text-secondary)', border: 'var(--bg-border)' }
+  analyst:      fromSolid('var(--c-violet-solid)'),
+  pm:           fromSolid('var(--c-orange-solid)'),
+  architect:    fromSolid('var(--c-blue-solid)'),
+  sm:           fromSolid('var(--c-yellow-solid)'),
+  dev:          fromSolid('var(--c-emerald-solid)'),
+  qa:           fromSolid('var(--c-blue-solid)'),
+  security:     fromSolid('var(--c-red-solid)'),
+  release:      fromSolid('var(--c-emerald-solid)'),
+  orchestrator: fromSolid('var(--c-violet-solid)'),
+  other:        fromSolid('var(--c-neutral-solid)')
 }
 
 /** 폴백 토큰 — 알 수 없는 phaseClass 에 사용. */
-const FALLBACK_TOKENS: PhaseTokens = {
-  bg: 'var(--bg-surface)',
-  fg: 'var(--text-secondary)',
-  border: 'var(--bg-border)'
-}
+const FALLBACK_TOKENS: PhaseTokens = fromSolid('var(--c-neutral-solid)')
 
 /**
  * phaseClass 문자열을 받아 DS 시맨틱 토큰을 반환한다.

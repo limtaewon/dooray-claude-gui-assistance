@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Workflow, Plus, History, Clock, RotateCcw, Download, Stethoscope, GitCompare, Search, Package } from 'lucide-react'
+import { Workflow, Plus, History, Clock, Download, Stethoscope, GitCompare, Search, Package, ArrowLeft } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { HarnessModel, CachedHarnessEntry, DiscoveredHarness } from '@shared/types/harness'
 import Button from '@/components/common/ds/Button'
@@ -240,6 +240,15 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
     <div className="flex flex-col h-full bg-[color:var(--bg-primary)]">
       {/* 헤더 */}
       <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[color:var(--bg-border)] bg-[color:var(--bg-surface)] flex-shrink-0">
+        <Button
+          variant="ghost"
+          size="xs"
+          leftIcon={<ArrowLeft size={13} />}
+          onClick={handleReset}
+          title="목록으로 돌아가기"
+        >
+          뒤로
+        </Button>
         <Workflow size={16} className="text-[color:var(--clauday-blue)]" />
         <h1 className="text-sm font-semibold text-[color:var(--text-primary)]">
           {model.meta.name}
@@ -278,15 +287,6 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
             title="HTML 리포트 다운로드"
           >
             Export
-          </Button>
-          <Button
-            variant="ghost"
-            size="xs"
-            leftIcon={<RotateCcw size={11} />}
-            onClick={handleReset}
-            title="다른 하네스 가져오기"
-          >
-            변경
           </Button>
           <Button
             variant="secondary"

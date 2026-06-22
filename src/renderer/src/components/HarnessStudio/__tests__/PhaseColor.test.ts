@@ -20,22 +20,23 @@ describe('PhaseColor — phaseTokens', () => {
     }
   })
 
+  // 페이즈 색은 bg(틴트)·accent(강조)에 담기고, fg 는 가독성 위해 text-primary 를 쓴다.
   it('analyst 는 violet 토큰을 사용한다', () => {
     const tokens = phaseTokens('analyst')
     expect(tokens.bg).toContain('violet')
-    expect(tokens.fg).toContain('violet')
+    expect(tokens.accent).toContain('violet')
   })
 
   it('dev 는 emerald 토큰을 사용한다', () => {
     const tokens = phaseTokens('dev')
     expect(tokens.bg).toContain('emerald')
-    expect(tokens.fg).toContain('emerald')
+    expect(tokens.accent).toContain('emerald')
   })
 
   it('security 는 red 토큰을 사용한다', () => {
     const tokens = phaseTokens('security')
     expect(tokens.bg).toContain('red')
-    expect(tokens.fg).toContain('red')
+    expect(tokens.accent).toContain('red')
   })
 
   it('architect 와 qa 는 blue 토큰을 사용한다', () => {
@@ -90,20 +91,22 @@ describe('PhaseColor — PHASE_TOKEN_MAP 완결성', () => {
     }
   })
 
-  it('모든 항목이 bg/fg/border 를 가진다', () => {
+  it('모든 항목이 bg/fg/border/accent 를 가진다', () => {
     for (const [key, tokens] of Object.entries(PHASE_TOKEN_MAP)) {
       expect(tokens.bg, `${key}.bg`).toBeTruthy()
       expect(tokens.fg, `${key}.fg`).toBeTruthy()
       expect(tokens.border, `${key}.border`).toBeTruthy()
+      expect(tokens.accent, `${key}.accent`).toBeTruthy()
     }
   })
 
-  it('모든 색상 값은 CSS 변수 표현(var(...)) 이다', () => {
-    for (const [key, tokens] of Object.entries(PHASE_TOKEN_MAP)) {
-      if (key !== 'other') {
-        expect(tokens.bg, `${key}.bg 가 var()`).toMatch(/^var\(/)
-        expect(tokens.fg, `${key}.fg 가 var()`).toMatch(/^var\(/)
-      }
+  it('모든 색상 값은 CSS 변수/color-mix 표현이다', () => {
+    for (const [, tokens] of Object.entries(PHASE_TOKEN_MAP)) {
+      // bg/border 는 color-mix(... var()) 합성, fg/accent 는 var() 직접.
+      expect(tokens.bg).toMatch(/^(var|color-mix)\(/)
+      expect(tokens.fg).toMatch(/^var\(/)
+      expect(tokens.border).toMatch(/^(var|color-mix)\(/)
+      expect(tokens.accent).toMatch(/^var\(/)
     }
   })
 })
