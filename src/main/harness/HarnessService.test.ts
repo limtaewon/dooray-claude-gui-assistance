@@ -242,11 +242,11 @@ describe('HarnessService', () => {
     })
   })
 
-  // ── estimateLevel (M7 stub) ───────────────────────────────────────────────
+  // ── dryrun (M7) ──────────────────────────────────────────────────────────
 
-  describe('estimateLevel', () => {
-    it('M7 미구현 — level/answers/rationale 를 반환하고 highlightPath 는 [] 이다', async () => {
-      const bundlePath = createMinimalBundle('estimate-level')
+  describe('dryrun', () => {
+    it('DryRunResult 를 반환한다 — level/answers/rationale/highlightPath 포함', async () => {
+      const bundlePath = createMinimalBundle('dryrun-basic')
       service = new HarnessService(userDataPath, mockAI)
 
       vi.mocked(mockAI.normalizeHarness).mockImplementation(async (skeleton) => {
@@ -254,20 +254,21 @@ describe('HarnessService', () => {
       })
       vi.mocked(mockAI.estimateLevel).mockResolvedValue(makeEstimate())
 
-      const result = await service.estimateLevel(bundlePath, '간단한 버그 수정')
+      const result = await service.dryrun(bundlePath, '간단한 버그 수정')
 
       expect(result.level).toBe('L1')
       expect(result.answers).toEqual(['테스트 답변'])
-      // M7 미구현 — 스텁
-      expect(result.highlightPath).toEqual([])
-      expect(result.parallelGroups).toEqual([])
-      expect(result.gates).toEqual([])
-      expect(result.estTimeRel).toBe(1.0)
-      expect(result.estCostRel).toBe(1.0)
+      expect(result.rationale).toBe('테스트 근거')
+      // levelPath 가 빈 레벨 정의로 인해 기본값 반환
+      expect(Array.isArray(result.highlightPath)).toBe(true)
+      expect(Array.isArray(result.parallelGroups)).toBe(true)
+      expect(Array.isArray(result.gates)).toBe(true)
+      expect(typeof result.estTimeRel).toBe('number')
+      expect(typeof result.estCostRel).toBe('number')
     })
 
-    it('estimateLevel 결과가 taskHash 캐시에 저장되어 두 번째 호출 시 AI 를 재호출하지 않는다', async () => {
-      const bundlePath = createMinimalBundle('estimate-cache')
+    it('동일 번들+태스크 두 번째 호출 시 AI 를 재호출하지 않는다 (taskHash 캐시)', async () => {
+      const bundlePath = createMinimalBundle('dryrun-cache')
       service = new HarnessService(userDataPath, mockAI)
 
       vi.mocked(mockAI.normalizeHarness).mockImplementation(async (skeleton) => {
@@ -276,11 +277,11 @@ describe('HarnessService', () => {
       vi.mocked(mockAI.estimateLevel).mockResolvedValue(makeEstimate())
 
       const taskText = '동일한 태스크 텍스트'
-      await service.estimateLevel(bundlePath, taskText)
+      await service.dryrun(bundlePath, taskText)
       expect(vi.mocked(mockAI.estimateLevel)).toHaveBeenCalledTimes(1)
 
-      // 두 번째 동일 태스크 — 캐시에서 반환
-      await service.estimateLevel(bundlePath, taskText)
+      // 두 번째 동일 태스크 — taskHash 캐시 hit
+      await service.dryrun(bundlePath, taskText)
       expect(vi.mocked(mockAI.estimateLevel)).toHaveBeenCalledTimes(1) // 여전히 1회
     })
   })

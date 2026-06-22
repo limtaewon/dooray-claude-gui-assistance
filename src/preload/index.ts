@@ -64,6 +64,7 @@ import type { McpServerConfig } from '../shared/types/mcp'
 import type {
   RawBundleSummary,
   HarnessModel,
+  DryRunResult,
   DiscoveredHarness,
   CachedHarnessEntry
 } from '../shared/types/harness'
@@ -699,7 +700,23 @@ const api = {
      * 캐시된 번들 목록을 반환한다 (최근 정규화 순).
      */
     listCached: (): Promise<CachedHarnessEntry[]> =>
-      ipcRenderer.invoke(IPC_CHANNELS.HARNESS_LIST_CACHED)
+      ipcRenderer.invoke(IPC_CHANNELS.HARNESS_LIST_CACHED),
+
+    /**
+     * 태스크 평문으로 레벨을 추정하고 결정론적 경로/게이트/비용을 계산한다.
+     *
+     * 처리 흐름:
+     * 1. taskHash 캐시 hit → 즉시 반환.
+     * 2. miss → AI(Haiku) 레벨 추정 + levelPath 결정론적 계산.
+     * requestId 를 지정하면 AI_PROGRESS 이벤트로 진행률을 받을 수 있다.
+     *
+     * @param args.path - 번들 루트 절대경로 (HarnessModel 획득에 사용)
+     * @param args.taskText - 태스크 설명 평문 또는 두레이 URL
+     * @param args.requestId - 진행률 이벤트 구분 ID (optional)
+     * @returns DryRunResult
+     */
+    dryrun: (args: { path: string; taskText: string; requestId?: string }): Promise<DryRunResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.HARNESS_DRYRUN, args)
   }
 }
 

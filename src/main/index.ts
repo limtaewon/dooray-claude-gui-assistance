@@ -1672,6 +1672,22 @@ ${data}`,
   ipcMain.handle(IPC_CHANNELS.HARNESS_LIST_CACHED, () => {
     return getHarnessService().listCached()
   })
+
+  /**
+   * HARNESS_DRYRUN — 태스크 평문으로 레벨 추정 + 결정론적 경로 계산.
+   * { path: string; taskText: string; requestId?: string }
+   *
+   * 처리 흐름:
+   * 1. HarnessService.dryrun(path, taskText, requestId) 위임.
+   * 2. taskHash 캐시 hit → 즉시 반환 / miss → Haiku 추정 + levelPath 계산.
+   * 3. 진행률은 기존 AI_PROGRESS 채널 재사용 (requestId 로 구분).
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.HARNESS_DRYRUN,
+    async (_, args: { path: string; taskText: string; requestId?: string }) => {
+      return getHarnessService().dryrun(args.path, args.taskText, args.requestId)
+    }
+  )
 }
 
 /**
