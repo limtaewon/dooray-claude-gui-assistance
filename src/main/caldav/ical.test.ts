@@ -46,6 +46,27 @@ describe('stripIcsPrefix — BEGIN:VCALENDAR 앞 XML 쓰레기 제거', () => {
     expect(out.match(/^DTSTART/gm)?.length).toBe(2)
   })
 
+  it('SEQUENCE 를 기존+1 로 올리고 LAST-MODIFIED 를 갱신한다 (두레이 no-op 방지)', () => {
+    const ics = [
+      'BEGIN:VCALENDAR', 'BEGIN:VEVENT', 'UID:e@dooray.com',
+      'DTSTART:20260619T013000Z', 'DTEND:20260619T023000Z', 'SUMMARY:OLD', 'SEQUENCE:3',
+      'END:VEVENT', 'END:VCALENDAR'
+    ].join('\r\n')
+    const out = patchEventFields(ics, { summary: 'NEW', start: '2026-06-19T01:30:00Z', end: '2026-06-19T02:30:00Z', allDay: false })
+    expect(out).toContain('SEQUENCE:4')
+    expect(out.match(/^SEQUENCE:/gm)?.length).toBe(1)
+    expect(out).toMatch(/^LAST-MODIFIED:\d{8}T\d{6}Z/m)
+  })
+
+  it('SEQUENCE 가 없으면 1 로 추가한다', () => {
+    const ics = [
+      'BEGIN:VCALENDAR', 'BEGIN:VEVENT', 'UID:e', 'DTSTART:20260619T013000Z',
+      'DTEND:20260619T023000Z', 'SUMMARY:OLD', 'END:VEVENT', 'END:VCALENDAR'
+    ].join('\r\n')
+    const out = patchEventFields(ics, { summary: 'X', start: '2026-06-19T01:30:00Z', end: '2026-06-19T02:30:00Z', allDay: false })
+    expect(out).toContain('SEQUENCE:1')
+  })
+
   it('patchDateTimeInIcs(드래그) 도 VTIMEZONE DTSTART 를 건드리지 않는다', () => {
     const withTz = [
       'BEGIN:VCALENDAR', 'BEGIN:VTIMEZONE', 'DTSTART:19700101T000000', 'END:VTIMEZONE',

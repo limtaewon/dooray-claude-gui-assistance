@@ -284,6 +284,14 @@ function replaceInEvent(ics: string, key: string, newLine: string, foldable = fa
   return seg.before + region + seg.rest
 }
 
+/** VEVENT top-level 구간에서 단일 라인 속성 값을 읽는다 (없으면 undefined). */
+function readInEvent(ics: string, key: string): string | undefined {
+  const seg = eventEditRegion(ics)
+  if (!seg) return undefined
+  const m = seg.region.match(new RegExp(`^${key}(?:;[^:\\r\\n]*)?:([^\\r\\n]*)`, 'm'))
+  return m ? m[1] : undefined
+}
+
 /** VEVENT top-level 구간에서만 단일 속성을 제거 (값이 빈 LOCATION/DESCRIPTION 등). */
 function removeInEvent(ics: string, key: string, foldable = false): string {
   const seg = eventEditRegion(ics)
@@ -342,6 +350,13 @@ export function patchEventFields(
   out = input.description
     ? replaceInEvent(out, 'DESCRIPTION', `DESCRIPTION:${escapeText(input.description)}`, true)
     : removeInEvent(out, 'DESCRIPTION', true)
+
+  // SEQUENCE +1 + LAST-MODIFIED 갱신 — 두레이가 "더 최신 아님"으로 PUT 을 무시(200/no-op)하지 않도록.
+  // (RFC 5545: 일정 수정 시 SEQUENCE 는 증가해야 한다.) VEVENT 블록 안에서만 처리.
+  const curSeq = readInEvent(out, 'SEQUENCE')
+  const seq = curSeq && /^\d+$/.test(curSeq.trim()) ? parseInt(curSeq.trim(), 10) : 0
+  out = replaceInEvent(out, 'SEQUENCE', `SEQUENCE:${seq + 1}`)
+  out = replaceInEvent(out, 'LAST-MODIFIED', `LAST-MODIFIED:${dtstampLine.slice('DTSTAMP:'.length)}`)
   return out
 }
 
