@@ -11,6 +11,52 @@ describe('stripIcsPrefix — BEGIN:VCALENDAR 앞 XML 쓰레기 제거', () => {
     expect(stripIcsPrefix(ok)).toBe(ok)
   })
 
+  it('VTIMEZONE 의 DTSTART 는 건드리지 않고 VEVENT 의 DTSTART/SUMMARY 만 교체 (두레이 회귀)', () => {
+    const withTz = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'BEGIN:VTIMEZONE',
+      'TZID:Asia/Seoul',
+      'BEGIN:STANDARD',
+      'DTSTART:19700101T000000',  // VTIMEZONE 규칙용 — 절대 안 바뀌어야 함
+      'TZOFFSETFROM:+0900',
+      'TZOFFSETTO:+0900',
+      'END:STANDARD',
+      'END:VTIMEZONE',
+      'BEGIN:VEVENT',
+      'UID:e@dooray.com',
+      'DTSTART;TZID=Asia/Seoul:20260619T103000',
+      'DTEND;TZID=Asia/Seoul:20260619T113000',
+      'SUMMARY:OLD',
+      'X-DOORAY-CALENDAR-ID:c1',
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].join('\r\n')
+    const out = patchEventFields(withTz, {
+      summary: 'NEW', start: '2026-06-19T01:30:00Z', end: '2026-06-19T02:30:00Z', allDay: false
+    })
+    // VTIMEZONE 규칙 DTSTART 보존
+    expect(out).toContain('DTSTART:19700101T000000')
+    // VEVENT DTSTART 는 UTC 로 교체
+    expect(out).toContain('DTSTART:20260619T013000Z')
+    expect(out).not.toContain('DTSTART;TZID=Asia/Seoul:20260619T103000')
+    expect(out).toContain('SUMMARY:NEW')
+    expect(out).toContain('X-DOORAY-CALENDAR-ID:c1')
+    // DTSTART 가 정확히 2개 (VTIMEZONE 1 + VEVENT 1)
+    expect(out.match(/^DTSTART/gm)?.length).toBe(2)
+  })
+
+  it('patchDateTimeInIcs(드래그) 도 VTIMEZONE DTSTART 를 건드리지 않는다', () => {
+    const withTz = [
+      'BEGIN:VCALENDAR', 'BEGIN:VTIMEZONE', 'DTSTART:19700101T000000', 'END:VTIMEZONE',
+      'BEGIN:VEVENT', 'UID:e', 'DTSTART;TZID=Asia/Seoul:20260619T103000',
+      'DTEND;TZID=Asia/Seoul:20260619T113000', 'SUMMARY:S', 'END:VEVENT', 'END:VCALENDAR'
+    ].join('\r\n')
+    const out = patchDateTimeInIcs(withTz, { start: '2026-06-20T01:30:00Z', end: '2026-06-20T02:30:00Z', allDay: false })
+    expect(out).toContain('DTSTART:19700101T000000') // VTIMEZONE 보존
+    expect(out).toContain('DTSTART:20260620T013000Z') // VEVENT 교체
+  })
+
   it('patchEventFields 가 손상된 캐시(xmlns 접두)도 깨끗하게 PUT 본문 생성', () => {
     const corrupt = "xmlns='urn:ietf:params:xml:ns:caldav'>" + [
       'BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', 'UID:u@dooray.com',

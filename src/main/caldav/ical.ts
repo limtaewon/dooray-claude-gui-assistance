@@ -225,52 +225,6 @@ export function buildICal(input: BuildICalInput): string {
   return lines.join('\r\n')
 }
 
-/**
- * 기존 VEVENT 의 DTSTART/DTEND/DTSTAMP 만 교체한 새 ICS 문자열을 만든다.
- * ATTENDEE/RRULE/VALARM 등 다른 필드는 그대로 보존 — 막대 드래그로 일정 시각만 변경할 때 사용.
- *
- * - allDay 면 RFC 5545 의 DTEND exclusive 규칙대로 +1일 적용
- * - 시간 이벤트는 UTC Z 표기
- * - DTSTAMP 는 현재 시각으로 갱신 (CalDAV 가 LAST-MODIFIED 와 동등하게 다룸)
- */
-export function patchDateTimeInIcs(ics: string, input: { start: string; end: string; allDay: boolean }): string {
-  const allDay = !!input.allDay
-  const fmtTimed = (iso: string): string => {
-    const d = new Date(iso)
-    return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`
-  }
-  const fmtAllDay = (iso: string, dayOffset = 0): string => {
-    const d = new Date(iso)
-    if (dayOffset !== 0) d.setDate(d.getDate() + dayOffset)
-    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`
-  }
-  const dtstartLine = allDay
-    ? `DTSTART;VALUE=DATE:${fmtAllDay(input.start)}`
-    : `DTSTART:${fmtTimed(input.start)}`
-  // DTEND: 종일은 exclusive → +1일
-  const dtendLine = allDay
-    ? `DTEND;VALUE=DATE:${fmtAllDay(input.end, 1)}`
-    : `DTEND:${fmtTimed(input.end)}`
-  const dtstampLine = `DTSTAMP:${fmtTimed(new Date().toISOString())}`
-
-  // RFC 5545 lined ICS — CRLF + line folding. 정규식으로 unfold 까지는 필요 X — DTSTART/DTEND 는 짧아 보통 fold 안 됨.
-  // 그래도 라인 단위 매칭이 안전하려면 unfold 후 다시 fold... 우선 단순 형태로 처리, 향후 line fold 발생 시 보강.
-  const replaceLine = (text: string, key: 'DTSTART' | 'DTEND' | 'DTSTAMP', newLine: string): string => {
-    // DTSTART, DTSTART;VALUE=DATE, DTSTART;TZID=... 모두 매치 (라인 시작 ~ \r\n 또는 \n)
-    const re = new RegExp(`^${key}(?:;[^:\\r\\n]*)?:[^\\r\\n]*`, 'm')
-    if (re.test(text)) return text.replace(re, newLine)
-    // 키가 없으면 (이상 케이스) 새 라인을 BEGIN:VEVENT 다음에 삽입
-    return text.replace(/(BEGIN:VEVENT\r?\n)/, `$1${newLine}\r\n`)
-  }
-
-  // 구버전 파싱 잔재로 BEGIN:VCALENDAR 앞에 XML 쓰레기(xmlns='...'>)가 붙은 캐시 방어 — 잘라낸다.
-  let out = stripIcsPrefix(ics)
-  out = replaceLine(out, 'DTSTART', dtstartLine)
-  out = replaceLine(out, 'DTEND', dtendLine)
-  out = replaceLine(out, 'DTSTAMP', dtstampLine)
-  return out
-}
-
 /** ICS 본문 앞에 섞인 비-iCalendar 텍스트(XML 태그 잔재 등)를 제거 — BEGIN:VCALENDAR 부터 반환. */
 export function stripIcsPrefix(ics: string): string {
   const i = ics.indexOf('BEGIN:VCALENDAR')
@@ -278,64 +232,117 @@ export function stripIcsPrefix(ics: string): string {
 }
 
 /**
- * 상세 편집용 — 원본 ICS 를 **그대로 두고** 편집 필드(SUMMARY/LOCATION/DESCRIPTION/DTSTART/DTEND/DTSTAMP)
- * 라인만 정규식으로 in-place 교체한다. 막대 드래그(patchDateTimeInIcs)와 동일한 보존 방식.
+ * VEVENT 블록 구간 [start, end) 를 찾는다. start 는 'BEGIN:VEVENT' 라인 시작 인덱스,
+ * end 는 'END:VEVENT' 인덱스(미포함). 없으면 null.
+ * Why: ICS 에는 VTIMEZONE 에도 DTSTART 가 있어, 전체 문자열에서 교체하면 VTIMEZONE 의 DTSTART 를
+ * 먼저 건드려 일정 시각이 엉뚱한 곳에 박히고 정작 VEVENT 는 안 바뀐다(=두레이 200-무시/500의 원인).
+ */
+function veventRange(ics: string): { start: number; end: number } | null {
+  const b = ics.indexOf('BEGIN:VEVENT')
+  if (b < 0) return null
+  const e = ics.indexOf('END:VEVENT', b)
+  if (e < 0) return null
+  return { start: b, end: e }
+}
+
+const fmtTimedUtc = (iso: string): string => {
+  const d = new Date(iso)
+  return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`
+}
+const fmtDate = (iso: string, dayOffset = 0): string => {
+  const d = new Date(iso)
+  if (dayOffset !== 0) d.setDate(d.getDate() + dayOffset)
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`
+}
+
+/**
+ * VEVENT 블록의 "top-level 속성 구간"(첫 BEGIN:VALARM 이전)만 잘라 [before, region, rest] 로 나눈다.
+ * VALARM 내부에도 DESCRIPTION 등이 있으므로, 편집은 이 region 안에서만 해야 알림 속성을 안 건드린다.
+ */
+function eventEditRegion(ics: string): { before: string; region: string; rest: string } | null {
+  const r = veventRange(ics)
+  if (!r) return null
+  const body = ics.slice(r.start, r.end)
+  const valarm = body.search(/^BEGIN:VALARM/m)
+  const cut = valarm >= 0 ? valarm : body.length
+  return {
+    before: ics.slice(0, r.start),
+    region: body.slice(0, cut),
+    rest: body.slice(cut) + ics.slice(r.end)
+  }
+}
+
+/** VEVENT top-level 구간에서만 단일/폴딩 속성을 교체. 없으면 BEGIN:VEVENT 직후 삽입. */
+function replaceInEvent(ics: string, key: string, newLine: string, foldable = false): string {
+  const seg = eventEditRegion(ics)
+  if (!seg) return ics
+  const tailRe = foldable ? '(?:\\r?\\n[ \\t][^\\r\\n]*)*' : ''
+  const re = new RegExp(`^${key}(?:;[^:\\r\\n]*)?:[^\\r\\n]*${tailRe}`, 'm')
+  let region = seg.region
+  if (re.test(region)) region = region.replace(re, newLine)
+  else region = region.replace(/(BEGIN:VEVENT\r?\n)/, `$1${newLine}\r\n`)
+  return seg.before + region + seg.rest
+}
+
+/** VEVENT top-level 구간에서만 단일 속성을 제거 (값이 빈 LOCATION/DESCRIPTION 등). */
+function removeInEvent(ics: string, key: string, foldable = false): string {
+  const seg = eventEditRegion(ics)
+  if (!seg) return ics
+  const tailRe = foldable ? '(?:\\r?\\n[ \\t][^\\r\\n]*)*' : ''
+  const re = new RegExp(`^${key}(?:;[^:\\r\\n]*)?:[^\\r\\n]*${tailRe}\\r?\\n?`, 'm')
+  return seg.before + seg.region.replace(re, '') + seg.rest
+}
+
+/**
+ * 기존 VEVENT 의 DTSTART/DTEND/DTSTAMP 만 교체한 새 ICS 문자열을 만든다.
+ * ATTENDEE/RRULE/VALARM 등 다른 필드는 그대로 보존 — 막대 드래그로 일정 시각만 변경할 때 사용.
  *
- * Why: buildICal 재구성은 두레이 고유 속성(X-DOORAY-* 등)을 잃어 서버가 200 으로 받고도 반영 안 함.
- * unfold/재정렬/VTIMEZONE 제거 같은 구조 변경은 두레이가 500 으로 거부. → 드래그가 동작하는
- * "라인 단위 in-place 교체"를 그대로 따르고 SUMMARY/LOCATION/DESCRIPTION 만 추가로 교체한다.
- * 폴딩(이어진 줄)·속성 순서·VTIMEZONE 등은 손대지 않는다.
+ * - allDay 면 RFC 5545 의 DTEND exclusive 규칙대로 +1일 적용
+ * - 시간 이벤트는 UTC Z 표기
+ * - 교체는 **VEVENT 블록 안에서만** 수행 (VTIMEZONE 의 DTSTART 오염 방지)
+ */
+export function patchDateTimeInIcs(ics: string, input: { start: string; end: string; allDay: boolean }): string {
+  const allDay = !!input.allDay
+  const dtstartLine = allDay ? `DTSTART;VALUE=DATE:${fmtDate(input.start)}` : `DTSTART:${fmtTimedUtc(input.start)}`
+  const dtendLine = allDay ? `DTEND;VALUE=DATE:${fmtDate(input.end, 1)}` : `DTEND:${fmtTimedUtc(input.end)}`
+  const dtstampLine = `DTSTAMP:${fmtTimedUtc(new Date().toISOString())}`
+
+  let out = stripIcsPrefix(ics)
+  out = replaceInEvent(out, 'DTSTART', dtstartLine)
+  out = replaceInEvent(out, 'DTEND', dtendLine)
+  out = replaceInEvent(out, 'DTSTAMP', dtstampLine)
+  return out
+}
+
+/**
+ * 상세 편집용 — 원본 ICS 를 보존하면서 VEVENT 의 편집 필드(SUMMARY/LOCATION/DESCRIPTION/DTSTART/DTEND/DTSTAMP)
+ * 만 in-place 교체. 두레이 고유 속성(X-DOORAY-*)·VTIMEZONE·VALARM·속성 순서는 그대로 둔다.
+ *
+ * Why: buildICal 재구성은 X-DOORAY-* 누락으로 서버가 200 으로 받고도 반영 안 함. 구조 변경(unfold/재정렬/
+ * VTIMEZONE 제거)은 500. → 라인 단위 in-place 교체가 정답이되, 반드시 **VEVENT 블록 안에서만** 교체해야
+ * VTIMEZONE 의 DTSTART 를 건드리지 않는다(이전 버전이 VTIMEZONE DTSTART 를 덮어써 서버가 무시했음).
  */
 export function patchEventFields(
   ics: string,
   input: { summary: string; description?: string; location?: string; start: string; end: string; allDay: boolean }
 ): string {
   const allDay = !!input.allDay
-  const fmtTimed = (iso: string): string => {
-    const d = new Date(iso)
-    return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`
-  }
-  const fmtAllDay = (iso: string, dayOffset = 0): string => {
-    const d = new Date(iso)
-    if (dayOffset !== 0) d.setDate(d.getDate() + dayOffset)
-    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`
-  }
-  const dtstartLine = allDay ? `DTSTART;VALUE=DATE:${fmtAllDay(input.start)}` : `DTSTART:${fmtTimed(input.start)}`
-  const dtendLine = allDay ? `DTEND;VALUE=DATE:${fmtAllDay(input.end, 1)}` : `DTEND:${fmtTimed(input.end)}`
-  const dtstampLine = `DTSTAMP:${fmtTimed(new Date().toISOString())}`
+  const dtstartLine = allDay ? `DTSTART;VALUE=DATE:${fmtDate(input.start)}` : `DTSTART:${fmtTimedUtc(input.start)}`
+  const dtendLine = allDay ? `DTEND;VALUE=DATE:${fmtDate(input.end, 1)}` : `DTEND:${fmtTimedUtc(input.end)}`
+  const dtstampLine = `DTSTAMP:${fmtTimedUtc(new Date().toISOString())}`
 
-  // 짧은 단일 라인 속성 (DTSTART/DTEND/DTSTAMP/SUMMARY 등) in-place 교체. 없으면 BEGIN:VEVENT 뒤 삽입.
-  const replaceLine = (text: string, key: string, newLine: string): string => {
-    const re = new RegExp(`^${key}(?:;[^:\\r\\n]*)?:[^\\r\\n]*`, 'm')
-    if (re.test(text)) return text.replace(re, newLine)
-    return text.replace(/(BEGIN:VEVENT\r?\n)/, `$1${newLine}\r\n`)
-  }
-  // 폴딩 가능한 속성(LOCATION/DESCRIPTION) — 이어진 줄(맨 앞 공백/탭)까지 포함해 교체/제거.
-  const replaceFoldable = (text: string, key: string, newLine: string | null): string => {
-    const re = new RegExp(`^${key}(?:;[^:\\r\\n]*)?:[^\\r\\n]*(?:\\r?\\n[ \\t][^\\r\\n]*)*`, 'm')
-    if (re.test(text)) {
-      if (newLine) return text.replace(re, newLine)
-      // 값이 비면 라인(및 뒤따르는 개행)까지 제거
-      return text.replace(new RegExp(re.source + '\\r?\\n?', 'm'), '')
-    }
-    return newLine ? text.replace(/(BEGIN:VEVENT\r?\n)/, `$1${newLine}\r\n`) : text
-  }
-
-  // 구버전 파싱 잔재(BEGIN:VCALENDAR 앞 XML 쓰레기) 방어 후 처리.
-  const src = stripIcsPrefix(ics)
-  // VALARM 내부에도 DESCRIPTION 이 있으므로, 교체는 첫 BEGIN:VALARM 이전 구간(VEVENT 본문)으로 한정.
-  const valarmIdx = src.search(/^BEGIN:VALARM/m)
-  const splitAt = valarmIdx >= 0 ? valarmIdx : src.length
-  let head = src.slice(0, splitAt)
-  const tail = src.slice(splitAt)
-
-  head = replaceLine(head, 'DTSTART', dtstartLine)
-  head = replaceLine(head, 'DTEND', dtendLine)
-  head = replaceLine(head, 'DTSTAMP', dtstampLine)
-  head = replaceFoldable(head, 'SUMMARY', `SUMMARY:${escapeText(input.summary)}`)
-  head = replaceFoldable(head, 'LOCATION', input.location ? `LOCATION:${escapeText(input.location)}` : null)
-  head = replaceFoldable(head, 'DESCRIPTION', input.description ? `DESCRIPTION:${escapeText(input.description)}` : null)
-  return head + tail
+  let out = stripIcsPrefix(ics)
+  out = replaceInEvent(out, 'DTSTART', dtstartLine)
+  out = replaceInEvent(out, 'DTEND', dtendLine)
+  out = replaceInEvent(out, 'DTSTAMP', dtstampLine)
+  out = replaceInEvent(out, 'SUMMARY', `SUMMARY:${escapeText(input.summary)}`, true)
+  out = input.location
+    ? replaceInEvent(out, 'LOCATION', `LOCATION:${escapeText(input.location)}`, true)
+    : removeInEvent(out, 'LOCATION', true)
+  out = input.description
+    ? replaceInEvent(out, 'DESCRIPTION', `DESCRIPTION:${escapeText(input.description)}`, true)
+    : removeInEvent(out, 'DESCRIPTION', true)
+  return out
 }
 
 /**
