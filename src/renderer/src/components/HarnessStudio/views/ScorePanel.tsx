@@ -20,6 +20,7 @@ import type { HarnessModel } from '@shared/types/harness'
 import Card from '@/components/common/ds/Card'
 import Chip from '@/components/common/ds/Chip'
 import { EmptyView } from '@/components/common/ds/StateViews'
+import { ViewExplainer } from '../shared/ViewExplainer'
 import {
   buildRadarData,
   scoreToGrade,
@@ -29,6 +30,7 @@ import {
 
 export interface ScorePanelProps {
   model: HarnessModel
+  sourcePath?: string
 }
 
 /** 6축 레이더 차트 */
@@ -83,7 +85,7 @@ function ScoreRadar({ model }: { model: HarnessModel }): JSX.Element {
  *
  * score 가 undefined 이면 EmptyView — 절대 빈 레이더로 크래시하지 않는다.
  */
-export function ScorePanel({ model }: ScorePanelProps): JSX.Element {
+export function ScorePanel({ model, sourcePath }: ScorePanelProps): JSX.Element {
   // score 없음 — EmptyView
   if (!model.score) {
     return (
@@ -112,8 +114,23 @@ export function ScorePanel({ model }: ScorePanelProps): JSX.Element {
   const score = model.score
   const gradeResult = scoreToGrade(score)
   const weakestAxis = findWeakestAxis(score.axes)
+  const path = sourcePath ?? model.meta.source
 
   return (
+    <div className="flex flex-col">
+      <ViewExplainer
+        title="Score / 점수"
+        howto={
+          <span>
+            이 하네스가 <strong>"고삐를 얼마나 잘 쥐는지"</strong> 6축으로 점수를 매긴 결과입니다.
+            강제력·제어흐름·상태·차단게이트·피드백루프·관측가능성 각 축이 높을수록
+            자율 에이전트를 더 단단하게 조율합니다. 숫자는 AI 추정값입니다.
+          </span>
+        }
+        topic="이 점수 6축이 각각 무엇을 의미하는지 설명"
+        sourcePath={path}
+        icon={BarChart2}
+      />
     <div className="flex flex-col gap-5 p-4">
       {/* 헤더 — 총점 등급 */}
       <section>
@@ -229,6 +246,7 @@ export function ScorePanel({ model }: ScorePanelProps): JSX.Element {
           </div>
         </section>
       )}
+    </div>
     </div>
   )
 }

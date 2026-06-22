@@ -28,6 +28,7 @@ import Card from '@/components/common/ds/Card'
 import Chip from '@/components/common/ds/Chip'
 import { EmptyView } from '@/components/common/ds/StateViews'
 import { ProvenanceBadge } from '../shared/ProvenanceBadge'
+import { ViewExplainer } from '../shared/ViewExplainer'
 import {
   buildRationalizationRows,
   buildBlockUsageMap,
@@ -39,6 +40,7 @@ import type { CategorizedTool } from './skillsUtils'
 
 export interface SkillsBlocksPanelProps {
   model: HarnessModel
+  sourcePath?: string
 }
 
 /** 도구 카테고리 아이콘 매핑 */
@@ -154,11 +156,12 @@ function AgentRoleCard({ agent, provenance }: { agent: HarnessAgent; provenance:
  * Skills & Blocks 패널 본체.
  *
  * 섹션:
+ * 0. ViewExplainer 해설 배너
  * 1. 에이전트 역할 카드 목록
  * 2. 합리화 방어 테이블 (riskNote 있는 에이전트)
  * 3. Blocks 재사용 매핑
  */
-export function SkillsBlocksPanel({ model }: SkillsBlocksPanelProps): JSX.Element {
+export function SkillsBlocksPanel({ model, sourcePath }: SkillsBlocksPanelProps): JSX.Element {
   const rationalizationRows = buildRationalizationRows(model.agents)
   const blockUsageMap = buildBlockUsageMap(model.agents)
 
@@ -174,7 +177,23 @@ export function SkillsBlocksPanel({ model }: SkillsBlocksPanelProps): JSX.Elemen
     )
   }
 
+  const path = sourcePath ?? model.meta.source
+
   return (
+    <div className="flex flex-col">
+      <ViewExplainer
+        title="Skills / Blocks"
+        howto={
+          <span>
+            각 에이전트의 역할·사용 도구·주된 위험(빠지기 쉬운 함정)을 보여줍니다.{' '}
+            <strong className="text-[color:var(--c-yellow-fg)]">노란 경고</strong>는 해당 역할의 위험 노트입니다.
+            카드를 펼치면 도구 화이트리스트와 쓰기 권한을 확인할 수 있습니다.
+          </span>
+        }
+        topic="이 하네스의 에이전트 구성과 각 역할을 설명"
+        sourcePath={path}
+        icon={Shield}
+      />
     <div className="flex flex-col gap-5 p-4">
       {/* 섹션 1 — 역할 카드 */}
       <section>
@@ -295,6 +314,7 @@ export function SkillsBlocksPanel({ model }: SkillsBlocksPanelProps): JSX.Elemen
           </div>
         </section>
       )}
+    </div>
     </div>
   )
 }

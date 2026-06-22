@@ -23,6 +23,7 @@ import Card from '@/components/common/ds/Card'
 import Chip from '@/components/common/ds/Chip'
 import { EmptyView } from '@/components/common/ds/StateViews'
 import { ProvenanceBadge } from '../shared/ProvenanceBadge'
+import { ViewExplainer } from '../shared/ViewExplainer'
 import {
   buildConstraintLayers,
   partitionGates,
@@ -33,18 +34,20 @@ import {
 
 export interface GatesPanelProps {
   model: HarnessModel
+  sourcePath?: string
 }
 
 /**
  * Gates & 강제 패널 본체.
  *
  * 섹션:
+ * 0. ViewExplainer 해설 배너
  * 1. 4계층 제약 요약
  * 2. 게이트 상세 (phase별 규칙코드 + blocking)
  * 3. Hook 목록
  * 4. 상태기계 전이 테이블
  */
-export function GatesPanel({ model }: GatesPanelProps): JSX.Element {
+export function GatesPanel({ model, sourcePath }: GatesPanelProps): JSX.Element {
   const { controlFlow } = model
   const layers = buildConstraintLayers(controlFlow)
   const { blocking: blockingGates, nonBlocking: nonBlockingGates } = partitionGates(controlFlow.gates)
@@ -67,7 +70,24 @@ export function GatesPanel({ model }: GatesPanelProps): JSX.Element {
     )
   }
 
+  const path = sourcePath ?? model.meta.source
+
   return (
+    <div className="flex flex-col">
+      <ViewExplainer
+        title="Gates / 강제"
+        howto={
+          <span>
+            페이즈별로 무엇을 강제 차단하는지 보여줍니다.{' '}
+            <strong>규칙코드</strong>는 실패 조건 식별자이고,{' '}
+            <strong className="text-[color:var(--c-red-fg)]">blocking=true</strong>는 실제 진행을 막는 차단입니다.
+            Hooks는 자동 실행되는 강제 트리거를 나타냅니다.
+          </span>
+        }
+        topic="이 하네스의 게이트와 강제 메커니즘을 설명"
+        sourcePath={path}
+        icon={ShieldCheck}
+      />
     <div className="flex flex-col gap-5 p-4">
       {/* 섹션 1 — 4계층 제약 요약 */}
       <section>
@@ -283,6 +303,7 @@ export function GatesPanel({ model }: GatesPanelProps): JSX.Element {
           </div>
         </section>
       )}
+    </div>
     </div>
   )
 }

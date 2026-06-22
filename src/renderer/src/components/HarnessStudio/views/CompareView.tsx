@@ -30,7 +30,9 @@ import Button from '@/components/common/ds/Button'
 import Card from '@/components/common/ds/Card'
 import Chip from '@/components/common/ds/Chip'
 import { LoadingView, ErrorView } from '@/components/common/ds/StateViews'
+import { ViewExplainer } from '../shared/ViewExplainer'
 import { diffModels } from './compareUtils'
+import { buildCompareSummaryLines } from './overviewUtils'
 import type { AgentDiff, LevelChainDiff, GateDiff, ScoreAxisDiff, DiffStatus } from './compareUtils'
 
 export interface CompareViewProps {
@@ -498,6 +500,7 @@ export function CompareView({ model, cachedList }: CompareViewProps): JSX.Elemen
   const [rightModel, setRightModel] = useState<HarnessModel | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // ViewExplainer 는 비교 모델 선택 전에도 항상 표시
 
   const handleSelect = useCallback(async (entry: CachedHarnessEntry) => {
     setLoading(true)
@@ -517,29 +520,54 @@ export function CompareView({ model, cachedList }: CompareViewProps): JSX.Elemen
     setError(null)
   }, [])
 
+  const explainerNode = (
+    <ViewExplainer
+      title="Compare / 비교"
+      howto={
+        <span>
+          두 하네스의 구조 차이(diff)를 보여줍니다 — 추가/제거된 에이전트, 모델·레벨체인·게이트·점수 변화.
+          "내 방법론 두 개가 어떻게 다른가"를 파악하는 용도입니다.
+          변경 항목만 굵게 강조되고, 동일한 항목은 흐리게 표시됩니다.
+        </span>
+      }
+      topic="이 두 하네스의 핵심 차이를 평어로 요약"
+      sourcePath={model.meta.source}
+      icon={GitCompare}
+    />
+  )
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full p-8">
-        <LoadingView label="비교 모델 로드 중..." />
+      <div className="flex flex-col h-full">
+        {explainerNode}
+        <div className="flex items-center justify-center flex-1 p-8">
+          <LoadingView label="비교 모델 로드 중..." />
+        </div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full p-8">
-        <ErrorView title="비교 모델 로드 실패" body={error} onRetry={handleReset} />
+      <div className="flex flex-col h-full">
+        {explainerNode}
+        <div className="flex items-center justify-center flex-1 p-8">
+          <ErrorView title="비교 모델 로드 실패" body={error} onRetry={handleReset} />
+        </div>
       </div>
     )
   }
 
   if (!rightModel) {
     return (
-      <SelectTargetView
-        currentModel={model}
-        cachedList={cachedList}
-        onSelect={(entry) => void handleSelect(entry)}
-      />
+      <div className="flex flex-col h-full">
+        {explainerNode}
+        <SelectTargetView
+          currentModel={model}
+          cachedList={cachedList}
+          onSelect={(entry) => void handleSelect(entry)}
+        />
+      </div>
     )
   }
 
@@ -553,8 +581,30 @@ export function CompareView({ model, cachedList }: CompareViewProps): JSX.Elemen
     diff.summary.gatesRemoved > 0 ||
     diff.summary.gatesChanged > 0
 
+  const summaryLines = buildCompareSummaryLines(
+    diff.leftName,
+    diff.rightName,
+    diff.summary,
+    diff.scoreTotalDelta
+  )
+
   return (
+    <div className="flex flex-col">
+      {explainerNode}
     <div className="flex flex-col gap-5 p-4">
+      {/* 평어 요약 */}
+      {summaryLines.length > 0 && (
+        <section className="flex flex-col gap-1.5 p-3 rounded-lg border border-[color:var(--bg-border)] bg-[color:var(--bg-surface)]">
+          <p className="text-xs font-semibold text-[color:var(--text-secondary)] mb-1">한 줄 요약</p>
+          {summaryLines.map((line, i) => (
+            <div key={i} className="flex items-start gap-2 text-sm text-[color:var(--text-primary)]">
+              <span className="flex-none mt-1 w-1.5 h-1.5 rounded-full bg-[color:var(--clauday-blue)]" />
+              <span>{line.text}</span>
+            </div>
+          ))}
+        </section>
+      )}
+
       {/* 헤더 — 비교 대상 표시 */}
       <section>
         <div className="flex items-center gap-2 p-3 rounded-lg border border-[color:var(--bg-border)] bg-[color:var(--bg-surface)] flex-wrap">
@@ -610,6 +660,7 @@ export function CompareView({ model, cachedList }: CompareViewProps): JSX.Elemen
 
       {/* 점수 diff */}
       <ScoreDiffSection scores={diff.scores} totalDelta={diff.scoreTotalDelta} />
+    </div>
     </div>
   )
 }

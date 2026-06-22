@@ -26,6 +26,7 @@ import Card from '@/components/common/ds/Card'
 import Chip from '@/components/common/ds/Chip'
 import { EmptyView } from '@/components/common/ds/StateViews'
 import { ProvenanceBadge } from '../shared/ProvenanceBadge'
+import { ViewExplainer } from '../shared/ViewExplainer'
 import {
   persistToChipTone,
   persistLabel,
@@ -36,6 +37,7 @@ import {
 
 export interface ArtifactsPanelProps {
   model: HarnessModel
+  sourcePath?: string
 }
 
 /** persist 분류별 아이콘 */
@@ -158,11 +160,12 @@ function ArtifactCard({
  * Artifacts 패널 본체.
  *
  * 섹션:
+ * 0. ViewExplainer 해설 배너
  * 1. persist 분류별 산출물 그룹
  * 2. 산출물 트리 (location 기반)
  * 3. 관계 경고 (소비자 없음 / 생산자 없음)
  */
-export function ArtifactsPanel({ model }: ArtifactsPanelProps): JSX.Element {
+export function ArtifactsPanel({ model, sourcePath }: ArtifactsPanelProps): JSX.Element {
   const { artifacts } = model
 
   if (artifacts.length === 0) {
@@ -180,8 +183,23 @@ export function ArtifactsPanel({ model }: ArtifactsPanelProps): JSX.Element {
   const persistGroups = groupArtifactsByPersist(artifacts)
   const treeNodes = buildArtifactTree(artifacts)
   const relationWarnings = findRelationWarnings(artifacts)
+  const path = sourcePath ?? model.meta.source
 
   return (
+    <div className="flex flex-col">
+      <ViewExplainer
+        title="Artifacts / 산출물"
+        howto={
+          <span>
+            각 단계가 만들어내는 산출물과 저장 위치를 보여줍니다.{' '}
+            <strong>git</strong>=버전 추적 / <strong>ignore</strong>=로컬 임시 / <strong>dooray</strong>=두레이 공유.
+            카드를 펼치면 생산자(producer)·소비자(consumer) 에이전트를 확인할 수 있습니다.
+          </span>
+        }
+        topic="이 하네스의 산출물 흐름을 설명"
+        sourcePath={path}
+        icon={Package}
+      />
     <div className="flex flex-col gap-5 p-4">
       {/* 섹션 1 — persist 분류 요약 */}
       <section>
@@ -280,6 +298,7 @@ export function ArtifactsPanel({ model }: ArtifactsPanelProps): JSX.Element {
           </div>
         </section>
       )}
+    </div>
     </div>
   )
 }

@@ -27,11 +27,13 @@ import { useState } from 'react'
 import type { HarnessModel } from '@shared/types/harness'
 import Card from '@/components/common/ds/Card'
 import Chip from '@/components/common/ds/Chip'
+import { ViewExplainer } from '../shared/ViewExplainer'
 import { runDoctorChecks } from './doctorUtils'
 import type { CheckResult, CheckSeverity, WeakAxisSummary } from './doctorUtils'
 
 export interface DoctorPanelProps {
   model: HarnessModel
+  sourcePath?: string
 }
 
 // ─────────────────────────────────────────────
@@ -176,11 +178,12 @@ function WeakAxesSection({ weakAxes }: { weakAxes: WeakAxisSummary[] }): JSX.Ele
  * Doctor 패널 본체.
  *
  * 섹션:
+ * 0. ViewExplainer 해설 배너
  * 1. 전체 요약 (overallSeverity, FAIL/WARN 카운트)
  * 2. 점검 결과 목록 (FAIL → WARN → PASS 순)
  * 3. 6축 약점 요약 (score 있을 때만)
  */
-export function DoctorPanel({ model }: DoctorPanelProps): JSX.Element {
+export function DoctorPanel({ model, sourcePath }: DoctorPanelProps): JSX.Element {
   const report = runDoctorChecks(model)
 
   // FAIL → WARN → PASS 순 정렬
@@ -190,8 +193,24 @@ export function DoctorPanel({ model }: DoctorPanelProps): JSX.Element {
   })
 
   const overallTone = severityChipTone(report.overallSeverity)
+  const path = sourcePath ?? model.meta.source
 
   return (
+    <div className="flex flex-col">
+      <ViewExplainer
+        title="Doctor / 구조 점검"
+        howto={
+          <span>
+            AI 없이 하네스 구조의 정합성을 자동 점검합니다 (저자 셀프-진단용).
+            호출되지 않는 에이전트, 소비자 없는 산출물, model=unknown 등을 검출합니다.{' '}
+            <strong className="text-[color:var(--c-red-fg)]">FAIL</strong>=반드시 고쳐야 할 문제,{' '}
+            <strong className="text-[color:var(--c-yellow-fg)]">WARN</strong>=개선 권고입니다.
+          </span>
+        }
+        topic="이 점검 결과가 의미하는 것과 고칠 점을 설명"
+        sourcePath={path}
+        icon={Stethoscope}
+      />
     <div className="flex flex-col gap-5 p-4">
       {/* 섹션 1 — 전체 요약 */}
       <section>
@@ -269,6 +288,7 @@ export function DoctorPanel({ model }: DoctorPanelProps): JSX.Element {
           </div>
         </section>
       )}
+    </div>
     </div>
   )
 }

@@ -11,6 +11,7 @@ import { EmptyView, LoadingView, ErrorView } from '@/components/common/ds/StateV
 import { ImportWizard } from './import/ImportWizard'
 import type { ConfirmStepPersonalization } from './import/ConfirmStep'
 import { FlowCanvas } from './flow/FlowCanvas'
+import { OverviewPanel } from './views/OverviewPanel'
 import { SkillsBlocksPanel } from './views/SkillsBlocksPanel'
 import { GatesPanel } from './views/GatesPanel'
 import { ArtifactsPanel } from './views/ArtifactsPanel'
@@ -24,10 +25,11 @@ interface HarnessStudioViewProps {
   active?: boolean
 }
 
-/** Harness Studio 탭 식별자 (M8: doctor, compare 추가) */
-type StudioTab = 'flow' | 'dryrun' | 'skills' | 'gates' | 'artifacts' | 'score' | 'doctor' | 'compare'
+/** Harness Studio 탭 식별자 (overview 추가: 개요 탭) */
+type StudioTab = 'overview' | 'flow' | 'dryrun' | 'skills' | 'gates' | 'artifacts' | 'score' | 'doctor' | 'compare'
 
 const STUDIO_TABS: SegTabItem<StudioTab>[] = [
+  { key: 'overview',  label: '개요' },
   { key: 'flow',      label: 'Flow Canvas' },
   { key: 'dryrun',    label: 'Dry-run' },
   { key: 'skills',    label: 'Skills/Blocks' },
@@ -50,7 +52,7 @@ const STUDIO_TABS: SegTabItem<StudioTab>[] = [
 export default function HarnessStudioView({ active: _active = true }: HarnessStudioViewProps): JSX.Element {
   const [model, setModel] = useState<HarnessModel | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<StudioTab>('flow')
+  const [activeTab, setActiveTab] = useState<StudioTab>('overview')
   // Dry-run 결과 경로 — Flow 탭의 highlightPath 로 전달된다(M7).
   const [dryRunHighlight, setDryRunHighlight] = useState<string[] | undefined>(undefined)
   // 개인화: 오버레이 반영 여부 — ConfirmStep 에서 선택한 값을 보존한다.
@@ -151,7 +153,7 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
 
   const handleReset = useCallback(() => {
     setModel(null)
-    setActiveTab('flow')
+    setActiveTab('overview')
     setDryRunHighlight(undefined)
     setOverlayEnabled(false)
     void loadLanding()
@@ -375,6 +377,7 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
           overlayEnabled={overlayEnabled}
           onHighlight={setDryRunHighlight}
           onGoToFlow={() => setActiveTab('flow')}
+          onNavigate={setActiveTab}
           cachedList={cachedList ?? []}
         />
       </div>
@@ -397,6 +400,7 @@ function TabContent({
   overlayEnabled,
   onHighlight,
   onGoToFlow,
+  onNavigate,
   cachedList
 }: {
   tab: StudioTab
@@ -405,13 +409,29 @@ function TabContent({
   overlayEnabled?: boolean
   onHighlight?: (path: string[]) => void
   onGoToFlow?: () => void
+  onNavigate?: (tab: StudioTab) => void
   cachedList: CachedHarnessEntry[]
 }): JSX.Element {
   switch (tab) {
+    case 'overview':
+      return (
+        <div className="w-full h-full overflow-y-auto">
+          <OverviewPanel
+            model={model}
+            sourcePath={model.meta.source}
+            onNavigate={onNavigate ? (t) => onNavigate(t as StudioTab) : undefined}
+          />
+        </div>
+      )
     case 'flow':
       return (
-        <div className="w-full h-full">
-          <FlowCanvas model={model} highlightPath={highlightPath} overlayEnabled={overlayEnabled} />
+        <div className="w-full h-full flex flex-col">
+          <div className="flex items-center gap-2 px-4 py-2 bg-[color:var(--bg-surface)] border-b border-[color:var(--bg-border)] flex-shrink-0 text-xs text-[color:var(--text-tertiary)]">
+            <span>노드=에이전트(색=역할) · 드래그로 이동 · 노드 클릭 시 상세 패널 · 레벨 토글로 경로 강조</span>
+          </div>
+          <div className="flex-1 min-h-0">
+            <FlowCanvas model={model} highlightPath={highlightPath} overlayEnabled={overlayEnabled} />
+          </div>
         </div>
       )
     case 'dryrun':
@@ -421,15 +441,15 @@ function TabContent({
         </div>
       )
     case 'skills':
-      return <div className="w-full h-full overflow-y-auto"><SkillsBlocksPanel model={model} /></div>
+      return <div className="w-full h-full overflow-y-auto"><SkillsBlocksPanel model={model} sourcePath={model.meta.source} /></div>
     case 'gates':
-      return <div className="w-full h-full overflow-y-auto"><GatesPanel model={model} /></div>
+      return <div className="w-full h-full overflow-y-auto"><GatesPanel model={model} sourcePath={model.meta.source} /></div>
     case 'artifacts':
-      return <div className="w-full h-full overflow-y-auto"><ArtifactsPanel model={model} /></div>
+      return <div className="w-full h-full overflow-y-auto"><ArtifactsPanel model={model} sourcePath={model.meta.source} /></div>
     case 'score':
-      return <div className="w-full h-full overflow-y-auto"><ScorePanel model={model} /></div>
+      return <div className="w-full h-full overflow-y-auto"><ScorePanel model={model} sourcePath={model.meta.source} /></div>
     case 'doctor':
-      return <div className="w-full h-full overflow-y-auto"><DoctorPanel model={model} /></div>
+      return <div className="w-full h-full overflow-y-auto"><DoctorPanel model={model} sourcePath={model.meta.source} /></div>
     case 'compare':
       return <div className="w-full h-full overflow-y-auto"><CompareView model={model} cachedList={cachedList} /></div>
     default:
