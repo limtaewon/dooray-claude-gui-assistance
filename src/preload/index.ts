@@ -714,16 +714,30 @@ const api = {
      *
      * 처리 흐름:
      * 1. taskHash 캐시 hit → 즉시 반환.
-     * 2. miss → AI(Haiku) 레벨 추정 + levelPath 결정론적 계산.
+     * 2. miss → (projectPath 지정 시) 프로젝트 맥락 정적 수집 → AI(Haiku) 레벨 추정 + levelPath 결정론적 계산.
      * requestId 를 지정하면 AI_PROGRESS 이벤트로 진행률을 받을 수 있다.
      *
      * @param args.path - 번들 루트 절대경로 (HarnessModel 획득에 사용)
      * @param args.taskText - 태스크 설명 평문 또는 두레이 URL
      * @param args.requestId - 진행률 이벤트 구분 ID (optional)
+     * @param args.projectPath - 프로젝트 루트 절대경로 (optional).
+     *   지정 시 정적 프로파일 수집 후 AI 레벨 추정 맥락으로 전달 — 추정 정확도 향상.
+     *   미지정 시 기존 동작 그대로.
      * @returns DryRunResult
      */
-    dryrun: (args: { path: string; taskText: string; requestId?: string }): Promise<DryRunResult> =>
+    dryrun: (args: { path: string; taskText: string; requestId?: string; projectPath?: string }): Promise<DryRunResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.HARNESS_DRYRUN, args),
+
+    /**
+     * 프로젝트 폴더 선택 다이얼로그를 열어 선택된 경로를 반환한다.
+     *
+     * dryrun 의 projectPath 입력에 사용한다.
+     * 사용자가 취소하면 null 을 반환한다.
+     *
+     * @returns 선택된 디렉터리 절대경로, 또는 취소 시 null
+     */
+    pickProjectDir: (): Promise<string | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.HARNESS_PICK_DIR),
 
     /**
      * 번들 경로 + 토픽을 받아 온디맨드 한국어 설명/용어번역을 반환한다 (P3, Sonnet).
