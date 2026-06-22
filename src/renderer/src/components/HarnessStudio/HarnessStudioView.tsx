@@ -466,16 +466,27 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
 
       {/* 탭 본체 */}
       <div className="flex-1 min-h-0 overflow-hidden">
-        <TabContent
-          tab={activeTab}
-          model={model}
-          highlightPath={dryRunHighlight}
-          overlayEnabled={overlayEnabled}
-          onHighlight={setDryRunHighlight}
-          onGoToFlow={() => setActiveTab('flow')}
-          onNavigate={setActiveTab}
-          cachedList={cachedList ?? []}
-        />
+        {/* Dry-run 은 항상 마운트 유지(비활성 시 hidden) — Flow 등 다른 탭 갔다 와도
+            입력/결과가 보존된다(언마운트 시 state 소실 방지). */}
+        <div className={activeTab === 'dryrun' ? 'w-full h-full overflow-y-auto' : 'hidden'}>
+          <DryRunPanel
+            model={model}
+            onHighlight={setDryRunHighlight}
+            onGoToFlow={() => setActiveTab('flow')}
+          />
+        </div>
+        {activeTab !== 'dryrun' && (
+          <TabContent
+            tab={activeTab}
+            model={model}
+            highlightPath={dryRunHighlight}
+            overlayEnabled={overlayEnabled}
+            onHighlight={setDryRunHighlight}
+            onGoToFlow={() => setActiveTab('flow')}
+            onNavigate={setActiveTab}
+            cachedList={cachedList ?? []}
+          />
+        )}
       </div>
     </div>
   )
@@ -531,11 +542,8 @@ function TabContent({
         </div>
       )
     case 'dryrun':
-      return (
-        <div className="w-full h-full overflow-y-auto">
-          <DryRunPanel model={model} onHighlight={onHighlight} onGoToFlow={onGoToFlow} />
-        </div>
-      )
+      // dryrun 은 상위에서 항상 마운트 유지하므로 여기선 렌더하지 않는다(결과 보존).
+      return <></>
     case 'skills':
       return <div className="w-full h-full overflow-y-auto"><SkillsBlocksPanel model={model} sourcePath={model.meta.source} /></div>
     case 'gates':
