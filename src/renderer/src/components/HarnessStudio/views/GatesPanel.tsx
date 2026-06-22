@@ -173,7 +173,7 @@ export function GatesPanel({ model, sourcePath }: GatesPanelProps): JSX.Element 
                       {gate.ruleDetails.map((d) => (
                         <div key={d.code} className="flex items-start gap-2">
                           <Chip tone="violet" square>{d.code}</Chip>
-                          <span className="text-xs text-[color:var(--text-tertiary)] leading-relaxed flex-1 min-w-0">
+                          <span className="text-xs text-[color:var(--text-secondary)] leading-relaxed flex-1 min-w-0">
                             {d.message}
                           </span>
                         </div>

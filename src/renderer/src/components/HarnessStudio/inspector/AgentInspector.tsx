@@ -238,7 +238,7 @@ export function AgentInspector({ agent, provenance, onClose, bundlePath, gate }:
                       <div key={code} className="flex items-start gap-1.5">
                         <Chip tone="violet" square>{code}</Chip>
                         {msgOf.get(code) && (
-                          <span className="text-xs text-[color:var(--text-tertiary)] leading-snug flex-1 min-w-0">
+                          <span className="text-xs text-[color:var(--text-secondary)] leading-snug flex-1 min-w-0">
                             {msgOf.get(code)}
                           </span>
                         )}

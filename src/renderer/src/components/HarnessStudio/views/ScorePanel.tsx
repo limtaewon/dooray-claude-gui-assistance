@@ -205,7 +205,7 @@ export function ScorePanel({ model, sourcePath }: ScorePanelProps): JSX.Element 
                         </span>
                       </div>
                     </td>
-                    <td className="py-2.5 text-[color:var(--text-tertiary)]">
+                    <td className="py-2.5 text-[color:var(--text-secondary)]">
                       {axis.note ?? '—'}
                     </td>
                   </tr>
