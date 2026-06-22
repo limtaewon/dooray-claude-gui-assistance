@@ -5,9 +5,10 @@
  * 사용하는 것을 권장한다(ADR-003 §격리).
  *
  * props:
- * - model         : HarnessModel (정규화된 하니스 모델)
- * - highlightPath : string[] (M7 Dry-run 연동 자리, 없으면 무시)
- * - onSelectAgent : (agentId: string) => void (노드 클릭 콜백)
+ * - model          : HarnessModel (정규화된 하니스 모델)
+ * - highlightPath  : string[] (Dry-run 연동 — 해당 에이전트 강조)
+ * - overlayEnabled : boolean  (개인화 오버레이 반영 여부, 기본 true)
+ * - onSelectAgent  : (agentId: string) => void (노드 클릭 콜백)
  */
 
 import { useState, useCallback, useMemo } from 'react'
@@ -67,10 +68,15 @@ export interface FlowCanvasProps {
   /** 정규화된 HarnessModel */
   model: HarnessModel
   /**
-   * M7 Dry-run 연동 — 하이라이트할 에이전트 ID 배열.
-   * M5 단계에서는 옵셔널로 받되 사용하지 않음.
+   * Dry-run 연동 — 하이라이트할 에이전트 ID 배열.
+   * 주어지면 해당 에이전트만 강조하고 나머지는 흐림 처리된다.
    */
   highlightPath?: string[]
+  /**
+   * 개인화 오버레이 반영 여부.
+   * true(기본)이면 model.overlay 를 buildGraph 에 반영한다.
+   */
+  overlayEnabled?: boolean
   /** 노드 클릭 시 에이전트 ID 콜백 */
   onSelectAgent?: (agentId: string) => void
 }
@@ -85,7 +91,7 @@ export interface FlowCanvasProps {
  * L0~L3 레벨 토글로 활성 에이전트 체인을 전환하며,
  * 노드 클릭 시 오른쪽 AgentInspector 패널에 에이전트 상세를 표시한다.
  */
-export function FlowCanvas({ model, onSelectAgent }: FlowCanvasProps): JSX.Element {
+export function FlowCanvas({ model, highlightPath, overlayEnabled = true, onSelectAgent }: FlowCanvasProps): JSX.Element {
   const levelTabs = useMemo(() => buildLevelTabs(model), [model])
   const defaultLevel = levelTabs[0]?.key ?? null
 
@@ -96,12 +102,12 @@ export function FlowCanvas({ model, onSelectAgent }: FlowCanvasProps): JSX.Eleme
 
   // buildGraph 결과 → react-flow Node/Edge 타입으로 변환
   const { nodes: currentNodes, edges: currentEdges } = useMemo(() => {
-    const result = buildGraph(model, activeLevel)
+    const result = buildGraph(model, activeLevel, highlightPath, overlayEnabled)
     return {
       nodes: result.nodes as unknown as Node[],
       edges: result.edges as unknown as Edge[]
     }
-  }, [model, activeLevel])
+  }, [model, activeLevel, highlightPath, overlayEnabled])
 
   // 노드 클릭 핸들러
   const handleNodeClick: NodeMouseHandler = useCallback(

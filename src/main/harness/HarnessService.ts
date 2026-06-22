@@ -23,6 +23,7 @@ import { DryRunEstimator } from './DryRunEstimator'
 import type { IAIServiceForNormalizer } from './HarnessNormalizer'
 import type { RawBundleSummary, HarnessModel, DryRunResult, DiscoveredHarness } from '../../shared/types/harness'
 import { detectBundleKind } from './bundleDetect'
+import { PathAllowlist, assertPathAllowed, getSkillsRoot, HarnessPathDeniedError } from './pathGate'
 
 // ─────────────────────────────────────────────
 // AIService 인터페이스
@@ -76,6 +77,15 @@ export class HarnessService {
   private readonly aiService: IAIServiceForHarness
 
   /**
+   * 세션 단위 경로 allowlist.
+   * scan 성공 시 경로를 등록하고, AI 전송 전 반드시 검증한다.
+   *
+   * 제약: ~/.claude/skills 하위 경로는 항상 허용 (등록 불필요).
+   * 그 외 경로는 scan 을 먼저 호출해 등록해야 normalize/dryrun/explain 이 허용된다.
+   */
+  private readonly allowlist: PathAllowlist = new PathAllowlist()
+
+  /**
    * @param userDataPath - electron app.getPath('userData') 값
    * @param aiService - AIService 인스턴스 (normalizeHarness + estimateLevel + explainHarness 포함)
    */
@@ -96,12 +106,28 @@ export class HarnessService {
    *
    * AI 없음. 즉시 반환. ImportWizard 의 ScanStep 에서 사용한다.
    *
-   * @param bundlePath - 번들 루트 절대경로
+   * 보안:
+   * - 스캔 성공 후 bundlePath 를 세션 allowlist 에 등록한다.
+   * - 이 등록이 완료돼야 같은 경로에 대한 normalize/dryrun/explain 이 허용된다.
+   * - ~/.claude/skills 하위 경로는 scan 없이도 항상 허용된다.
+   *
+   * @param bundlePath - 번들 루트 절대경로 (사용자가 다이얼로그/드롭으로 선택한 경로)
    * @returns RawBundleSummary (kind, fileTree, agentStubs, warnings)
    */
   async scan(bundlePath: string): Promise<RawBundleSummary> {
     const raw = await this.scanner.scan(bundlePath)
-    return this.scanner.toSummary(raw)
+    const summary = this.scanner.toSummary(raw)
+
+    // scan 이 성공했으면 세션 allowlist 에 등록
+    // (심링크 해소: realpath 실패 시 등록 생략, 이후 AI 전송에서 검증 거부)
+    try {
+      const realResolved = await fs.realpath(path.resolve(bundlePath))
+      this.allowlist.register(realResolved)
+    } catch {
+      // realpath 실패 — 등록 생략. normalize 단계에서 assertPathAllowed 가 거부한다.
+    }
+
+    return summary
   }
 
   // ─────────────────────────────────────────────
@@ -123,6 +149,14 @@ export class HarnessService {
    * @returns HarnessModel
    */
   async normalize(bundlePath: string, force = false, requestId?: string): Promise<HarnessModel> {
+    // 0. 경로 게이트 — AI 전송 전 필수 검증.
+    //    skills 하위이거나 scan 으로 등록된 경로만 허용(미등록 임의 경로의 silent AI 전송 차단).
+    //    dryrun/explain 은 이 normalize 를 경유하므로 함께 보호된다.
+    //    skills root 도 realpath 로 해소 — 등록 경로(realpath)와 비교 기준을 일치시킨다
+    //    (~/.claude 가 심링크인 환경 대비; 미존재 시 resolve 폴백).
+    const skillsRoot = await fs.realpath(getSkillsRoot()).catch(() => path.resolve(getSkillsRoot()))
+    await assertPathAllowed(bundlePath, this.allowlist.toAllowedRoots(skillsRoot))
+
     // 1. 정적 스캔 → RawBundle
     const raw = await this.scanner.scan(bundlePath)
 

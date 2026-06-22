@@ -75,10 +75,17 @@ const LEVEL_COST_WEIGHT: Record<HarnessLevelId, number> = {
 /**
  * securityOverride 조건 문자열에서 security 에이전트가 필수인지 판정.
  *
- * 지원하는 패턴:
- * - "L3 OR Q3=Yes" → 레벨이 L3 이거나 Q3=Yes 로 추정된 경우 필수
- * - "L3" → L3 레벨이면 무조건 security 필수
- * - 그 외 산문 → 언급 여부로 간단 판정
+ * 지원 범위 (현재 — 레벨 기반 판정만):
+ * - "L3" / "L3 OR …" → 추정 레벨이 L3 이면 필수
+ * - "L2 이상" / "L2+" → 레벨이 L2·L3 이면 필수
+ *
+ * 제약 (의도적 한계):
+ * - "Q3=Yes" 같은 **개별 트리아지 질문 진리값 기반 override 는 미지원**한다.
+ *   estimateLevel(Haiku) 이 반환하는 `answers` 는 자연어 문자열이라 Q→bool 구조화 값이
+ *   levelPath 로 전달되지 않기 때문이다. 따라서 레벨이 L3 미만이면서 보안 질문만 Yes 인
+ *   케이스에서는 security 가 추가되지 않는다(보수적 degradation — 오탐보다 미탐 회피).
+ *   Q기반 override 지원은 estimateLevel 출력에 구조화 securityAnswer 플래그를 추가하는
+ *   향후 과제다.
  *
  * @param securityOverride - triage.securityOverride 문자열 (optional)
  * @param levelId - 추정된 레벨
@@ -92,7 +99,7 @@ export function isSecurityRequired(
 
   const norm = securityOverride.toLowerCase()
 
-  // "L3 OR Q3=Yes" 또는 "L3" 패턴 — L3 이면 security 필수
+  // "L3" 또는 "L3 OR …" 패턴 — 레벨이 L3 이면 security 필수 (Q기반 절은 위 docstring 참고)
   if (norm.includes('l3')) {
     if (levelId === 'L3') return true
   }

@@ -114,6 +114,7 @@ describe('HarnessService', () => {
     it('캐시 miss 시 AIService.normalizeHarness 를 호출한다', async () => {
       const bundlePath = createMinimalBundle('normalize-miss')
       service = new HarnessService(userDataPath, mockAI)
+      await service.scan(bundlePath) // 경로 게이트 등록(실제 import 흐름: scan→normalize)
 
       vi.mocked(mockAI.normalizeHarness).mockImplementation(async (skeleton) => {
         // scanner 가 계산한 bundleHash 를 meta 에 반영해서 반환
@@ -129,6 +130,7 @@ describe('HarnessService', () => {
     it('캐시 hit 시 AIService.normalizeHarness 를 호출하지 않는다', async () => {
       const bundlePath = createMinimalBundle('normalize-hit')
       service = new HarnessService(userDataPath, mockAI)
+      await service.scan(bundlePath)
 
       vi.mocked(mockAI.normalizeHarness).mockImplementation(async (skeleton) => {
         return makeModel(bundlePath, skeleton.meta?.bundleHash || 'mock')
@@ -147,6 +149,7 @@ describe('HarnessService', () => {
     it('force=true 시 캐시가 있어도 AIService 를 재호출한다', async () => {
       const bundlePath = createMinimalBundle('normalize-force')
       service = new HarnessService(userDataPath, mockAI)
+      await service.scan(bundlePath)
 
       vi.mocked(mockAI.normalizeHarness).mockImplementation(async (skeleton) => {
         return makeModel(bundlePath, skeleton.meta?.bundleHash || 'mock')
@@ -164,6 +167,7 @@ describe('HarnessService', () => {
     it('AI 오류 시 크래시 없이 축소 모델을 반환한다', async () => {
       const bundlePath = createMinimalBundle('normalize-error')
       service = new HarnessService(userDataPath, mockAI)
+      await service.scan(bundlePath)
 
       vi.mocked(mockAI.normalizeHarness).mockRejectedValue(new Error('AI 오류'))
 
@@ -181,6 +185,7 @@ describe('HarnessService', () => {
     it('normalize 후 listCached 에 항목이 있다', async () => {
       const bundlePath = createMinimalBundle('list-cached')
       service = new HarnessService(userDataPath, mockAI)
+      await service.scan(bundlePath)
 
       vi.mocked(mockAI.normalizeHarness).mockImplementation(async (skeleton) => {
         return makeModel(bundlePath, skeleton.meta?.bundleHash || 'mock')
@@ -196,6 +201,7 @@ describe('HarnessService', () => {
     it('clearCache() 로 전체 삭제 후 listCached 가 빈 배열을 반환한다', async () => {
       const bundlePath = createMinimalBundle('clear-cache-all')
       service = new HarnessService(userDataPath, mockAI)
+      await service.scan(bundlePath)
 
       vi.mocked(mockAI.normalizeHarness).mockImplementation(async (skeleton) => {
         return makeModel(bundlePath, skeleton.meta?.bundleHash || 'mock')
@@ -214,6 +220,8 @@ describe('HarnessService', () => {
       const bundlePath1 = createMinimalBundle('clear-path-1')
       const bundlePath2 = createMinimalBundle('clear-path-2')
       service = new HarnessService(userDataPath, mockAI)
+      await service.scan(bundlePath1)
+      await service.scan(bundlePath2)
 
       vi.mocked(mockAI.normalizeHarness).mockImplementation(async (skeleton) => {
         return makeModel(skeleton.meta?.source || bundlePath1, skeleton.meta?.bundleHash || 'mock')
@@ -249,6 +257,7 @@ describe('HarnessService', () => {
     it('DryRunResult 를 반환한다 — level/answers/rationale/highlightPath 포함', async () => {
       const bundlePath = createMinimalBundle('dryrun-basic')
       service = new HarnessService(userDataPath, mockAI)
+      await service.scan(bundlePath)
 
       vi.mocked(mockAI.normalizeHarness).mockImplementation(async (skeleton) => {
         return makeModel(bundlePath, skeleton.meta?.bundleHash || 'mock')
@@ -271,6 +280,7 @@ describe('HarnessService', () => {
     it('동일 번들+태스크 두 번째 호출 시 AI 를 재호출하지 않는다 (taskHash 캐시)', async () => {
       const bundlePath = createMinimalBundle('dryrun-cache')
       service = new HarnessService(userDataPath, mockAI)
+      await service.scan(bundlePath)
 
       vi.mocked(mockAI.normalizeHarness).mockImplementation(async (skeleton) => {
         return makeModel(bundlePath, skeleton.meta?.bundleHash || 'mock')

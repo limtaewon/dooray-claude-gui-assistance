@@ -11,6 +11,7 @@
  */
 
 import { createHash } from 'crypto'
+import { CURRENT_SCHEMA_VERSION } from './HarnessCache'
 
 /**
  * 태스크 텍스트를 정규화한다.
@@ -35,9 +36,14 @@ export function normalizeTaskText(taskText: string): string {
  */
 export function computeTaskHash(bundleHash: string, taskText: string): string {
   const normalized = normalizeTaskText(taskText)
+  // schemaVersion 을 해시에 포함 — HarnessModel/triage 스키마가 바뀌면(버전 bump)
+  // 같은 번들·태스크라도 해시가 달라져 옛 DryRunResult 캐시가 자동 무효화된다.
+  // (bundleHash 는 파일 내용 기반이라 스키마 로직 변경만으로는 바뀌지 않으므로 별도 필요.)
   return createHash('sha256')
     .update(bundleHash)
     .update('\x00')  // 구분자 — bundleHash 와 taskText 가 이어 붙여질 때 충돌 방지
     .update(normalized)
+    .update('\x00')
+    .update(`schema:${CURRENT_SCHEMA_VERSION}`)
     .digest('hex')
 }

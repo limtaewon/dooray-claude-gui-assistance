@@ -51,6 +51,9 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
   const [activeTab, setActiveTab] = useState<StudioTab>('flow')
   // Dry-run 결과 경로 — Flow 탭의 highlightPath 로 전달된다(M7).
   const [dryRunHighlight, setDryRunHighlight] = useState<string[] | undefined>(undefined)
+  // 개인화: 오버레이 반영 여부 — ConfirmStep 에서 선택한 값을 보존한다.
+  // 용어 번역(termTranslation)은 현재 미구현 — 상태만 보유, 후속 P3 에서 활성화 예정.
+  const [overlayEnabled, setOverlayEnabled] = useState(false)
   const [cachedList, setCachedList] = useState<CachedHarnessEntry[] | null>(null)
   const [cachedLoading, setCachedLoading] = useState(false)
   const [cachedError, setCachedError] = useState<string | null>(null)
@@ -87,9 +90,11 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
 
   const handleWizardComplete = useCallback((
     result: HarnessModel,
-    _personalization: ConfirmStepPersonalization
+    personalization: ConfirmStepPersonalization
   ) => {
     setModel(result)
+    setOverlayEnabled(personalization.applyOverlay)
+    // termTranslation 은 현재 미구현 — 상태만 보유, 후속 P3 에서 활성화 예정.
     setWizardOpen(false)
   }, [])
 
@@ -97,6 +102,7 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
     setModel(null)
     setActiveTab('flow')
     setDryRunHighlight(undefined)
+    setOverlayEnabled(false)
     void loadCached()
   }, [loadCached])
 
@@ -270,6 +276,7 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
           tab={activeTab}
           model={model}
           highlightPath={dryRunHighlight}
+          overlayEnabled={overlayEnabled}
           onHighlight={setDryRunHighlight}
           onGoToFlow={() => setActiveTab('flow')}
           cachedList={cachedList ?? []}
@@ -291,6 +298,7 @@ function TabContent({
   tab,
   model,
   highlightPath,
+  overlayEnabled,
   onHighlight,
   onGoToFlow,
   cachedList
@@ -298,6 +306,7 @@ function TabContent({
   tab: StudioTab
   model: HarnessModel
   highlightPath?: string[]
+  overlayEnabled?: boolean
   onHighlight?: (path: string[]) => void
   onGoToFlow?: () => void
   cachedList: CachedHarnessEntry[]
@@ -306,7 +315,7 @@ function TabContent({
     case 'flow':
       return (
         <div className="w-full h-full">
-          <FlowCanvas model={model} highlightPath={highlightPath} />
+          <FlowCanvas model={model} highlightPath={highlightPath} overlayEnabled={overlayEnabled} />
         </div>
       )
     case 'dryrun':

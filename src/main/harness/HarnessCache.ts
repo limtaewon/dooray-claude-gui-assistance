@@ -194,7 +194,7 @@ export class HarnessCache {
   /**
    * 캐시를 지운다.
    *
-   * - path を指定した場合: 해당 번들 경로에 연결된 항목만 삭제.
+   * - path 를 지정한 경우: 해당 번들 경로에 연결된 항목만 삭제.
    * - path 없으면: 전체 bundles/tasks 파일을 모두 삭제하고 index 초기화.
    *
    * @param bundlePath - 특정 번들 경로 (optional)

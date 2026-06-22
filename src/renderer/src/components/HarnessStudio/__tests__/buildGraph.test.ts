@@ -439,3 +439,98 @@ describe('buildGraph — 오버레이 modelOverrides', () => {
     expect((qaNode!.data as AgentNodeData).originalModel).toBeUndefined()
   })
 })
+
+// ─────────────────────────────────────────────
+// buildGraph — highlightPath (H1 회귀 방지)
+// ─────────────────────────────────────────────
+
+describe('buildGraph — highlightPath 하이라이트/흐림 처리', () => {
+  const agents = [
+    makeAgent({ id: 'analyst', phaseClass: 'analyst' }),
+    makeAgent({ id: 'developer', phaseClass: 'dev' }),
+    makeAgent({ id: 'qa', phaseClass: 'qa' })
+  ]
+  const levels = [makeLevel('L1', ['analyst', 'developer', 'qa'])]
+  const model = makeModel({ agents, levels })
+
+  it('highlightPath 에 포함된 에이전트는 highlighted=true', () => {
+    const result = buildGraph(model, 'L1', ['developer'])
+    const devNode = result.nodes.find((n) => n.id === 'developer')
+    expect((devNode!.data as AgentNodeData).highlighted).toBe(true)
+  })
+
+  it('highlightPath 에 없는 활성 체인 에이전트는 dimmed=true', () => {
+    const result = buildGraph(model, 'L1', ['developer'])
+    const analystNode = result.nodes.find((n) => n.id === 'analyst')
+    const qaNode = result.nodes.find((n) => n.id === 'qa')
+    expect((analystNode!.data as AgentNodeData).dimmed).toBe(true)
+    expect((qaNode!.data as AgentNodeData).dimmed).toBe(true)
+  })
+
+  it('highlightPath 가 없으면 활성 체인 에이전트는 모두 highlighted=false, dimmed=false', () => {
+    const result = buildGraph(model, 'L1', undefined)
+    for (const agentId of ['analyst', 'developer', 'qa']) {
+      const node = result.nodes.find((n) => n.id === agentId)
+      expect((node!.data as AgentNodeData).highlighted).toBe(false)
+      expect((node!.data as AgentNodeData).dimmed).toBe(false)
+    }
+  })
+
+  it('빈 highlightPath 배열은 highlightPath 없음과 동일하게 동작한다', () => {
+    const result = buildGraph(model, 'L1', [])
+    for (const agentId of ['analyst', 'developer', 'qa']) {
+      const node = result.nodes.find((n) => n.id === agentId)
+      expect((node!.data as AgentNodeData).highlighted).toBe(false)
+      expect((node!.data as AgentNodeData).dimmed).toBe(false)
+    }
+  })
+
+  it('highlightPath 에 여러 에이전트를 지정하면 모두 highlighted=true', () => {
+    const result = buildGraph(model, 'L1', ['analyst', 'qa'])
+    const analystNode = result.nodes.find((n) => n.id === 'analyst')
+    const qaNode = result.nodes.find((n) => n.id === 'qa')
+    const devNode = result.nodes.find((n) => n.id === 'developer')
+    expect((analystNode!.data as AgentNodeData).highlighted).toBe(true)
+    expect((qaNode!.data as AgentNodeData).highlighted).toBe(true)
+    expect((devNode!.data as AgentNodeData).dimmed).toBe(true)
+  })
+})
+
+// ─────────────────────────────────────────────
+// buildGraph — overlayEnabled=false (H2 회귀 방지)
+// ─────────────────────────────────────────────
+
+describe('buildGraph — overlayEnabled=false 시 오버레이 미적용', () => {
+  const agents = [
+    makeAgent({ id: 'developer', model: 'sonnet' }),
+    makeAgent({ id: 'qa', model: 'haiku' }),
+    makeAgent({ id: 'security', phaseClass: 'security' })
+  ]
+  const levels = [makeLevel('L2', ['developer', 'qa', 'security'])]
+  const overlay = {
+    domains: [],
+    modelOverrides: { developer: 'opus' as const },
+    disabledAgents: ['security']
+  }
+  const model = makeModel({ agents, levels, overlay })
+
+  it('overlayEnabled=false 이면 disabledAgents 가 overlayDisabled=false 로 유지된다', () => {
+    const result = buildGraph(model, 'L2', undefined, false)
+    const secNode = result.nodes.find((n) => n.id === 'security')
+    expect((secNode!.data as AgentNodeData).overlayDisabled).toBe(false)
+  })
+
+  it('overlayEnabled=false 이면 modelOverrides 가 적용되지 않는다', () => {
+    const result = buildGraph(model, 'L2', undefined, false)
+    const devNode = result.nodes.find((n) => n.id === 'developer')
+    // 오버레이 미적용 → 원본 sonnet 유지
+    expect((devNode!.data as AgentNodeData).model).toBe('sonnet')
+    expect((devNode!.data as AgentNodeData).originalModel).toBeUndefined()
+  })
+
+  it('overlayEnabled=true 이면 modelOverrides 가 적용된다', () => {
+    const result = buildGraph(model, 'L2', undefined, true)
+    const devNode = result.nodes.find((n) => n.id === 'developer')
+    expect((devNode!.data as AgentNodeData).model).toBe('opus')
+  })
+})
