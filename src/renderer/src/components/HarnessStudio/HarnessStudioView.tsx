@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Workflow, Plus, History, Clock, Download, Stethoscope, GitCompare, Search, Package, ArrowLeft, RefreshCw } from 'lucide-react'
+import { Workflow, Plus, History, Clock, Download, Stethoscope, GitCompare, Search, Package, ArrowLeft, RefreshCw, Cpu } from 'lucide-react'
+import { useAIProgress, formatElapsed } from '@/hooks/useAIProgress'
 import type { LucideIcon } from 'lucide-react'
 import type { HarnessModel, CachedHarnessEntry, DiscoveredHarness } from '@shared/types/harness'
 import Button from '@/components/common/ds/Button'
@@ -62,9 +63,10 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
   const [discovered, setDiscovered] = useState<DiscoveredHarness[] | null>(null)
   // 정규화(AI) 진행 중인 경로 — 발견/캐시 항목을 열 때 로딩 오버레이 표시용.
   const [opening, setOpening] = useState<string | null>(null)
-  // 강제 재정규화 진행/에러 — 헤더 버튼용.
+  // 강제 재정규화 진행/에러 — 진행 중에는 탭 전체를 막는 풀스크린 뷰로 표시.
   const [renormalizing, setRenormalizing] = useState(false)
   const [renormError, setRenormError] = useState<string | null>(null)
+  const { progress: renormProgress, start: startRenormProgress, done: doneRenormProgress } = useAIProgress()
 
   // 랜딩 진입 시 최근 캐시 + 자동 발견을 함께 로드한다(발견은 버튼 없이 자동).
   const loadLanding = useCallback(async () => {
@@ -135,15 +137,17 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
     if (!model) return
     setRenormalizing(true)
     setRenormError(null)
+    const requestId = startRenormProgress()
     try {
-      const fresh = await window.api.harness.normalize({ path: model.meta.source, force: true })
+      const fresh = await window.api.harness.normalize({ path: model.meta.source, force: true, requestId })
       setModel(fresh)
     } catch (e) {
       setRenormError(e instanceof Error ? e.message : String(e))
     } finally {
+      doneRenormProgress()
       setRenormalizing(false)
     }
-  }, [model])
+  }, [model, startRenormProgress, doneRenormProgress])
 
   const handleReset = useCallback(() => {
     setModel(null)
@@ -161,6 +165,27 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
           onComplete={handleWizardComplete}
           onClose={() => setWizardOpen(false)}
         />
+      </div>
+    )
+  }
+
+  // ── 재정규화 중 — 탭 전체를 막는 풀스크린 진행 화면 (Import 정규화 화면과 동일 UX) ──
+  if (renormalizing) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3 bg-[color:var(--bg-primary)]">
+        <Cpu size={32} className="text-[color:var(--c-blue-solid)] animate-pulse" />
+        <div className="text-center">
+          <p className="text-sm font-semibold text-[color:var(--text-primary)]">AI 재정규화 진행 중</p>
+          <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
+            {renormProgress.message || '번들 구조를 다시 분석하고 있습니다… (대용량 번들은 수 분 소요)'}
+          </p>
+        </div>
+        {renormProgress.elapsedMs > 0 && (
+          <p className="text-xs text-[color:var(--text-tertiary)]">{formatElapsed(renormProgress.elapsedMs)} 경과</p>
+        )}
+        <div className="w-64 h-1.5 rounded-full bg-[color:var(--bg-border)] overflow-hidden">
+          <div className="h-full bg-[color:var(--c-blue-solid)] animate-[progress-indeterminate_1.5s_ease-in-out_infinite] rounded-full" />
+        </div>
       </div>
     )
   }
@@ -312,10 +337,9 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
             size="xs"
             leftIcon={<RefreshCw size={11} />}
             onClick={() => void handleRenormalize()}
-            disabled={renormalizing}
             title="현재 AI 모델로 다시 정규화 (모델 변경·번들 갱신 반영)"
           >
-            {renormalizing ? '재정규화 중…' : '재정규화'}
+            재정규화
           </Button>
           <Button
             variant="secondary"
