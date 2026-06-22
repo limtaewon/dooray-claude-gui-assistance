@@ -16,7 +16,11 @@ import {
   AlertTriangle,
   Lock,
   Unlock,
-  Activity
+  Activity,
+  FileCheck,
+  ListChecks,
+  CheckCircle2,
+  Dot
 } from 'lucide-react'
 import type { HarnessModel } from '@shared/types/harness'
 import Card from '@/components/common/ds/Card'
@@ -31,6 +35,19 @@ import {
   groupStateMachineByFrom,
   hookEventTone
 } from './gatesUtils'
+import { groupRuleDetails } from './gateRuleGroups'
+import type { RuleCategory } from './gateRuleGroups'
+
+/** 카테고리별 lucide 아이콘 컴포넌트 반환 */
+function RuleGroupIcon({ category, size = 11 }: { category: RuleCategory; size?: number }): JSX.Element {
+  switch (category) {
+    case 'existence': return <FileCheck size={size} className="text-[color:var(--c-emerald-fg)] flex-none" />
+    case 'section':   return <ListChecks size={size} className="text-[color:var(--c-blue-fg)] flex-none" />
+    case 'content':   return <CheckCircle2 size={size} className="text-[color:var(--c-violet-fg)] flex-none" />
+    case 'domain':    return <ShieldAlert size={size} className="text-[color:var(--c-orange-fg)] flex-none" />
+    default:          return <Dot size={size} className="text-[color:var(--text-tertiary)] flex-none" />
+  }
+}
 
 export interface GatesPanelProps {
   model: HarnessModel
@@ -167,19 +184,36 @@ export function GatesPanel({ model, sourcePath }: GatesPanelProps): JSX.Element 
                       <ProvenanceBadge source={descSource} size="xs" />
                     </div>
                   )}
-                  {/* 규칙 코드별 검사 내용 (스크립트 원문 메시지) */}
-                  {gate.ruleDetails && gate.ruleDetails.length > 0 && (
-                    <div className="flex flex-col gap-1 mt-1 pt-2 border-t border-[color:var(--bg-border)]">
-                      {gate.ruleDetails.map((d) => (
-                        <div key={d.code} className="flex items-start gap-2">
-                          <Chip tone="violet" square>{d.code}</Chip>
-                          <span className="text-xs text-[color:var(--text-secondary)] leading-relaxed flex-1 min-w-0">
-                            {d.message}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  {/* 규칙 코드별 검사 내용 — 성격별 그룹핑 */}
+                  {gate.ruleDetails && gate.ruleDetails.length > 0 && (() => {
+                    const groups = groupRuleDetails(gate.ruleDetails)
+                    return (
+                      <div className="flex flex-col gap-2 mt-1 pt-2 border-t border-[color:var(--bg-border)]">
+                        {groups.map((group) => (
+                          <div key={group.category} className="flex flex-col gap-1">
+                            {/* 그룹 소제목 */}
+                            <div className="flex items-center gap-1">
+                              <RuleGroupIcon category={group.category} />
+                              <span className="text-[10px] font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
+                                {group.label}
+                              </span>
+                            </div>
+                            {/* 그룹 규칙 목록 */}
+                            <div className="flex flex-col gap-1 pl-4">
+                              {group.rules.map((d) => (
+                                <div key={d.code} className="flex items-start gap-2">
+                                  <Chip tone="violet" square>{d.code}</Chip>
+                                  <span className="text-xs text-[color:var(--text-secondary)] leading-relaxed flex-1 min-w-0">
+                                    {d.message}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })()}
                 </Card>
               )
             })}

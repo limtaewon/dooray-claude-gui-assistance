@@ -11,12 +11,31 @@
  */
 
 import { useState, useCallback } from 'react'
-import { X, Wrench, FileInput, FileOutput, AlertTriangle, ArrowUpCircle, Sparkles, ChevronDown, ChevronRight, Lock, Unlock } from 'lucide-react'
+import {
+  X,
+  Wrench,
+  FileInput,
+  FileOutput,
+  AlertTriangle,
+  ArrowUpCircle,
+  Sparkles,
+  ChevronDown,
+  ChevronRight,
+  Lock,
+  Unlock,
+  FileCheck,
+  ListChecks,
+  CheckCircle2,
+  ShieldAlert,
+  Dot
+} from 'lucide-react'
 import type { HarnessAgent, HarnessGate, Provenance } from '@shared/types/harness'
 import { ProvenanceBadge } from '../shared/ProvenanceBadge'
 import { phaseTokens } from '../shared/PhaseColor'
 import Chip from '@/components/common/ds/Chip'
 import Button from '@/components/common/ds/Button'
+import { groupRuleDetails } from '../views/gateRuleGroups'
+import type { RuleCategory } from '../views/gateRuleGroups'
 
 export interface AgentInspectorProps {
   /** 표시할 에이전트 */
@@ -229,19 +248,34 @@ export function AgentInspector({ agent, provenance, onClose, bundlePath, gate }:
                   <Chip tone="emerald" square>경고만</Chip>
                 )}
               </div>
-              {/* 규칙코드 + 무엇을 검사하나 */}
+              {/* 규칙코드 + 무엇을 검사하나 — 성격별 그룹핑 */}
               {gate.ruleCodes.length > 0 && (() => {
-                const msgOf = new Map((gate.ruleDetails ?? []).map((d) => [d.code, d.message]))
+                const ruleDetails = gate.ruleDetails && gate.ruleDetails.length > 0
+                  ? gate.ruleDetails
+                  : gate.ruleCodes.map((code) => ({ code, message: '' }))
+                const groups = groupRuleDetails(ruleDetails)
                 return (
-                  <div className="flex flex-col gap-1">
-                    {gate.ruleCodes.map((code) => (
-                      <div key={code} className="flex items-start gap-1.5">
-                        <Chip tone="violet" square>{code}</Chip>
-                        {msgOf.get(code) && (
-                          <span className="text-xs text-[color:var(--text-secondary)] leading-snug flex-1 min-w-0">
-                            {msgOf.get(code)}
+                  <div className="flex flex-col gap-2">
+                    {groups.map((group) => (
+                      <div key={group.category} className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1">
+                          <RuleGroupIcon category={group.category} />
+                          <span className="text-[10px] font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
+                            {group.label}
                           </span>
-                        )}
+                        </div>
+                        <div className="flex flex-col gap-1 pl-3.5">
+                          {group.rules.map((d) => (
+                            <div key={d.code} className="flex items-start gap-1.5">
+                              <Chip tone="violet" square>{d.code}</Chip>
+                              {d.message && (
+                                <span className="text-xs text-[color:var(--text-secondary)] leading-snug flex-1 min-w-0">
+                                  {d.message}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -323,6 +357,17 @@ export function AgentInspector({ agent, provenance, onClose, bundlePath, gate }:
 // ─────────────────────────────────────────────
 // 내부 헬퍼 컴포넌트
 // ─────────────────────────────────────────────
+
+/** 카테고리별 lucide 아이콘 */
+function RuleGroupIcon({ category, size = 11 }: { category: RuleCategory; size?: number }): JSX.Element {
+  switch (category) {
+    case 'existence': return <FileCheck size={size} style={{ color: 'var(--c-emerald-fg)', flexShrink: 0 }} />
+    case 'section':   return <ListChecks size={size} style={{ color: 'var(--c-blue-fg)', flexShrink: 0 }} />
+    case 'content':   return <CheckCircle2 size={size} style={{ color: 'var(--c-violet-fg)', flexShrink: 0 }} />
+    case 'domain':    return <ShieldAlert size={size} style={{ color: 'var(--c-orange-fg)', flexShrink: 0 }} />
+    default:          return <Dot size={size} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
+  }
+}
 
 interface SectionProps {
   label: string

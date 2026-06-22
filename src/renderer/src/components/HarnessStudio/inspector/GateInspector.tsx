@@ -17,11 +17,18 @@ import {
   AlertTriangle,
   Sparkles,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  FileCheck,
+  ListChecks,
+  CheckCircle2,
+  ShieldAlert,
+  Dot
 } from 'lucide-react'
 import type { HarnessGate } from '@shared/types/harness'
 import Chip from '@/components/common/ds/Chip'
 import Button from '@/components/common/ds/Button'
+import { groupRuleDetails } from '../views/gateRuleGroups'
+import type { RuleCategory } from '../views/gateRuleGroups'
 
 export interface GateInspectorProps {
   /** 표시할 게이트 */
@@ -156,18 +163,35 @@ export function GateInspector({ gate, sourcePath, onClose }: GateInspectorProps)
           </span>
         </Section>
 
-        {/* 규칙 코드별 검사 내용 — 코드 + 스크립트 원문 메시지 */}
+        {/* 규칙 코드별 검사 내용 — 성격별 그룹핑 */}
         {gate.ruleCodes.length > 0 && (() => {
-          const msgOf = new Map((gate.ruleDetails ?? []).map((d) => [d.code, d.message]))
+          const ruleDetails = gate.ruleDetails && gate.ruleDetails.length > 0
+            ? gate.ruleDetails
+            : gate.ruleCodes.map((code) => ({ code, message: '(스크립트에서 설명 추출 안 됨)' }))
+          const groups = groupRuleDetails(ruleDetails)
           return (
             <Section label={`규칙 코드 (${gate.ruleCodes.length}개) — 무엇을 검사하나`}>
-              <div className="flex flex-col gap-1.5">
-                {gate.ruleCodes.map((code) => (
-                  <div key={code} className="flex items-start gap-2">
-                    <Chip tone="violet" square>{code}</Chip>
-                    <span className="text-xs text-[color:var(--text-secondary)] leading-relaxed flex-1 min-w-0">
-                      {msgOf.get(code) ?? '(스크립트에서 설명 추출 안 됨)'}
-                    </span>
+              <div className="flex flex-col gap-2">
+                {groups.map((group) => (
+                  <div key={group.category} className="flex flex-col gap-1">
+                    {/* 그룹 소제목 */}
+                    <div className="flex items-center gap-1">
+                      <RuleGroupIcon category={group.category} />
+                      <span className="text-[10px] font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
+                        {group.label}
+                      </span>
+                    </div>
+                    {/* 그룹 규칙 목록 */}
+                    <div className="flex flex-col gap-1 pl-3.5">
+                      {group.rules.map((d) => (
+                        <div key={d.code} className="flex items-start gap-2">
+                          <Chip tone="violet" square>{d.code}</Chip>
+                          <span className="text-xs text-[color:var(--text-secondary)] leading-relaxed flex-1 min-w-0">
+                            {d.message}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -237,6 +261,17 @@ export function GateInspector({ gate, sourcePath, onClose }: GateInspectorProps)
 // ─────────────────────────────────────────────
 // 내부 헬퍼 컴포넌트
 // ─────────────────────────────────────────────
+
+/** 카테고리별 lucide 아이콘 */
+function RuleGroupIcon({ category, size = 11 }: { category: RuleCategory; size?: number }): JSX.Element {
+  switch (category) {
+    case 'existence': return <FileCheck size={size} style={{ color: 'var(--c-emerald-fg)', flexShrink: 0 }} />
+    case 'section':   return <ListChecks size={size} style={{ color: 'var(--c-blue-fg)', flexShrink: 0 }} />
+    case 'content':   return <CheckCircle2 size={size} style={{ color: 'var(--c-violet-fg)', flexShrink: 0 }} />
+    case 'domain':    return <ShieldAlert size={size} style={{ color: 'var(--c-orange-fg)', flexShrink: 0 }} />
+    default:          return <Dot size={size} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
+  }
+}
 
 interface SectionProps {
   label: string
