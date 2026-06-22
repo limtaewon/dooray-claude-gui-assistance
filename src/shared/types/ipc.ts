@@ -266,7 +266,108 @@ export const IPC_CHANNELS = {
   FEEDBACK_SUBMIT: 'feedback:submit',
 
   // Config
-  CONFIG_CHANGED: 'config:changed'
+  CONFIG_CHANGED: 'config:changed',
+
+  // Harness Studio (v1.7)
+  /** 경로(또는 폴더 선택 다이얼로그)를 받아 정적 스캔 결과 RawBundleSummary 반환 — AI 없음, 즉시 */
+  HARNESS_SCAN: 'harness:scan',
+  /** ~/.claude/skills/* 를 정적으로 스캔해 발견된 번들 목록 반환 */
+  HARNESS_DISCOVER: 'harness:discover',
+  /** 번들 경로를 AI(Opus)로 정규화해 HarnessModel 반환 — 캐시 hit 시 즉시, force=true 면 재정규화 */
+  HARNESS_NORMALIZE: 'harness:normalize',
+  /** 태스크 평문을 받아 레벨 추정 + 경로 계산 DryRunResult 반환 — taskHash 캐시 */
+  HARNESS_DRYRUN: 'harness:dryrun',
+  /**
+   * 프로젝트 폴더 선택 다이얼로그를 열어 사용자가 선택한 경로를 반환.
+   * 취소 시 null 반환. Dry-run 레벨 추정의 projectPath 입력에 사용.
+   * dialog.showOpenDialog({ properties: ['openDirectory'] }) 래퍼.
+   */
+  HARNESS_PICK_DIR: 'harness:pick-dir',
+  /** 번들 경로 + 토픽을 받아 온디맨드 설명/용어번역 마크다운 반환 (P3, Sonnet) */
+  HARNESS_EXPLAIN: 'harness:explain',
+  /** 캐시 삭제 — path 지정 시 해당 번들만, 생략 시 전체. 삭제된 항목 수 반환 */
+  HARNESS_CACHE_CLEAR: 'harness:cache:clear',
+  /** 캐시된 번들 목록 반환 — 최근 정규화한 하네스 빠른 재오픈용 */
+  HARNESS_LIST_CACHED: 'harness:list-cached',
+
+  // Harness Studio — 편집(저작) 기능 (v1.8)
+  // 네임스페이스: harness:edit:*
+  // 요청/응답 타입: src/shared/types/harness-edit.ts 참조
+  // 3+1 규칙: ① harness-edit.ts 타입 → ② preload api.harness.edit.* → ③ main index.ts handle 등록
+
+  /**
+   * 번들 내 단일 파일 원본 내용 + 에이전트 출처 맵 반환.
+   * 요청: { path: string; relPath: string }
+   *   - path: 번들 루트 절대경로
+   *   - relPath: 번들 루트 기준 파일 상대경로
+   * 응답: { content: string; sourceMap?: AgentSourceMap }
+   *   - content: 파일 전체 텍스트 (raw 에디터 / 구조화 폼 초기값)
+   *   - sourceMap: AgentSourceMap (에이전트 frontmatter 출처 파일 맵, 편집 대상 파일 결정에 사용)
+   * 기존 읽기 게이트(assertPathAllowed) 재사용. 쓰기 없음.
+   */
+  HARNESS_READ_FILE: 'harness:edit:read-file',
+
+  /**
+   * draft 를 디스크 현재 내용과 대조해 diff 요약 반환 (적용 전 미리보기).
+   * 요청: { path: string; draft: HarnessDraft }
+   *   - path: 번들 루트 절대경로
+   *   - draft: 편집 세션 draft 전체
+   * 응답: DraftDiffSummary
+   *   - files: 파일별 변경/추가/삭제 줄 수 + stale 여부
+   *   - hasStale: stale=true 파일 1건 이상 → 적용 불가
+   *   - hasShellEdit: .sh 변경 포함 → ApplyDialog 경고 배너
+   * 쓰기 없음. stale 감지만 수행.
+   */
+  HARNESS_DIFF_DRAFT: 'harness:edit:diff',
+
+  /**
+   * draft 를 파일에 원자적으로 적용한다 (백업 + 쓰기 + 재정규화).
+   * 요청: { path: string; draft: HarnessDraft }
+   *   - path: 번들 루트 절대경로
+   *   - draft: 편집 세션 draft 전체
+   * 응답: { applied: string[]; backupDir: string; model: HarnessModel }
+   *   - applied: 실제로 쓰여진 relPath 목록
+   *   - backupDir: 백업 디렉터리 절대경로 (사용자에게 복원 가능 안내)
+   *   - model: 재정규화 후 최신 HarnessModel
+   * 처리 순서: 경로 게이트 → stale 대조 → 백업 → temp-write+rename → cache clear → normalize(force=true)
+   * 충돌(stale) 또는 경로 위반 시 에러 반환 (부분 적용 없음).
+   */
+  HARNESS_APPLY_DRAFT: 'harness:edit:apply',
+
+  /**
+   * 자연어 명령을 받아 AI 가 파일 변경안을 제안한다 (자동 쓰기 없음).
+   * 요청: { path: string; command: string; targetRelPaths: string[]; requestId?: string }
+   *   - path: 번들 루트 절대경로
+   *   - command: 사용자 자연어 명령 (예: "보안검토자를 opus로 바꿔줘")
+   *   - targetRelPaths: 편집 대상 파일 상대경로 목록 (화이트리스트)
+   *   - requestId: AI_PROGRESS 진행률 구분자 (생략 가능)
+   * 응답: { proposals: AIEditProposal[] }
+   *   - proposals: AI 제안 편집안 목록 (targetRelPaths 교집합만 채택)
+   * 제약: proposals 는 자동 적용되지 않는다. 사용자 승인 후 draft 에 반영.
+   * 진행률: 기존 AI_PROGRESS 채널 재사용 (requestId 로 구분).
+   */
+  HARNESS_AI_EDIT: 'harness:edit:ai-propose',
+
+  /**
+   * 번들의 백업 목록을 반환한다.
+   * 요청: { path: string }
+   *   - path: 번들 루트 절대경로
+   * 응답: BackupEntry[]
+   *   - 최신 백업 우선 정렬
+   */
+  HARNESS_LIST_BACKUPS: 'harness:edit:list-backups',
+
+  /**
+   * 지정한 백업 디렉터리의 파일을 원본으로 복원한다 (백업된 파일 → 번들로 덮어쓰기 + 재정규화).
+   * 요청: { path: string; backupDir: string }
+   *   - path: 번들 루트 절대경로
+   *   - backupDir: 복원 대상 백업 디렉터리 절대경로 (BackupEntry.backupDir)
+   * 응답: { restored: string[]; model: HarnessModel }
+   *   - restored: 복원된 relPath 목록
+   *   - model: 재정규화 후 최신 HarnessModel
+   * 제약: backupDir 은 <userData>/harness-backups/ 하위여야 한다 (경로 주입 방어).
+   */
+  HARNESS_RESTORE_BACKUP: 'harness:edit:restore'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]

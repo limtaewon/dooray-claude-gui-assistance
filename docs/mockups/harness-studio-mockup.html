@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clauday — Harness Studio (방법론 시뮬레이터) · neon-bmad 목업</title>
+<style>
+  :root{
+    --bg:#0e1014; --panel:#161a22; --panel2:#1c212b; --border:#272d3a; --border2:#333b4a;
+    --tx:#e7ebf2; --tx2:#9aa4b6; --tx3:#6b7484;
+    --orange:#ff7a1a; --blue:#4a9eff;
+    --haiku:#34d399; --sonnet:#60a5fa; --opus:#c084fc;
+    --ok:#34d399; --warn:#fbbf24; --bad:#f87171; --gate:#fbbf24;
+    --radius:10px;
+    font-synthesis:none;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--tx);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    font-size:13px; line-height:1.5; overflow:hidden;
+  }
+  /* ===== App shell ===== */
+  .app{display:flex; flex-direction:column; height:100vh}
+  .titlebar{height:38px; background:#0b0d11; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:10px; padding:0 14px; flex:none; -webkit-user-select:none}
+  .lights{display:flex; gap:7px}
+  .lights i{width:11px;height:11px;border-radius:50%}
+  .lights i:nth-child(1){background:#ff5f57}.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}
+  .title{font-weight:600; font-size:12.5px; letter-spacing:.2px}
+  .title b{background:linear-gradient(90deg,var(--orange),var(--blue));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .titlebar .spacer{flex:1}
+  .cmdk{font-size:11px; color:var(--tx3); border:1px solid var(--border2); padding:3px 8px; border-radius:6px}
+  .body{display:flex; flex:1; min-height:0}
+  /* sidebar */
+  .sidebar{width:56px; background:#0b0d11; border-right:1px solid var(--border); flex:none;
+    display:flex; flex-direction:column; align-items:center; padding-top:10px; gap:5px}
+  .nav{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    color:var(--tx3); cursor:pointer; font-size:17px; position:relative}
+  .nav:hover{background:#181c24;color:var(--tx2)}
+  .nav.active{background:linear-gradient(135deg,rgba(255,122,26,.22),rgba(74,158,255,.22));color:var(--tx)}
+  .nav.active::before{content:"";position:absolute;left:-10px;top:8px;bottom:8px;width:3px;border-radius:3px;background:linear-gradient(var(--orange),var(--blue))}
+  /* main */
+  .main{flex:1; display:flex; flex-direction:column; min-width:0}
+  .topbar{padding:12px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:14px; flex:none}
+  .hsum{display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid var(--border);
+    border-radius:10px; padding:8px 12px}
+  .hsum .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--orange),var(--blue));
+    display:flex;align-items:center;justify-content:center;font-weight:800;color:#0b0d11;font-size:15px}
+  .hsum .meta b{font-size:13px}
+  .hsum .meta div{color:var(--tx2);font-size:11px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{font-size:10.5px;padding:2px 8px;border-radius:20px;border:1px solid var(--border2);color:var(--tx2);white-space:nowrap}
+  .chip.score{border-color:rgba(52,211,153,.5);color:#9ff0cf;background:rgba(52,211,153,.08)}
+  .topbar .spacer{flex:1}
+  .btn{font-size:12px;padding:7px 13px;border-radius:8px;border:1px solid var(--border2);background:var(--panel2);
+    color:var(--tx);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .btn:hover{border-color:var(--blue)}
+  .btn.primary{background:linear-gradient(135deg,var(--orange),#ff924a);border:none;color:#1a0e03;font-weight:600}
+  /* tabs */
+  .tabs{display:flex;gap:4px;padding:10px 18px 0;border-bottom:1px solid var(--border);flex:none}
+  .tab{padding:8px 14px;font-size:12.5px;color:var(--tx2);cursor:pointer;border-radius:8px 8px 0 0;border:1px solid transparent;border-bottom:none}
+  .tab:hover{color:var(--tx)}
+  .tab.active{color:var(--tx);background:var(--panel);border-color:var(--border);position:relative;top:1px}
+  .content{flex:1;min-height:0;overflow:auto;position:relative}
+  .pane{display:none;padding:18px}
+  .pane.active{display:block}
+  /* ===== Flow tab ===== */
+  .flowtop{display:flex;align-items:center;gap:16px;margin-bottom:8px;flex-wrap:wrap}
+  .seg{display:inline-flex;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px}
+  .seg button{border:none;background:transparent;color:var(--tx2);padding:6px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600}
+  .seg button .lv{font-size:10px;color:var(--tx3);font-weight:500;display:block;margin-top:-2px}
+  .seg button.active{background:linear-gradient(135deg,rgba(255,122,26,.25),rgba(74,158,255,.25));color:var(--tx)}
+  .seg button.active .lv{color:var(--tx2)}
+  .lvdesc{color:var(--tx2);font-size:12px}
+  .lvdesc b{color:var(--tx)}
+  .layout{display:flex;gap:16px;align-items:flex-start}
+  .canvas{flex:1;min-width:0;background:
+      radial-gradient(circle at 12px 12px, rgba(255,255,255,.025) 1px, transparent 1px);
+    background-size:22px 22px;border:1px solid var(--border);border-radius:14px;padding:22px 18px;overflow-x:auto}
+  .flowrow{display:flex;align-items:stretch;gap:0;min-width:max-content;padding-bottom:6px}
+  .stage{display:flex;flex-direction:column;align-items:center;gap:8px;position:relative}
+  .conn{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:52px;align-self:center;gap:4px}
+  .conn .arr{color:var(--tx3);font-size:18px;line-height:1}
+  .gatechip{font-size:9.5px;color:#1a1405;background:var(--gate);padding:1px 6px;border-radius:10px;font-weight:700;white-space:nowrap;cursor:help}
+  .gatechip.auto{background:#f87171;color:#240505}
+  .pclass{font-size:9.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--tx3);font-weight:700}
+  .node{width:148px;background:var(--panel);border:1px solid var(--border2);border-radius:12px;padding:10px 11px;cursor:pointer;
+    transition:transform .08s,border-color .12s,box-shadow .12s;position:relative}
+  .node:hover{transform:translateY(-2px);border-color:var(--blue);box-shadow:0 6px 18px rgba(0,0,0,.4)}
+  .node.dim{opacity:.28;filter:grayscale(.7)}
+  .node.cond{border-style:dashed}
+  .node .nname{font-weight:700;font-size:12.5px;display:flex;align-items:center;gap:6px}
+  .node .nrole{color:var(--tx2);font-size:10.5px;margin-top:3px;min-height:26px}
+  .mbadge{font-size:9.5px;font-weight:700;padding:1px 7px;border-radius:20px;display:inline-block}
+  .mbadge.haiku{background:rgba(52,211,153,.16);color:var(--haiku)}
+  .mbadge.sonnet{background:rgba(96,165,250,.16);color:var(--sonnet)}
+  .mbadge.opus{background:rgba(192,132,252,.18);color:var(--opus)}
+  .mbadge.split{background:linear-gradient(90deg,rgba(96,165,250,.18),rgba(192,132,252,.2));color:#d7c4fb}
+  .ntag{position:absolute;top:-8px;right:-6px;font-size:9px;background:var(--warn);color:#241a02;padding:1px 6px;border-radius:8px;font-weight:700}
+  .ntag.skip{background:var(--border2);color:var(--tx2)}
+  .parallel{display:flex;flex-direction:column;gap:10px;position:relative;padding:8px;border:1px dashed var(--border2);border-radius:14px}
+  .parallel .plabel{position:absolute;top:-9px;left:12px;font-size:9.5px;background:var(--panel2);padding:0 6px;color:var(--tx2);border-radius:6px}
+  .loopbadge{font-size:9.5px;color:var(--warn);margin-top:2px;display:flex;align-items:center;gap:4px}
+  .verdicts{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+  .vd{font-size:9px;padding:1px 6px;border-radius:6px;font-weight:700}
+  .vd.m{background:rgba(52,211,153,.16);color:var(--ok)} .vd.d{background:rgba(251,191,36,.16);color:var(--warn)} .vd.v{background:rgba(248,113,113,.16);color:var(--bad)}
+  /* inspector */
+  .inspector{width:300px;flex:none;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:0;overflow:hidden;position:sticky;top:0}
+  .insp-head{padding:14px 15px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,rgba(74,158,255,.06),transparent)}
+  .insp-head .iname{font-size:16px;font-weight:800}
+  .insp-head .irole{color:var(--tx2);font-size:11.5px;margin-top:4px}
+  .insp-body{padding:14px 15px;display:flex;flex-direction:column;gap:13px}
+  .irow .k{font-size:10px;letter-spacing:.4px;text-transform:uppercase;color:var(--tx3);font-weight:700;margin-bottom:4px}
+  .irow .v{font-size:12px;color:var(--tx)}
+  .irow .v code{background:var(--panel2);padding:1px 5px;border-radius:5px;font-size:11px;color:#cdd6e6}
+  .io{display:flex;gap:8px}
+  .io .iobox{flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:8px}
+  .io .iobox .k{color:var(--tx3);font-size:9.5px;margin-bottom:3px}
+  .io .iobox .v{font-size:11px;color:var(--tx2)}
+  .esc{background:rgba(192,132,252,.08);border:1px solid rgba(192,132,252,.3);border-radius:9px;padding:8px 10px;font-size:11px;color:#d7c4fb}
+  .insp-empty{padding:30px 18px;text-align:center;color:var(--tx3);font-size:12px}
+  /* legend */
+  .legend{margin-top:14px;display:flex;gap:18px;flex-wrap:wrap;align-items:center;color:var(--tx2);font-size:11px}
+  .legend .li{display:flex;align-items:center;gap:6px}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+  /* ===== Dry-run ===== */
+  .dr-grid{display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px}
+  .card h3{margin:0 0 10px;font-size:13px}
+  textarea{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:9px;color:var(--tx);
+    padding:10px;font-family:inherit;font-size:12.5px;resize:vertical;min-height:70px}
+  .presets{display:flex;flex-direction:column;gap:6px;margin:10px 0}
+  .preset{text-align:left;font-size:11.5px;padding:9px 11px;border-radius:9px;border:1px solid var(--border2);background:var(--panel2);color:var(--tx2);cursor:pointer}
+  .preset:hover{border-color:var(--blue);color:var(--tx)}
+  .preset b{color:var(--tx);display:block;margin-bottom:1px}
+  .ai-note{display:flex;align-items:center;gap:7px;font-size:10.5px;color:var(--tx3);margin-top:8px}
+  .ai-note .pulse{width:7px;height:7px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 0 rgba(74,158,255,.5);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(74,158,255,.5)}70%{box-shadow:0 0 0 7px rgba(74,158,255,0)}100%{box-shadow:0 0 0 0 rgba(74,158,255,0)}}
+  .qgrid{display:flex;flex-direction:column;gap:5px}
+  .q{display:flex;align-items:center;gap:9px;font-size:11.5px;padding:6px 9px;border-radius:8px;background:var(--panel2)}
+  .q .yn{font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:6px;flex:none}
+  .q .yn.y{background:rgba(255,122,26,.18);color:var(--orange)} .q .yn.n{background:var(--border2);color:var(--tx3)}
+  .q .qt{color:var(--tx2)}
+  .verdict-big{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+  .lvbig{font-size:30px;font-weight:900;width:74px;height:74px;border-radius:16px;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,rgba(255,122,26,.2),rgba(74,158,255,.22));border:1px solid var(--border2)}
+  .verdict-big .vt b{font-size:14px}
+  .verdict-big .vt div{color:var(--tx2);font-size:11.5px;margin-top:3px}
+  .estrow{display:flex;gap:10px;margin:12px 0}
+  .est{flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px}
+  .est .k{font-size:9.5px;color:var(--tx3);text-transform:uppercase;letter-spacing:.4px}
+  .est .v{font-size:17px;font-weight:800;margin-top:2px}
+  .est .v small{font-size:10px;color:var(--tx2);font-weight:500}
+  .timeline{display:flex;flex-direction:column;gap:0;margin-top:6px}
+  .tl{display:flex;gap:12px;align-items:flex-start}
+  .tl .rail{display:flex;flex-direction:column;align-items:center;flex:none;width:22px}
+  .tl .rail .d{width:13px;height:13px;border-radius:50%;border:2px solid var(--blue);background:var(--bg);margin-top:4px}
+  .tl .rail .ln{flex:1;width:2px;background:var(--border2);min-height:20px}
+  .tl:last-child .rail .ln{display:none}
+  .tl .tlc{padding-bottom:14px;flex:1}
+  .tl .tlc .th{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .tl .tlc .th b{font-size:12.5px}
+  .tl .tlc .sub{color:var(--tx2);font-size:11px;margin-top:2px}
+  .parallel-tl{border:1px dashed var(--border2);border-radius:10px;padding:8px 10px;background:rgba(74,158,255,.04)}
+  .gate-tl{font-size:10px;color:#1a1405;background:var(--gate);padding:1px 7px;border-radius:8px;font-weight:700}
+  .empty-dr{color:var(--tx3);text-align:center;padding:60px 20px;font-size:13px}
+  /* ===== Artifacts ===== */
+  .art-grid{display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start}
+  .tree{font-size:12px;line-height:1.9}
+  .tree .t{display:flex;align-items:center;gap:7px;padding:1px 6px;border-radius:6px;cursor:pointer}
+  .tree .t:hover{background:var(--panel2)}
+  .tree .t.sel{background:rgba(74,158,255,.12)}
+  .tree .ic{width:15px;text-align:center;color:var(--tx3)}
+  .tree .nm{color:var(--tx)}
+  .tree .nm.dir{color:#cdd6e6;font-weight:600}
+  .badge{font-size:9px;padding:0 6px;border-radius:7px;font-weight:700;margin-left:2px}
+  .badge.git{background:rgba(52,211,153,.16);color:var(--ok)}
+  .badge.ignore{background:var(--border2);color:var(--tx3)}
+  .badge.dooray{background:rgba(255,122,26,.16);color:var(--orange)}
+  .badge.html{background:rgba(192,132,252,.18);color:var(--opus)}
+  .doc-preview .dh{font-size:13px;font-weight:700;margin-bottom:2px}
+  .doc-preview .dmeta{color:var(--tx2);font-size:11px;margin-bottom:12px}
+  .skel{background:var(--bg);border:1px solid var(--border2);border-radius:10px;padding:14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:#c6cfde;white-space:pre-wrap;line-height:1.7}
+  .skel .fm{color:var(--tx3)} .skel .h{color:var(--orange);font-weight:700} .skel .req{color:var(--sonnet)}
+  /* ===== Score ===== */
+  .score-grid{display:grid;grid-template-columns:380px 1fr;gap:18px;align-items:start}
+  .axis-list{display:flex;flex-direction:column;gap:9px}
+  .axis{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:11px 13px}
+  .axis .ah{display:flex;align-items:center;justify-content:space-between}
+  .axis .ah b{font-size:12.5px}
+  .axis .av{font-size:11px;font-weight:800}
+  .bar{height:6px;background:var(--panel2);border-radius:4px;margin:7px 0 5px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--orange),var(--blue))}
+  .axis .ad{color:var(--tx2);font-size:11px}
+  .journey{display:flex;align-items:center;gap:10px;margin-top:14px;color:var(--tx2);font-size:12px}
+  .journey .step{font-weight:800;color:var(--tx);background:var(--panel2);border:1px solid var(--border2);padding:3px 10px;border-radius:20px}
+  .journey .step.now{border-color:var(--ok);color:#9ff0cf}
+  h2.sec{font-size:13px;margin:2px 0 12px;color:var(--tx2);font-weight:600}
+  .muted{color:var(--tx2)} .small{font-size:11px}
+  .callout{background:linear-gradient(135deg,rgba(255,122,26,.07),rgba(74,158,255,.07));border:1px solid var(--border2);
+    border-radius:12px;padding:13px 15px;font-size:12px;color:var(--tx2);margin-bottom:14px}
+  .callout b{color:var(--tx)}
+  /* import modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:50}
+  .modal-bg.show{display:flex}
+  .modal{width:520px;background:var(--panel);border:1px solid var(--border2);border-radius:16px;padding:22px}
+  .drop{border:2px dashed var(--border2);border-radius:12px;padding:34px;text-align:center;color:var(--tx2);margin:14px 0}
+  .drop .big{font-size:30px}
+  .detected{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--ok);border-radius:10px;padding:11px 13px;font-size:12px}
+  /* skills & blocks */
+  .sk-grid{display:grid;grid-template-columns:280px 1fr;gap:16px;align-items:start}
+  .sk-list{display:flex;flex-direction:column;gap:6px}
+  .sk-item{padding:9px 11px;border-radius:9px;border:1px solid var(--border2);background:var(--panel2);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .sk-item:hover{border-color:var(--blue)} .sk-item.sel{border-color:var(--orange);background:rgba(255,122,26,.08)}
+  .sk-item .nm{font-weight:600}
+  .anat .ah2{font-size:15px;font-weight:800}
+  .anat .sec-h{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--tx3);font-weight:700;margin:14px 0 6px}
+  .pill{display:inline-block;font-size:11px;background:var(--panel2);border:1px solid var(--border);border-radius:7px;padding:3px 9px;margin:0 5px 5px 0}
+  .pill.risk{border-color:rgba(248,113,113,.4);color:#f7b3b3}
+  .rule-li{font-size:12px;padding:6px 9px;background:var(--panel2);border-left:3px solid var(--sonnet);border-radius:6px;margin-bottom:5px}
+  .rt{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:4px}
+  .rt th{text-align:left;color:var(--tx3);font-weight:600;padding:5px 8px;font-size:10.5px}
+  .rt td{padding:6px 8px;border-top:1px solid var(--border);vertical-align:top}
+  .rt td.ex{color:#f7a3a3;width:44%} .rt td.re{color:#9ff0cf}
+  .blocks{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:10px;margin-top:8px}
+  .blockcard{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:11px 12px}
+  .blockcard .bn{font-weight:700;display:flex;align-items:center;gap:6px}
+  .blockcard .bt{font-size:9px;font-weight:700;padding:1px 6px;border-radius:6px}
+  .bt.script{background:rgba(192,132,252,.18);color:var(--opus)} .bt.pattern{background:rgba(96,165,250,.16);color:var(--sonnet)}
+  .blockcard .bd{color:var(--tx2);font-size:11px;margin:5px 0} .blockcard .bw{font-size:10px;color:var(--tx3)}
+  /* gates & enforcement */
+  .layers{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+  .layer{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:12px}
+  .layer.real{border-color:rgba(52,211,153,.45)} .layer.soft{border-style:dashed}
+  .layer .ln{font-weight:700;font-size:12.5px} .layer .lm{font-size:11px;color:var(--tx2);margin:6px 0}
+  .layer .lf{font-size:11px;font-weight:800} .layer .lf.y{color:var(--ok)} .layer .lf.n{color:var(--warn)}
+  .layer .lnote{font-size:10.5px;color:var(--tx3);margin-top:6px}
+  .gaterow{display:grid;grid-template-columns:128px 1fr;gap:12px;align-items:start;padding:11px 0;border-top:1px solid var(--border)}
+  .gaterow .gp{font-weight:700} .gaterow .gp .tr{display:block;font-size:10.5px;color:var(--tx3);font-weight:500;margin-top:2px} .gaterow .gp .au{display:inline-block;margin-top:5px;font-size:9px;font-weight:800;background:var(--bad);color:#240505;padding:1px 6px;border-radius:6px}
+  .grules{display:flex;flex-direction:column;gap:5px}
+  .grule{display:flex;gap:9px;align-items:center;font-size:11.5px;color:var(--tx2)}
+  .grule code{background:var(--panel2);color:#d7c4fb;padding:1px 6px;border-radius:5px;font-size:10.5px;flex:none;min-width:96px;text-align:center}
+  .hooks{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .hookcard{background:linear-gradient(135deg,rgba(248,113,113,.06),transparent);border:1px solid rgba(248,113,113,.32);border-radius:11px;padding:12px}
+  .hookcard .hn{font-weight:700;font-size:12.5px} .hookcard .hw{font-size:10.5px;color:var(--tx3);margin:4px 0} .hookcard .hd{font-size:11.5px;color:var(--tx2);margin:7px 0} .hookcard .ha{font-size:10px;color:var(--ok);font-weight:800}
+  .sm-flow{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:8px}
+  .sm-node{background:var(--panel2);border:1px solid var(--border2);border-radius:8px;padding:6px 10px;font-size:11.5px;font-weight:600}
+  .sm-node.cond{border-style:dashed;color:var(--tx2)}
+  .sm-arr{color:var(--tx3)}
+  .sm-trans{display:flex;flex-direction:column;gap:6px;margin-top:14px}
+  .sm-t{font-size:11.5px;display:flex;gap:9px;align-items:center;color:var(--tx2)}
+  .sm-t .tag{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:6px;flex:none;min-width:78px;text-align:center}
+  .tag.pass{background:rgba(52,211,153,.16);color:var(--ok)} .tag.violation{background:rgba(248,113,113,.16);color:var(--bad)} .tag.deviation{background:rgba(251,191,36,.16);color:var(--warn)} .tag.redo{background:rgba(96,165,250,.16);color:var(--sonnet)} .tag.escalate{background:rgba(192,132,252,.18);color:var(--opus)}
+  /* import wizard */
+  .modal.wide{width:640px}
+  .stepper{display:flex;align-items:center;gap:6px;margin:14px 0 18px}
+  .stepper .st{display:flex;align-items:center;gap:7px;color:var(--tx3);font-size:11.5px;font-weight:600}
+  .stepper .st .nz{width:21px;height:21px;border-radius:50%;border:1.5px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:11px}
+  .stepper .st.on{color:var(--tx)} .stepper .st.on .nz{border-color:var(--orange);background:rgba(255,122,26,.15);color:var(--orange)}
+  .stepper .st.done .nz{border-color:var(--ok);background:rgba(52,211,153,.15);color:var(--ok)}
+  .stepper .sep{flex:1;height:1.5px;background:var(--border)}
+  .wstep{display:none} .wstep.on{display:block}
+  .srctabs{display:flex;gap:6px;margin-bottom:10px}
+  .srctab{font-size:11.5px;padding:6px 11px;border-radius:8px;border:1px solid var(--border2);background:var(--panel2);color:var(--tx2);cursor:pointer}
+  .srctab.on{border-color:var(--blue);color:var(--tx)}
+  .discover{display:flex;flex-direction:column;gap:7px;margin-top:12px}
+  .disc{display:flex;align-items:center;gap:11px;padding:10px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--panel2);cursor:pointer}
+  .disc:hover{border-color:var(--blue)} .disc.sel{border-color:var(--orange);background:rgba(255,122,26,.07)}
+  .disc .di{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#0b0d11}
+  .disc .dt b{font-size:12.5px} .disc .dt div{font-size:10.5px;color:var(--tx2)}
+  .disc .radio{margin-left:auto;width:16px;height:16px;border-radius:50%;border:2px solid var(--border2)}
+  .disc.sel .radio{border-color:var(--orange);background:radial-gradient(var(--orange) 40%,transparent 45%)}
+  .scanlist{display:flex;flex-direction:column;gap:7px;margin-top:6px}
+  .scan{display:flex;align-items:center;gap:10px;font-size:12px;padding:7px 10px;border-radius:8px;background:var(--panel2)}
+  .scan .ck{width:18px;height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex:none}
+  .scan .ck.y{background:rgba(52,211,153,.18);color:var(--ok)} .scan .ck.w{background:rgba(251,191,36,.18);color:var(--warn)}
+  .scan .sp{color:var(--tx2)} .scan code{background:var(--bg);padding:1px 6px;border-radius:5px;font-size:11px;color:#cdd6e6}
+  .typebadge{display:inline-flex;align-items:center;gap:7px;background:rgba(74,158,255,.1);border:1px solid rgba(74,158,255,.35);border-radius:9px;padding:8px 12px;font-size:12px;margin-top:12px}
+  .normrow{display:flex;align-items:center;gap:11px;font-size:12px;padding:8px 0}
+  .normrow .nck{width:16px;height:16px;border-radius:50%;border:2px solid var(--border2);flex:none}
+  .normrow.done .nck{border-color:var(--ok);background:radial-gradient(var(--ok) 42%,transparent 46%)}
+  .normrow.run .nck{border-color:var(--blue);animation:spin 1s linear infinite;border-right-color:transparent}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .pbar{height:7px;background:var(--panel2);border-radius:5px;overflow:hidden;margin:6px 0 4px}
+  .pbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--orange),var(--blue));transition:width .5s ease}
+  .opt{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;border:1px solid var(--border2);border-radius:9px;background:var(--panel2);margin-top:8px;font-size:12px}
+  .toggle{width:38px;height:21px;border-radius:20px;background:var(--border2);position:relative;cursor:pointer;flex:none;transition:background .15s}
+  .toggle.on{background:var(--orange)} .toggle i{position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:#fff;transition:left .15s} .toggle.on i{left:19px}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- titlebar -->
+  <div class="titlebar">
+    <div class="lights"><i></i><i></i><i></i></div>
+    <div class="title"><b>Clauday</b> · Harness Studio <span class="muted" style="font-weight:400">— 방법론 시뮬레이터</span></div>
+    <div class="spacer"></div>
+    <div class="cmdk">⌘K</div>
+  </div>
+  <div class="body">
+    <!-- sidebar -->
+    <div class="sidebar">
+      <div class="nav" title="두레이">🏠</div>
+      <div class="nav" title="터미널">▢</div>
+      <div class="nav" title="세션">💬</div>
+      <div class="nav" title="MCP">🧩</div>
+      <div class="nav" title="스킬">⚡</div>
+      <div class="nav active" title="Harness Studio">🧭</div>
+      <div class="nav" title="사용량">📊</div>
+      <div class="nav" title="설정">⚙</div>
+    </div>
+    <!-- main -->
+    <div class="main">
+      <div class="topbar">
+        <div class="hsum">
+          <div class="logo">N</div>
+          <div class="meta">
+            <b>neon-bmad <span class="muted small">v1.6.0</span></b>
+            <div>2NEON 재무회계 · 임태원(토란)</div>
+          </div>
+        </div>
+        <div class="chips">
+          <span class="chip">에이전트 13 (워크플로우 10 + 정비용 3)</span>
+          <span class="chip">레벨 4 (L0–L3)</span>
+          <span class="chip">게이트 8</span>
+          <span class="chip score">하네스 6축 12/12</span>
+        </div>
+        <div class="spacer"></div>
+        <button class="btn" onclick="alert('하네스 비교 뷰 (예: neon-bmad ↔ reined-bmad) — 후속 P3')">⇄ 비교</button>
+        <button class="btn primary" onclick="openImport()">＋ Import</button>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active" data-tab="flow" onclick="switchTab('flow')">🔀 흐름</div>
+        <div class="tab" data-tab="dryrun" onclick="switchTab('dryrun')">🔮 Dry-run 미리보기</div>
+        <div class="tab" data-tab="skills" onclick="switchTab('skills')">🧩 스킬 &amp; 블록</div>
+        <div class="tab" data-tab="gates" onclick="switchTab('gates')">🛡 게이트 &amp; 강제</div>
+        <div class="tab" data-tab="artifacts" onclick="switchTab('artifacts')">📁 산출물</div>
+        <div class="tab" data-tab="score" onclick="switchTab('score')">📐 하네스 점수</div>
+      </div>
+
+      <div class="content">
+        <!-- ============ FLOW ============ -->
+        <div class="pane active" id="pane-flow">
+          <div class="flowtop">
+            <div class="seg" id="lvseg">
+              <button data-lv="0" onclick="setLevel(0)"><span>L0</span><span class="lv">Tiny Fix</span></button>
+              <button data-lv="1" onclick="setLevel(1)"><span>L1</span><span class="lv">Small</span></button>
+              <button data-lv="2" class="active" onclick="setLevel(2)"><span>L2</span><span class="lv">Standard</span></button>
+              <button data-lv="3" onclick="setLevel(3)"><span>L3</span><span class="lv">Major</span></button>
+            </div>
+            <div class="lvdesc" id="lvdesc"></div>
+          </div>
+          <div class="layout">
+            <div class="canvas">
+              <div class="flowrow" id="flowrow"></div>
+            </div>
+            <div class="inspector" id="inspector">
+              <div class="insp-empty">노드를 클릭하면<br>에이전트 상세가 표시됩니다.<br><br><span style="font-size:20px">👈</span></div>
+            </div>
+          </div>
+          <div class="legend">
+            <div class="li"><span class="mbadge haiku">Haiku</span> 빠른·저비용 (라우팅·AC대조·배포)</div>
+            <div class="li"><span class="mbadge sonnet">Sonnet</span> 표준 구현·분석</div>
+            <div class="li"><span class="mbadge opus">Opus</span> 고난도 설계 (조건부)</div>
+            <div class="li"><span class="gatechip">게이트</span> gate-check.sh (exit 2 차단)</div>
+            <div class="li"><span class="gatechip auto">자동</span> SubagentStop 자동 차단</div>
+            <div class="li"><span class="dot" style="background:var(--border2);border:1px dashed var(--tx3)"></span> 점선=조건부 / 흐림=이 레벨에서 생략</div>
+          </div>
+        </div>
+
+        <!-- ============ DRY-RUN ============ -->
+        <div class="pane" id="pane-dryrun">
+          <div class="callout">
+            <b>Dry-run</b> — 태스크를 주면 neon-bmad가 <b>어떤 레벨로 판정</b>하고 <b>어떤 에이전트가 어떤 모델로 어떤 순서</b>로 도는지,
+            <b>어떤 게이트</b>를 통과하고 <b>어떤 산출물</b>이 남는지를 <b>실행 없이 미리</b> 보여줍니다.
+            레벨 추정만 AI(Haiku)가 하고, 그 다음 경로·게이트·산출물은 하네스 규칙으로 결정론적 계산.
+          </div>
+          <div class="dr-grid">
+            <div class="card">
+              <h3>① 태스크 입력</h3>
+              <textarea id="taskinput" placeholder="두레이 태스크 URL 붙여넣기 또는 요청 자유 텍스트…"></textarea>
+              <div class="presets" id="presets"></div>
+              <button class="btn primary" style="width:100%;justify-content:center" onclick="runDry()">🔮 Dry-run 실행</button>
+              <div class="ai-note"><span class="pulse"></span> 레벨 추정: neon-bmad-orchestrator (Haiku) · 메뉴 경로는 ad_menu_m DB 조회</div>
+            </div>
+            <div class="card" id="drresult">
+              <div class="empty-dr">왼쪽에서 예시 태스크를 고르거나 입력 후<br><b>Dry-run 실행</b>을 눌러보세요.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ ARTIFACTS ============ -->
+        <div class="pane" id="pane-artifacts">
+          <div class="callout">
+            산출물 정책 — <b>ADR은 git 커밋</b>(코드 PR과 함께 리뷰), <b>나머지(brief·prd·story·impl-log·qa·metrics·state)는 <code>.neon-bmad/docs/</code> gitignore</b>(휘발),
+            story 정본은 <b>두레이 하위업무</b>, arch.md·release-notes는 <b>두레이 위키</b>(살아있는 문서), 최종 <b>neon-bmad-report.html</b>.
+          </div>
+          <div class="art-grid">
+            <div class="card">
+              <h3>출력 트리 (L2 기준)</h3>
+              <div class="tree" id="arttree"></div>
+            </div>
+            <div class="card doc-preview" id="docprev">
+              <div class="insp-empty">왼쪽 트리에서 산출물을 클릭하면<br>템플릿 스켈레톤을 미리봅니다.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ SKILLS & BLOCKS ============ -->
+        <div class="pane" id="pane-skills">
+          <div class="callout">
+            <b>스킬 &amp; 블록</b> — 각 에이전트의 <b>SKILL.md 매뉴얼</b>(역할 카드 · 필독 파일 · 핵심 규칙 · <b>합리화 방어 테이블</b>)과,
+            여러 에이전트가 공유하는 <b>blocks/</b>(재사용 스크립트·패턴)를 봅니다. 방법론의 "철학·가드레일"이 가장 잘 드러나는 곳.
+          </div>
+          <div class="sk-grid">
+            <div class="card"><h3>에이전트 SKILL.md</h3><div class="sk-list" id="sklist"></div></div>
+            <div class="card anat" id="skanat"></div>
+          </div>
+          <div class="card" style="margin-top:16px">
+            <h3>blocks/ — 재사용 스크립트·패턴 <span class="muted small">(여러 에이전트가 공유 · 중복 제거)</span></h3>
+            <div class="blocks" id="blocklist"></div>
+          </div>
+        </div>
+
+        <!-- ============ GATES & ENFORCEMENT ============ -->
+        <div class="pane" id="pane-gates">
+          <div class="callout">
+            <b>게이트 &amp; 강제</b> — "~하지 마세요"는 강제가 아니다. <b>강제는 코드가 차단(exit 2)할 때만 강제다.</b>
+            4계층 제약 중 <b>런타임 강제는 둘뿐</b> — 도구 권한 + 자동 hook.
+          </div>
+          <h2 class="sec">4계층 제약 — 무엇이 진짜 강제인가</h2>
+          <div class="layers" id="layers"></div>
+          <div class="card">
+            <h3>gate-check.sh — 페이즈 전환 게이트 <span class="muted small">(exit 0 통과 / exit 2 차단 · 우회 NEON_BMAD_SKIP_RULES)</span></h3>
+            <div id="gatelist"></div>
+          </div>
+          <h2 class="sec" style="margin-top:20px">자동 hook — LLM 협조 없이 차단</h2>
+          <div class="hooks" id="hooklist"></div>
+          <div class="card" style="margin-top:16px">
+            <h3>pipeline.sh — 자율 루프 상태기계 <span class="muted small">("고삐는 멈추지 않는다")</span></h3>
+            <div class="sm-flow" id="smflow"></div>
+            <div class="muted small" style="margin-top:10px"><code>advance</code> = 게이트를 <b>직접 호출</b>해 exit code·verdict로 전이 결정 — LLM이 결과를 위조할 수 없는 폐루프. 루프 지속/종료는 Stop hook.</div>
+            <div class="sm-trans" id="smtrans"></div>
+          </div>
+        </div>
+
+        <!-- ============ SCORE ============ -->
+        <div class="pane" id="pane-score">
+          <div class="callout">
+            neon-bmad는 스스로를 <b>6축</b>으로 적대적 채점(<code>harness-critic</code>, Opus)합니다.
+            각 축 = <b>골격이 행동을 강제·기록(2)</b> / <b>모델 협조 기대(1)</b> / <b>없음(0)</b>.
+            "프롬프트 더미"와 "하네스"를 가르는 기준.
+          </div>
+          <div class="score-grid">
+            <div>
+              <div class="card" style="text-align:center">
+                <svg id="radar" width="340" height="300" viewBox="0 0 340 300"></svg>
+                <div style="font-size:26px;font-weight:900;margin-top:4px">12 <span class="muted" style="font-size:14px">/ 12</span></div>
+                <div class="journey">
+                  <span class="muted small">여정</span>
+                  <span class="step">5</span><span>→</span><span class="step">10</span><span>→</span><span class="step now">12</span>
+                </div>
+                <div class="muted small" style="margin-top:8px">제어흐름·상태 두 축은 <code>pipeline.sh</code> + Stop hook("고삐는 멈추지 않는다")으로 마지막에 폐루프.</div>
+              </div>
+            </div>
+            <div class="axis-list" id="axislist"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- import wizard -->
+<div class="modal-bg" id="importModal" onclick="if(event.target===this)closeImport()">
+  <div class="modal wide">
+    <h3 style="margin:0">방법론 Import — 누가 무엇을 올리든 그 환경에 맞게 해석</h3>
+    <div class="muted small">하네스 번들 / config.md / 스킬 zip / 두레이 태스크. 정적 스캔(무료) → AI 정규화(Opus, 캐시) → 개인화 확정.</div>
+    <div class="stepper" id="stepper">
+      <div class="st" data-s="1"><span class="nz">1</span>소스</div><div class="sep"></div>
+      <div class="st" data-s="2"><span class="nz">2</span>구조 인식</div><div class="sep"></div>
+      <div class="st" data-s="3"><span class="nz">3</span>AI 정규화</div><div class="sep"></div>
+      <div class="st" data-s="4"><span class="nz">4</span>확정·개인화</div>
+    </div>
+
+    <!-- step 1 -->
+    <div class="wstep" data-step="1">
+      <div class="srctabs">
+        <div class="srctab on">📦 번들 (폴더/zip)</div>
+        <div class="srctab">⚙ config.md 연결</div>
+        <div class="srctab">🔗 두레이 / 스킬 zip</div>
+      </div>
+      <div class="drop"><div class="big">📦</div><div style="margin-top:8px">여기에 <b>하네스 번들 / 스킬 zip / config.md</b> 드롭</div><div class="muted small" style="margin-top:4px">한 폴더, 여러 zip, 부분 스킬 모두 허용</div></div>
+      <div class="muted small" style="margin-top:12px">또는 — 이 기기에 설치된 하네스 자동 발견 <code style="font-size:10px">~/.claude/skills/*-bmad</code></div>
+      <div class="discover">
+        <div class="disc sel" onclick="pickDisc(this)"><div class="di" style="background:linear-gradient(135deg,#ff7a1a,#4a9eff)">N</div><div class="dt"><b>neon-bmad v1.6.0</b><div>2NEON 재무회계 · 에이전트 13 · 레벨 4 · 6축 12/12</div></div><div class="radio"></div></div>
+        <div class="disc" onclick="pickDisc(this)"><div class="di" style="background:linear-gradient(135deg,#34d399,#4a9eff)">R</div><div class="dt"><b>reined-bmad v1.1.0</b><div>범용 · 에이전트 12 (be/fe 분리) · 레벨 4</div></div><div class="radio"></div></div>
+      </div>
+    </div>
+
+    <!-- step 2 -->
+    <div class="wstep" data-step="2">
+      <div class="muted small">정적 스캔 (AI 없음) — 디렉터리·frontmatter 규칙만으로 골격 인식.</div>
+      <div class="scanlist">
+        <div class="scan"><span class="ck y">✓</span><span><code>_core/</code> THEORY·concepts·dooray-task-template</span></div>
+        <div class="scan"><span class="ck y">✓</span><span><code>_agents/*.md</code> <span class="sp">frontmatter name·model·tools 13개 인식</span></span></div>
+        <div class="scan"><span class="ck y">✓</span><span><code>*/SKILL.md</code> <span class="sp">에이전트 매뉴얼 13</span></span></div>
+        <div class="scan"><span class="ck y">✓</span><span><code>blocks/</code> <span class="sp">재사용 스크립트·패턴 8 (pipeline·metrics·gate-check…)</span></span></div>
+        <div class="scan"><span class="ck w">!</span><span><code>config.md</code> <span class="sp">없음 → 2NEON 고정값 / generic 오버레이 fallback</span></span></div>
+      </div>
+      <div class="typebadge">🧭 <b>방법론 번들 (BMAD 형)</b> 으로 감지 — 흐름·에이전트·산출물 전부 그릴 수 있음</div>
+    </div>
+
+    <!-- step 3 -->
+    <div class="wstep" data-step="3">
+      <div class="muted small">HarnessModel 정규화 — 지저분한 마크다운 규칙을 구조화 JSON으로. <b>Opus 1회 · 번들 해시 캐시</b>(재오픈 0초).</div>
+      <div class="pbar"><i id="normbar"></i></div>
+      <div id="normrows" style="margin-top:6px">
+        <div class="normrow" data-i="0"><span class="nck"></span><span>에이전트 13 × 모델·도구·역할·입출력 추출</span></div>
+        <div class="normrow" data-i="1"><span class="nck"></span><span>레벨 L0~L3 + 트리아지 6질문 규칙</span></div>
+        <div class="normrow" data-i="2"><span class="nck"></span><span>산출물 9 + 템플릿 스켈레톤 + 의존 흐름</span></div>
+        <div class="normrow" data-i="3"><span class="nck"></span><span>게이트(gate-check) · 자동 hook · pipeline 상태기계</span></div>
+        <div class="normrow" data-i="4"><span class="nck"></span><span>하네스 6축 점수 (harness-critic 자기채점)</span></div>
+      </div>
+    </div>
+
+    <!-- step 4 -->
+    <div class="wstep" data-step="4">
+      <div class="detected">✅ <div><b>neon-bmad v1.6.0</b> 정규화 완료 — 에이전트 13 · 레벨 4 · 산출물 9 · 게이트 8 · 6축 12/12</div></div>
+      <div class="muted small" style="margin-top:14px">개인화 — 올린 사람 환경에 맞게 해석 (선택):</div>
+      <div class="opt"><span>내 프로젝트 <code style="font-size:10px">config.md</code> 오버레이로 해석 (스택·도메인·model_overrides·disabled_agents 반영)</span><div class="toggle on" onclick="this.classList.toggle('on')"><i></i></div></div>
+      <div class="opt"><span>용어 번역 — "developer = 내 프로젝트의 main process/shared 코드"처럼 치환</span><div class="toggle" onclick="this.classList.toggle('on')"><i></i></div></div>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:18px">
+      <button class="btn" id="wzBack" onclick="wzBack()" style="visibility:hidden">← 이전</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="closeImport()">취소</button>
+        <button class="btn primary" id="wzNext" onclick="wzNext()">다음 →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   HarnessModel — neon-bmad v1.6.0 (정규화된 데이터 모델)
+   렌더러는 이 객체 하나만 그린다 (하네스-agnostic).
+   ========================================================= */
+const AGENTS = {
+  orchestrator:{name:"orchestrator",model:"haiku",pclass:"coordinate",
+    role:"조정자 — 레벨 판정·intake·라우팅. 직접 코드 수정 금지.",
+    tools:"Bash·Read·Glob·Grep·Task·AskUserQuestion·Skill·dooray-mcp·mysql",
+    reads:"두레이 태스크 · concepts.md",writes:".neon-bmad-state.json · _triage/&lt;id&gt;.md",
+    esc:"메인 세션 경량 원칙 — 내용 아닌 '경로'만 들고 다님 (비용 96%=cache_read)"},
+  analyst:{name:"analyst",model:"sonnet",pclass:"discover",
+    role:"분석가 — 가설/사실 구분, 측정지표 도출, 관련 파일 경로 manifest 작성.",
+    tools:"Read·Glob·Grep·Write·dooray-mcp·clickhouse",
+    reads:"두레이 태스크 · 위키 · MySQL/ClickHouse",writes:"brief.md (## 관련 파일 경로 manifest)",
+    esc:"L3 신규 도메인·모호 입력 시 Opus 승격 (오버레이)"},
+  pm:{name:"pm",model:"sonnet",pclass:"plan",
+    role:"기획자 — 스코프·비기능·Epic 분해, AC 정제.",
+    tools:"Read·Glob·Grep·Edit·Write·dooray-mcp",
+    reads:"brief.md",writes:"prd.md (실행계획 4섹션)",
+    esc:"multi-Epic L3 / RETURN 3회차 에스컬레이션 시 Opus"},
+  architect:{name:"architect",model:"split",pclass:"design",
+    role:"설계자 — arch.md(조건부) + ADR≥1. 구현 코드 작성 금지.",
+    tools:"Read·Glob·Grep·Edit·Write·Bash·dooray-mcp",
+    reads:"prd.md · manifest",writes:"arch.md(위키) · ADR-{task}-NN.md (git 커밋)",
+    esc:"기본 Sonnet+6규칙. L3 ∧ (광역 전수열거 ∨ 비가역 고위험)일 때만 Opus (Step 3.5 판정식). 가드 없는 Opus는 오히려 스코프 폭발·날조로 점수 ↓."},
+  "scrum-master":{name:"scrum-master",model:"sonnet",pclass:"plan",
+    role:"작업 분해 — Story Fit(INVEST) + 의존성 그래프.",
+    tools:"Read·Glob·Grep·Edit·Write·Bash·dooray-mcp",
+    reads:"prd.md · arch.md",writes:"story-N.md (로컬, 정본=두레이 하위업무)",esc:null},
+  developer:{name:"developer",model:"sonnet",pclass:"build",
+    role:"구현자 — Controller/Service/Mapper 3레이어. 자기 도메인 외 수정 금지.",
+    tools:"Read·Edit·Write·Glob·Grep·Bash·Task",
+    reads:"story.md · manifest",writes:"impl-log.md · 운영코드 · ADR commit",
+    esc:"⚠ 절대 Opus 금지 — 과잉 코드 생성 + 도메인 경계 침범 위험"},
+  qa:{name:"qa",model:"haiku",pclass:"verify",
+    role:"검증자 — AC × 시나리오 대조 행렬. 운영코드 read-only. 3진 판정.",
+    tools:"Read·Glob·Grep·Bash·Write",
+    reads:"story.md · impl-log.md",writes:"qa-report.md (&lt;!-- qa:verdict=… --&gt; 마커)",
+    esc:"AC 모호·회귀범위 판단 필요한 L3 시 Sonnet 승격"},
+  "security-reviewer":{name:"security-reviewer",model:"sonnet",pclass:"verify",
+    role:"보안 — OWASP P0/P1/P2 + 체인 공격 추론(인가 우회+세션+사이드채널). read-only.",
+    tools:"Read·Glob·Grep·Write·Bash",
+    reads:"impl-log.md",writes:"security-report.md",
+    esc:"결제·인증 전면 개편 시 Opus (체인 공격 추론 비중 ↑). P0 false negative 1건 = 토큰비 1000배+"},
+  "release-manager":{name:"release-manager",model:"haiku",pclass:"ship",
+    role:"배포 — release-notes + PR + tag. 코드 Edit 금지.",
+    tools:"Read·Glob·Grep·Write·Edit·Bash",
+    reads:"qa-report(MATCH) · security-report(P0 없음)",writes:"release-notes.md(위키) · PR · tag",esc:null},
+};
+
+/* 정비용 3종 — 워크플로우 자동 호출 안 됨 (사용자 명시 호출만) */
+const MAINTENANCE = [
+  {name:"harness-critic",model:"opus",desc:"6축 적대적 자기채점 + 약점·증거 파일"},
+  {name:"harness-verifier",model:"opus",desc:"하네스 파일 전수 정합 검증"},
+  {name:"report-verifier",model:"opus",desc:"neon-bmad-report.html 검증 (NHN DS + 내용)"},
+];
+
+/* 흐름 stage 정의 (L3 superset) — 각 노드는 자기 레벨 집합을 가짐 */
+const STAGES = [
+  {pclass:"coordinate", nodes:[{a:"orchestrator",L:[0,1,2,3],note:"레벨 판정·라우팅"}]},
+  {pclass:"discover", gateBefore:null, nodes:[{a:"analyst",L:[2,3]}]},
+  {pclass:"plan", nodes:[{a:"pm",L:[2,3]}]},
+  {pclass:"design", gateAfter:"adr · handoff", nodes:[{a:"architect",L:[2,3],cond:"Q1/Q2=Yes"}]},
+  {pclass:"plan", gateAfter:"ac (AC≥3)", nodes:[{a:"scrum-master",L:[1,2,3]}]},
+  {pclass:"build", gateAfter:"notrx · lint · qa", loop:true, parallelLabel:"스토리별 dev→qa (L3 병렬)",
+    nodes:[{a:"developer",L:[0,1,2,3]},{a:"qa",L:[1,2,3]}]},
+  {pclass:"verify", gateAfter:"security (P0 없음)", nodes:[{a:"security-reviewer",L:[2,3],cond:"Q3=Yes · 레벨 무관"}]},
+  {pclass:"ship", nodes:[{a:"release-manager",L:[1,2,3],note:"L3 단계 배포"}]},
+];
+
+const LV_DESC = [
+  "<b>L0 Tiny Fix</b> — Developer 단독 → 커밋. 한 줄 수정·문구 변경.",
+  "<b>L1 Small Task</b> — SM(경량 story) → Developer ⇄ QA → Release. 단일 도메인 작은 기능.",
+  "<b>L2 Standard Feature</b> — Analyst → PM → Architect(조건부) → SM → Dev⇄QA → (Security 조건부) → Release. ADR≥1.",
+  "<b>L3 Major Initiative</b> — L2 + Developer 병렬 + QA∥Security 병렬 + 단계 배포. 보안·비가역 영향.",
+];
+
+/* 6축 점수 */
+const AXES = [
+  {k:"강제력",v:2,d:"도구 화이트리스트 + hook(exit 2). 모델이 아닌 골격이 경계를 친다."},
+  {k:"제어흐름",v:2,d:"pipeline.sh 결정론 상태머신이 페이즈 전이 소유 (LLM 판단 X)."},
+  {k:"상태",v:2,d:".neon-bmad-state.json + pipeline-state.json (jq CRUD)."},
+  {k:"차단게이트",v:2,d:"gate-check.sh advance 가 게이트를 직접 호출 — 결과 위조 불가."},
+  {k:"피드백루프",v:2,d:"QA 3진 판정(MATCH/DEVIATION/VIOLATION) + return_counts 3회 에스컬레이션."},
+  {k:"관측가능성",v:2,d:"metrics.sh → 원장 #392. 핵심 지표 '고삐 잡힘'(차단 횟수) 자동 기록."},
+];
+
+/* Dry-run 프리셋 (레벨 추정은 AI, 그 외 결정론) */
+const PRESETS = [
+  {label:"<b>L1 예시</b> 거래처관리 화면 그리드 컬럼 순서·기본 정렬만 변경 (저장 로직 동일)",
+   text:"재무회계 > 거래처 > 거래처관리 화면의 그리드 컬럼 순서와 기본 정렬을 거래처명 오름차순으로 변경. 저장/조회 로직은 그대로.",
+   q:[0,0,0,0,0,1], level:1, archModel:null, sec:false, est:{time:"≈ 18분",cost:"35"},
+   note:"Q6(FE 중심 소변경)만 약하게 Yes, 나머지 No → L1"},
+  {label:"<b>L2 예시</b> 휴폐업거래처 화면에 엑셀 다운로드 추가",
+   text:"재무회계 > 거래처 > 거래처관리 > 휴폐업거래처 화면에 엑셀 다운로드 버튼 추가 (목록 조건 그대로 export).",
+   q:[1,0,0,0,0,1], level:2, archModel:"sonnet", sec:false, est:{time:"≈ 52분",cost:"130"},
+   note:"Q1(다운로드 엔드포인트 신규)+Q6(버튼+API) Yes → L2. 국소·경계명확 → architect=Sonnet+6규칙"},
+  {label:"<b>L3 예시</b> 전표 결제 승인 API 전면 개편 + 인가 체계 변경 + 공용 승인 컴포넌트 다수 화면 일괄 교체",
+   text:"전표 결제 승인 API를 전면 개편하고 승인 권한(인가) 체계를 변경. 공용 승인 컴포넌트를 사용하는 다수 화면을 일괄 교체.",
+   q:[1,0,1,0,1,1], level:3, archModel:"opus", sec:true, est:{time:"≈ 57분",cost:"135"},
+   note:"Q1+Q3(인가)+Q5(전면개편·다수화면)+Q6 Yes → L3. 광역 전수열거 ∧ 비가역 고위험 → architect=Opus. Q3 → security_required"},
+];
+const QTEXT = ["Q1 공개 API 계약(엔드포인트/DTO) 변경","Q2 DB 스키마(테이블/컬럼/제약) 변경","Q3 인증·인가·세션·개인정보 경로 변경","Q4 breaking / 새 외부 의존성","Q5 영향 도메인>2 또는 스토리 3개+ 분할","Q6 FE+BE 동시 변경"];
+
+/* 산출물 트리 (L2) */
+const TREE = [
+  {d:1,dir:1,nm:".neon-bmad/"},
+  {d:2,dir:1,nm:"adr/"},
+  {d:3,nm:"ADR-6700-01-export-endpoint.md",b:"git",doc:"adr"},
+  {d:2,dir:1,nm:"docs/",b:"ignore"},
+  {d:3,dir:1,nm:"_triage/"},
+  {d:4,nm:"6700.md",doc:"triage"},
+  {d:3,dir:1,nm:"_metrics/"},
+  {d:4,nm:"6700.jsonl",doc:"metrics"},
+  {d:3,dir:1,nm:"6700/"},
+  {d:4,nm:"brief.md",doc:"brief"},
+  {d:4,nm:"prd.md",doc:"prd"},
+  {d:4,nm:"story-1.md",doc:"story"},
+  {d:4,nm:"impl-log.md",doc:"impl"},
+  {d:4,nm:"qa-report.md",doc:"qa"},
+  {d:2,nm:".neon-bmad-state.json",b:"ignore",doc:"state"},
+  {d:1,dir:1,nm:"두레이 (외부)",b:"dooray"},
+  {d:2,nm:"하위업무 = story 정본",b:"dooray"},
+  {d:2,nm:"위키: arch.md · release-notes.md",b:"dooray"},
+  {d:2,nm:"원장 #392 ← metrics 요약",b:"dooray"},
+  {d:1,nm:"neon-bmad-report.html",b:"html",doc:"report"},
+];
+const DOCS = {
+  adr:{t:"ADR — Architecture Decision Record",meta:"architect 작성 · git 커밋 (코드 PR과 함께 리뷰)",
+    fm:["task: NEON-6700","seq: 01","status: accepted"],
+    secs:["# 결정","# 맥락 / 대안 검토","## 결정 사항","## 제약","## 참조"]},
+  triage:{t:"Triage — 레벨 판정 기록",meta:"orchestrator · .neon-bmad/docs/_triage/",
+    fm:["task: {두레이 URL}","level: L2","architect_model: sonnet","decided_at: …Z"],
+    secs:["## 6개 질문 응답 (Q1~Q6)","## 판정 (security_required 포함)","## 결정 사항","## 제약","## 참조"]},
+  brief:{t:"brief.md — 분석 브리프",meta:"analyst · gitignore",
+    fm:[],secs:["## 배경 / 가설 vs 사실","## 측정지표","## 관련 파일 경로 (manifest)","## 결정 사항","## 제약","## 참조"]},
+  prd:{t:"prd.md — 제품 요구",meta:"pm · gitignore",
+    fm:[],secs:["## 스코프 / 비기능","## Epic 분해","## 실행계획 (4섹션)","## 결정 사항","## 제약","## 참조"]},
+  story:{t:"story-N.md — 스토리",meta:"scrum-master · 정본=두레이 하위업무",
+    fm:[],secs:["## 사용자 스토리","## 수락기준 (AC ≥ 3)","## 의존성 (depends-on:)","## 결정 사항","## 제약","## 참조"]},
+  impl:{t:"impl-log.md — 구현 로그",meta:"developer · gitignore",
+    fm:[],secs:["## 변경 요약 (수정대상 vs 불변)","## 레이어별 변경","## 수동 작업 체크리스트","## 결정 사항","## 제약","## 참조"]},
+  qa:{t:"qa-report.md — QA 리포트",meta:"qa · verdict 마커로 게이트 판정",
+    fm:[],secs:["&lt;!-- qa:verdict=MATCH|DEVIATION|VIOLATION --&gt;","## AC × 시나리오 대조 행렬","## 발견 / 역동기화 요청","## 결정 사항","## 제약","## 참조"]},
+  metrics:{t:"metrics jsonl — 실행 이벤트",meta:"metrics.sh append (LLM 평가 X)",
+    fm:[],secs:['{"ev":"start","lvl":"L2"}','{"ev":"phase","phase":"architect","model":"sonnet"}','{"ev":"gate","exit":2,"failed":"notrx"}  ← 고삐 잡힘','{"ev":"end","status":"complete"}']},
+  state:{t:".neon-bmad-state.json — 체크포인트",meta:"orchestrator · resume 재진입점",
+    fm:[],secs:["level · architect_model · security_required","current_agent · completed_phases","return_counts · human_decision_needed","deviation_log[]"]},
+  report:{t:"neon-bmad-report.html — 최종 리포트",meta:"NHN 디자인시스템 · report-verifier(Opus) 검증",
+    fm:[],secs:["워크플로우 요약 (페이즈 × 상태)","수동 작업 체크리스트","실행 데이터 (고삐 잡힘·토큰)","ADR 링크 · PR 링크"]},
+};
+
+/* ---- 스킬 해부 (SKILL.md 구조) ---- */
+const SKILLS = {
+  orchestrator:{risk:"직접 코드수정 · 레벨 과소판정 · 페이즈 생략 · 메인세션 오염",write:".neon-bmad-state.json · _triage/*.md",
+    readFirst:["_core/concepts.md","orchestrator/SKILL.md","현재 단계 산출물 1개만"],
+    rules:["⚡ 메인세션 경량 — 내용 아닌 '경로'만 전달, sub-agent는 요약만 반환 (비용 96%=cache_read)","레벨 6질문 자동추정 → 사용자 확인","게이트는 권고 아님 — exit 2 차단 스크립트","실패 은폐 금지 — 빠진 검증=실패"],
+    table:[["사용자가 시작하랬으니 바로 task 생성","워크플로우 시작 ≠ 생성 승인 — 명시 승인 게이트 필수"],["거의 다 됐으니 강제중단 무시","'.neon-bmad-stop' 은 HARD STOP"]]},
+  analyst:{risk:"가설/사실 혼동 · 측정지표 누락",write:"brief.md (## 관련 파일 경로 manifest)",
+    readFirst:["두레이 태스크","clauday-domain/<domain>.md"],
+    rules:["가설 vs 사실 분리","측정지표 도출 (없으면 NEON-G20 차단)","manifest 작성 → 다운스트림 광역 grep 절약"],
+    table:[["대충 배경만 적고 넘어가자","측정지표 없으면 brief 게이트 차단"]]},
+  pm:{risk:"스코프 폭주 · 비기능 누락",write:"prd.md (실행계획 4섹션)",
+    readFirst:["brief.md"],
+    rules:["스코프 명시 + Epic 분해","비기능(보안/성능/관측) 섹션 (없으면 NEON-G21)","안 할 것도 명시"],
+    table:[["일단 다 넣자","스코프 = 할 것 + 안 할 것 둘 다 명시"]]},
+  architect:{risk:"구현 코드 작성 경향 · 추측 설계 · 스코프 폭발 · 근거 날조",write:"arch.md(위키) · ADR(git 커밋)",
+    readFirst:["docs/adr/ 과거 결정","prd.md","manifest 경로"],
+    rules:["① manifest-first 조사 (광역 grep 금지)","② 조사 깊이 (추측 설계 금지)","③ 컴플라이언스 바닥 ('다음 스코프' 미루기 금지)","④ DataSource 경계 먼저","⑤ 역함정 (수정대상 vs 불변 분리표)","⑥ 확인/추정 분리 (anti-hallucination)"],
+    table:[["이 정도 인접 코드도 같이 고치자","표적만. 인접 화면 끌어들이면 R4 19점(꼴찌)"],["근거는 그럴듯하게 적어두자","검증 불가 근거=날조. 확인/추정 분리"]]},
+  "scrum-master":{risk:"과대 스토리 · 의존성 누락",write:"story-N.md (정본=두레이 하위업무)",
+    readFirst:["prd.md","arch.md"],
+    rules:["Story Fit (INVEST)","AC ≥ 3 (게이트 ac)","의존성 그래프 depends-on:","분할 깊이 2 초과 금지"],
+    table:[["큰 스토리 하나로 묶자","INVEST 위반 — 분할. 단 깊이 2 초과는 금지"]]},
+  developer:{risk:"자기 도메인 외 수정 · @Transactional · Controller→Mapper · 과잉 생성",write:"impl-log.md · 운영코드 · ADR commit",
+    readFirst:["story.md","manifest","해당 도메인 노트"],
+    rules:["3레이어 Controller→BO→Mapper (BO 생략 금지 = NEON-LYR01)","@Transactional 금지 (메서드명 AOP = NEON-AOP01)","수정대상 vs 불변 분리","통과 증거 남김 (실패 은폐 = NEON-G32)"],
+    table:[["트랜잭션 필요하니 @Transactional 달자","2NEON 절대금지 — SubagentStop이 종료 순간 exit 2 차단"],["빨리 Controller에서 Mapper 바로 쓰자","3레이어 위반 — 자동 차단 + 되먹임 자가수정"]]},
+  qa:{risk:"운영 코드 수정 (최대 위험) · 오탐",write:"qa-report.md (verdict 마커)",
+    readFirst:["story.md","impl-log.md"],
+    rules:["AC × 시나리오 대조 행렬","3진 판정 마커 &lt;!-- qa:verdict=… --&gt;","운영코드 read-only — 고치려면 RETURN","DEVIATION vs VIOLATION 구분"],
+    table:[["운영코드 한 줄이면 고치는데","read-only. RETURN → developer 재호출"],["구현 됐으니 문서만 맞추자","합의 위반이면 VIOLATION. DEVIATION으로 둔갑 금지"]]},
+  "security-reviewer":{risk:"P0 false negative (= 보안 사고)",write:"security-report.md",
+    readFirst:["impl-log.md"],
+    rules:["OWASP P0/P1/P2","체인 공격 추론 (인가 우회 + 세션 + 사이드채널 조합)","P0 있으면 release 차단 (NEON-G51)"],
+    table:[["눈에 띄는 것만 보자","체인 공격 추론 — 조합 취약점. P0 1건=토큰비 1000배+"]]},
+  "release-manager":{risk:"코드 수정 · 롤백 누락",write:"release-notes(위키) · PR · tag",
+    readFirst:["qa-report (MATCH)","security-report (P0 없음)"],
+    rules:["코드 Edit 금지","롤백 플랜 필수 (NEON-G60)","QA MATCH + P0 없음 확인 후만"],
+    table:[["QA 좀 덜 됐어도 배포하자","MATCH 아니면 qa 게이트가 차단"]]},
+};
+const BLOCKS=[
+  {n:"pipeline.sh",t:"script",who:"orchestrator",d:"자율 루프 결정론 상태머신 + 상태 CRUD. advance=게이트 직접 호출 폐루프"},
+  {n:"metrics.sh",t:"script",who:"orchestrator",d:"실행 이벤트 jsonl append → 원장 #392 요약. '고삐 잡힘' 자동 기록"},
+  {n:"doctor.sh",t:"script",who:"전체",d:"설치·정합 진단 (수정 X, 진단만). 거짓 점검 금지"},
+  {n:"menu-lookup.md",t:"pattern",who:"orchestrator · sm",d:"ad_menu_m(fi)에서 모듈>메뉴 경로 조회 — 제목 날조 금지"},
+  {n:"code-analyze.md",t:"pattern",who:"architect · developer",d:"대상 화면/모듈 기존 코드 패턴 탐색"},
+  {n:"diff-collect.md",t:"pattern",who:"qa",d:"변경 파일 수집 (QA 입력용)"},
+  {n:"lint-check.md",t:"pattern",who:"developer",d:"BE(Gradle test) + FE(npm run lint) 통합 실행"},
+  {n:"dooray-task.md",t:"pattern",who:"orchestrator · sm · release",d:"두레이 태스크/하위업무 조회·생성 패턴"},
+];
+/* ---- 게이트 & 강제 ---- */
+const LAYERS=[
+  {n:"① 도구 권한",real:true,mech:"sub-agent <code>tools:</code> 화이트리스트",force:"✅ 런타임 강제",note:"위험 도구는 처음부터 안 줌 — 유일하게 확실한 강제"},
+  {n:"② 사후 검증 hook",real:true,mech:"SubagentStop · PreToolUse (exit 2)",force:"✅ 자동 (LLM 협조 불요)",note:"@Transactional · Controller→Mapper · force-push 차단"},
+  {n:"③ 컨텍스트 제한",real:false,mech:"필독 파일 자동 read",force:"⚠ 프롬프트 의존",note:"모델이 무시해도 강제 차단 불가"},
+  {n:"④ 행동 지침",real:false,mech:"SKILL.md + 합리화 방어 테이블",force:"⚠ 프롬프트 의존",note:"'이 정도는 괜찮겠지' 합리화 대응"},
+];
+const GATEDATA=[
+  {ph:"analyst",tr:"→ pm",rules:[["NEON-G01","brief.md 존재"],["NEON-G20","측정지표 포함"],["NEON-G10~12","결정/제약/참조 3섹션"]]},
+  {ph:"pm",tr:"→ architect/sm",rules:[["NEON-G02","prd.md 존재"],["NEON-G21","비기능 섹션"],["NEON-G10~12","3섹션"]]},
+  {ph:"architect",tr:"→ sm",rules:[["adr · handoff","arch.md/ADR 존재 + 3섹션"]]},
+  {ph:"sm",tr:"→ developer",rules:[["ac","AC ≥ 3"]]},
+  {ph:"developer",tr:"→ qa",auto:true,rules:[["NEON-AOP01","@Transactional 금지 (자동)"],["NEON-LYR01","Controller→Mapper 금지 (자동)"],["NEON-G30/31/32","린트·테스트·통과 증거 (실패 은폐 차단)"],["NEON-G40","VIOLATION 없음"]]},
+  {ph:"qa",tr:"→ release",rules:[["qa","verdict=MATCH (DEVIATION/VIOLATION 차단)"],["NEON-G50","미충족 항목 없음"]]},
+  {ph:"release",tr:"→ 완료",rules:[["NEON-G60","롤백 플랜"],["NEON-G51","security P0 없음 (L3·Q3)"]]},
+];
+const HOOKS=[
+  {n:"SubagentStop guard",w:"developer/qa/security 종료 순간",d:"변경 .java → NEON-AOP01/LYR01 검사. 위반 시 exit 2 → 종료 차단 + stderr 되먹임 → 자가수정",a:"LLM 협조 불요"},
+  {n:"PreToolUse guard",w:"도구 호출 직전",d:"git push -f origin main 등 강제푸시 차단 (exit 2)",a:"메인 세션 사고 방지"},
+  {n:"Stop hook (자율 루프)",w:"매 턴 종료",d:"완료/취소/3회 RETURN 전까지 다음 페이즈 포인터 재주입 — 트랜스크립트 얇게 유지",a:"'고삐는 멈추지 않는다'"},
+];
+const SM_TRANS=[
+  {t:"pass",c:"pass",d:"시퀀스 다음 페이즈로 (또는 done)"},
+  {t:"violation",c:"violation",d:"스펙 위반 → developer RETURN (같은 페이즈 3회 → escalate)"},
+  {t:"deviation",c:"deviation",d:"문서 뒤처짐 → architect 역동기화 (구현 유지)"},
+  {t:"redo",c:"redo",d:"산출물 미충족 → 같은 페이즈 재시도 (3회 → escalate)"},
+  {t:"escalate",c:"escalate",d:"pending_decision 세팅 → Stop hook PAUSE (사용자 결정 대기)"},
+];
+
+/* ===================== 렌더 ===================== */
+let curLevel = 2;
+let curAgent = null;
+
+function mbadgeHtml(m){
+  if(m==="split") return '<span class="mbadge split">Sonnet→Opus</span>';
+  const lbl={haiku:"Haiku",sonnet:"Sonnet",opus:"Opus"}[m];
+  return '<span class="mbadge '+m+'">'+lbl+'</span>';
+}
+
+function renderFlow(){
+  const row=document.getElementById("flowrow"); row.innerHTML="";
+  document.getElementById("lvdesc").innerHTML=LV_DESC[curLevel];
+  STAGES.forEach((st,si)=>{
+    // connector + gate before this stage (gateAfter on previous stage)
+    if(si>0){
+      const prev=STAGES[si-1];
+      const conn=document.createElement("div"); conn.className="conn";
+      const stageActive = st.nodes.some(n=>n.L.includes(curLevel));
+      let g="";
+      if(prev.gateAfter && stageActive && prev.nodes.some(n=>n.L.includes(curLevel))){
+        const auto = prev.gateAfter.includes("notrx")?'<div class="gatechip auto" title="developer 종료 순간 SubagentStop 자동 차단: @Transactional / Controller→Mapper">자동</div>':"";
+        g='<div class="gatechip" title="gate-check.sh — exit 2면 다음 페이즈 차단">⛬ '+prev.gateAfter+'</div>'+auto;
+      }
+      conn.innerHTML='<div class="arr">→</div>'+g;
+      row.appendChild(conn);
+    }
+    const stage=document.createElement("div"); stage.className="stage";
+    const pc=document.createElement("div"); pc.className="pclass"; pc.textContent=st.pclass; stage.appendChild(pc);
+
+    const wrap=document.createElement(st.nodes.length>1?"div":"div");
+    if(st.nodes.length>1){ wrap.className="parallel";
+      const pl=document.createElement("div"); pl.className="plabel"; pl.textContent=st.parallelLabel||"병렬"; wrap.appendChild(pl);
+    }
+    st.nodes.forEach(n=>{
+      const ag=AGENTS[n.a];
+      const active=n.L.includes(curLevel);
+      const node=document.createElement("div");
+      node.className="node"+(active?"":" dim")+(n.cond?" cond":"");
+      node.onclick=()=>selectAgent(n.a);
+      let tag="";
+      if(!active) tag='<span class="ntag skip">L'+curLevel+' 생략</span>';
+      else if(n.cond) tag='<span class="ntag">조건부</span>';
+      let extra="";
+      if(st.loop && n.a==="qa" && active){
+        extra='<div class="verdicts"><span class="vd m">MATCH</span><span class="vd d">DEVIATION</span><span class="vd v">VIOLATION</span></div>';
+      }
+      node.innerHTML=tag+
+        '<div class="nname">'+ag.name+'</div>'+
+        '<div style="margin:5px 0 2px">'+mbadgeHtml(ag.model)+'</div>'+
+        '<div class="nrole">'+(n.note||ag.role)+'</div>'+
+        (n.cond&&active?'<div class="loopbadge">⚐ '+n.cond+'</div>':"")+
+        extra;
+      wrap.appendChild(node);
+    });
+    if(st.loop){
+      const lb=document.createElement("div"); lb.className="loopbadge";
+      lb.innerHTML="↩ QA RETURN → developer (3회 → PM 에스컬레이션)";
+      if(!st.nodes.some(n=>n.L.includes(curLevel))) lb.style.opacity=.3;
+      wrap.appendChild(lb);
+    }
+    stage.appendChild(wrap);
+    row.appendChild(stage);
+  });
+  // commit/end marker
+  const conn=document.createElement("div"); conn.className="conn"; conn.innerHTML='<div class="arr">→</div>';
+  row.appendChild(conn);
+  const end=document.createElement("div"); end.className="stage";
+  end.innerHTML='<div class="pclass">done</div><div class="node" style="cursor:default;width:120px;text-align:center">'+
+    (curLevel===0?'<div class="nname">commit</div><div class="nrole">사용자 커밋 확인</div>':
+     '<div class="nname">완료</div><div class="nrole">report.html + 원장 #392 기록 + 회고 권유</div>')+'</div>';
+  row.appendChild(end);
+}
+
+function selectAgent(a){
+  curAgent=a; const ag=AGENTS[a];
+  const ins=document.getElementById("inspector");
+  ins.innerHTML=
+    '<div class="insp-head"><div class="iname">'+ag.name+'</div>'+
+    '<div style="margin:7px 0 0">'+mbadgeHtml(ag.model)+' <span class="chip" style="margin-left:6px">'+ag.pclass+'</span></div>'+
+    '<div class="irole">'+ag.role+'</div></div>'+
+    '<div class="insp-body">'+
+      '<div class="irow"><div class="k">도구 (화이트리스트 = 유일한 런타임 강제)</div><div class="v"><code>'+ag.tools+'</code></div></div>'+
+      '<div class="io"><div class="iobox"><div class="k">▼ 입력 (읽음)</div><div class="v">'+ag.reads+'</div></div>'+
+        '<div class="iobox"><div class="k">▲ 출력 (산출물)</div><div class="v">'+ag.writes+'</div></div></div>'+
+      (ag.esc?'<div class="esc"><b>모델/경계 노트</b><br>'+ag.esc+'</div>':"")+
+    '</div>';
+}
+
+function setLevel(n){ curLevel=n; document.querySelectorAll("#lvseg button").forEach(b=>b.classList.toggle("active",+b.dataset.lv===n)); renderFlow(); }
+
+function switchTab(t){
+  document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x.dataset.tab===t));
+  document.querySelectorAll(".pane").forEach(p=>p.classList.remove("active"));
+  document.getElementById("pane-"+t).classList.add("active");
+  if(t==="score") drawRadar();
+}
+
+/* ---- Dry-run ---- */
+function renderPresets(){
+  const c=document.getElementById("presets"); c.innerHTML="";
+  PRESETS.forEach((p,i)=>{ const b=document.createElement("button"); b.className="preset"; b.innerHTML=p.label;
+    b.onclick=()=>{document.getElementById("taskinput").value=p.text; runDry(i);}; c.appendChild(b); });
+}
+function runDry(forceIdx){
+  const tv=document.getElementById("taskinput").value.trim();
+  let idx = (forceIdx!==undefined)?forceIdx : PRESETS.findIndex(p=>p.text===tv);
+  if(idx<0) idx=1; // 기본 데모: L2
+  const p=PRESETS[idx];
+  const r=document.getElementById("drresult");
+  // 6 questions
+  let qhtml="";
+  p.q.forEach((y,i)=>{ qhtml+='<div class="q"><span class="yn '+(y?'y':'n')+'">'+(y?'Yes':'No')+'</span><span class="qt">'+QTEXT[i]+'</span></div>'; });
+  // fired phases for level
+  const fired=phasesForLevel(p);
+  let tl=""; fired.forEach((f)=>{
+    tl+='<div class="tl"><div class="rail"><div class="d"></div><div class="ln"></div></div><div class="tlc">';
+    if(f.parallel){
+      tl+='<div class="parallel-tl"><div class="th"><b>병렬 dispatch</b></div>';
+      f.parallel.forEach(n=>{ tl+='<div class="sub">• '+n.name+' '+mbadgeHtml(n.model)+' — '+n.role+'</div>'; });
+      tl+='</div>';
+    } else {
+      tl+='<div class="th"><b>'+f.name+'</b> '+mbadgeHtml(f.model)+(f.cond?' <span class="chip">조건부</span>':"")+'</div><div class="sub">'+f.role+'</div>';
+    }
+    if(f.gate) tl+='<div style="margin-top:5px"><span class="gate-tl">⛬ 게이트: '+f.gate+'</span></div>';
+    tl+='</div></div>';
+  });
+  const archLine = p.archModel==="opus"
+    ? '<span class="mbadge opus">architect = Opus</span> <span class="muted small">— 광역 전수열거 ∧ 비가역 고위험 (Step 3.5)</span>'
+    : (p.archModel==="sonnet" ? '<span class="mbadge sonnet">architect = Sonnet+6규칙</span> <span class="muted small">— 국소·경계명확</span>' : '<span class="muted small">architect 미진입</span>');
+  r.innerHTML=
+    '<div class="verdict-big"><div class="lvbig">L'+p.level+'</div><div class="vt">'+
+      '<b>'+["Tiny Fix","Small Task","Standard Feature","Major Initiative"][p.level]+'</b>'+
+      '<div>'+p.note+'</div>'+
+      '<div style="margin-top:6px">'+archLine+(p.sec?' &nbsp;·&nbsp; <span class="mbadge sonnet">🔒 security_required</span>':"")+'</div>'+
+    '</div></div>'+
+    '<h3 style="margin-top:4px">레벨 판정 — 6개 질문 (AI 추정 → 사용자 확인)</h3>'+
+    '<div class="qgrid">'+qhtml+'</div>'+
+    '<div class="estrow"><div class="est"><div class="k">활성 에이전트</div><div class="v">'+countAgents(fired)+'<small> 개</small></div></div>'+
+      '<div class="est"><div class="k">예상 시간</div><div class="v">'+p.est.time.replace("≈","")+'</div></div>'+
+      '<div class="est"><div class="k">상대 비용</div><div class="v">'+p.est.cost+' <small>(전부 Sonnet=100)</small></div></div></div>'+
+    '<h3 style="margin-top:8px">실행 경로 미리보기</h3><div class="timeline">'+tl+'</div>';
+}
+function phasesForLevel(p){
+  const L=p.level; const out=[];
+  const push=(a,opt={})=>{const ag=AGENTS[a]; out.push({name:ag.name,model:ag.model==="split"?(p.archModel||"sonnet"):ag.model,role:ag.role,...opt});};
+  push("orchestrator",{gate:null});
+  if(L===0){ push("developer"); return out; }
+  if(L>=2){ push("analyst"); push("pm"); if(p.q[0]||p.q[1]) push("architect",{cond:true,gate:"adr · handoff"}); }
+  push("scrum-master",{gate:"ac (AC≥3)"});
+  if(L===3){
+    out.push({parallel:[{name:"developer",model:"sonnet",role:"BE 구현"},{name:"developer",model:"sonnet",role:"FE 구현"}],gate:"notrx · lint"});
+    if(p.sec) out.push({parallel:[{name:"qa",model:"haiku",role:"AC 대조 (verdict)"},{name:"security-reviewer",model:"sonnet",role:"OWASP + 체인공격"}],gate:"qa(MATCH) · security(P0 없음)"});
+    else out.push({parallel:[{name:"qa",model:"haiku",role:"AC 대조 (verdict)"}],gate:"qa(MATCH)"});
+  } else {
+    push("developer",{gate:"notrx · lint"});
+    push("qa",{gate:"qa(MATCH)"});
+    if(p.sec) push("security-reviewer",{cond:true,gate:"security(P0 없음)"});
+  }
+  push("release-manager");
+  return out;
+}
+function countAgents(fired){ let c=0; fired.forEach(f=>c+=f.parallel?f.parallel.length:1); return c; }
+
+/* ---- Artifacts ---- */
+function renderTree(){
+  const c=document.getElementById("arttree"); c.innerHTML="";
+  TREE.forEach((n,i)=>{
+    const t=document.createElement("div"); t.className="t"; t.style.paddingLeft=((n.d-1)*16)+"px";
+    const ic=n.dir?"📂":(n.b==="html"?"🌐":(n.b==="dooray"?"🔶":"📄"));
+    let badge=""; if(n.b==="git")badge=' <span class="badge git">git 커밋</span>';
+    else if(n.b==="ignore")badge=' <span class="badge ignore">gitignore</span>';
+    else if(n.b==="dooray")badge=' <span class="badge dooray">두레이</span>';
+    else if(n.b==="html")badge=' <span class="badge html">최종</span>';
+    t.innerHTML='<span class="ic">'+ic+'</span><span class="nm'+(n.dir?' dir':'')+'">'+n.nm+'</span>'+badge;
+    if(n.doc){ t.onclick=()=>{ document.querySelectorAll('.tree .t').forEach(x=>x.classList.remove('sel')); t.classList.add('sel'); showDoc(n.doc); }; }
+    c.appendChild(t);
+  });
+}
+function showDoc(k){
+  const d=DOCS[k]; const c=document.getElementById("docprev");
+  let body="";
+  if(d.fm.length){ body+='<span class="fm">---\n'+d.fm.join("\n")+'\n---</span>\n\n'; }
+  d.secs.forEach(s=>{
+    if(s.startsWith("#")) body+='<span class="h">'+s+'</span>\n  …\n';
+    else if(s.startsWith("{")||s.startsWith("&lt;!--")) body+='<span class="req">'+s+'</span>\n';
+    else body+=s+'\n';
+  });
+  c.innerHTML='<div class="dh">'+d.t+'</div><div class="dmeta">'+d.meta+'</div><div class="skel">'+body+'</div>'+
+    '<div class="muted small" style="margin-top:10px">모든 핵심 산출물은 <b>결정 사항 / 제약 / 참조</b> 3섹션 필수 — handoff 게이트가 검증.</div>';
+}
+
+/* ---- Score radar ---- */
+function drawRadar(){
+  const svg=document.getElementById("radar"); const cx=170,cy=150,R=100; const n=AXES.length;
+  let grid="",axes="",poly="",labels="";
+  for(let r=1;r<=2;r++){ let pts=""; for(let i=0;i<n;i++){const a=-Math.PI/2+i*2*Math.PI/n; pts+=(cx+Math.cos(a)*R*r/2)+","+(cy+Math.sin(a)*R*r/2)+" ";}
+    grid+='<polygon points="'+pts+'" fill="none" stroke="#2a3140" stroke-width="1"/>'; }
+  let dpts="";
+  for(let i=0;i<n;i++){ const a=-Math.PI/2+i*2*Math.PI/n;
+    const ex=cx+Math.cos(a)*R, ey=cy+Math.sin(a)*R;
+    axes+='<line x1="'+cx+'" y1="'+cy+'" x2="'+ex+'" y2="'+ey+'" stroke="#2a3140" stroke-width="1"/>';
+    const vr=R*AXES[i].v/2; dpts+=(cx+Math.cos(a)*vr)+","+(cy+Math.sin(a)*vr)+" ";
+    const lx=cx+Math.cos(a)*(R+22), ly=cy+Math.sin(a)*(R+14);
+    labels+='<text x="'+lx+'" y="'+ly+'" fill="#9aa4b6" font-size="10.5" text-anchor="middle">'+AXES[i].k+'</text>';
+  }
+  poly='<polygon points="'+dpts+'" fill="rgba(74,158,255,.18)" stroke="#4a9eff" stroke-width="2"/>';
+  // brand gradient fill
+  svg.innerHTML='<defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="rgba(255,122,26,.25)"/><stop offset="1" stop-color="rgba(74,158,255,.25)"/></linearGradient></defs>'+
+    grid+axes+'<polygon points="'+dpts+'" fill="url(#g1)" stroke="#7da9ff" stroke-width="2"/>'+labels;
+}
+function renderAxes(){
+  const c=document.getElementById("axislist"); c.innerHTML="";
+  AXES.forEach(a=>{ const el=document.createElement("div"); el.className="axis";
+    el.innerHTML='<div class="ah"><b>'+a.k+'</b><span class="av" style="color:'+(a.v===2?'var(--ok)':a.v===1?'var(--warn)':'var(--bad)')+'">'+a.v+'/2 '+(a.v===2?'골격 강제':a.v===1?'협조 기대':'없음')+'</span></div>'+
+      '<div class="bar"><i style="width:'+(a.v/2*100)+'%"></i></div><div class="ad">'+a.d+'</div>';
+    c.appendChild(el); });
+}
+
+/* ---- Skills & Blocks ---- */
+let curSkill="architect";
+function renderSkillList(){
+  const c=document.getElementById("sklist"); c.innerHTML="";
+  Object.keys(SKILLS).forEach(k=>{ const ag=AGENTS[k]; const it=document.createElement("div");
+    it.className="sk-item"+(k===curSkill?" sel":"");
+    it.innerHTML='<span class="nm">'+ag.name+'</span>'+mbadgeHtml(ag.model);
+    it.onclick=()=>{curSkill=k; renderSkillList(); renderSkillAnat();}; c.appendChild(it); });
+}
+function renderSkillAnat(){
+  const k=curSkill, s=SKILLS[k], ag=AGENTS[k]; const c=document.getElementById("skanat");
+  let rules=s.rules.map(r=>'<div class="rule-li">'+r+'</div>').join("");
+  let tbl='<table class="rt"><tr><th>에이전트 변명 (합리화)</th><th>현실 (가드)</th></tr>'+
+    s.table.map(row=>'<tr><td class="ex">"'+row[0]+'"</td><td class="re">'+row[1]+'</td></tr>').join("")+'</table>';
+  let reads=s.readFirst.map(r=>'<span class="pill">'+r+'</span>').join("");
+  c.innerHTML='<div class="ah2">'+ag.name+' <span style="font-size:12px">'+mbadgeHtml(ag.model)+'</span></div>'+
+    '<div class="muted small" style="margin-top:3px">'+ag.role+'</div>'+
+    '<div class="sec-h">⚠ 위험 (이 역할이 일으킬 수 있는 사고)</div><span class="pill risk">'+s.risk+'</span>'+
+    '<div class="sec-h">쓰기 권한</div><span class="pill">'+s.write+'</span>'+
+    '<div class="sec-h">먼저 읽을 것 (필독)</div>'+reads+
+    '<div class="sec-h">핵심 규칙 (§⚡)</div>'+rules+
+    '<div class="sec-h">합리화 방어 테이블</div>'+tbl;
+}
+function renderBlocks(){
+  const c=document.getElementById("blocklist"); c.innerHTML="";
+  BLOCKS.forEach(b=>{ const el=document.createElement("div"); el.className="blockcard";
+    el.innerHTML='<div class="bn">'+(b.t==="script"?"📜":"🧩")+' '+b.n+' <span class="bt '+b.t+'">'+(b.t==="script"?"스크립트":"패턴")+'</span></div>'+
+      '<div class="bd">'+b.d+'</div><div class="bw">사용 에이전트: '+b.who+'</div>';
+    c.appendChild(el); });
+}
+/* ---- Gates & Enforcement ---- */
+function renderLayers(){
+  const c=document.getElementById("layers"); c.innerHTML="";
+  LAYERS.forEach(l=>{ const el=document.createElement("div"); el.className="layer "+(l.real?"real":"soft");
+    el.innerHTML='<div class="ln">'+l.n+'</div><div class="lm">'+l.mech+'</div>'+
+      '<div class="lf '+(l.real?"y":"n")+'">'+l.force+'</div><div class="lnote">'+l.note+'</div>';
+    c.appendChild(el); });
+}
+function renderGates(){
+  const c=document.getElementById("gatelist"); c.innerHTML="";
+  GATEDATA.forEach(g=>{ const el=document.createElement("div"); el.className="gaterow";
+    let rules=g.rules.map(r=>'<div class="grule"><code>'+r[0]+'</code> <span>'+r[1]+'</span></div>').join("");
+    el.innerHTML='<div class="gp">'+g.ph+'<span class="tr">'+g.tr+'</span>'+(g.auto?'<span class="au">SubagentStop 자동</span>':"")+'</div>'+
+      '<div class="grules">'+rules+'</div>';
+    c.appendChild(el); });
+}
+function renderHooks(){
+  const c=document.getElementById("hooklist"); c.innerHTML="";
+  HOOKS.forEach(h=>{ const el=document.createElement("div"); el.className="hookcard";
+    el.innerHTML='<div class="hn">'+h.n+'</div><div class="hw">⏱ '+h.w+'</div><div class="hd">'+h.d+'</div><div class="ha">🔒 '+h.a+'</div>';
+    c.appendChild(el); });
+}
+function renderStateMachine(){
+  const seq=["analyst","pm","architect","sm","dev","qa","security","release"];
+  const cond={architect:1,security:1};
+  const f=document.getElementById("smflow"); f.innerHTML="";
+  seq.forEach((p,i)=>{ if(i)f.innerHTML+='<span class="sm-arr">→</span>';
+    f.innerHTML+='<span class="sm-node'+(cond[p]?" cond":"")+'">'+p+(cond[p]?" *":"")+'</span>'; });
+  f.innerHTML+='<span class="sm-arr">→</span><span class="sm-node" style="border-color:var(--ok);color:#9ff0cf">done</span>';
+  const t=document.getElementById("smtrans"); t.innerHTML='<div class="muted small">* architect/security = 조건부 (build_seq가 레벨·Q값으로 시퀀스 구성) · transition(결과):</div>';
+  SM_TRANS.forEach(x=>{ t.innerHTML+='<div class="sm-t"><span class="tag '+x.c+'">'+x.t+'</span><span>'+x.d+'</span></div>'; });
+}
+
+/* import wizard */
+let wzStep=1;
+function openImport(){wzStep=1; renderWizard(); document.getElementById("importModal").classList.add("show");}
+function closeImport(){document.getElementById("importModal").classList.remove("show");}
+function pickDisc(el){document.querySelectorAll(".disc").forEach(d=>d.classList.remove("sel")); el.classList.add("sel");}
+function renderWizard(){
+  document.querySelectorAll(".wstep").forEach(s=>s.classList.toggle("on",+s.dataset.step===wzStep));
+  document.querySelectorAll("#stepper .st").forEach(s=>{ const n=+s.dataset.s;
+    s.classList.toggle("on",n===wzStep); s.classList.toggle("done",n<wzStep);
+    s.querySelector(".nz").textContent = n<wzStep?"✓":n; });
+  document.getElementById("wzBack").style.visibility = wzStep>1?"visible":"hidden";
+  const next=document.getElementById("wzNext");
+  next.textContent = wzStep===4 ? "이 하네스로 열기 ✓" : (wzStep===3 ? "정규화 완료 → 다음" : "다음 →");
+  if(wzStep===3) runNormalize();
+}
+function runNormalize(){
+  const rows=[...document.querySelectorAll("#normrows .normrow")]; const bar=document.getElementById("normbar");
+  rows.forEach(r=>r.className="normrow"); bar.style.width="0";
+  let i=0; const tick=()=>{
+    if(i>0) rows[i-1].className="normrow done";
+    if(i<rows.length){ rows[i].className="normrow run"; bar.style.width=((i+1)/rows.length*100)+"%"; i++; setTimeout(tick,420); }
+  }; setTimeout(tick,200);
+}
+function wzNext(){ if(wzStep>=4){closeImport(); return;} wzStep++; renderWizard(); }
+function wzBack(){ if(wzStep>1){wzStep--; renderWizard();} }
+
+/* init */
+renderFlow(); selectAgent("architect"); renderPresets(); renderTree(); showDoc("adr"); renderAxes();
+renderSkillList(); renderSkillAnat(); renderBlocks();
+renderLayers(); renderGates(); renderHooks(); renderStateMachine();
+</script>
+</body>
+</html>

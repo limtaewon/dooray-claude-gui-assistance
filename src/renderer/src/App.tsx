@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   Calendar as CalendarIcon, Terminal as TerminalIcon, GitBranch, Users, Server, Sparkles,
   MessageSquare, BarChart3, BookOpen, Settings as SettingsIcon, Radar, Moon, Sun, Lightbulb, Bot,
-  LayoutDashboard, ListTodo, MessageCircle, FileText, CheckSquare
+  LayoutDashboard, ListTodo, MessageCircle, FileText, CheckSquare, Workflow
 } from 'lucide-react'
 import Sidebar from './components/Layout/Sidebar'
 import TitleBar from './components/Layout/TitleBar'
@@ -22,13 +22,14 @@ import ImageLightbox from './components/common/ImageLightbox'
 import CommunityView from './components/Community/CommunityView'
 import MonitoringView from './components/Monitoring/MonitoringView'
 import AIRecommendView from './components/AIRecommend/AIRecommendView'
+import HarnessStudioView from './components/HarnessStudio/HarnessStudioView'
 import QuickTodoModal from './components/Dooray/QuickTodoModal'
 import { ToastHost, CommandPalette, type CommandGroup, type CommandItem } from './components/common/ds'
 import ErrorReportProvider from './components/ErrorReport/ErrorReportProvider'
 import FeedbackProvider from './components/Feedback/FeedbackProvider'
 import { useTheme } from './hooks/useTheme'
 
-type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent'
+type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent' | 'harness'
 
 /** Cmd+E 최근 뷰 LRU 항목 — sub 가 있으면 같은 view 안의 sub-tab 별로 별개 entry */
 interface RecentViewItem {
@@ -254,6 +255,7 @@ function App(): JSX.Element {
         { id: 'go-agent', label: '에이전트', icon: <Bot size={13} /> },
         { id: 'go-terminal', label: '터미널', icon: <TerminalIcon size={13} />, hint: '⌘3' },
         { id: 'go-git', label: '브랜치 작업', icon: <GitBranch size={13} />, hint: '⌘4' },
+        { id: 'go-harness', label: 'Harness Studio', icon: <Workflow size={13} /> },
         { id: 'go-community', label: '커뮤니티', icon: <Users size={13} /> },
         { id: 'go-mcp', label: 'MCP 서버', icon: <Server size={13} /> },
         { id: 'go-skills', label: 'Claude 스킬', icon: <Sparkles size={13} /> },
@@ -351,6 +353,11 @@ function App(): JSX.Element {
                 <ClaudeCodeSessionsView active={activeView === 'sessions'} />
               </ErrorBoundary>
             </div>
+            <div className={`absolute inset-0 ${vis('harness')}`}>
+              <ErrorBoundary label="Harness Studio">
+                <HarnessStudioView active={activeView === 'harness'} />
+              </ErrorBoundary>
+            </div>
             <div className={`absolute inset-0 ${vis('usage')}`}><UsageDashboard /></div>
             <div className={`absolute inset-0 ${vis('manual')}`}><ClaudeManual /></div>
             <div className={`absolute inset-0 ${vis('settings')}`}><SettingsView /></div>
@@ -411,6 +418,7 @@ function RecentViewsPalette({ open, items, index, onHover, onPick, onClose }: {
         case 'manual': return { label: '매뉴얼', icon: <BookOpen size={13} /> }
         case 'settings': return { label: '설정', icon: <SettingsIcon size={13} /> }
         case 'agent': return { label: '에이전트', icon: <Bot size={13} /> }
+        case 'harness': return { label: 'Harness Studio', icon: <Workflow size={13} /> }
         default: return { label: v, icon: <BookOpen size={13} /> }
       }
     })()

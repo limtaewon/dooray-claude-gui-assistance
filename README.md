@@ -152,6 +152,27 @@
 ## 그 외에도 — 펼쳐보기
 
 <details>
+<summary><b>Harness Studio</b> — bmad 번들 시각화 & 분석</summary>
+
+![Harness Studio](docs/screenshots/harness-studio.png)
+
+- 에이전트 오케스트레이션 번들(reined-bmad, neon-bmad 등) import → 정적 구조 + AI 정규화
+- **Flow Canvas** — react-flow 에이전트 그래프. L0~L3 레벨 토글, 역할별 노드 색상(분석가/PM/아키텍트/개발자/보안), 핸드오프 엣지
+- **Dry-run** — 태스크 설명 입력하면 예상 경로·단계 추정
+- **Doctor** — AI 없는 정적 정합 검사 (체인 누락, 미정의 에이전트, 고아 산출물, 게이트 불일치, 점수 결측)
+- **Compare** — 두 번들 비교 (에이전트, 레벨, 게이트, 점수 diff)
+- **Export** — HTML 리포트로 다운로드
+- 8개 탭: Flow Canvas · Dry-run · Skills/Blocks · Gates · Artifacts · Score · Doctor · Compare
+- 각 필드의 신뢰도 배지 (정적/AI/파생/없음)
+
+**언제 좋냐면**
+- 에이전트 체인 구조가 제대로 연결됐는지 시각적으로 검증하고 싶을 때
+- 번들 품질(결측·불일치)을 자동으로 점검하고 리포트로 공유하고 싶을 때
+- 다른 팀의 하네스와 구조를 비교해 개선 아이디어를 얻고 싶을 때
+
+</details>
+
+<details>
 <summary><b>메신저 와처</b> — 자연어 룰로 채팅방에서 키워드 추출</summary>
 
 ![와처](docs/screenshots/v155-watcher.png)

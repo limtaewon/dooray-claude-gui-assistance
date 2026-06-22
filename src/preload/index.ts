@@ -61,6 +61,20 @@ function subscribeCaldavSyncProgress(cb: (p: SyncProgressPayload) => void): () =
   return () => { caldavSyncHandlers.delete(cb) }
 }
 import type { McpServerConfig } from '../shared/types/mcp'
+import type {
+  RawBundleSummary,
+  HarnessModel,
+  DryRunResult,
+  DiscoveredHarness,
+  CachedHarnessEntry
+} from '../shared/types/harness'
+import type {
+  HarnessDraft,
+  DraftDiffSummary,
+  AIEditProposal,
+  BackupEntry,
+  AgentSourceMap
+} from '../shared/types/harness-edit'
 import type { Skill, SkillSaveRequest } from '../shared/types/skills'
 import type { UsageQueryParams, UsageSummary } from '../shared/types/usage'
 import type {
@@ -661,6 +675,173 @@ const api = {
       callback(payload)
     ipcRenderer.on(IPC_CHANNELS.CONFIG_CHANGED, handler)
     return () => ipcRenderer.removeListener(IPC_CHANNELS.CONFIG_CHANGED, handler)
+  },
+
+  // Harness Studio (v1.7)
+  harness: {
+    /**
+     * 번들 경로를 정적으로 스캔한다. AI 없음, 즉시 반환.
+     * pickDialog=true 로 호출하면 폴더 선택 다이얼로그를 연다.
+     */
+    scan: (args: { path?: string; pickDialog?: boolean }): Promise<RawBundleSummary | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.HARNESS_SCAN, args),
+
+    /**
+     * ~/.claude/skills/* 를 자동 발견한다. 정적, AI 없음.
+     */
+    discover: (): Promise<DiscoveredHarness[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.HARNESS_DISCOVER),
+
+    /**
+     * 번들 경로를 AI(Opus) 로 정규화해 HarnessModel 을 반환한다.
+     * 캐시 hit 시 즉시, force=true 면 재정규화.
+     * requestId 를 지정하면 AI_PROGRESS 이벤트로 진행률을 받을 수 있다.
+     */
+    normalize: (args: { path: string; force?: boolean; requestId?: string }): Promise<HarnessModel> =>
+      ipcRenderer.invoke(IPC_CHANNELS.HARNESS_NORMALIZE, args),
+
+    /**
+     * 캐시를 삭제한다. path 지정 시 해당 번들만, 생략 시 전체.
+     */
+    clearCache: (args?: { path?: string }): Promise<{ cleared: number }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.HARNESS_CACHE_CLEAR, args),
+
+    /**
+     * 캐시된 번들 목록을 반환한다 (최근 정규화 순).
+     */
+    listCached: (): Promise<CachedHarnessEntry[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.HARNESS_LIST_CACHED),
+
+    /**
+     * 태스크 평문으로 레벨을 추정하고 결정론적 경로/게이트/비용을 계산한다.
+     *
+     * 처리 흐름:
+     * 1. taskHash 캐시 hit → 즉시 반환.
+     * 2. miss → (projectPath 지정 시) 프로젝트 맥락 정적 수집 → AI(Haiku) 레벨 추정 + levelPath 결정론적 계산.
+     * requestId 를 지정하면 AI_PROGRESS 이벤트로 진행률을 받을 수 있다.
+     *
+     * @param args.path - 번들 루트 절대경로 (HarnessModel 획득에 사용)
+     * @param args.taskText - 태스크 설명 평문 또는 두레이 URL
+     * @param args.requestId - 진행률 이벤트 구분 ID (optional)
+     * @param args.projectPath - 프로젝트 루트 절대경로 (optional).
+     *   지정 시 정적 프로파일 수집 후 AI 레벨 추정 맥락으로 전달 — 추정 정확도 향상.
+     *   미지정 시 기존 동작 그대로.
+     * @returns DryRunResult
+     */
+    dryrun: (args: { path: string; taskText: string; requestId?: string; projectPath?: string }): Promise<DryRunResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.HARNESS_DRYRUN, args),
+
+    /**
+     * 프로젝트 폴더 선택 다이얼로그를 열어 선택된 경로를 반환한다.
+     *
+     * dryrun 의 projectPath 입력에 사용한다.
+     * 사용자가 취소하면 null 을 반환한다.
+     *
+     * @returns 선택된 디렉터리 절대경로, 또는 취소 시 null
+     */
+    pickProjectDir: (): Promise<string | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.HARNESS_PICK_DIR),
+
+    /**
+     * 번들 경로 + 토픽을 받아 온디맨드 한국어 설명/용어번역을 반환한다 (P3, Sonnet).
+     *
+     * 처리 흐름:
+     * 1. normalize(path) 로 HarnessModel 획득 (캐시 hit 우선).
+     * 2. 모델 컨텍스트 요약 → AIService.explainHarness(Sonnet) 호출 → 마크다운 반환.
+     * requestId 를 지정하면 AI_PROGRESS 이벤트로 진행률을 받을 수 있다.
+     *
+     * @param args.path - 번들 루트 절대경로
+     * @param args.topic - 설명 요청 토픽 (예: "architect 에이전트 역할", "L2 레벨 진입 조건")
+     * @param args.requestId - 진행률 이벤트 구분 ID (optional)
+     * @returns { markdown: string }
+     */
+    explain: (args: { path: string; topic: string; requestId?: string }): Promise<{ markdown: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.HARNESS_EXPLAIN, args),
+
+    /**
+     * Harness Studio 편집(저작) 기능 (v1.8).
+     * 네임스페이스: api.harness.edit.*
+     *
+     * AI_PROGRESS 진행률은 기존 api.ai.onProgress 재사용 (requestId 로 구분).
+     */
+    edit: {
+      /**
+       * 번들 내 단일 파일 원본 내용 + AgentSourceMap 반환.
+       * 게이트: 번들이 HARNESS_SCAN 으로 등록되어 있어야 한다.
+       *
+       * @param path - 번들 루트 절대경로
+       * @param relPath - 번들 루트 기준 파일 상대경로
+       * @returns { content: string; sourceMap?: AgentSourceMap }
+       */
+      readFile: (path: string, relPath: string): Promise<{ content: string; sourceMap?: AgentSourceMap }> =>
+        ipcRenderer.invoke(IPC_CHANNELS.HARNESS_READ_FILE, { path, relPath }),
+
+      /**
+       * draft 와 디스크 현재 내용을 대조해 DraftDiffSummary 를 반환한다.
+       * 쓰기 없음. 적용 전 미리보기 및 stale 감지 용도.
+       *
+       * @param path - 번들 루트 절대경로
+       * @param draft - 편집 세션 draft 전체
+       * @returns DraftDiffSummary
+       */
+      diff: (path: string, draft: HarnessDraft): Promise<DraftDiffSummary> =>
+        ipcRenderer.invoke(IPC_CHANNELS.HARNESS_DIFF_DRAFT, { path, draft }),
+
+      /**
+       * draft 를 파일에 원자적으로 적용한다 (백업 + 쓰기 + 재정규화).
+       *
+       * 처리 순서: 경로 게이트 → stale 대조 → 백업 → temp-write+rename → cache clear → normalize(force=true).
+       * stale 또는 경로 위반 시 에러를 throw 한다 (부분 적용 없음).
+       *
+       * @param path - 번들 루트 절대경로
+       * @param draft - 편집 세션 draft 전체
+       * @returns { applied: string[]; backupDir: string; model: HarnessModel }
+       */
+      apply: (path: string, draft: HarnessDraft): Promise<{ applied: string[]; backupDir: string; model: HarnessModel }> =>
+        ipcRenderer.invoke(IPC_CHANNELS.HARNESS_APPLY_DRAFT, { path, draft }),
+
+      /**
+       * 자연어 명령을 AI 에 보내 파일 변경안을 제안받는다 (자동 쓰기 없음).
+       *
+       * proposals 는 사용자 승인 후 draft 에 반영한다.
+       * 진행률은 api.ai.onProgress 로 구독 (requestId 로 구분).
+       *
+       * @param path - 번들 루트 절대경로
+       * @param command - 사용자 자연어 명령 (예: "보안검토자를 opus 로 바꿔줘")
+       * @param targetRelPaths - 편집 대상 파일 상대경로 목록 (화이트리스트)
+       * @param requestId - 진행률 이벤트 구분 ID (optional)
+       * @returns { proposals: AIEditProposal[] }
+       */
+      aiPropose: (
+        path: string,
+        command: string,
+        targetRelPaths: string[],
+        requestId?: string
+      ): Promise<{ proposals: AIEditProposal[] }> =>
+        ipcRenderer.invoke(IPC_CHANNELS.HARNESS_AI_EDIT, { path, command, targetRelPaths, requestId }),
+
+      /**
+       * 번들의 백업 목록을 반환한다 (최신 백업 우선 정렬).
+       *
+       * @param path - 번들 루트 절대경로
+       * @returns BackupEntry[]
+       */
+      listBackups: (path: string): Promise<BackupEntry[]> =>
+        ipcRenderer.invoke(IPC_CHANNELS.HARNESS_LIST_BACKUPS, { path }),
+
+      /**
+       * 지정한 백업 디렉터리의 파일을 번들로 복원한다.
+       *
+       * backupDir 은 <userData>/harness-backups/ 하위여야 한다 (경로 주입 방어).
+       * 복원 후 HarnessService.normalize(force=true) 로 재정규화한다.
+       *
+       * @param path - 번들 루트 절대경로
+       * @param backupDir - 복원 대상 백업 디렉터리 절대경로 (BackupEntry.backupDir)
+       * @returns { restored: string[]; model: HarnessModel }
+       */
+      restore: (path: string, backupDir: string): Promise<{ restored: string[]; model: HarnessModel }> =>
+        ipcRenderer.invoke(IPC_CHANNELS.HARNESS_RESTORE_BACKUP, { path, backupDir })
+    }
   }
 }
 

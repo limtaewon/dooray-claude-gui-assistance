@@ -23,6 +23,11 @@ import { UnifiedCalendarService } from './caldav/UnifiedCalendarService'
 import { CTagPoller } from './caldav/CTagPoller'
 import { CalendarObjectsStore } from './caldav/CalendarObjectsStore'
 import { HolidayService } from './holiday/HolidayService'
+import { HarnessService } from './harness/HarnessService'
+import { HarnessEditService } from './harness/HarnessEditService'
+import type { HarnessDraft } from '../shared/types/harness-edit'
+import { promises as editFs } from 'fs'
+import * as editPath from 'path'
 import type {
   CalDAVEventCreate,
   CalDAVEventQuery,
@@ -294,6 +299,28 @@ function formatToolDetail(tool: string | undefined, input: Record<string, unknow
 const skillStore = new SkillStore()
 const gitService = new GitService()
 const analyticsService = new AnalyticsService()
+
+// Harness Studio (v1.7) — HarnessService 인스턴스화는 app.getPath('userData') 가 필요하므로
+// createWindow() 내부 또는 app.whenReady() 이후에 생성한다. 여기서는 지연 초기화용 레퍼런스만 선언.
+// 정적 import 로 번들에 포함시키고(electron-vite 단일 번들에서 동적 require 는 해소 불가),
+// 인스턴스화만 app.getPath('userData') 가 준비된 이후로 지연한다.
+let _harnessService: HarnessService | null = null
+function getHarnessService(): HarnessService {
+  if (!_harnessService) {
+    _harnessService = new HarnessService(app.getPath('userData'), aiService)
+  }
+  return _harnessService
+}
+
+// Harness Studio 편집 서비스 (v1.8) — HarnessService 와 동일한 lazy 패턴.
+// HarnessService 인스턴스를 재사용(중복 생성 금지) + AIService 도 동일 인스턴스.
+let _harnessEditService: HarnessEditService | null = null
+function getHarnessEditService(): HarnessEditService {
+  if (!_harnessEditService) {
+    _harnessEditService = new HarnessEditService(app.getPath('userData'), getHarnessService())
+  }
+  return _harnessEditService
+}
 
 // (이전에는 브리핑/보고서 사이에 cachedTasks를 공유했지만, 두레이 측에서 상태가
 // 바뀐 뒤에도 stale 데이터가 남아 보고서가 옛 상태를 출력하는 버그가 있었다.
@@ -1611,6 +1638,265 @@ ${data}`,
         platform: process.platform,
       }
       return feedbackService.submit(enriched)
+    }
+  )
+
+  // ── Harness Studio (v1.7) ───────────────────────────────────────────────────
+
+  /**
+   * HARNESS_SCAN — 번들 경로 정적 스캔. AI 없음, 즉시 반환.
+   * { path: string } 또는 { pickDialog: true } 로 호출.
+   * pickDialog 시 폴더 선택 다이얼로그를 열어 경로를 받는다.
+   */
+  ipcMain.handle(IPC_CHANNELS.HARNESS_SCAN, async (_, args: { path?: string; pickDialog?: boolean }) => {
+    // P1-2: 쓰기 allowlist 등록은 dialog(사용자 명시 선택) 경유 경로만.
+    // args.path 직접 전달 경로는 읽기(scan) 는 허용하나 write-allowlist 에는 올리지 않는다.
+    const fromDialog = Boolean(args?.pickDialog)
+    let bundlePath: string | null = args?.path || null
+
+    if (fromDialog) {
+      const result = await dialog.showOpenDialog({
+        properties: ['openDirectory'],
+        title: '번들 폴더 선택'
+      })
+      if (result.canceled || result.filePaths.length === 0) return null
+      bundlePath = result.filePaths[0]
+    }
+    if (!bundlePath) return null
+
+    const scanResult = await getHarnessService().scan(bundlePath)
+
+    // 스캔 성공 + dialog 경유 경로만 write-allowlist 에 등록 (P1-2).
+    // skills 하위 경로는 pathGate 에서 항상 허용하므로 별도 등록 불필요.
+    if (scanResult && fromDialog) {
+      try {
+        const { realpath: realpathFn } = await import('fs/promises')
+        const realBundlePath = await realpathFn(bundlePath).catch(() => bundlePath!)
+        getHarnessEditService().registerBundle(realBundlePath)
+      } catch {
+        // allowlist 등록 실패는 치명적이지 않음 — 이후 readFile/diff/apply 에서 재검증
+      }
+    }
+    return scanResult
+  })
+
+  /**
+   * HARNESS_DISCOVER — ~/.claude/skills/* 자동 발견. 정적, AI 없음.
+   */
+  ipcMain.handle(IPC_CHANNELS.HARNESS_DISCOVER, async () => {
+    return getHarnessService().discover()
+  })
+
+  /**
+   * HARNESS_NORMALIZE — 번들 경로 AI 정규화. 캐시 hit 시 즉시, miss 시 Opus 호출.
+   * { path: string; force?: boolean; requestId?: string }
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.HARNESS_NORMALIZE,
+    async (_, args: { path: string; force?: boolean; requestId?: string }) => {
+      return getHarnessService().normalize(args.path, args.force ?? false, args.requestId)
+    }
+  )
+
+  /**
+   * HARNESS_CACHE_CLEAR — 캐시 삭제. path 지정 시 해당 번들만, 생략 시 전체.
+   * { path?: string }
+   */
+  ipcMain.handle(IPC_CHANNELS.HARNESS_CACHE_CLEAR, (_, args?: { path?: string }) => {
+    const cleared = getHarnessService().clearCache(args?.path)
+    return { cleared }
+  })
+
+  /**
+   * HARNESS_LIST_CACHED — 캐시된 번들 목록 반환. 최근 정규화 순.
+   */
+  ipcMain.handle(IPC_CHANNELS.HARNESS_LIST_CACHED, () => {
+    return getHarnessService().listCached()
+  })
+
+  /**
+   * HARNESS_DRYRUN — 태스크 평문으로 레벨 추정 + 결정론적 경로 계산.
+   * { path: string; taskText: string; requestId?: string; projectPath?: string }
+   *
+   * 처리 흐름:
+   * 1. HarnessService.dryrun(path, taskText, requestId, projectPath) 위임.
+   * 2. projectPath 지정 시 — 정적 프로파일 수집(bound) → AI 맥락으로 전달.
+   * 3. taskHash 캐시 hit → 즉시 반환 / miss → Haiku 추정 + levelPath 계산.
+   * 4. 진행률은 기존 AI_PROGRESS 채널 재사용 (requestId 로 구분).
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.HARNESS_DRYRUN,
+    async (_, args: { path: string; taskText: string; requestId?: string; projectPath?: string }) => {
+      return getHarnessService().dryrun(args.path, args.taskText, args.requestId, args.projectPath)
+    }
+  )
+
+  /**
+   * HARNESS_PICK_DIR — 프로젝트 폴더 선택 다이얼로그.
+   * 취소 시 null 반환.
+   * Dry-run 레벨 추정의 projectPath 입력 전용.
+   */
+  ipcMain.handle(IPC_CHANNELS.HARNESS_PICK_DIR, async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory'],
+      title: '프로젝트 폴더 선택 (레벨 추정 맥락용)'
+    })
+    return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0]
+  })
+
+  /**
+   * HARNESS_EXPLAIN — 번들 경로 + 토픽을 받아 온디맨드 한국어 설명 반환 (P3, Sonnet).
+   *
+   * 처리 흐름:
+   * 1. HarnessService.explain(path, topic, requestId) 위임.
+   * 2. normalize(path) 로 HarnessModel 획득 (캐시 hit 우선).
+   * 3. 모델 컨텍스트 요약 → AIService.explainHarness(Sonnet) 호출 → 마크다운 반환.
+   * 4. 진행률은 기존 AI_PROGRESS 채널 재사용 (requestId 로 구분).
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.HARNESS_EXPLAIN,
+    async (_, args: { path: string; topic: string; requestId?: string }) => {
+      return getHarnessService().explain(args.path, args.topic, args.requestId)
+    }
+  )
+
+  // ── Harness Studio — 편집(저작) 기능 (v1.8) ───────────────────────────────
+
+  /**
+   * HARNESS_READ_FILE — 번들 내 단일 파일 원본 내용 반환.
+   * 요청: { path: string; relPath: string }
+   * 응답: { content: string; sourceMap?: AgentSourceMap }
+   *
+   * 핸들러는 얇은 어댑터 — 게이트/검증은 HarnessEditService 내부에서 수행.
+   * HARNESS_SCAN 이 선행되어 번들이 등록된 경우를 전제한다.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.HARNESS_READ_FILE,
+    async (_, args: { path: string; relPath: string }) => {
+      try {
+        return await getHarnessEditService().readFile(args.path, args.relPath)
+      } catch (err) {
+        // P2-4: 절대경로/허용루트 상세는 internalReason 으로만. renderer 에는 일반화된 message 만 전달.
+        const e = err as Error & { internalReason?: string }
+        console.error('[HARNESS_READ_FILE] 실패:', e.internalReason ?? e.message)
+        throw err
+      }
+    }
+  )
+
+  /**
+   * HARNESS_DIFF_DRAFT — draft 와 디스크 현재 내용 대조 → DraftDiffSummary 반환.
+   * 요청: { path: string; draft: HarnessDraft }
+   * 응답: DraftDiffSummary
+   *
+   * 쓰기 없음. stale 감지 전용.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.HARNESS_DIFF_DRAFT,
+    async (_, args: { path: string; draft: HarnessDraft }) => {
+      try {
+        return await getHarnessEditService().diff(args.path, args.draft)
+      } catch (err) {
+        const e = err as Error & { internalReason?: string }
+        console.error('[HARNESS_DIFF_DRAFT] 실패:', e.internalReason ?? e.message)
+        throw err
+      }
+    }
+  )
+
+  /**
+   * HARNESS_APPLY_DRAFT — draft 를 파일에 원자적으로 적용한다 (백업 + 쓰기 + 재정규화).
+   * 요청: { path: string; draft: HarnessDraft }
+   * 응답: { applied: string[]; backupDir: string; model: HarnessModel }
+   *
+   * 처리 순서: 경로 게이트 → stale 대조 → 백업 → temp-write+rename → cache clear → normalize(force=true).
+   * 충돌(stale) 또는 경로 위반 시 에러 반환 (부분 적용 없음).
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.HARNESS_APPLY_DRAFT,
+    async (_, args: { path: string; draft: HarnessDraft }) => {
+      try {
+        return await getHarnessEditService().apply(args.path, args.draft)
+      } catch (err) {
+        const e = err as Error & { internalReason?: string }
+        console.error('[HARNESS_APPLY_DRAFT] 실패:', e.internalReason ?? e.message)
+        throw err
+      }
+    }
+  )
+
+  /**
+   * HARNESS_AI_EDIT — 자연어 명령을 받아 AI 가 파일 변경안을 제안한다 (자동 쓰기 없음).
+   * 요청: { path: string; command: string; targetRelPaths: string[]; requestId?: string }
+   * 응답: { proposals: AIEditProposal[] }
+   *
+   * 처리 흐름:
+   * 1. targetRelPaths 의 파일 내용을 디스크에서 읽는다.
+   * 2. AIService.proposeEdit(command, targetFiles, requestId) 위임.
+   * 3. 진행률은 기존 AI_PROGRESS 채널 재사용 (requestId 로 구분).
+   *
+   * proposals 는 자동 적용되지 않는다. 사용자 승인 후 draft 에 반영.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.HARNESS_AI_EDIT,
+    async (_, args: { path: string; command: string; targetRelPaths: string[]; requestId?: string }) => {
+      try {
+        // targetRelPaths 의 파일 내용을 HarnessEditService.readFile(게이트 경유) 로 읽는다 (P0-2).
+        // 직접 fs.readFile(args.path, relPath) 금지 — 게이트 없는 임의 파일 유출 방지.
+        const editService = getHarnessEditService()
+        const targetFiles: { relPath: string; content: string }[] = []
+        for (const relPath of args.targetRelPaths) {
+          try {
+            const { content } = await editService.readFile(args.path, relPath)
+            targetFiles.push({ relPath, content })
+          } catch (readErr) {
+            // HarnessPathDeniedError 는 warn 레벨 — 허용 루트 외 경로는 무음 스킵
+            console.warn(`[HARNESS_AI_EDIT] 파일 읽기 거부/실패 (스킵): ${relPath}`, (readErr as Error).message)
+          }
+        }
+        return await aiService.proposeEdit(args.command, targetFiles, args.requestId)
+      } catch (err) {
+        console.error('[HARNESS_AI_EDIT] 실패:', (err as Error).message)
+        throw err
+      }
+    }
+  )
+
+  /**
+   * HARNESS_LIST_BACKUPS — 번들의 백업 목록 반환.
+   * 요청: { path: string }
+   * 응답: BackupEntry[] (최신 백업 우선 정렬)
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.HARNESS_LIST_BACKUPS,
+    async (_, args: { path: string }) => {
+      try {
+        return await getHarnessEditService().listBackups(args.path)
+      } catch (err) {
+        console.error('[HARNESS_LIST_BACKUPS] 실패:', (err as Error).message)
+        throw err
+      }
+    }
+  )
+
+  /**
+   * HARNESS_RESTORE_BACKUP — 지정한 백업 디렉터리의 파일을 번들로 복원한다.
+   * 요청: { path: string; backupDir: string }
+   * 응답: { restored: string[]; model: HarnessModel }
+   *
+   * backupDir 은 <userData>/harness-backups/ 하위여야 한다 (경로 주입 방어).
+   * 복원 후 HarnessService.normalize(force=true) 로 재정규화.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.HARNESS_RESTORE_BACKUP,
+    async (_, args: { path: string; backupDir: string }) => {
+      try {
+        return await getHarnessEditService().restore(args.path, args.backupDir)
+      } catch (err) {
+        const e = err as Error & { internalReason?: string }
+        console.error('[HARNESS_RESTORE_BACKUP] 실패:', e.internalReason ?? e.message)
+        throw err
+      }
     }
   )
 }

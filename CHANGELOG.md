@@ -1,5 +1,54 @@
 # Changelog
 
+## [1.8.0] - Harness Studio 편집(저작) 모드
+
+read-only 분석 도구였던 Harness Studio 에 **편집(저작)** 기능 추가. 편집 모드는 기본 OFF — 켜기 전까지 기존 동작 그대로.
+
+### 신규 기능
+
+- **편집 모드 토글** — 켜면 구조화 필드 폼 + 원본 파일 에디터로 하네스를 수정.
+- **구조화 필드 폼** — 에이전트 모델/도구 등 frontmatter 기반 필드를 폼으로 편집(AI 해석값은 원본/AI 편집으로 안내).
+- **원본 파일 에디터** — 번들의 `.md`/`.sh` 를 Monaco 에디터로 직접 편집(`.sh` 는 경고 표시).
+- **AI 편집** — 자연어 명령(예: "보안 검토자를 opus로") → AI 가 변경안(diff) 제시 → 2단계 승인.
+- **Draft → diff → 적용** — 편집은 draft 에 쌓이고, diff 확인 후 **명시적으로 '파일에 적용'**(자동 쓰기 없음). 적용 시 자동 백업.
+- **백업/복원** — 적용 전 원본 백업, 백업 목록에서 복원 가능.
+- 안전장치 — 번들 폴더 밖 쓰기 차단(경로 게이트·심링크 해소), `.sh` 비실행, 외부 변경 충돌(STALE) 시 적용 거부, 적용 후 자동 재정규화.
+
+## [1.7.0] - Harness Studio (bmad 번들 분석 도구)
+
+에이전트 오케스트레이션 번들(reined-bmad, neon-bmad 등)을 가져와 구조, 체인, 게이트, 산출물을 한눈에 분석하는 시각화 도구. **정적 스캔 + AI 정규화 + 정합점검 + 비교** 기능으로 하네스 품질 보증.
+
+### 신규 기능
+
+- **Import 위저드 (4단계)** — 번들 폴더 지정 → 구조 인식(정적) → AI 정규화(Opus) → 오버레이 반영 후 Harness Studio 열기
+- **Flow Canvas 탭** — react-flow 기반 에이전트 그래프. L0~L3 레벨 토글, 노드별 역할 색상(analyst/pm/architect/dev/security 등), 모델 배지(haiku/sonnet/opus), 핸드오프 엣지에 산출물 라벨, 오버레이(비활성/모델 override) 반영, Agent Inspector 패널(역할·도구·위험·AI 설명)
+- **Dry-run 탭** — 태스크 설명 입력 → 예상 레벨·에이전트 경로·단계 추정 (Haiku)
+- **Skills/Blocks 탭** — 에이전트별 역할 카드·도구 목록
+- **Gates 탭** — 게이트 규칙 코드(R5xx/NEON-Gxx)·훅·상태기계 전이
+- **Artifacts 탭** — 산출물 트리·persist 구분(git/ignore/dooray)
+- **Score 탭** — 6축 레이더 차트(강제력·제어흐름·상태·차단게이트·피드백루프·관측가능성)
+- **Doctor 탭** — AI 없는 정적 정합 검사. 체인 미포함·미정의 에이전트·고아 산출물·게이트-페이즈 불일치·unknown 모델·점수 결측 7가지 검사. PASS/WARN/FAIL.
+- **Compare 탭** — 캐시된 두 하네스 비교. 에이전트·레벨 체인·게이트·6축 점수 변화량 표시
+- **신뢰도 배지 (Provenance)** — 각 필드의 출처(정적/AI/파생/없음) 시각화
+- **최근 하네스** — 랜딩 화면에 최근 열어본 번들 목록. 캐시에서 즉시 재오픈
+- **HTML 리포트 Export** — 현재 하네스를 독립 HTML 파일로 다운로드 (스타일·차트 자체 포함)
+- **AI 설명** — Agent Inspector 에서 "AI 설명 생성" 버튼 클릭 → Sonnet이 해당 에이전트 역할·동작을 자연어로 설명
+
+### 기술 변경
+
+- **사이드바 새 항목** — Workflow 아이콘 "Harness Studio"
+- **캐싱 전략** — 번들 해시 기반 캐시, AI 정규화 결과 저장 → 재오픈 시 즉시 표시
+- **번들 종류 감지** — bundle / overlay / partial-skill / task 자동 식별 + 수동 교정 버튼
+
+### 문서
+
+- **ClaudeManual** — 'Harness Studio' 섹션 추가. Import 위저드·Flow Canvas·Dry-run·8개 탭·신뢰도 배지·Doctor·Compare·Export 전체 가이드
+- **README.md** — 기능 소개에 Harness Studio 추가
+
+### 테스트
+
+- 751 tests pass, typecheck clean.
+
 ## [1.6.0] - 사용자 피드백 채널 (두레이 Agent 직접 전달)
 
 Claude Code 사용 중 불편사항, 기능 제안, 개선 아이디어를 **두레이 Agent 채널로 직접 전달**하는 피드백 시스템 도입. 사용자가 앱 내에서 바로 피드백을 작성하면 두레이 웹훅을 통해 Agent 가 실시간으로 수신 → 빠른 대응과 기능 반영.

@@ -6,6 +6,10 @@ import { BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '../../shared/types/ipc'
 import type { DoorayTask, DoorayCalendarEvent } from '../../shared/types/dooray'
 import type { AIBriefing, AIReport, AIProgressEvent, AIModelName, AIModelConfig } from '../../shared/types/ai'
+import type { HarnessModel, HarnessTriage, DryRunResult } from '../../shared/types/harness'
+import { buildNormalizeSystemPrompt, buildNormalizeUserPrompt, buildEstimateSystemPrompt, buildEstimateUserPrompt } from '../harness/normalizePrompt'
+import { buildEditSystemPrompt, buildEditUserPrompt } from './harnessEditPrompt'
+import type { AIEditProposal } from '../../shared/types/harness-edit'
 
 interface ClaudeCliResult {
   type: string
@@ -185,6 +189,36 @@ function wrapClaudeError(message: string, stderr?: string): Error {
     )
   }
   return new Error(`Claude CLI 오류: ${message}`)
+}
+
+/**
+ * 잘린(truncated) JSON 을 최선 복구 — 열린 채 닫히지 않은 `{`/`[` 을 끝에 닫아준다.
+ * 문자열 리터럴 내부의 괄호·이스케이프는 무시하고, 마지막 trailing comma 도 제거한다.
+ * LLM 출력이 토큰 한계로 중간에 끊긴 경우의 last-resort 복구용(완벽하지 않음).
+ */
+export function balanceBrackets(text: string): string {
+  const stack: string[] = []
+  let inStr = false
+  let escaped = false
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (inStr) {
+      if (escaped) escaped = false
+      else if (ch === '\\') escaped = true
+      else if (ch === '"') inStr = false
+      continue
+    }
+    if (ch === '"') inStr = true
+    else if (ch === '{' || ch === '[') stack.push(ch)
+    else if (ch === '}' || ch === ']') stack.pop()
+  }
+  let out = text
+  if (inStr) out += '"' // 끊긴 문자열 닫기
+  out = out.replace(/,\s*$/, '') // 끝의 trailing comma 제거
+  for (let i = stack.length - 1; i >= 0; i--) {
+    out += stack[i] === '{' ? '}' : ']'
+  }
+  return out
 }
 
 function buildArgs(prompt: string, opts: {
@@ -486,11 +520,20 @@ ${stdinPrompt ?? ''}`
 
       // 진단 로그 누적 — 호출 끝나면 userData/logs/claude-cli.log 에 한 줄 추가.
       // 사용자가 오류 제보할 때 같이 보낼 데이터.
+      //
+      // harness 계열 feature(harnessNormalize/harnessEstimate/harnessExplain) 는
+      // stdin 에 번들 원문/사용자 입력이 포함되므로 promptHead 평문 로깅 제거.
+      // platform/argv 진단은 유지 (CLAUDE.md 함정 #4).
+      const HARNESS_FEATURES = new Set(['harnessNormalize', 'harnessEstimate', 'harnessExplain', 'harnessEdit'])
+      const isHarnessFeature = options.feature !== undefined && HARNESS_FEATURES.has(options.feature)
+      const diagPrompt = isHarnessFeature
+        ? `[redacted: ${options.feature} promptLength=${stdinPrompt?.length ?? 0}]`
+        : stdinPrompt
       const diag = startCliCall({
         feature: options.feature,
         bin: CLAUDE_CLI,
         argv: cleaned,
-        prompt: stdinPrompt
+        prompt: diagPrompt
       })
 
       // timeoutMs === null이면 타임아웃 없음(장시간 MCP 작업용). 미지정이면 120초.
@@ -1405,6 +1448,392 @@ ${useMcp ? `
     } catch {
       return null
     }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Harness Studio — AI 정규화 / 레벨 추정
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * 번들 정적 스켈레톤을 AI(Opus)로 보강해 완전한 HarnessModel 을 반환한다.
+   *
+   * Windows/Mac 플랫폼 분기는 runClaudeStream 내부에서 처리된다.
+   * 이 메서드는 argv/stdin 구성 후 runClaudeStream 을 재사용할 뿐,
+   * 분기 코드를 수정하거나 중복 구현하지 않는다 (CLAUDE.md 함정 #1·#3).
+   *
+   * Windows 에서는 큰 system prompt(스키마 강제) 가 stdin 으로 합쳐지므로
+   * 양쪽 플랫폼 테스트가 반드시 필요하다 (CLAUDE.md 함정 #2).
+   *
+   * JSON 파싱 실패 시 throw 하지 않고 부분/축소 모델을 반환한다.
+   * 반환 모델의 warnings 배열에 파싱 오류 사유가 기록된다.
+   *
+   * @param skeleton - 정적 스캐너가 [S] 필드로 채운 부분 HarnessModel
+   * @param rawBundleText - 번들 주요 파일 원문 (AI 분석 대상)
+   * @param requestId - AI_PROGRESS 이벤트 구분 ID (선택)
+   * @returns 완성된 HarnessModel (AI 보강 + provenance 기록)
+   */
+  async normalizeHarness(
+    skeleton: Partial<HarnessModel>,
+    rawBundleText: string,
+    requestId?: string
+  ): Promise<HarnessModel> {
+    // 정규화는 1회성(번들 해시 캐시) + 품질 핵심(HarnessModel 이 8뷰 전체의 단일 진실 소스)이라
+    // 기본 Opus. 빈도가 낮고 캐시되므로 비용 영향은 작고 정확도 이득이 크다.
+    const model = this.pickModel('harnessNormalize', 'opus')
+    const systemPrompt = buildNormalizeSystemPrompt()
+    const userPrompt = buildNormalizeUserPrompt(skeleton, rawBundleText)
+
+    const args = buildArgs(userPrompt, {
+      model,
+      systemPrompt,
+      maxBudget: '3.5',  // Opus + 큰 번들, 컴팩트 출력이라도 넉넉히 (1회성·캐시)
+      effort: 'medium',
+      noTools: true  // 정규화는 순수 텍스트 분석 — 도구 불필요
+    })
+
+    // 정규화는 1회성(번들 해시 캐시)·대용량 번들 분석이라 기본 120초로는 부족하다.
+    // 캐시되므로 한 번 오래 걸려도 무방 — 타임아웃을 10분으로 크게 늘린다.
+    const result = await this.runWithProgress(
+      requestId,
+      '번들 AI 정규화 중... (대용량 번들은 수 분 소요될 수 있습니다)',
+      args,
+      { feature: 'harnessNormalize', timeoutMs: 600000 }
+    )
+
+    const raw = (result.result || '').trim()
+    // 마크다운 코드블록 제거 후 JSON 추출
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim()
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
+
+    // LLM JSON 관용 복구: 직접 파싱 → trailing comma 제거 → 괄호 균형 보정(잘림 대비) 순으로 시도.
+    const tryParseLenient = (text: string): HarnessModel | null => {
+      const attempts = [
+        text,
+        text.replace(/,(\s*[}\]])/g, '$1'), // trailing comma 제거
+        balanceBrackets(text.replace(/,(\s*[}\]])/g, '$1')) // 잘린 경우 열린 괄호 닫기
+      ]
+      for (const candidate of attempts) {
+        try {
+          return JSON.parse(candidate) as HarnessModel
+        } catch {
+          // 다음 복구 전략 시도
+        }
+      }
+      return null
+    }
+
+    if (!jsonMatch) {
+      // JSON 추출 실패 — 스켈레톤에 경고 추가 후 축소 반환
+      const fallback: HarnessModel = {
+        schemaVersion: 1,
+        meta: (skeleton.meta as HarnessModel['meta']) ?? {
+          name: 'unknown', source: '', bundleHash: '', kind: 'bundle'
+        },
+        agents: skeleton.agents ?? [],
+        levels: skeleton.levels ?? [],
+        triage: skeleton.triage ?? { questions: [], rules: [] },
+        artifacts: skeleton.artifacts ?? [],
+        controlFlow: skeleton.controlFlow ?? { gates: [], hooks: [], parallelGroups: [], loops: [] },
+        warnings: [
+          ...(skeleton.warnings ?? []),
+          `AI 정규화 JSON 파싱 실패 — 원본 응답 앞 400자: ${raw.substring(0, 400)}`
+        ],
+        provenance: skeleton.provenance ?? {}
+      }
+      return fallback
+    }
+
+    const normalized = tryParseLenient(jsonMatch[0])
+    if (normalized) {
+      return normalized
+    }
+    {
+      // 모든 복구 시도 실패 — 축소 모델 반환
+      const err = new Error('JSON 파싱/복구 실패')
+      const fallback: HarnessModel = {
+        schemaVersion: 1,
+        meta: (skeleton.meta as HarnessModel['meta']) ?? {
+          name: 'unknown', source: '', bundleHash: '', kind: 'bundle'
+        },
+        agents: skeleton.agents ?? [],
+        levels: skeleton.levels ?? [],
+        triage: skeleton.triage ?? { questions: [], rules: [] },
+        artifacts: skeleton.artifacts ?? [],
+        controlFlow: skeleton.controlFlow ?? { gates: [], hooks: [], parallelGroups: [], loops: [] },
+        warnings: [
+          ...(skeleton.warnings ?? []),
+          `AI 정규화 JSON 파싱 예외: ${err instanceof Error ? err.message : String(err)}`
+        ],
+        provenance: skeleton.provenance ?? {}
+      }
+      return fallback
+    }
+  }
+
+  /**
+   * 태스크 설명 텍스트로 번들의 레벨(L0~L3)을 추정한다 (Dry-run).
+   *
+   * AI(Haiku) 가 triage 구조(질문/규칙)를 보고 레벨을 추정하며,
+   * Q 코드를 직접 노출하지 않고 자연어 answers 를 반환한다.
+   *
+   * levelPath 같은 결정론적 계산은 이 메서드 이후 호출자(DryRunEstimator)가 담당한다.
+   * 이 메서드는 { level, answers, rationale } 만 반환한다.
+   *
+   * @param taskText - 태스크 평문 또는 두레이 URL/설명
+   * @param triage - 번들의 HarnessTriage 구조
+   * @param requestId - AI_PROGRESS 이벤트 구분 ID (선택)
+   * @param projectContext - toPromptText(profile) 로 생성한 프로젝트 맥락 문자열 (선택).
+   *   지정 시 userPrompt 에 "## 프로젝트 맥락" 섹션으로 포함되어 레벨 추정 정확도를 높인다.
+   *   미지정(undefined) 시 기존 동작 그대로 — 회귀 없음.
+   * @returns { level, answers, rationale }
+   */
+  async estimateLevel(
+    taskText: string,
+    triage: HarnessTriage,
+    requestId?: string,
+    projectContext?: string
+  ): Promise<Pick<DryRunResult, 'level' | 'answers' | 'rationale'>> {
+    const model = this.pickModel('harnessEstimate', 'haiku')
+    const systemPrompt = buildEstimateSystemPrompt()
+    const baseUserPrompt = buildEstimateUserPrompt(taskText, triage)
+    const userPrompt = projectContext
+      ? `${baseUserPrompt}\n\n## 프로젝트 맥락\n${projectContext}`
+      : baseUserPrompt
+
+    const args = buildArgs(userPrompt, {
+      model,
+      systemPrompt,
+      maxBudget: '0.1',
+      effort: 'low',
+      noTools: true  // 레벨 추정은 텍스트 추론 — 도구 불필요
+    })
+
+    const result = await this.runWithProgress(
+      requestId,
+      '레벨 추정 중...',
+      args,
+      { feature: 'harnessEstimate' }
+    )
+
+    const raw = (result.result || '').trim()
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim()
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
+
+    if (!jsonMatch) {
+      // 파싱 실패 시 기본값 반환 (throw 금지 — degradation)
+      return {
+        level: 'L1',
+        answers: ['레벨 추정 응답 파싱 실패 — 기본 L1 반환'],
+        rationale: `AI 응답에서 JSON 을 찾지 못했습니다. 원본: ${raw.substring(0, 200)}`
+      }
+    }
+
+    try {
+      const parsed = JSON.parse(jsonMatch[0]) as {
+        level?: string
+        answers?: unknown
+        rationale?: string
+      }
+      const level = (['L0', 'L1', 'L2', 'L3'] as const).find((l) => l === parsed.level) ?? 'L1'
+      const answers = Array.isArray(parsed.answers)
+        ? (parsed.answers as unknown[]).map((a) => String(a))
+        : []
+      const rationale = typeof parsed.rationale === 'string' ? parsed.rationale : ''
+      return { level, answers, rationale }
+    } catch (err) {
+      return {
+        level: 'L1',
+        answers: ['레벨 추정 JSON 파싱 예외 — 기본 L1 반환'],
+        rationale: `파싱 예외: ${err instanceof Error ? err.message : String(err)}`
+      }
+    }
+  }
+
+  /**
+   * 번들의 특정 토픽(에이전트/게이트/레벨/용어 등)에 대한 한국어 설명을 온디맨드로 생성한다.
+   *
+   * 사용자가 Harness Studio 에서 특정 노드 또는 용어를 클릭할 때 호출되며,
+   * HarnessModel 의 컨텍스트(번들 원문 또는 정규화 모델)를 바탕으로
+   * Sonnet 이 해당 토픽을 한국어 마크다운으로 설명한다.
+   *
+   * 캐시 필요 없음(온디맨드) — 동일 topic 재요청 시 재생성.
+   * 단, HarnessService 계층에서 필요에 따라 간단한 인메모리 캐시를 적용할 수 있다.
+   *
+   * Windows/Mac 플랫폼 분기는 runClaudeStream 내부에서 처리된다.
+   * 이 메서드는 args 구성 + pickModel + runClaudeStream 재사용만 담당한다 (CLAUDE.md 함정 #1·#3).
+   *
+   * @param rawContext - 번들 컨텍스트 요약 (agent 목록, gate 규칙 등 관련 섹션)
+   * @param topic - 설명 요청 토픽 (예: "architect 에이전트의 역할", "L2 레벨 규칙", "SIGNAL:ESCALATE")
+   * @param requestId - AI_PROGRESS 이벤트 구분 ID (선택)
+   * @returns 한국어 마크다운 설명 문자열
+   */
+  async explainHarness(
+    rawContext: string,
+    topic: string,
+    requestId?: string
+  ): Promise<string> {
+    const model = this.pickModel('harnessExplain', 'sonnet')
+
+    const systemPrompt = `당신은 AI 에이전트 하네스(agentic harness/workflow) 전문 설명가입니다.
+사용자가 Harness Studio 에서 특정 개념/용어/에이전트/게이트/레벨을 클릭하면 그 내용을 한국어로 친절하게 설명합니다.
+
+규칙:
+- 응답은 **한국어 마크다운**으로만 작성.
+- 제목(##)으로 시작하고, 핵심 역할·제약·주의사항을 불릿/표로 정리.
+- 기술 용어(SIGNAL, gate, hook, triage 등)는 원어 그대로 쓰되 한국어 설명을 병기.
+- 250단어 이내로 간결하게. 번들 컨텍스트에 없는 내용을 지어내지 말 것.
+- JSON·코드블록 없이 순수 마크다운으로만 출력.`
+
+    const userPrompt = `[번들 컨텍스트]
+${rawContext}
+
+---
+
+[설명 요청 토픽]
+${topic}
+
+위 번들 컨텍스트를 바탕으로 요청 토픽을 한국어로 설명해 주세요.`
+
+    const args = buildArgs(userPrompt, {
+      model,
+      systemPrompt,
+      maxBudget: '0.2',
+      effort: 'low',
+      noTools: true  // 설명은 순수 텍스트 생성 — 도구 불필요
+    })
+
+    const result = await this.runWithProgress(
+      requestId,
+      `"${topic}" 설명 생성 중...`,
+      args,
+      { feature: 'harnessExplain' }
+    )
+
+    return (result.result || '').trim() || `"${topic}" 에 대한 설명을 생성하지 못했습니다.`
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Harness Studio — AI 편집 제안
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * 자연어 명령 + 대상 파일 원문 → AI 파일 변경안 제안 (자동 쓰기 없음).
+   *
+   * 반환된 proposals 는 사용자 승인 후 HarnessDraft 에 반영되며
+   * 직접 파일에 쓰이지 않는다 (arch §5, ADR-edit-001).
+   *
+   * 플랫폼 분기는 runClaudeStream 내부에서 처리된다.
+   * 이 메서드는 buildArgs + pickModel + runWithProgress 만 재사용하며
+   * runClaudeStream 분기 코드를 수정/중복 구현하지 않는다 (CLAUDE.md 함정 #1·#3).
+   *
+   * Windows 에서는 큰 system prompt 가 stdin 으로 합쳐지므로
+   * 양쪽 플랫폼 테스트가 반드시 필요하다 (CLAUDE.md 함정 #2).
+   *
+   * JSON 파싱 실패 시 throw 하지 않고 빈 proposals 를 반환한다 (degradation).
+   * AI 가 화이트리스트 밖 relPath 를 제안하면 해당 항목은 드롭된다.
+   *
+   * @param command - 사용자 자연어 명령 (예: "보안검토자를 opus 모델로 바꿔줘")
+   * @param targetFiles - 편집 대상 파일 목록 ({ relPath, content } 배열). 합산 40KB 상한.
+   * @param requestId - AI_PROGRESS 이벤트 구분 ID (선택)
+   * @returns proposals 배열. 파싱 실패/화이트리스트 미해당 항목은 드롭.
+   * @throws 입력 합산 크기가 MAX_AI_EDIT_BYTES(40KB) 초과 시 에러.
+   */
+  async proposeEdit(
+    command: string,
+    targetFiles: { relPath: string; content: string }[],
+    requestId?: string
+  ): Promise<{ proposals: AIEditProposal[] }> {
+    /** 입력 총량 상한 — 40KB 초과 시 에러 (토큰 폭발 + 유출 최소화, arch §5.1) */
+    const MAX_AI_EDIT_BYTES = 40 * 1024
+    const totalBytes = targetFiles.reduce((sum, f) => sum + f.content.length, 0)
+    if (totalBytes > MAX_AI_EDIT_BYTES) {
+      throw new Error(
+        `AI 편집 대상 파일 합산 크기(${Math.round(totalBytes / 1024)}KB)가 상한(40KB)을 초과합니다. ` +
+        `대상 파일 수를 줄이거나 더 작은 파일만 선택하세요.`
+      )
+    }
+
+    const model = this.pickModel('harnessEdit', 'sonnet')
+    const systemPrompt = buildEditSystemPrompt()
+    const userPrompt = buildEditUserPrompt(command, targetFiles)
+
+    const args = buildArgs(userPrompt, {
+      model,
+      systemPrompt,
+      // 편집은 파일 전체 내용을 다루므로 normalizeHarness 보다는 작지만 여유있게 (arch §5.1)
+      maxBudget: '2.0',
+      effort: 'medium',
+      noTools: true  // 편집 제안은 순수 텍스트 변환 — 도구 불필요
+    })
+
+    // 편집은 파일 크기에 따라 소요 시간이 다를 수 있어 3분 허용 (normalizeHarness 10분보다는 짧게)
+    const result = await this.runWithProgress(
+      requestId,
+      'AI 편집 제안 생성 중...',
+      args,
+      { feature: 'harnessEdit', timeoutMs: 180000 }
+    )
+
+    // relPath 화이트리스트 — AI 가 화이트리스트 밖 파일을 제안해도 드롭 (arch §5.2, 함정 #2)
+    const whitelist = new Set(targetFiles.map((f) => f.relPath))
+
+    const raw = (result.result || '').trim()
+    // 마크다운 코드블록 제거 후 JSON 추출 (normalizeHarness 와 동일 패턴)
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim()
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
+
+    // LLM JSON 관용 복구 (balanceBrackets 재사용 — normalizeHarness 와 동일)
+    const tryParseLenient = (text: string): { proposals?: unknown[] } | null => {
+      const attempts = [
+        text,
+        text.replace(/,(\s*[}\]])/g, '$1'),
+        balanceBrackets(text.replace(/,(\s*[}\]])/g, '$1'))
+      ]
+      for (const candidate of attempts) {
+        try {
+          return JSON.parse(candidate) as { proposals?: unknown[] }
+        } catch {
+          // 다음 복구 전략 시도
+        }
+      }
+      return null
+    }
+
+    if (!jsonMatch) {
+      // JSON 추출 실패 — throw 금지, degradation (빈 proposals 반환)
+      console.warn('[AIService.proposeEdit] JSON 추출 실패 — 빈 proposals 반환. 원본 앞 400자:', raw.substring(0, 400))
+      return { proposals: [] }
+    }
+
+    const parsed = tryParseLenient(jsonMatch[0])
+    if (!parsed || !Array.isArray(parsed.proposals)) {
+      console.warn('[AIService.proposeEdit] proposals 파싱 실패 — 빈 proposals 반환.')
+      return { proposals: [] }
+    }
+
+    // 화이트리스트 교집합만 채택 — AI 가 범위 밖 파일을 반환하면 드롭 (arch §5.2)
+    const proposals: AIEditProposal[] = []
+    for (const item of parsed.proposals) {
+      if (
+        item !== null &&
+        typeof item === 'object' &&
+        typeof (item as Record<string, unknown>).relPath === 'string' &&
+        typeof (item as Record<string, unknown>).newContent === 'string'
+      ) {
+        const proposal = item as { relPath: string; newContent: string; rationale?: string }
+        if (!whitelist.has(proposal.relPath)) {
+          console.warn(`[AIService.proposeEdit] 화이트리스트 밖 relPath 드롭: ${proposal.relPath}`)
+          continue
+        }
+        proposals.push({
+          relPath: proposal.relPath,
+          newContent: proposal.newContent,
+          rationale: typeof proposal.rationale === 'string' ? proposal.rationale : ''
+        })
+      }
+    }
+
+    return { proposals }
   }
 
   private saveAIRecommendation(result: import('../../shared/types/ai-recommend').AIRecommendResult): void {
