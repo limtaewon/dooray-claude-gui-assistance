@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Workflow, Plus, History, Clock, Download, Stethoscope, GitCompare, Search, Package, ArrowLeft, RefreshCw, Cpu, Pencil } from 'lucide-react'
+import { Workflow, Plus, History, Clock, Download, Search, Package, ArrowLeft, RefreshCw, Cpu, Pencil } from 'lucide-react'
 import { useAIProgress, formatElapsed } from '@/hooks/useAIProgress'
 import type { LucideIcon } from 'lucide-react'
 import type { HarnessModel, CachedHarnessEntry, DiscoveredHarness } from '@shared/types/harness'
@@ -401,61 +401,46 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
         {model.warnings.length > 0 && (
           <Chip tone="yellow" square>{model.warnings.length}개 경고</Chip>
         )}
+        {/* 액션 — 진단/비교는 탭에 있으므로 헤더에선 제외(중복 방지).
+            자주 쓰는 동작만 크게: 편집(주 동작·primary) · 재정규화 · 내보내기 · 새로 가져오기 */}
         <div className="ml-auto flex items-center gap-2">
           <Button
             variant="ghost"
-            size="xs"
-            leftIcon={<Stethoscope size={11} />}
-            onClick={() => setActiveTab('doctor')}
-            title="진단 점검"
-          >
-            진단
-          </Button>
-          <Button
-            variant="ghost"
-            size="xs"
-            leftIcon={<GitCompare size={11} />}
-            onClick={() => setActiveTab('compare')}
-            title="다른 하네스와 비교"
-          >
-            비교
-          </Button>
-          <Button
-            variant="ghost"
-            size="xs"
-            leftIcon={<Download size={11} />}
+            size="sm"
+            leftIcon={<Download size={14} />}
             onClick={() => downloadHtmlReport(model)}
-            title="HTML 리포트 다운로드"
+            title="이 하네스를 독립 HTML 리포트로 저장"
           >
             내보내기
           </Button>
           <Button
             variant="ghost"
-            size="xs"
-            leftIcon={<RefreshCw size={11} />}
+            size="sm"
+            leftIcon={<RefreshCw size={14} />}
             onClick={() => void handleRenormalize()}
             title="현재 AI 모델로 다시 정규화 (모델 변경·번들 갱신 반영)"
           >
             재정규화
           </Button>
-          {/* 편집 모드 진입 버튼 */}
           <Button
             variant="secondary"
-            size="xs"
-            leftIcon={<Pencil size={11} />}
-            onClick={() => { void enterEditMode() }}
-            disabled={editModeLoading}
-            title="번들 편집 모드 진입 (구조화 폼 / raw 에디터 / AI 명령)"
-          >
-            {editModeLoading ? '준비 중...' : '편집'}
-          </Button>
-          <Button
-            variant="secondary"
-            size="xs"
-            leftIcon={<Plus size={11} />}
+            size="sm"
+            leftIcon={<Plus size={14} />}
             onClick={() => setWizardOpen(true)}
+            title="다른 번들을 새로 가져오기"
           >
             새로 가져오기
+          </Button>
+          {/* 편집 모드 진입 — 주 동작이라 primary 로 강조 */}
+          <Button
+            variant="primary"
+            size="sm"
+            leftIcon={<Pencil size={14} />}
+            onClick={() => { void enterEditMode() }}
+            disabled={editModeLoading}
+            title="이 하네스를 편집 (구조화 폼 / 원본 파일 / AI 명령)"
+          >
+            {editModeLoading ? '준비 중…' : '편집'}
           </Button>
         </div>
       </div>
