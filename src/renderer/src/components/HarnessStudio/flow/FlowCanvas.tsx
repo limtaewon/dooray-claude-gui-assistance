@@ -11,13 +11,15 @@
  * - onSelectAgent  : (agentId: string) => void (노드 클릭 콜백)
  */
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import {
   ReactFlow,
   Background,
   Controls,
   MiniMap,
-  BackgroundVariant
+  BackgroundVariant,
+  useNodesState,
+  useEdgesState
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
@@ -100,14 +102,16 @@ export function FlowCanvas({ model, highlightPath, overlayEnabled = true, onSele
   )
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
 
-  // buildGraph 결과 → react-flow Node/Edge 타입으로 변환
-  const { nodes: currentNodes, edges: currentEdges } = useMemo(() => {
+  // 노드는 useNodesState 로 관리해 드래그 이동이 적용·유지되도록 한다(onNodesChange 필수).
+  // 모델/레벨/하이라이트/오버레이가 바뀌면 buildGraph 로 레이아웃을 다시 계산해 리셋한다.
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
+
+  useEffect(() => {
     const result = buildGraph(model, activeLevel, highlightPath, overlayEnabled)
-    return {
-      nodes: result.nodes as unknown as Node[],
-      edges: result.edges as unknown as Edge[]
-    }
-  }, [model, activeLevel, highlightPath, overlayEnabled])
+    setNodes(result.nodes as unknown as Node[])
+    setEdges(result.edges as unknown as Edge[])
+  }, [model, activeLevel, highlightPath, overlayEnabled, setNodes, setEdges])
 
   // 노드 클릭 핸들러
   const handleNodeClick: NodeMouseHandler = useCallback(
@@ -165,8 +169,10 @@ export function FlowCanvas({ model, highlightPath, overlayEnabled = true, onSele
         {/* react-flow 캔버스 */}
         <div className="flex-1 relative" style={{ background: flowTheme.containerBg }}>
           <ReactFlow
-            nodes={currentNodes}
-            edges={currentEdges}
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
             onNodeClick={handleNodeClick}
             onPaneClick={handlePaneClick}
             nodeTypes={NODE_TYPES}

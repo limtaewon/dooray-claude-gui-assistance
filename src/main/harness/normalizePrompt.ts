@@ -128,11 +128,16 @@ ${skeletonJson}
 아래 파일 내용에서 비어있는 [AI] 필드를 추출해 채우세요.
 [S] 필드(id, tools, model(frontmatter), phase, ruleCodes, blocking 등)는 이미 위에 채워졌으니 그대로 두세요.
 
+**단, agents[].model 이 "unknown" 인 에이전트**(frontmatter 에 model 미선언)는 예외입니다:
+번들의 모델 매트릭스(예: _core/models.md, concepts.md 의 모델 배정표)나 각 에이전트 정의에서
+해당 역할에 배정된 모델을 찾아 \`haiku\`/\`sonnet\`/\`opus\` 중 하나로 채워주세요.
+매트릭스/근거를 못 찾으면 "unknown" 그대로 두세요(임의 추측 금지).
+
 ${rawBundleText}
 
 ## 요청
 위 스켈레톤에서 비어있거나 undefined/[] 인 [AI] 필드를 채운 **완전한 HarnessModel JSON** 을 반환하세요.
-- [S] 필드는 스켈레톤 값 그대로 유지
+- [S] 필드는 스켈레톤 값 그대로 유지 (단, model="unknown" 항목은 위 규칙대로 매트릭스에서 채움)
 - 채운 [AI] 필드는 provenance 맵에 {"경로": "ai"} 로 기록
 - 추출 실패한 항목은 warnings 배열에 추가
 - 결과는 순수 JSON 만 (코드블록, 설명 텍스트 금지)`

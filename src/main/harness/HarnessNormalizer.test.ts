@@ -183,6 +183,27 @@ describe('HarnessNormalizer', () => {
       expect(result.agents[0].modelSource).toBe('static')
     })
 
+    it('정적 model 이 absent(unknown) 면 AI 가 채운 model 을 사용한다 (matrix 기반 번들 대응)', async () => {
+      const raw = makeRawBundle({
+        agentStubs: [
+          { id: 'test-bundle-developer', displayName: 'developer', model: 'unknown', modelSource: 'absent', tools: ['Read'] },
+        ],
+      })
+      const bundlePath = createTmpBundle('absent-model')
+      const rawWithPath = { ...raw, bundlePath, fileTree: ['README.md'] }
+
+      vi.mocked(mockAI.normalizeHarness).mockResolvedValue(
+        makeAIResult() // AI 가 model: 'opus' 반환
+      )
+
+      const result = await normalizer.normalize(rawWithPath)
+
+      // 정적이 absent 였으므로 AI 값('opus')으로 채워지고 출처는 'ai'
+      expect(result.agents[0].model).toBe('opus')
+      expect(result.agents[0].modelSource).toBe('ai')
+      expect(result.provenance['agents[0].model']).toBe('ai')
+    })
+
     it('AI 가 agents[].tools 를 다른 배열로 반환해도 정적 값이 유지된다', async () => {
       const raw = makeRawBundle()
       const bundlePath = createTmpBundle('static-tools')

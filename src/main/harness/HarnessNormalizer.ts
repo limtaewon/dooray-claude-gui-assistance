@@ -386,14 +386,21 @@ function mergeWithStatic(
   const aiAgentMap = new Map(safeAIAgents.map((a) => [a.id, a]))
   const agents: HarnessAgent[] = (skeleton.agents ?? []).map((stub, i) => {
     const aiAgent = aiAgentMap.get(stub.id)
-    // [AI] agents[].model 화이트리스트 검증 — AI 가 잘못된 값 반환 시 'unknown' 대체.
-    // [S] model(stub.model) 은 정적 값이므로 덮어쓰지 않음 — 이 검증은 AI 가 새 에이전트를 추가할 때만 의미 있음.
+    // model 병합 규칙:
+    // - 정적으로 확정된 model(frontmatter/matrix, modelSource !== 'absent')은 [S] 라 덮어쓰지 않는다.
+    // - 정적으로 못 찾은 경우(modelSource === 'absent', model='unknown')에 한해 AI 가 채운다.
+    //   neon-bmad 처럼 frontmatter 에 model 이 없고 _core/models.md 매트릭스로 관리하는 번들 대응.
+    const aiFilledModel =
+      stub.modelSource === 'absent' && aiAgent?.model
+        ? sanitizeAgentModel(aiAgent.model, stub.id, aiValidationWarnings)
+        : null
+    const useAIModel = aiFilledModel !== null && aiFilledModel !== 'unknown'
     const merged: HarnessAgent = {
       // [S] 필드 — 덮어쓰기 금지
       id: stub.id,
       displayName: stub.displayName,
-      model: stub.model,
-      modelSource: stub.modelSource,
+      model: useAIModel ? aiFilledModel : stub.model,
+      modelSource: useAIModel ? 'ai' : stub.modelSource,
       tools: stub.tools,
       // [AI] 필드 — AI 에서 채움 (없으면 빈 값 유지)
       role: aiAgent?.role || '',
@@ -404,6 +411,7 @@ function mergeWithStatic(
       ...(aiAgent?.signals ? { signals: aiAgent.signals } : {}),
       ...(aiAgent?.riskNote ? { riskNote: aiAgent.riskNote } : {}),
     }
+    if (useAIModel) provenance[`agents[${i}].model`] = 'ai'
     if (aiAgent?.role) provenance[`agents[${i}].role`] = 'ai'
     if (aiAgent?.reads && ensureArray<string>(aiAgent.reads).length) provenance[`agents[${i}].reads`] = 'ai'
     if (aiAgent?.writes && ensureArray<string>(aiAgent.writes).length) provenance[`agents[${i}].writes`] = 'ai'
