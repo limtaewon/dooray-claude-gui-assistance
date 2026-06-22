@@ -1,75 +1,60 @@
 ---
 task: harness-studio-m3
 agent: main-process-engineer
-date: 2026-06-19
+date: 2026-06-22
 ---
 
-# Impl Log — Harness Studio M3: 정규화 파이프라인 조립 + IPC 핸들러
+# Impl Log — Harness Studio Edit M3: 쓰기 게이트 + 백업 + 적용 파사드
 
 ## 변경한 파일
 
-- `src/main/harness/HarnessNormalizer.ts` (신규) — RawBundle → HarnessModel 정규화 파이프라인
-- `src/main/harness/HarnessNormalizer.test.ts` (신규) — 25개 테스트
-- `src/main/harness/HarnessService.ts` (신규) — 정적 스캔/AI 정규화/캐시/Dry-run/discover 파사드
-- `src/main/harness/HarnessService.test.ts` (신규) — 11개 테스트
-- `src/main/index.ts` (수정) — HarnessService 지연 초기화 + 5개 IPC 핸들러 등록
-- `src/preload/index.ts` (수정) — `window.api.harness.{scan,discover,normalize,clearCache,listCached}` 노출
+- `src/main/harness/pathGate.ts` (수정) — `assertWritablePath`, `isWritableExtension` 추가 (쓰기 경로 게이트)
+- `src/main/harness/backup.ts` (신규) — 백업 경로 계산(순수) + 파일 복사 + 목록/복원 유틸
+- `src/main/harness/draftDiff.ts` (신규) — `sha256`, `computeLineDiff`, `computeFileDiffSummary`, `computeDraftDiffSummary` [순수]
+- `src/main/harness/HarnessEditService.ts` (신규) — 편집 파사드 (readFile/diff/apply/listBackups/restore)
+- `src/shared/types/harness-edit.ts` (수정) — `DraftFileEdit.stale?: boolean` 추가 (M2 renderer draftReducer 호환)
+- `src/main/harness/__tests__/pathGate.writable.test.ts` (신규) — assertWritablePath 18개 테스트
+- `src/main/harness/__tests__/backup.test.ts` (신규) — backup 유틸 20개 테스트
+- `src/main/harness/__tests__/draftDiff.test.ts` (신규) — draftDiff 21개 테스트
+- `src/main/harness/__tests__/HarnessEditService.test.ts` (신규) — HarnessEditService 14개 테스트
 
 ## 결정 사항
 
-### HarnessNormalizer — 스켈레톤 타입 분리
-- `SkeletonControlFlow` 인터페이스를 만들어 `HarnessControlFlow` 대신 스켈레톤 내에서 사용.
-  이유: `RawGate.scriptFile` / `RawHook.absolutePath` 같은 정적 확장 필드를 머지 시 보호하기 위해
-  타입 레벨에서 구분이 필요했음.
-- `HarnessModelSkeleton` 타입도 함께 정의해 `mergeWithStatic` 함수가 타입 안전하게 동작하도록 함.
+### assertWritablePath — 신규 파일 처리 전략
+신규 파일(디스크에 없음)은 `fs.realpath`가 실패하므로 부모 디렉터리를 `realpath`로 해소한 뒤 파일명을 결합해 검증한다. 부모가 없어도 실패로 처리(번들 외 임의 경로 생성 차단).
 
-### HarnessNormalizer — toHarnessControlFlow 헬퍼
-- 스켈레톤 → AIService 전달 시 / 폴백 반환 시 `SkeletonControlFlow` → `HarnessControlFlow` 변환이 필요.
-  `toHarnessControlFlow` 순수 헬퍼를 `normalize` 메서드 내부에 클로저로 배치.
+### DraftFileEdit.stale 추가
+M2 renderer `draftReducer.ts` 가 `DraftFileEditWithStale.stale` 플래그를 `HarnessDraft.edits` 에 저장하는데, `HarnessDraft.edits` 의 값 타입이 `DraftFileEdit` 이어서 typecheck가 실패했다. `stale` 은 UI-only 힌트 필드이며 main 은 이를 무시하고 독립적으로 STALE 를 재검증한다. append-only 변경으로 공유 타입에 `stale?: boolean` 추가.
 
-### HarnessService — estimateLevel에 aiService 직접 접근
-- `HarnessNormalizer`에 aiService를 주입하므로 `HarnessService`도 별도로 `aiService` 레퍼런스를 가짐.
-  `IAIServiceForHarness` 인터페이스가 `IAIServiceForNormalizer`를 확장해 `estimateLevel`도 포함.
+### HarnessEditService.registerBundle
+HarnessService 의 scan allowlist 와 별도로 HarnessEditService 도 자체 allowlist 를 관리한다. IPC 핸들러(M5)에서 scan/normalize 완료 후 `registerBundle(realPath)` 를 호출해 편집 허용 번들을 등록한다. skills 루트 하위는 항상 허용.
 
-### HarnessService 지연 초기화 (lazy init)
-- `app.getPath('userData')`는 `app.whenReady()` 이후에야 사용 가능.
-  `_harnessService` null + `getHarnessService()` getter 패턴으로 첫 IPC 호출 시 초기화.
-  기존 `index.ts`의 다른 서비스들과 달리 모듈 최상위가 아닌 getter를 쓰는 이유는 전자.
+### backupFiles — 신규 파일 스킵
+`DraftFileEdit.baseContent = ''` 인 신규 파일 draft 는 백업할 원본이 없다. `fs.access` 로 존재 여부를 확인하고 없으면 건너뛴다. `apply` 에서 신규 파일 생성은 정상 처리.
 
-### M7 스텁 처리
-- `estimateLevel`: `levelPath`(M7)이 없으므로 `highlightPath/parallelGroups/gates/estTimeRel/estCostRel`를
-  빈 값/기본값 스텁으로 채움. IPC 핸들러는 등록하지 않음 (요구사항대로 DRYRUN은 후속).
+### STALE 검증 구간
+`apply` 에서 디스크 읽기 후 sha 대조, rename 직전 재검사는 구현하지 않았다(TOCTOU 창 최소화는 ADR-002 권장 사항). 현재 구현은 초기 sha 대조 1회. rename 이 파일 단위 원자적이므로 창은 좁다.
+
+### .sh 비실행 단언
+`HarnessEditService` 는 `child_process` 를 import 하지 않는다. `.sh` 파일은 `fs.writeFile` + `fs.rename` 으로 텍스트 쓰기만 한다. 테스트에서 `.sh` 쓰기가 내용 변경만 일으키고 실행 부작용이 없음을 `readFile` 로 확인한다.
 
 ## 제약 (하지 말 것)
 
-- **`levelPath.ts` / `DryRunEstimator.ts` 파일 생성 금지** — M7 영역. 현재 파일이 없어야 M7이 충돌 없이 구현 가능.
-- **`HARNESS_DRYRUN` / `HARNESS_EXPLAIN` IPC 핸들러 등록 금지** — M7/M8 영역.
-- **`runClaudeStream` 분기 수정 금지** — AIService의 Windows/Mac 분기 가이드(CLAUDE.md) 준수.
-- **renderer 수정 금지** — M4 영역.
-- **`HarnessNormalizer.mergeWithStatic`에서 [S] 필드를 AI 응답으로 덮어쓰는 것 금지** — ADR-001.
-
-## IPC 등록 현황 (M3 기준)
-
-| 채널 | 등록 여부 | 비고 |
-|---|---|---|
-| `HARNESS_SCAN` | 완료 | pickDialog 옵션 포함 |
-| `HARNESS_DISCOVER` | 완료 | |
-| `HARNESS_NORMALIZE` | 완료 | requestId 지원 |
-| `HARNESS_CACHE_CLEAR` | 완료 | |
-| `HARNESS_LIST_CACHED` | 완료 | |
-| `HARNESS_DRYRUN` | 미등록 | M7 |
-| `HARNESS_EXPLAIN` | 미등록 | M8 |
+- **IPC 핸들러/preload 등록 금지** — M5 영역. `HarnessEditService` 는 서비스 클래스만.
+- **AI 편집제안 구현 금지** — M4 영역. `proposeEdit` 없음.
+- **`runClaudeStream` 수정 금지** — M4 에서도 기존 분기 재사용.
+- **renderer 수정 금지** — `src/renderer/` 전체.
+- **`.sh` 실행(spawn/exec) 절대 금지** — `HarnessEditService`, `backup.ts` 모두 텍스트 I/O 만.
 
 ## 테스트 결과
 
-- 전체: 75 파일, 950 테스트 통과
-- 신규: HarnessNormalizer (25개) + HarnessService (11개) = 36개
+- 전체: 102 파일, 1462 테스트 통과 (기존 94 파일 포함)
+- 신규: pathGate.writable(18) + backup(20) + draftDiff(21) + HarnessEditService(14) = 73개
+- 커버리지: 94.79% (70% 기준 초과)
 - typecheck: `tsc --noEmit` 양쪽 모두 통과 (exit 0)
 
 ## 참조
 
-- ADR-harness-studio-001 (머지계약: 정적 우선, AI가 [S] 덮어쓰기 금지)
-- ADR-harness-studio-004 (캐시 전략: 파일 JSON, bundleHash/taskHash)
-- `docs/planning/harness-studio-arch.md` §3(데이터흐름), §4(IPC 채널)
-- M1: BundleScanner, frontmatter, bundleHash, bundleDetect
-- M2: normalizePrompt, HarnessCache, taskHash + AIService.normalizeHarness/estimateLevel
+- ADR-harness-studio-edit-002 (쓰기 게이트 + 백업 전략)
+- `docs/planning/harness-studio-edit-arch.md` §4(쓰기 게이트), §7(안전 원칙)
+- `docs/planning/harness-studio-edit-plan.md` M3 체크리스트

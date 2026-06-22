@@ -123,6 +123,123 @@ export async function assertPathAllowed(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 쓰기 경로 게이트 (ADR-harness-studio-edit-002)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * 쓰기가 허용된 확장자 화이트리스트.
+ *
+ * `.md`/`.sh`/`.txt`/`VERSION` 만 허용한다.
+ * 실행 파일·바이너리·임의 설정 파일 쓰기를 막아 신뢰경계를 최소화한다.
+ *
+ * 확장자 없는 파일은 basename 으로 직접 비교한다 (`VERSION`).
+ */
+const WRITABLE_EXTENSIONS = new Set(['.md', '.sh', '.txt'])
+const WRITABLE_BASENAMES = new Set(['VERSION'])
+
+/**
+ * 주어진 파일 상대경로의 확장자 또는 basename 이 화이트리스트에 있는지 검사한다.
+ *
+ * @param relPath - 번들 루트 기준 상대경로
+ * @returns 허용 여부
+ */
+export function isWritableExtension(relPath: string): boolean {
+  const ext = nodePath.extname(relPath).toLowerCase()
+  if (ext) return WRITABLE_EXTENSIONS.has(ext)
+  return WRITABLE_BASENAMES.has(nodePath.basename(relPath))
+}
+
+/**
+ * 번들 루트 하위 파일에 대한 쓰기 경로를 검증한다.
+ *
+ * 모든 조건을 통과해야 검증된 절대경로를 반환한다. 하나라도 실패하면 throw.
+ *
+ * 검증 단계:
+ * 1. `relPath` 에 `..` 세그먼트 포함 여부 확인 — 디렉터리 탈출 차단.
+ * 2. 확장자 화이트리스트 검사 (`.md`/`.sh`/`.txt`/`VERSION`).
+ * 3. 대상 절대경로 계산:
+ *    - 파일이 이미 존재하면 `fs.realpath` 로 심링크 해소.
+ *    - 신규 파일(존재하지 않으면) 부모 디렉터리를 `fs.realpath` 로 해소.
+ * 4. 해소된 경로가 bundleRoot 하위인지 검사 — 심링크 탈출 차단.
+ *
+ * 제약:
+ * - bundleRoot 는 이미 기존 읽기 게이트(assertPathAllowed)를 통과한 realpath 절대경로여야 한다.
+ * - `.sh` 는 텍스트 파일로 쓰기만 허용한다. 실행(spawn/exec)은 이 함수 바깥에서도 절대 금지.
+ *
+ * @param bundleRoot - 번들 루트 realpath 절대경로 (읽기 게이트 통과 완료)
+ * @param relPath - 번들 루트 기준 POSIX 상대경로 (쓰려는 파일)
+ * @returns 검증된 대상 절대경로 (심링크 해소 완료)
+ * @throws HarnessPathDeniedError — 검증 실패 시
+ */
+export async function assertWritablePath(bundleRoot: string, relPath: string): Promise<string> {
+  // 1. '..' 세그먼트 포함 거부 — 디렉터리 탈출 차단
+  const normalized = nodePath.posix.normalize(relPath)
+  const segments = normalized.split('/')
+  if (segments.some((seg) => seg === '..')) {
+    throw new HarnessPathDeniedError(
+      relPath,
+      `경로에 '..' 세그먼트 포함 — 디렉터리 탈출 시도: ${relPath}`
+    )
+  }
+
+  // 2. 확장자 화이트리스트 검사
+  if (!isWritableExtension(relPath)) {
+    const ext = nodePath.extname(relPath) || '(없음)'
+    throw new HarnessPathDeniedError(
+      relPath,
+      `허용되지 않은 확장자: ${ext} — 허용: .md/.sh/.txt/VERSION`
+    )
+  }
+
+  // 3. 대상 절대경로 계산 + 심링크 해소
+  const absTarget = nodePath.join(bundleRoot, relPath)
+  let resolvedTarget: string
+
+  let targetExists: boolean
+  try {
+    await fs.access(absTarget)
+    targetExists = true
+  } catch {
+    targetExists = false
+  }
+
+  if (targetExists) {
+    // 기존 파일 — realpath 로 심링크 해소
+    try {
+      resolvedTarget = await fs.realpath(absTarget)
+    } catch {
+      throw new HarnessPathDeniedError(
+        relPath,
+        `realpath 실패 — 접근 불가: ${absTarget}`
+      )
+    }
+  } else {
+    // 신규 파일 — 부모 디렉터리를 realpath 로 해소한 뒤 파일명 결합
+    const parentDir = nodePath.dirname(absTarget)
+    let resolvedParent: string
+    try {
+      resolvedParent = await fs.realpath(parentDir)
+    } catch {
+      throw new HarnessPathDeniedError(
+        relPath,
+        `부모 디렉터리 realpath 실패 — 존재하지 않거나 접근 불가: ${parentDir}`
+      )
+    }
+    resolvedTarget = nodePath.join(resolvedParent, nodePath.basename(absTarget))
+  }
+
+  // 4. bundleRoot 하위인지 검사 — 심링크 탈출 차단
+  if (!isUnderAllowedRoot(resolvedTarget, [bundleRoot])) {
+    throw new HarnessPathDeniedError(
+      relPath,
+      `번들 루트 외부 경로 (심링크 탈출 의심): ${resolvedTarget} (루트: ${bundleRoot})`
+    )
+  }
+
+  return resolvedTarget
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 세션 Allowlist (HarnessService 가 소유)
 // ─────────────────────────────────────────────────────────────────────────────
 
