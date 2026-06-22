@@ -437,6 +437,11 @@ export class BundleScanner {
       warnings.push(`파일 트리 탐색 실패: ${err instanceof Error ? err.message : String(err)}`)
     }
 
+    // fs.readdir 순서는 플랫폼마다 다르므로 정렬해 처리 순서를 결정론화한다.
+    // 특히 agentSourceMap/스텁 병합 우선순위(_agents/ 가 <role>/SKILL.md 보다 먼저 — '_' 가 앞)가
+    // OS 와 무관하게 동일해야 한다(Windows/macOS 회귀 방지).
+    relativePaths.sort()
+
     // ── 2. 콘텐츠 읽기 및 frontmatter 파싱 ────────────
     const agentStubMap = new Map<string, AgentStub>()
     /** agentId → 각 필드의 출처 파일 상대경로 (편집 기능 M1) */
