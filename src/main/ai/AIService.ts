@@ -1376,16 +1376,18 @@ ${useMcp ? `
     const args = buildArgs(userPrompt, {
       model,
       systemPrompt,
-      maxBudget: '1.0',
+      maxBudget: '2.5',  // Opus + 큰 번들 — 1회성·캐시되므로 넉넉히
       effort: 'medium',
       noTools: true  // 정규화는 순수 텍스트 분석 — 도구 불필요
     })
 
+    // 정규화는 1회성(번들 해시 캐시)·대용량 번들 분석이라 기본 120초로는 부족하다.
+    // 캐시되므로 한 번 오래 걸려도 무방 — 타임아웃을 10분으로 크게 늘린다.
     const result = await this.runWithProgress(
       requestId,
-      '번들 AI 정규화 중...',
+      '번들 AI 정규화 중... (대용량 번들은 수 분 소요될 수 있습니다)',
       args,
-      { feature: 'harnessNormalize' }
+      { feature: 'harnessNormalize', timeoutMs: 600000 }
     )
 
     const raw = (result.result || '').trim()

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildGraph } from '../flow/buildGraph'
+import { buildGraph, inferPhaseClass } from '../flow/buildGraph'
 import type { BuildGraphResult, AgentNodeData, GateNodeData } from '../flow/buildGraph'
 import type { HarnessModel, HarnessAgent, HarnessLevel, HarnessLevelId } from '@shared/types/harness'
 
@@ -71,14 +71,15 @@ describe('buildGraph — 빈 모델 degradation', () => {
     expect(result.edges).toHaveLength(0)
   })
 
-  it('levelId가 null 이면 모든 에이전트가 dimmed', () => {
+  it('levelId가 null 이면(활성 체인 없음) 모든 에이전트를 흐리지 않고 또렷하게 표시', () => {
     const model = makeModel({
       agents: [makeAgent({ id: 'a1' }), makeAgent({ id: 'a2' })]
     })
     const result = buildGraph(model, null)
     for (const node of result.nodes) {
       const data = node.data as AgentNodeData
-      expect(data.dimmed).toBe(true)
+      // 대비할 활성 집합이 없으므로 흐리지 않는다(레벨 미추출 시 회색 캔버스 방지).
+      expect(data.dimmed).toBe(false)
     }
   })
 })
@@ -162,12 +163,13 @@ describe('buildGraph — 레벨 간 활성/비활성 분리', () => {
     expect(dimmedNodes).toHaveLength(0)
   })
 
-  it('레벨이 없으면 모든 에이전트 dimmed', () => {
+  it('요청 레벨이 없으면(활성 체인 없음) 모든 에이전트를 흐리지 않고 표시', () => {
     const result = buildGraph(model, 'L3')
-    const activeNodes = result.nodes.filter(
-      (n) => n.type === 'agentNode' && !(n.data as AgentNodeData).dimmed
-    )
-    expect(activeNodes).toHaveLength(0)
+    const agentNodes = result.nodes.filter((n) => n.type === 'agentNode')
+    const activeNodes = agentNodes.filter((n) => !(n.data as AgentNodeData).dimmed)
+    // 대비할 활성 집합이 없으므로 전부 또렷(dimmed=false).
+    expect(activeNodes).toHaveLength(agentNodes.length)
+    expect(agentNodes.length).toBeGreaterThan(0)
   })
 })
 
@@ -532,5 +534,31 @@ describe('buildGraph — overlayEnabled=false 시 오버레이 미적용', () =>
     const result = buildGraph(model, 'L2', undefined, true)
     const devNode = result.nodes.find((n) => n.id === 'developer')
     expect((devNode!.data as AgentNodeData).model).toBe('opus')
+  })
+})
+
+describe('inferPhaseClass — phaseClass 없을 때 id/이름 추론', () => {
+  const cases: Array<[string, string]> = [
+    ['neon-bmad-analyst', 'analyst'],
+    ['neon-bmad-architect', 'architect'],
+    ['neon-bmad-developer', 'dev'],
+    ['neon-bmad-pm', 'pm'],
+    ['neon-bmad-qa', 'qa'],
+    ['neon-bmad-security-reviewer', 'security'],
+    ['neon-bmad-scrum-master', 'sm'],
+    ['neon-bmad-release-manager', 'release'],
+    ['neon-bmad-orchestrator', 'orchestrator'],
+    ['neon-bmad-harness-verifier', 'qa'],
+    ['neon-bmad-retrospective', 'qa'],
+    ['something-unknown', 'other']
+  ]
+  for (const [id, expected] of cases) {
+    it(`${id} → ${expected}`, () => {
+      expect(inferPhaseClass({ id, displayName: id, phaseClass: undefined })).toBe(expected)
+    })
+  }
+
+  it('명시적 phaseClass 가 있으면 그대로 사용', () => {
+    expect(inferPhaseClass({ id: 'x', displayName: 'x', phaseClass: 'pm' })).toBe('pm')
   })
 })

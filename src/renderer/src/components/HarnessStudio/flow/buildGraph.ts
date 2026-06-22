@@ -217,7 +217,8 @@ function hasReturnLoop(model: HarnessModel): boolean {
  * - 지정된 levelId 의 agentChain 을 활성 경로로 취급한다.
  * - 활성 체인에 없는 에이전트도 dimmed=true 로 포함해 전체 구조를 표시한다.
  * - 게이트 노드는 blocking 게이트만 활성 체인 phase 에이전트 다음에 삽입한다.
- * - levelId 가 null/undefined 이거나 해당 레벨이 없으면 모든 에이전트를 dimmed 처리한다.
+ * - levelId 가 null/undefined 이거나 해당 레벨이 없으면(또는 levels 미추출) 모든 에이전트를
+ *   흐리지 않고 전체 구조를 또렷하게 표시한다(대비할 활성 집합이 없으므로).
  * - highlightPath 가 주어지면 해당 에이전트만 highlighted=true,
  *   나머지 활성 체인 에이전트는 dimmed=true 로 처리(Dry-run 경로 강조).
  *
@@ -362,6 +363,12 @@ export function buildGraph(
     : -1
   const dimmedStartCol = maxActiveCol + 2
 
+  // 활성 체인이 비어있으면(레벨 정보 없음/미추출) 대비할 활성 집합이 없으므로
+  // 흐리지 않고 전체를 또렷하게 보여준다. 활성 체인이 있을 때만 비활성 노드를 흐린다.
+  const dimInactive = effectiveActiveChain.length > 0
+  // 활성 체인이 없으면 그리드를 좌측(START)부터 채워 빈 공간 낭비를 줄인다.
+  const gridStartCol = dimInactive ? dimmedStartCol : 0
+
   dimmedAgents.forEach((agent, idx) => {
     const isOverlayDisabled = overlayDisabledSet.has(agent.id)
     const overriddenModel = overlayModelMap.get(agent.id)
@@ -373,12 +380,13 @@ export function buildGraph(
       id: agent.id,
       type: 'agentNode',
       position: {
-        x: START_X + (dimmedStartCol + Math.floor(idx / 3)) * COL_WIDTH,
+        x: START_X + (gridStartCol + Math.floor(idx / 3)) * COL_WIDTH,
         y: START_Y + (idx % 3) * ROW_HEIGHT
       },
       data: agentToNodeData(
         displayAgent,
-        true,
+        // 비활성 노드는 활성 체인이 있을 때만 흐림. 오버레이 비활성은 항상 흐림.
+        isOverlayDisabled || dimInactive,
         false,
         isOverlayDisabled,
         overriddenModel ? agent.model : undefined
@@ -503,6 +511,26 @@ export function buildGraph(
 // 내부 헬퍼
 // ─────────────────────────────────────────────
 
+/**
+ * phaseClass 가 비어있을 때(정적 스켈레톤만 있거나 AI 가 못 채운 경우)
+ * 에이전트 id/displayName 키워드로 페이즈를 추론한다 — 노드 색 구분을 위해.
+ * 순서 중요: 더 구체적인 패턴(security) 을 일반 패턴(review/qa) 보다 먼저 검사.
+ */
+export function inferPhaseClass(agent: Pick<HarnessAgent, 'id' | 'displayName' | 'phaseClass'>): string {
+  if (agent.phaseClass) return agent.phaseClass
+  const s = `${agent.id} ${agent.displayName}`.toLowerCase()
+  if (/(security|보안)/.test(s)) return 'security'
+  if (/(architect|설계)/.test(s)) return 'architect'
+  if (/(scrum|sprint|\bsm\b)/.test(s)) return 'sm'
+  if (/(release|deploy|배포|릴리)/.test(s)) return 'release'
+  if (/(orchestrat|coordinat|오케스트)/.test(s)) return 'orchestrator'
+  if (/(analyst|research|분석|탐색)/.test(s)) return 'analyst'
+  if (/(\bpm\b|product|기획|prd|매니저)/.test(s)) return 'pm'
+  if (/(develop|\bdev\b|engineer|구현|개발|코딩)/.test(s)) return 'dev'
+  if (/(\bqa\b|test|verif|critic|review|검증|품질|회고|retro)/.test(s)) return 'qa'
+  return 'other'
+}
+
 function agentToNodeData(
   agent: HarnessAgent,
   dimmed: boolean,
@@ -517,7 +545,7 @@ function agentToNodeData(
     role: agent.role,
     model: agent.model,
     modelSource: agent.modelSource,
-    phaseClass: agent.phaseClass ?? 'other',
+    phaseClass: inferPhaseClass(agent),
     tools: agent.tools,
     riskNote: agent.riskNote,
     escalation: agent.escalation,
