@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { SearchAddon } from '@xterm/addon-search'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { ChevronUp, ChevronDown, X, Image as ImageIcon, ExternalLink } from 'lucide-react'
+import { shouldFollowOutput } from './scrollFollow'
 import '@xterm/xterm/css/xterm.css'
 
 interface TerminalPaneProps {
@@ -371,10 +372,14 @@ function TerminalPane({ sessionId, isActive, initialOutput }: TerminalPaneProps)
     const seenPaths = new Set<string>()
     const cleanup = window.api.terminal.onOutput(({ id, data }) => {
       if (id !== sessionId) return
-      // write() 콜백 안에서 scrollToBottom 을 호출해야 새 출력이 표시된 뒤 뷰포트가 이동한다.
+      // auto-follow: 사용자가 바닥에 있을 때만 새 출력을 따라 내려간다. 위로 올려 읽는 중이면 유지.
+      // wasAtBottom 은 반드시 write() 이전에 스냅샷한다 — write 후엔 baseY 가 늘어 판단이 망가진다.
+      // write() 콜백 안에서 scrollToBottom 을 호출해야 새 출력이 렌더된 뒤 뷰포트가 이동한다.
       // Why: terminal.write() 는 비동기(내부 큐잉)이므로 write 직후 scrollToBottom 을 호출하면
       // 렌더링이 완료되기 전에 호출될 수 있다. 콜백 인자를 활용해 렌더 후 실행되게 한다.
-      terminal.write(data, () => { terminal.scrollToBottom() })
+      const buf = terminal.buffer.active
+      const wasAtBottom = shouldFollowOutput(buf.viewportY, buf.baseY)
+      terminal.write(data, () => { if (wasAtBottom) terminal.scrollToBottom() })
       // path sniff — 같은 path 는 중복 추가 X. 최대 20개 유지 (오래된 것부터 drop).
       IMAGE_PATH_RE.lastIndex = 0
       let m: RegExpExecArray | null
