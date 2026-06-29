@@ -33,7 +33,7 @@ export function ErrorView({ message, onRetry, onReport, className = '' }: ErrorV
         {onRetry && (
           <button
             onClick={onRetry}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-surface border border-bg-border text-[11px] text-text-primary hover:border-clauday-blue/50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-surface border border-bg-border text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary hover:border-clauday-blue/50 transition-colors"
           >
             <RefreshCw size={11} /> 다시 시도
           </button>
@@ -41,7 +41,7 @@ export function ErrorView({ message, onRetry, onReport, className = '' }: ErrorV
         {onReport && (
           <button
             onClick={onReport}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-surface border border-bg-border text-[11px] text-text-primary hover:border-clauday-blue/50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-surface border border-bg-border text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary hover:border-clauday-blue/50 transition-colors"
             title="진단 정보와 함께 오류를 제보합니다"
           >
             <Bug size={11} /> 오류 리포트
@@ -79,7 +79,7 @@ export function EmptyView({
       <div className="text-center">
         <p className="text-sm font-medium text-text-primary">{title}</p>
         {description && (
-          <p className="text-[11px] text-text-tertiary mt-1 max-w-md whitespace-pre-wrap">{description}</p>
+          <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mt-1 max-w-md whitespace-pre-wrap">{description}</p>
         )}
       </div>
       {actionLabel && onAction && (

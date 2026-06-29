@@ -300,14 +300,14 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
       {/* 드롭 오버레이 — Pane 전체에 시각 피드백 */}
       {dragOver && (
         <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-clauday-orange/5 backdrop-blur-[1px] border-2 border-dashed border-clauday-orange/60">
-          <div className="px-4 py-2 rounded-full bg-clauday-orange/15 border border-clauday-orange/50 text-[12px] font-semibold text-clauday-orange">
+          <div className="px-4 py-2 rounded-full bg-clauday-orange/15 border border-clauday-orange/50 text-[calc(12px_*_var(--app-font-scale,1))] font-semibold text-clauday-orange">
             놓으면 첨부됩니다
           </div>
         </div>
       )}
       {/* Breadcrumb */}
       {cwd && (
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-bg-border text-[12px] text-text-secondary flex-shrink-0">
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-bg-border text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary flex-shrink-0">
           <FolderOpen size={13} className="text-text-tertiary" />
           <span className="font-mono truncate text-text-tertiary">{cwd}</span>
           {sessionId && <span className="text-text-tertiary/70">· 세션 {sessionId.slice(0, 8)}</span>}
@@ -348,20 +348,20 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
             <Sparkles size={36} className="text-clauday-orange/60" />
             <div className="text-center">
               <div className="text-sm font-medium text-text-primary">Claude Code</div>
-              <div className="text-[11px] mt-1">아래 입력창에 질문이나 지시를 입력하세요</div>
+              <div className="text-[calc(11px_*_var(--app-font-scale,1))] mt-1">아래 입력창에 질문이나 지시를 입력하세요</div>
             </div>
           </div>
         ) : (
           <div className="w-full px-5 py-4 space-y-3">
             {messages.map((m) => <MessageRow key={m.id} msg={m} />)}
             {busy && (
-              <div className="flex items-center gap-2 text-[11px] text-text-tertiary pl-12">
+              <div className="flex items-center gap-2 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary pl-12">
                 <span className="w-1.5 h-1.5 rounded-full bg-clauday-orange animate-pulse" />
                 Claude 가 생각 중...
               </div>
             )}
             {resultMeta && !busy && (
-              <div className="text-[10px] text-text-tertiary pl-12">
+              <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary pl-12">
                 · {(resultMeta.durationMs / 1000).toFixed(1)}초 · ${resultMeta.costUsd.toFixed(4)}
               </div>
             )}
@@ -377,7 +377,7 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
             {attachments.map((a) => (
               <span
                 key={a.id}
-                className="inline-flex items-center gap-1 pl-1.5 pr-1 py-1 rounded-md text-[11px]"
+                className="inline-flex items-center gap-1 pl-1.5 pr-1 py-1 rounded-md text-[calc(11px_*_var(--app-font-scale,1))]"
                 style={{ background: 'var(--bg-primary)', border: '1px solid var(--bg-border)' }}
                 title={a.path}
               >
@@ -398,7 +398,7 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
               className="absolute left-0 right-12 bottom-full mb-1 z-30 rounded-lg border border-bg-border shadow-2xl overflow-hidden"
               style={{ background: 'var(--bg-surface-raised)', maxHeight: 280 }}
             >
-              <div className="px-3 py-1.5 text-[10px] text-text-tertiary border-b border-bg-border bg-bg-subtle flex items-center justify-between">
+              <div className="px-3 py-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary border-b border-bg-border bg-bg-subtle flex items-center justify-between">
                 <span>스킬 — ↑↓ 이동, Enter 삽입, Esc 취소</span>
                 <span>{paletteSkills.length}개</span>
               </div>
@@ -421,8 +421,8 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
                     }`}
                   >
                     <Sparkles size={11} className={`flex-none ${isHi ? 'text-clauday-orange' : 'text-clauday-blue'}`} />
-                    <span className={`text-[12px] truncate ${isHi ? 'text-text-primary font-semibold' : 'text-text-primary'}`}>{s.name}</span>
-                    <span className="text-[10px] text-text-tertiary font-mono truncate flex-1 text-right">{s.filename}</span>
+                    <span className={`text-[calc(12px_*_var(--app-font-scale,1))] truncate ${isHi ? 'text-text-primary font-semibold' : 'text-text-primary'}`}>{s.name}</span>
+                    <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary font-mono truncate flex-1 text-right">{s.filename}</span>
                   </div>
                   )
                 })}
@@ -603,7 +603,7 @@ function LinkChip({ target }: { target: string }): JSX.Element {
           {isHttp ? (
             <button
               onClick={(e) => { e.preventDefault(); handleOpen() }}
-              className="px-2 py-0.5 rounded text-[11px] text-text-primary hover:bg-bg-surface-hover"
+              className="px-2 py-0.5 rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary hover:bg-bg-surface-hover"
             >
               Open in browser
             </button>
@@ -611,15 +611,15 @@ function LinkChip({ target }: { target: string }): JSX.Element {
             <>
               <button
                 onClick={(e) => { e.preventDefault(); handleOpen() }}
-                className="px-2 py-0.5 rounded text-[11px] text-text-primary hover:bg-bg-surface-hover"
+                className="px-2 py-0.5 rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary hover:bg-bg-surface-hover"
               >
                 Open file
-                <span className="ml-1 text-[10px] text-text-tertiary">⌘+클릭</span>
+                <span className="ml-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">⌘+클릭</span>
               </button>
-              <span className="text-text-tertiary text-[10px]">|</span>
+              <span className="text-text-tertiary text-[calc(10px_*_var(--app-font-scale,1))]">|</span>
               <button
                 onClick={(e) => { e.preventDefault(); handleReveal() }}
-                className="px-2 py-0.5 rounded text-[11px] text-text-primary hover:bg-bg-surface-hover"
+                className="px-2 py-0.5 rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary hover:bg-bg-surface-hover"
               >
                 Show in Finder
               </button>
@@ -654,7 +654,7 @@ const markdownComponents = {
       const openable = isOpenableTarget(text)
       return (
         <code
-          className={`px-1 py-0.5 rounded font-mono text-[12px] ${openable ? 'cursor-pointer hover:underline' : ''}`}
+          className={`px-1 py-0.5 rounded font-mono text-[calc(12px_*_var(--app-font-scale,1))] ${openable ? 'cursor-pointer hover:underline' : ''}`}
           style={{ background: 'rgba(0,0,0,0.2)', color: openable ? 'var(--c-blue-fg, #93C5FD)' : 'var(--c-orange-fg)' }}
           onClick={openable ? (e) => {
             if (!e.metaKey && !e.ctrlKey) return
@@ -669,7 +669,7 @@ const markdownComponents = {
       )
     }
     return (
-      <code className={`block font-mono text-[12px] ${className || ''}`} {...props}>
+      <code className={`block font-mono text-[calc(12px_*_var(--app-font-scale,1))] ${className || ''}`} {...props}>
         {children}
       </code>
     )
@@ -681,7 +681,7 @@ const markdownComponents = {
   ),
   table: ({ children }: { children?: React.ReactNode }) => (
     <div className="overflow-x-auto my-1.5">
-      <table className="text-[12px] border-collapse" style={{ minWidth: '100%' }}>
+      <table className="text-[calc(12px_*_var(--app-font-scale,1))] border-collapse" style={{ minWidth: '100%' }}>
         {children}
       </table>
     </div>
@@ -726,7 +726,7 @@ const markdownComponents = {
   li: ({ children }: { children?: React.ReactNode }) => <li>{linkifyChildren(children, 'li')}</li>,
   h1: ({ children }: { children?: React.ReactNode }) => <h1 className="text-base font-bold mt-2 mb-1">{linkifyChildren(children, 'h1')}</h1>,
   h2: ({ children }: { children?: React.ReactNode }) => <h2 className="text-sm font-bold mt-2 mb-1">{linkifyChildren(children, 'h2')}</h2>,
-  h3: ({ children }: { children?: React.ReactNode }) => <h3 className="text-[13px] font-semibold mt-1.5 mb-1">{linkifyChildren(children, 'h3')}</h3>,
+  h3: ({ children }: { children?: React.ReactNode }) => <h3 className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold mt-1.5 mb-1">{linkifyChildren(children, 'h3')}</h3>,
   p: ({ children }: { children?: React.ReactNode }) => <p className="my-0.5">{linkifyChildren(children, 'p')}</p>,
   blockquote: ({ children }: { children?: React.ReactNode }) => (
     <blockquote className="border-l-2 pl-3 my-1.5 italic" style={{ borderColor: 'color-mix(in oklab, var(--c-orange-fg) 50%, transparent)', color: 'var(--text-secondary)' }}>
@@ -746,7 +746,7 @@ function MessageRow({ msg }: { msg: ChatMessage }): JSX.Element {
     return (
       <div className="flex justify-end">
         <div
-          className="max-w-[85%] px-3.5 py-2 rounded-2xl text-[13px] leading-relaxed whitespace-pre-wrap break-words"
+          className="max-w-[85%] px-3.5 py-2 rounded-2xl text-[calc(13px_*_var(--app-font-scale,1))] leading-relaxed whitespace-pre-wrap break-words"
           style={{
             background: 'var(--c-blue-solid)',
             color: '#fff',
@@ -766,19 +766,19 @@ function MessageRow({ msg }: { msg: ChatMessage }): JSX.Element {
       <div className="flex justify-start">
         <div className="max-w-[85%] flex gap-2 items-start">
           <span
-            className="inline-flex items-center gap-1 h-5 px-1.5 rounded-[4px] text-[10px] font-bold flex-none mt-1"
+            className="inline-flex items-center gap-1 h-5 px-1.5 rounded-[4px] text-[calc(10px_*_var(--app-font-scale,1))] font-bold flex-none mt-1"
             style={{ color: 'var(--c-violet-fg)', background: 'var(--c-violet-bg)' }}
           >
             <Wrench size={11} />
             TOOL
           </span>
           <div className="flex-1 min-w-0 space-y-1">
-            <div className="text-[12px] text-text-secondary font-mono">
+            <div className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary font-mono">
               <span className="text-violet-400 font-semibold">{msg.toolName || 'tool'}</span>
               {inputPreview && <span className="text-text-tertiary"> {inputPreview}</span>}
             </div>
             {msg.text && (
-              <pre className={`text-[11px] font-mono whitespace-pre-wrap break-words rounded-md px-2.5 py-2 ${
+              <pre className={`text-[calc(11px_*_var(--app-font-scale,1))] font-mono whitespace-pre-wrap break-words rounded-md px-2.5 py-2 ${
                 msg.isError
                   ? 'bg-red-500/10 text-red-400 border border-red-500/25'
                   : 'bg-bg-surface text-text-secondary border border-bg-border'
@@ -802,7 +802,7 @@ function MessageRow({ msg }: { msg: ChatMessage }): JSX.Element {
         <Sparkles size={13} style={{ color: 'var(--c-orange-solid)' }} />
       </span>
       <div
-        className={`max-w-[85%] px-3.5 py-2 rounded-2xl text-[13px] leading-relaxed break-words ${msg.isError ? 'text-red-400' : 'text-text-primary'}`}
+        className={`max-w-[85%] px-3.5 py-2 rounded-2xl text-[calc(13px_*_var(--app-font-scale,1))] leading-relaxed break-words ${msg.isError ? 'text-red-400' : 'text-text-primary'}`}
         style={{
           background: 'var(--bg-surface)',
           border: '1px solid var(--bg-border)',
@@ -885,9 +885,9 @@ function SessionHistoryButton({
               </button>
             </div>
             {loading ? (
-              <div className="px-3 py-4 text-[11px] text-text-tertiary text-center">로딩...</div>
+              <div className="px-3 py-4 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary text-center">로딩...</div>
             ) : sessions.length === 0 ? (
-              <div className="px-3 py-4 text-[11px] text-text-tertiary text-center">저장된 세션 없음</div>
+              <div className="px-3 py-4 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary text-center">저장된 세션 없음</div>
             ) : (
               <div className="py-1">
                 {sessions.map((s) => {
@@ -900,10 +900,10 @@ function SessionHistoryButton({
                         isCurrent ? 'bg-clauday-blue/10 border-l-2 border-clauday-blue' : ''
                       }`}
                     >
-                      <span className="text-[12px] text-text-primary line-clamp-2 font-medium">
+                      <span className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary line-clamp-2 font-medium">
                         {s.title}
                       </span>
-                      <div className="flex items-center gap-2 text-[10px] text-text-tertiary">
+                      <div className="flex items-center gap-2 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
                         <span>{formatRelative(s.lastActivityAt)}</span>
                         <span>·</span>
                         <span>{s.messageCount}개 메시지</span>
@@ -982,13 +982,13 @@ function McpStatusButton({
               </button>
             </div>
             {loading ? (
-              <div className="px-3 py-4 text-[11px] text-text-tertiary text-center">로딩...</div>
+              <div className="px-3 py-4 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary text-center">로딩...</div>
             ) : servers.length === 0 ? (
-              <div className="px-3 py-4 text-[11px] text-text-tertiary text-center">등록된 MCP 없음</div>
+              <div className="px-3 py-4 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary text-center">등록된 MCP 없음</div>
             ) : (
               <div className="py-1">
                 {servers.map((s) => (
-                  <div key={s.name} className="px-3 py-1.5 flex items-center gap-2 text-[11px]">
+                  <div key={s.name} className="px-3 py-1.5 flex items-center gap-2 text-[calc(11px_*_var(--app-font-scale,1))]">
                     {s.isHealthy ? (
                       <Check size={11} className="text-emerald-400 flex-none" />
                     ) : (
@@ -1056,8 +1056,8 @@ function TerminalDropdown({ sessionId, cwd }: { sessionId: string | undefined; c
             >
               <TerminalSquare size={13} className="text-clauday-blue mt-0.5 flex-shrink-0" />
               <div className="flex flex-col gap-0.5 min-w-0">
-                <span className="text-[12px] text-text-primary font-medium leading-tight">터미널에서 열기</span>
-                <span className="text-[10px] text-text-tertiary leading-tight">권한 확인 살림 (기본)</span>
+                <span className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary font-medium leading-tight">터미널에서 열기</span>
+                <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary leading-tight">권한 확인 살림 (기본)</span>
               </div>
             </button>
             <button
@@ -1066,8 +1066,8 @@ function TerminalDropdown({ sessionId, cwd }: { sessionId: string | undefined; c
             >
               <Zap size={13} className="text-clauday-orange mt-0.5 flex-shrink-0" />
               <div className="flex flex-col gap-0.5 min-w-0">
-                <span className="text-[12px] text-text-primary font-medium leading-tight">bypass 로 열기</span>
-                <span className="text-[10px] text-text-tertiary leading-tight">--dangerously-skip-permissions · 권한 확인 건너뜀</span>
+                <span className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary font-medium leading-tight">bypass 로 열기</span>
+                <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary leading-tight">--dangerously-skip-permissions · 권한 확인 건너뜀</span>
               </div>
             </button>
           </div>

@@ -91,10 +91,10 @@ function ItemCard({ item, category }: { item: AIRecommendItem; category: Categor
     <div className="ds-card group relative" style={{ padding: '12px 14px', borderLeft: `3px solid ${meta.color}` }}>
       <div className="flex items-start gap-2.5">
         <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-semibold text-text-primary leading-snug">{item.title}</div>
-          <div className="text-[11px] text-text-secondary mt-1 leading-relaxed whitespace-pre-wrap">{item.reason}</div>
+          <div className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary leading-snug">{item.title}</div>
+          <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary mt-1 leading-relaxed whitespace-pre-wrap">{item.reason}</div>
           {item.coveredBy && (
-            <div className="text-[10.5px] text-text-tertiary mt-1.5">
+            <div className="text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-tertiary mt-1.5">
               <span className="opacity-70">커버 스킬/MCP:</span>{' '}
               <span className="font-medium text-text-secondary">{item.coveredBy}</span>
             </div>
@@ -102,7 +102,7 @@ function ItemCard({ item, category }: { item: AIRecommendItem; category: Categor
         </div>
         <button
           type="button"
-          className="flex-none flex items-center gap-1 text-[11px] text-clauday-blue hover:text-clauday-blue/80"
+          className="flex-none flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-clauday-blue hover:text-clauday-blue/80"
           title="두레이에서 열기"
           onClick={(e) => { e.stopPropagation(); window.open(item.url, '_blank', 'noopener,noreferrer') }}
         >
@@ -121,8 +121,8 @@ function Section({ category, items }: { category: Category; items: AIRecommendIt
       <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-[6px]"
         style={{ background: meta.bg, border: `1px solid ${meta.border}` }}>
         <span className="w-1.5 h-1.5 rounded-full" style={{ background: meta.color }} />
-        <span className="text-[12px] font-semibold" style={{ color: meta.color }}>{meta.label}</span>
-        <span className="text-[11px] text-text-tertiary">{items.length}건</span>
+        <span className="text-[calc(12px_*_var(--app-font-scale,1))] font-semibold" style={{ color: meta.color }}>{meta.label}</span>
+        <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">{items.length}건</span>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
         {items.map((item) => <ItemCard key={item.taskId} item={item} category={category} />)}
@@ -160,24 +160,24 @@ function PostCard({ post, onSelect }: { post: DoorayTask; onSelect: () => void }
     >
       <div className="flex gap-3">
         <div className="flex-shrink-0 flex flex-col items-center pt-0.5">
-          <div className="min-w-7 h-6 px-1.5 rounded-md flex items-center justify-center text-[11px] font-bold text-clauday-blue group-hover:bg-clauday-blue group-hover:text-white transition-colors"
+          <div className="min-w-7 h-6 px-1.5 rounded-md flex items-center justify-center text-[calc(11px_*_var(--app-font-scale,1))] font-bold text-clauday-blue group-hover:bg-clauday-blue group-hover:text-white transition-colors"
             style={{ background: 'var(--c-blue-bg)', border: '1px solid color-mix(in oklab, var(--c-blue-fg) 25%, transparent)' }}>
             {post.number ?? '·'}
           </div>
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-text-primary group-hover:text-clauday-blue transition-colors leading-snug pr-2">{post.subject}</p>
-          {preview && <p className="text-[11px] text-text-tertiary mt-1 line-clamp-2 leading-relaxed">{preview}</p>}
+          {preview && <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mt-1 line-clamp-2 leading-relaxed">{preview}</p>}
           <div className="flex items-center gap-3 mt-2">
             <div className="flex items-center gap-1.5">
-              <span className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold flex-shrink-0"
+              <span className="w-4 h-4 rounded-full flex items-center justify-center text-[calc(8px_*_var(--app-font-scale,1))] font-bold flex-shrink-0"
                 style={{ background: colors.bg, color: colors.text, border: `1px solid ${colors.ring}40` }}>
                 {initials}
               </span>
-              {authorName && <span className="text-[10px] text-text-secondary font-medium">{authorName}</span>}
+              {authorName && <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary font-medium">{authorName}</span>}
             </div>
-            <span className="text-text-tertiary text-[10px]">·</span>
-            <span className="flex items-center gap-1 text-[10px] text-text-tertiary">
+            <span className="text-text-tertiary text-[calc(10px_*_var(--app-font-scale,1))]">·</span>
+            <span className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
               <Clock size={9} />
               {timeAgo}
             </span>
@@ -242,13 +242,13 @@ function PostDetail({ post, onBack }: { post: DoorayTask; onBack: () => void }):
         </div>
         <button
           onClick={() => window.open(`https://nhnent.dooray.com/task/${AI_SHARING_PROJECT_ID}/${post.id}`, '_blank', 'noopener,noreferrer')}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-surface transition-all text-[11px]"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-surface transition-all text-[calc(11px_*_var(--app-font-scale,1))]"
           title="두레이에서 열기"
         >
           <ExternalLink size={11} />
           두레이
         </button>
-        <span className="text-[10px] text-text-tertiary flex-shrink-0">{formatTimeAgo(post.createdAt)}</span>
+        <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">{formatTimeAgo(post.createdAt)}</span>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -260,7 +260,7 @@ function PostDetail({ post, onBack }: { post: DoorayTask; onBack: () => void }):
               style={{ border: '1px solid var(--bg-border)', background: 'var(--bg-surface)' }}>
               <div className="px-4 py-3 flex items-center gap-2.5"
                 style={{ borderBottom: '1px solid var(--bg-border)', background: 'var(--bg-primary)' }}>
-                <span className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0"
+                <span className="w-7 h-7 rounded-full flex items-center justify-center text-[calc(11px_*_var(--app-font-scale,1))] font-bold flex-shrink-0"
                   style={{ background: authorColors.bg, color: authorColors.text, border: `1.5px solid ${authorColors.ring}60` }}>
                   {authorInitials}
                 </span>
@@ -268,10 +268,10 @@ function PostDetail({ post, onBack }: { post: DoorayTask; onBack: () => void }):
                   <span className="text-xs font-semibold text-text-primary">{authorName || '알 수 없음'}</span>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <Clock size={9} className="text-text-tertiary" />
-                    <span className="text-[9px] text-text-tertiary">{formatTimeAgo(post.createdAt)}</span>
+                    <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">{formatTimeAgo(post.createdAt)}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium"
+                <div className="flex items-center gap-1 px-2 py-1 rounded-lg text-[calc(10px_*_var(--app-font-scale,1))] font-medium"
                   style={{ background: 'var(--c-orange-bg)', color: 'var(--c-orange-fg)', border: '1px solid color-mix(in oklab, var(--c-orange-fg) 30%, transparent)' }}>
                   <Hash size={9} />
                   AI 공유
@@ -300,7 +300,7 @@ function PostDetail({ post, onBack }: { post: DoorayTask; onBack: () => void }):
               <MessageSquare size={13} className="text-clauday-blue" />
               <span className="text-xs font-bold text-text-primary">댓글</span>
               {comments.length > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold"
+                <span className="px-1.5 py-0.5 rounded-full text-[calc(9px_*_var(--app-font-scale,1))] font-bold"
                   style={{ background: 'var(--c-blue-bg)', color: 'var(--c-blue-fg)' }}>
                   {comments.length}
                 </span>
@@ -328,7 +328,7 @@ function PostDetail({ post, onBack }: { post: DoorayTask; onBack: () => void }):
                 return (
                   <div key={c.id} className="flex gap-2.5">
                     <div className="flex flex-col items-center flex-shrink-0">
-                      <span className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold"
+                      <span className="w-6 h-6 rounded-full flex items-center justify-center text-[calc(9px_*_var(--app-font-scale,1))] font-bold"
                         style={{ background: commenterColors.bg, color: commenterColors.text, border: `1.5px solid ${commenterColors.ring}50` }}>
                         {commenterInitials}
                       </span>
@@ -340,8 +340,8 @@ function PostDetail({ post, onBack }: { post: DoorayTask; onBack: () => void }):
                       <div className="rounded-xl overflow-hidden" style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)' }}>
                         <div className="px-3 py-2 flex items-center gap-2"
                           style={{ borderBottom: c.body?.content ? '1px solid var(--bg-border)' : 'none', background: 'var(--bg-primary)' }}>
-                          <span className="text-[11px] font-semibold text-text-primary">{commenterName}</span>
-                          {c.createdAt && <span className="text-[9px] text-text-tertiary ml-auto">{formatTimeAgo(c.createdAt)}</span>}
+                          <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">{commenterName}</span>
+                          {c.createdAt && <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary ml-auto">{formatTimeAgo(c.createdAt)}</span>}
                         </div>
                         {c.body?.content && (
                           <div className="px-3 py-2.5 markdown-body text-xs leading-relaxed text-text-secondary">
@@ -474,7 +474,7 @@ function CommentComposer({ postId, onPosted }: { postId: string; onPosted: () =>
       <div className="flex items-center px-3 pt-2.5 gap-1">
         <button
           onClick={() => setTab('write')}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[calc(11px_*_var(--app-font-scale,1))] font-semibold transition-all"
           style={tab === 'write'
             ? { background: 'var(--c-blue-bg)', color: 'var(--c-blue-fg)', border: '1px solid color-mix(in oklab, var(--c-blue-fg) 30%, transparent)' }
             : { color: 'var(--text-secondary)', border: '1px solid transparent' }
@@ -486,7 +486,7 @@ function CommentComposer({ postId, onPosted }: { postId: string; onPosted: () =>
         <button
           onClick={() => setTab('preview')}
           disabled={!text.trim()}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all disabled:opacity-40"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[calc(11px_*_var(--app-font-scale,1))] font-semibold transition-all disabled:opacity-40"
           style={tab === 'preview'
             ? { background: 'var(--c-blue-bg)', color: 'var(--c-blue-fg)', border: '1px solid color-mix(in oklab, var(--c-blue-fg) 30%, transparent)' }
             : { color: 'var(--text-secondary)', border: '1px solid transparent' }
@@ -496,7 +496,7 @@ function CommentComposer({ postId, onPosted }: { postId: string; onPosted: () =>
           미리보기
         </button>
         <label
-          className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium cursor-pointer transition-colors"
+          className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[calc(11px_*_var(--app-font-scale,1))] font-medium cursor-pointer transition-colors"
           style={{ color: 'var(--text-secondary)', border: '1px solid transparent' }}
         >
           <ImageIcon size={10} />
@@ -537,7 +537,7 @@ function CommentComposer({ postId, onPosted }: { postId: string; onPosted: () =>
         <div className="px-3 pb-2 flex flex-wrap gap-1.5">
           {images.map((img) => (
             <div key={img.tmpId}
-              className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-lg text-[10px] text-text-secondary"
+              className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-lg text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary"
               style={{ background: 'var(--bg-primary)', border: '1px solid var(--bg-border)' }}>
               <img src={img.dataUrl} alt="" className="w-5 h-5 object-cover rounded" />
               <span className="max-w-[100px] truncate">{img.filename}</span>
@@ -554,7 +554,7 @@ function CommentComposer({ postId, onPosted }: { postId: string; onPosted: () =>
 
       <div className="flex items-center justify-between px-3 py-2"
         style={{ borderTop: '1px solid var(--bg-border)' }}>
-        <p className="text-[9px] text-text-tertiary">⌘+Enter로 전송</p>
+        <p className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">⌘+Enter로 전송</p>
         <button
           onClick={submit}
           disabled={!text.trim() || posting}
@@ -687,7 +687,7 @@ function AIRecommendView(): JSX.Element {
         {/* PageHeader */}
         <div className="flex items-center gap-3 flex-wrap">
           <Lightbulb size={18} className="text-clauday-orange" />
-          <h2 className="text-[14px] font-semibold text-text-primary">AI 추천</h2>
+          <h2 className="text-[calc(14px_*_var(--app-font-scale,1))] font-semibold text-text-primary">AI 추천</h2>
           {tab === 'posts' && posts.length > 0 && <span className="ds-chip neutral">{posts.length}개</span>}
           {tab === 'recommend' && result && <span className="ds-chip neutral">{totalRec}건</span>}
           <div className="flex-1" />
@@ -773,7 +773,7 @@ function AIRecommendView(): JSX.Element {
                 <div className="w-8 h-8 rounded-[8px] flex-none flex items-center justify-center bg-clauday-blue/10">
                   <Sparkles size={16} className="text-clauday-blue" />
                 </div>
-                <div className="text-[12px] text-text-secondary leading-relaxed text-center">
+                <div className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary leading-relaxed text-center">
                   <strong className="text-text-primary">AI 활용 사례 공유 프로젝트</strong>의 최신 사례를
                   내 설정(스킬 · MCP 서버)과 비교해
                   <strong className="text-text-primary"> 즉시 도입 / 참고 / 이미 보유</strong> 3가지로 분류합니다.
@@ -784,7 +784,7 @@ function AIRecommendView(): JSX.Element {
             {analyzing && (
               <div className="ds-card flex items-center gap-3" style={{ padding: '12px 14px' }}>
                 <Loader2 size={16} className="animate-spin text-clauday-blue flex-none" />
-                <div className="text-[12px] text-text-secondary flex-1">분석 중...</div>
+                <div className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary flex-1">분석 중...</div>
               </div>
             )}
 
@@ -793,15 +793,15 @@ function AIRecommendView(): JSX.Element {
                 style={{ padding: '12px 14px', borderColor: 'color-mix(in oklab, var(--c-red-fg) 30%, transparent)', background: 'var(--c-red-bg)' }}>
                 <AlertCircle size={16} className="text-red-400 flex-none mt-0.5" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-[12px] font-semibold text-red-400 mb-1">분석 실패</div>
-                  <pre className="text-[11px] text-text-secondary whitespace-pre-wrap break-words font-mono">{analyzeError}</pre>
+                  <div className="text-[calc(12px_*_var(--app-font-scale,1))] font-semibold text-red-400 mb-1">분석 실패</div>
+                  <pre className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary whitespace-pre-wrap break-words font-mono">{analyzeError}</pre>
                 </div>
               </div>
             )}
 
             {result && !analyzing && (
               <>
-                <div className="text-[12px] text-text-secondary px-0.5">
+                <div className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary px-0.5">
                   {result.summary}
                   {result.analyzedAt && (
                     <span className="text-text-tertiary"> · 분석 {formatTimeAgo(new Date(result.analyzedAt).toISOString())}</span>
@@ -816,7 +816,7 @@ function AIRecommendView(): JSX.Element {
                   <Section category="covered" items={result.covered} />
                 </div>
                 {totalRec === 0 && (
-                  <div className="py-12 text-center text-[12px] text-text-tertiary">분류된 사례가 없습니다.</div>
+                  <div className="py-12 text-center text-[calc(12px_*_var(--app-font-scale,1))] text-text-tertiary">분류된 사례가 없습니다.</div>
                 )}
               </>
             )}
@@ -825,7 +825,7 @@ function AIRecommendView(): JSX.Element {
               <div className="py-16 text-center">
                 <Lightbulb size={32} className="mx-auto text-text-tertiary mb-3" />
                 <p className="text-sm font-medium text-text-primary mb-1">아직 분석된 결과가 없습니다</p>
-                <p className="text-[11px] text-text-tertiary">'분석 시작' 버튼을 눌러 내 설정과 비교해보세요</p>
+                <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">'분석 시작' 버튼을 눌러 내 설정과 비교해보세요</p>
               </div>
             )}
           </>

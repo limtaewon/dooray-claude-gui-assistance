@@ -83,7 +83,7 @@ function NavButton({
     >
       <Icon size={20} />
       {badge !== undefined && badge > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-[3px] rounded-full bg-clauday-orange text-white text-[9px] font-bold flex items-center justify-center border-2 border-bg-surface">
+        <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-[3px] rounded-full bg-clauday-orange text-white text-[calc(9px_*_var(--app-font-scale,1))] font-bold flex items-center justify-center border-2 border-bg-surface">
           {badge > 99 ? '99+' : badge}
         </span>
       )}

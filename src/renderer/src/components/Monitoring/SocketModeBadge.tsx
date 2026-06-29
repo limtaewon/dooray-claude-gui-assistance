@@ -89,7 +89,7 @@ export default function SocketModeBadge(): JSX.Element {
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[10px] hover:bg-bg-surface-hover transition-colors"
+        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[calc(10px_*_var(--app-font-scale,1))] hover:bg-bg-surface-hover transition-colors"
         title={tone.desc}
       >
         <Zap size={11} className="text-clauday-orange flex-none" />
@@ -123,13 +123,13 @@ export default function SocketModeBadge(): JSX.Element {
               </button>
             </div>
 
-            <p className="text-[10px] text-text-tertiary leading-relaxed mb-2">
+            <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary leading-relaxed mb-2">
               두레이 도메인을 입력하면 WebSocket으로 메시지를 실시간 수신합니다 (폴링 누락 0).
               두레이 API 토큰을 그대로 재사용해요.
             </p>
 
             {hasApiToken === false && (
-              <div className="p-2 mb-2 rounded text-[10px] flex items-start gap-1.5"
+              <div className="p-2 mb-2 rounded text-[calc(10px_*_var(--app-font-scale,1))] flex items-start gap-1.5"
                 style={{ background: 'var(--c-yellow-bg)', border: '1px solid color-mix(in oklab, var(--c-yellow-fg) 30%, transparent)', color: 'var(--c-yellow-fg)' }}>
                 <AlertCircle size={11} className="flex-none mt-0.5" />
                 <span>먼저 Settings → 두레이 연결에서 API 토큰을 등록하세요</span>
@@ -137,7 +137,7 @@ export default function SocketModeBadge(): JSX.Element {
             )}
 
             {/* 상태 */}
-            <div className="px-2 py-1.5 mb-2 rounded text-[10px] flex items-center gap-1.5"
+            <div className="px-2 py-1.5 mb-2 rounded text-[calc(10px_*_var(--app-font-scale,1))] flex items-center gap-1.5"
               style={{ background: 'var(--bg-primary)', border: '1px solid var(--bg-border)' }}>
               {isActive && <><Check size={10} className="text-emerald-400" /><span className="text-emerald-400 font-semibold">ACTIVE</span></>}
               {isConnecting && <><Loader2 size={10} className="text-clauday-blue animate-spin" /><span className="text-clauday-blue font-semibold">CONNECTING</span></>}
@@ -149,14 +149,14 @@ export default function SocketModeBadge(): JSX.Element {
             </div>
 
             {status?.lastError && (
-              <div className="p-2 mb-2 rounded text-[10px] text-red-400"
+              <div className="p-2 mb-2 rounded text-[calc(10px_*_var(--app-font-scale,1))] text-red-400"
                 style={{ background: 'var(--c-red-bg)', border: '1px solid color-mix(in oklab, var(--c-red-fg) 25%, transparent)' }}>
                 {status.lastError}
               </div>
             )}
 
             {/* 도메인 입력 */}
-            <label className="text-[10px] font-medium text-text-secondary block mb-1">
+            <label className="text-[calc(10px_*_var(--app-font-scale,1))] font-medium text-text-secondary block mb-1">
               두레이 도메인
             </label>
             <input
@@ -168,18 +168,18 @@ export default function SocketModeBadge(): JSX.Element {
                 if (e.key === 'Enter') { e.preventDefault(); void save() }
               }}
               placeholder="company.dooray.com"
-              className="w-full px-2 py-1.5 rounded text-[11px] font-mono text-text-primary placeholder-text-tertiary focus:outline-none"
+              className="w-full px-2 py-1.5 rounded text-[calc(11px_*_var(--app-font-scale,1))] font-mono text-text-primary placeholder-text-tertiary focus:outline-none"
               style={{ background: 'var(--bg-primary)', border: '1px solid var(--bg-border)' }}
             />
 
             <div className="flex items-center gap-1.5 mt-2">
               <button onClick={save} disabled={saving || !hasApiToken}
-                className="flex-1 px-2 py-1 rounded text-[10px] font-semibold text-white bg-clauday-orange hover:bg-clauday-orange/80 disabled:opacity-40">
+                className="flex-1 px-2 py-1 rounded text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-white bg-clauday-orange hover:bg-clauday-orange/80 disabled:opacity-40">
                 {saving ? '연결 중...' : domain ? '재연결' : '연결'}
               </button>
               {domain && (
                 <button onClick={clear} disabled={saving}
-                  className="px-2 py-1 rounded text-[10px] text-red-400 hover:bg-red-500/10">
+                  className="px-2 py-1 rounded text-[calc(10px_*_var(--app-font-scale,1))] text-red-400 hover:bg-red-500/10">
                   비활성화
                 </button>
               )}

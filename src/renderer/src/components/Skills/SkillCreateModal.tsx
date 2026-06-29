@@ -105,7 +105,7 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
           </div>
           <div className="flex-1">
             <h2 className="text-sm font-bold text-text-primary">새 스킬 만들기</h2>
-            <p className="text-[10px] text-text-tertiary">Claude Code 스킬 — AI로 생성하거나 직접 작성</p>
+            <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">Claude Code 스킬 — AI로 생성하거나 직접 작성</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-bg-surface-hover text-text-tertiary hover:text-text-primary">
             <X size={16} />
@@ -122,7 +122,7 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
               </div>
               <div className="text-center">
                 <p className="text-sm font-semibold text-text-primary">AI로 만들기</p>
-                <p className="text-[11px] text-text-tertiary mt-1 leading-relaxed">
+                <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mt-1 leading-relaxed">
                   원하는 스킬을 자연어로 설명하면<br/>AI가 이름·설명·본문까지 생성
                 </p>
               </div>
@@ -134,7 +134,7 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
               </div>
               <div className="text-center">
                 <p className="text-sm font-semibold text-text-primary">직접 작성</p>
-                <p className="text-[11px] text-text-tertiary mt-1 leading-relaxed">
+                <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mt-1 leading-relaxed">
                   이름만 입력하고<br/>빈 에디터에서 작성
                 </p>
               </div>
@@ -146,7 +146,7 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
         {mode === 'ai' && (
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
             <div>
-              <label className="text-[11px] font-semibold text-text-secondary block mb-1.5">
+              <label className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-secondary block mb-1.5">
                 어떤 스킬을 만들고 싶으세요?
               </label>
               <textarea value={instruction} onChange={(e) => setInstruction(e.target.value)}
@@ -154,7 +154,7 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
                 className="w-full min-h-[120px] px-3 py-2.5 rounded-lg bg-bg-subtle border border-bg-border text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue resize-y"
               />
               <div className="flex items-center justify-between mt-2">
-                <span className="text-[10px] text-text-tertiary">구체적일수록 좋습니다 · 모델: Opus (고정)</span>
+                <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">구체적일수록 좋습니다 · 모델: Opus (고정)</span>
                 <button onClick={handleGenerate} disabled={generating || !instruction.trim()}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-clauday-orange to-clauday-blue disabled:opacity-40 hover:opacity-90">
                   {generating ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
@@ -166,11 +166,11 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
             {/* MCP 서버 선택 — 스킬 생성 중 실시간 데이터 조회용 */}
             <div>
               <div className="flex items-center gap-1.5 mb-1.5">
-                <span className="text-[11px] font-semibold text-text-secondary">MCP 서버 활용 (선택)</span>
-                <span className="text-[10px] text-text-tertiary">선택한 MCP로 실제 ID·값을 조회해 스킬에 박아넣습니다</span>
+                <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-secondary">MCP 서버 활용 (선택)</span>
+                <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">선택한 MCP로 실제 ID·값을 조회해 스킬에 박아넣습니다</span>
               </div>
               {mcpServers.length === 0 ? (
-                <div className="px-3 py-2 rounded-lg bg-bg-subtle border border-bg-border text-[10px] text-text-tertiary">
+                <div className="px-3 py-2 rounded-lg bg-bg-subtle border border-bg-border text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
                   등록된 MCP 서버가 없습니다 (MCP 탭에서 추가 가능)
                 </div>
               ) : (
@@ -179,7 +179,7 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
                     const checked = selectedMcp.has(name)
                     return (
                       <button key={name} onClick={() => toggleMcp(name)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] border transition-colors ${
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[calc(11px_*_var(--app-font-scale,1))] border transition-colors ${
                           checked
                             ? 'bg-clauday-blue/15 border-clauday-blue/40 text-clauday-blue font-medium'
                             : 'bg-bg-subtle border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light'
@@ -187,7 +187,7 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
                         <span className={`w-3 h-3 rounded border flex items-center justify-center flex-shrink-0 ${
                           checked ? 'bg-clauday-blue border-clauday-blue' : 'border-bg-border-light'
                         }`}>
-                          {checked && <span className="text-white text-[8px]">✓</span>}
+                          {checked && <span className="text-white text-[calc(8px_*_var(--app-font-scale,1))]">✓</span>}
                         </span>
                         {name}
                       </button>
@@ -196,7 +196,7 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
                 </div>
               )}
               {selectedMcp.size > 0 && (
-                <p className="text-[10px] text-clauday-orange mt-1.5">
+                <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-clauday-orange mt-1.5">
                   ⚠ MCP 조회는 시간이 더 걸려요 (30초~2분). 비용도 증가.
                 </p>
               )}
@@ -211,12 +211,12 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
                 </div>
                 <div className="p-3 space-y-2">
                   <div>
-                    <div className="text-[10px] font-semibold text-text-tertiary mb-0.5">설명</div>
+                    <div className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary mb-0.5">설명</div>
                     <p className="text-xs text-text-secondary">{generated.description}</p>
                   </div>
                   <div>
-                    <div className="text-[10px] font-semibold text-text-tertiary mb-0.5">본문</div>
-                    <pre className="text-[11px] text-text-primary bg-bg-subtle rounded p-2 font-mono whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
+                    <div className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary mb-0.5">본문</div>
+                    <pre className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary bg-bg-subtle rounded p-2 font-mono whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
                       {generated.content}
                     </pre>
                   </div>
@@ -236,14 +236,14 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
         {mode === 'manual' && (
           <div className="p-6 space-y-4">
             <div>
-              <label className="text-[11px] font-semibold text-text-secondary block mb-1.5">스킬 이름</label>
+              <label className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-secondary block mb-1.5">스킬 이름</label>
               <input type="text" value={manualName} onChange={(e) => setManualName(e.target.value)}
                 placeholder="예) code-reviewer, commit-helper"
                 autoFocus
                 onKeyDown={(e) => { if (e.key === 'Enter' && manualName.trim()) handleSaveManual() }}
                 className="w-full px-3 py-2 rounded-lg bg-bg-subtle border border-bg-border text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
               />
-              <p className="text-[10px] text-text-tertiary mt-1.5">
+              <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-1.5">
                 <FileText size={9} className="inline mr-0.5" />
                 파일로 저장 시: <span className="font-mono text-text-secondary">{manualName.trim() ? slugify(manualName) : 'skill-name'}.md</span>
               </p>

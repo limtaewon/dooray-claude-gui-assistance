@@ -102,7 +102,7 @@ const TaskRow = memo(function TaskRow({ task, isSelected, currentTagFilter, onSe
       <div className="flex-1 min-w-0">
         <p className="text-xs text-text-primary truncate">{task.subject}</p>
         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-          <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${WORKFLOW_BG_COLORS[wf] || 'bg-gray-500/10 text-gray-400'}`}>
+          <span className={`text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full ${WORKFLOW_BG_COLORS[wf] || 'bg-gray-500/10 text-gray-400'}`}>
             {wfName}
           </span>
           {task.tags && task.tags.length > 0 && (() => {
@@ -114,7 +114,7 @@ const TaskRow = memo(function TaskRow({ task, isSelected, currentTagFilter, onSe
                 {visible.map((tag) => (
                   <span
                     key={tag.id}
-                    className="text-[9px] px-1.5 py-0.5 rounded-full border"
+                    className="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full border"
                     style={tagStyle(tag.color)}
                     onClick={(e) => { e.stopPropagation(); onToggleTag(tag.name || tag.id) }}
                   >
@@ -123,7 +123,7 @@ const TaskRow = memo(function TaskRow({ task, isSelected, currentTagFilter, onSe
                 ))}
                 {hidden > 0 && (
                   <span
-                    className="text-[9px] px-1.5 py-0.5 rounded-full bg-bg-surface border border-bg-border text-text-tertiary cursor-default"
+                    className="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-bg-surface border border-bg-border text-text-tertiary cursor-default"
                     title={task.tags.slice(MAX_VISIBLE).map((t) => t.name || t.id).join(', ')}
                   >
                     +{hidden}
@@ -133,12 +133,12 @@ const TaskRow = memo(function TaskRow({ task, isSelected, currentTagFilter, onSe
             )
           })()}
           {task.milestone?.name && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-400">
+            <span className="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-400">
               {task.milestone.name}
             </span>
           )}
           {task.dueDateAt && (
-            <span className="text-[9px] text-text-tertiary">
+            <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">
               마감 {new Date(task.dueDateAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
             </span>
           )}
@@ -354,7 +354,7 @@ function ProjectTaskView(): JSX.Element {
         <>
           <div style={{ width: sidebarWidth }} className="flex-shrink-0 bg-bg-surface border-r border-bg-border flex flex-col">
             <div className="flex items-center justify-between px-3 py-2 border-b border-bg-border">
-              <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-wide">프로젝트</span>
+              <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-secondary uppercase tracking-wide">프로젝트</span>
               <div className="flex items-center gap-0.5">
                 <ProjectFilter onChanged={loadProjects} />
                 <button onClick={loadProjects} className="p-1 rounded hover:bg-bg-surface-hover text-text-tertiary">
@@ -375,7 +375,7 @@ function ProjectTaskView(): JSX.Element {
                     value={projectQuery}
                     onChange={(e) => setProjectQuery(e.target.value)}
                     placeholder="프로젝트 검색"
-                    className="w-full pl-6 pr-6 py-1 bg-bg-primary border border-bg-border rounded text-[10px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
+                    className="w-full pl-6 pr-6 py-1 bg-bg-primary border border-bg-border rounded text-[calc(10px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
                   />
                   {projectQuery && (
                     <button onClick={() => setProjectQuery('')}
@@ -388,12 +388,12 @@ function ProjectTaskView(): JSX.Element {
             )}
             <div className="flex-1 overflow-y-auto py-1">
               {loadingProjects ? (
-                <div className="text-[10px] text-text-tertiary text-center py-4">로딩...</div>
+                <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">로딩...</div>
               ) : (() => {
                 const q = projectQuery.trim().toLowerCase()
                 const visible = q ? projects.filter((p) => p.code.toLowerCase().includes(q)) : projects
                 if (visible.length === 0) {
-                  return <div className="text-[10px] text-text-tertiary text-center py-4">검색 결과 없음</div>
+                  return <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">검색 결과 없음</div>
                 }
                 return visible.map((p) => {
                   const isSelected = selectedProject?.id === p.id
@@ -451,14 +451,14 @@ function ProjectTaskView(): JSX.Element {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="업무 검색..."
-                  className="w-40 px-2.5 py-1 bg-bg-surface border border-bg-border rounded text-[11px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
+                  className="w-40 px-2.5 py-1 bg-bg-surface border border-bg-border rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
                 />
 
                 {/* 상태 드롭다운 */}
                 <div className="relative">
                   <button
                     onClick={() => { setShowWfDropdown(!showWfDropdown); setShowTagDropdown(false) }}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded text-[11px] border transition-colors ${
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded text-[calc(11px_*_var(--app-font-scale,1))] border transition-colors ${
                       wfFilter !== '전체' ? 'bg-clauday-blue/10 border-clauday-blue/30 text-clauday-blue' : 'bg-bg-surface border-bg-border text-text-secondary hover:border-bg-border-light'
                     }`}
                   >
@@ -467,12 +467,12 @@ function ProjectTaskView(): JSX.Element {
                   {showWfDropdown && (
                     <div className="absolute top-full left-0 mt-1 w-48 bg-bg-surface border border-bg-border rounded-lg shadow-xl z-20 py-1 max-h-60 overflow-y-auto">
                       <button onClick={() => { setWfFilter('전체'); setShowWfDropdown(false) }}
-                        className={`w-full text-left px-3 py-1.5 text-[11px] transition-colors ${wfFilter === '전체' ? 'bg-clauday-blue/10 text-clauday-blue' : 'text-text-secondary hover:bg-bg-surface-hover'}`}>
+                        className={`w-full text-left px-3 py-1.5 text-[calc(11px_*_var(--app-font-scale,1))] transition-colors ${wfFilter === '전체' ? 'bg-clauday-blue/10 text-clauday-blue' : 'text-text-secondary hover:bg-bg-surface-hover'}`}>
                         전체
                       </button>
                       {workflowCounts.map((wf) => (
                         <button key={wf.name} onClick={() => { setWfFilter(wf.name); setShowWfDropdown(false) }}
-                          className={`w-full text-left px-3 py-1.5 text-[11px] flex items-center justify-between transition-colors ${
+                          className={`w-full text-left px-3 py-1.5 text-[calc(11px_*_var(--app-font-scale,1))] flex items-center justify-between transition-colors ${
                             wfFilter === wf.name ? 'bg-clauday-blue/10 text-clauday-blue' : 'text-text-secondary hover:bg-bg-surface-hover'
                           }`}>
                           <span className="flex items-center gap-1.5">
@@ -492,7 +492,7 @@ function ProjectTaskView(): JSX.Element {
                 <div className="relative">
                   <button
                     onClick={() => { setShowTagDropdown(!showTagDropdown); setShowWfDropdown(false) }}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded text-[11px] border transition-colors ${
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded text-[calc(11px_*_var(--app-font-scale,1))] border transition-colors ${
                       tagFilter !== '전체' ? 'bg-clauday-blue/10 border-clauday-blue/30 text-clauday-blue' : 'bg-bg-surface border-bg-border text-text-secondary hover:border-bg-border-light'
                     }`}
                   >
@@ -501,16 +501,16 @@ function ProjectTaskView(): JSX.Element {
                   {showTagDropdown && (
                     <div className="absolute top-full left-0 mt-1 w-56 bg-bg-surface border border-bg-border rounded-lg shadow-xl z-20 py-1 max-h-60 overflow-y-auto">
                       <button onClick={() => { setTagFilter('전체'); setShowTagDropdown(false) }}
-                        className={`w-full text-left px-3 py-1.5 text-[11px] transition-colors ${tagFilter === '전체' ? 'bg-clauday-blue/10 text-clauday-blue' : 'text-text-secondary hover:bg-bg-surface-hover'}`}>
+                        className={`w-full text-left px-3 py-1.5 text-[calc(11px_*_var(--app-font-scale,1))] transition-colors ${tagFilter === '전체' ? 'bg-clauday-blue/10 text-clauday-blue' : 'text-text-secondary hover:bg-bg-surface-hover'}`}>
                         전체
                       </button>
                       {tagList.map((tag) => (
                         <button key={tag.name} onClick={() => { setTagFilter(tag.name); setShowTagDropdown(false) }}
-                          className={`w-full text-left px-3 py-1.5 text-[11px] flex items-center justify-between transition-colors ${
+                          className={`w-full text-left px-3 py-1.5 text-[calc(11px_*_var(--app-font-scale,1))] flex items-center justify-between transition-colors ${
                             tagFilter === tag.name ? 'bg-clauday-blue/10 text-clauday-blue' : 'text-text-secondary hover:bg-bg-surface-hover'
                           }`}>
                           <span className="flex items-center gap-1.5">
-                            <span className="px-1.5 py-0.5 rounded text-[9px] border" style={tagStyle(tag.color)}>{tag.name}</span>
+                            <span className="px-1.5 py-0.5 rounded text-[calc(9px_*_var(--app-font-scale,1))] border" style={tagStyle(tag.color)}>{tag.name}</span>
                           </span>
                           <span className="text-text-tertiary">{tag.count}</span>
                         </button>
@@ -520,7 +520,7 @@ function ProjectTaskView(): JSX.Element {
                 </div>
 
                 {/* 결과 수 */}
-                <span className="text-[10px] text-text-tertiary ml-auto">
+                <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary ml-auto">
                   {filteredTasks.length}/{tasks.length}
                 </span>
               </div>
@@ -550,7 +550,7 @@ function ProjectTaskView(): JSX.Element {
                     />
                   ))}
                   {renderCount < filteredTasks.length && (
-                    <div className="py-3 text-center text-[10px] text-text-tertiary">
+                    <div className="py-3 text-center text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
                       {visibleTasks.length} / {filteredTasks.length}개 표시 — 스크롤하면 더 불러옵니다
                     </div>
                   )}

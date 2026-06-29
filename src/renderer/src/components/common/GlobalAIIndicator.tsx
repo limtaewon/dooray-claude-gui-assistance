@@ -32,10 +32,10 @@ function GlobalAIIndicator(): JSX.Element | null {
         <Sparkles size={11} className="text-clauday-orange" />
         <Loader2 size={14} className="absolute text-clauday-orange/40 animate-spin" />
       </div>
-      <span className="text-[10px] text-text-primary font-medium truncate max-w-[200px]">
+      <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-primary font-medium truncate max-w-[200px]">
         {active.message}
       </span>
-      <span className="text-[9px] text-text-tertiary font-mono">{timeStr}</span>
+      <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary font-mono">{timeStr}</span>
     </div>
   )
 }

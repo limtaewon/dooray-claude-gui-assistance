@@ -53,7 +53,7 @@ function DoorayImage({ src, alt, className }: Props): JSX.Element | null {
 
   if (loading) {
     return (
-      <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-bg-surface border border-bg-border text-[10px] text-text-tertiary">
+      <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-bg-surface border border-bg-border text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
         <Loader2 size={11} className="animate-spin" /> 이미지 로딩 중...
       </span>
     )
@@ -65,12 +65,12 @@ function DoorayImage({ src, alt, className }: Props): JSX.Element | null {
     const is404 = error.includes('404')
     return (
       <a href={webUrl} target="_blank" rel="noreferrer"
-        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-surface border border-bg-border text-[11px] text-text-secondary hover:border-clauday-blue/40 hover:text-clauday-blue transition-colors"
+        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-surface border border-bg-border text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:border-clauday-blue/40 hover:text-clauday-blue transition-colors"
         title={error}>
         <ImageOff size={13} className="flex-shrink-0" />
         <span className="truncate max-w-xs">{alt || '이미지'}</span>
         <ExternalLink size={10} className="flex-shrink-0 opacity-60" />
-        <span className="text-[9px] text-text-tertiary flex-shrink-0">
+        <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">
           {is404 ? '두레이에서 보기' : '로드 실패'}
         </span>
       </a>

@@ -108,7 +108,7 @@ function SkillEditor({ filename, content, onChange }: SkillEditorProps): JSX.Ele
           type="button"
           onClick={() => setAiPanel(aiPanel ? null : 'input')}
           disabled={aiPanel === 'loading'}
-          className={`flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md border transition-colors ${
+          className={`flex items-center gap-1 px-2 py-0.5 text-[calc(11px_*_var(--app-font-scale,1))] rounded-md border transition-colors ${
             aiPanel
               ? 'bg-clauday-orange/15 text-clauday-orange border-clauday-orange/40'
               : 'text-text-tertiary border-transparent hover:text-clauday-blue hover:border-clauday-blue/30'
@@ -123,7 +123,7 @@ function SkillEditor({ filename, content, onChange }: SkillEditorProps): JSX.Ele
           <button
             type="button"
             onClick={() => setMode('edit')}
-            className={`flex items-center gap-1 px-2 py-0.5 text-[11px] transition-colors ${
+            className={`flex items-center gap-1 px-2 py-0.5 text-[calc(11px_*_var(--app-font-scale,1))] transition-colors ${
               mode === 'edit'
                 ? 'bg-clauday-blue/15 text-clauday-blue'
                 : 'text-text-tertiary hover:text-text-primary'
@@ -134,7 +134,7 @@ function SkillEditor({ filename, content, onChange }: SkillEditorProps): JSX.Ele
           <button
             type="button"
             onClick={() => setMode('preview')}
-            className={`flex items-center gap-1 px-2 py-0.5 text-[11px] border-l border-bg-border transition-colors ${
+            className={`flex items-center gap-1 px-2 py-0.5 text-[calc(11px_*_var(--app-font-scale,1))] border-l border-bg-border transition-colors ${
               mode === 'preview'
                 ? 'bg-clauday-blue/15 text-clauday-blue'
                 : 'text-text-tertiary hover:text-text-primary'
@@ -152,8 +152,8 @@ function SkillEditor({ filename, content, onChange }: SkillEditorProps): JSX.Ele
             <>
               <div className="flex items-center gap-2">
                 <Sparkles size={12} className="text-clauday-orange" />
-                <span className="text-[11px] font-semibold text-text-primary">AI로 스킬 개선</span>
-                <span className="text-[10px] text-text-tertiary">현재 스킬 내용을 바탕으로 AI가 개선안을 제시합니다</span>
+                <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">AI로 스킬 개선</span>
+                <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">현재 스킬 내용을 바탕으로 AI가 개선안을 제시합니다</span>
               </div>
               <div className="flex items-center gap-2">
                 <input
@@ -172,7 +172,7 @@ function SkillEditor({ filename, content, onChange }: SkillEditorProps): JSX.Ele
                 >
                   <Sparkles size={11} /> 개선하기
                 </button>
-                <button onClick={handleDiscardAI} className="text-[11px] text-text-tertiary hover:text-text-primary px-1">
+                <button onClick={handleDiscardAI} className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-primary px-1">
                   취소
                 </button>
               </div>
@@ -193,20 +193,20 @@ function SkillEditor({ filename, content, onChange }: SkillEditorProps): JSX.Ele
             <>
               <div className="flex items-center gap-2">
                 <Check size={12} className="text-emerald-500" />
-                <span className="text-[11px] font-semibold text-text-primary">AI 개선 완료 — 검토 후 적용하세요</span>
+                <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">AI 개선 완료 — 검토 후 적용하세요</span>
               </div>
               <div className="rounded-lg border border-clauday-blue/30 bg-clauday-blue/5 p-3 space-y-1.5 text-xs">
                 <div>
-                  <span className="text-[10px] font-semibold text-text-tertiary">이름</span>
+                  <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary">이름</span>
                   <p className="text-text-primary mt-0.5">{aiResult.name}</p>
                 </div>
                 <div>
-                  <span className="text-[10px] font-semibold text-text-tertiary">설명</span>
+                  <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary">설명</span>
                   <p className="text-text-secondary mt-0.5">{aiResult.description}</p>
                 </div>
                 <div>
-                  <span className="text-[10px] font-semibold text-text-tertiary">본문 미리보기</span>
-                  <pre className="mt-0.5 text-[11px] font-mono text-text-primary bg-bg-subtle rounded p-2 whitespace-pre-wrap max-h-32 overflow-y-auto leading-relaxed">
+                  <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary">본문 미리보기</span>
+                  <pre className="mt-0.5 text-[calc(11px_*_var(--app-font-scale,1))] font-mono text-text-primary bg-bg-subtle rounded p-2 whitespace-pre-wrap max-h-32 overflow-y-auto leading-relaxed">
                     {aiResult.content.slice(0, 400)}{aiResult.content.length > 400 ? '...' : ''}
                   </pre>
                 </div>
@@ -224,7 +224,7 @@ function SkillEditor({ filename, content, onChange }: SkillEditorProps): JSX.Ele
                 >
                   다시 시도
                 </button>
-                <button onClick={handleDiscardAI} className="text-[11px] text-text-tertiary hover:text-text-primary px-1">
+                <button onClick={handleDiscardAI} className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-primary px-1">
                   닫기
                 </button>
               </div>

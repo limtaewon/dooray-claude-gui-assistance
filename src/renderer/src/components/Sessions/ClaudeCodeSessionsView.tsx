@@ -163,7 +163,7 @@ export default function ClaudeCodeSessionsView({ active = true }: { active?: boo
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="세션 검색 (제목, 폴더, ID)..."
-              className="w-full pl-7 pr-7 py-1.5 rounded text-[11px] bg-bg-primary border border-bg-border text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-clauday-orange"
+              className="w-full pl-7 pr-7 py-1.5 rounded text-[calc(11px_*_var(--app-font-scale,1))] bg-bg-primary border border-bg-border text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-clauday-orange"
             />
             {search && (
               <button
@@ -175,7 +175,7 @@ export default function ClaudeCodeSessionsView({ active = true }: { active?: boo
               </button>
             )}
           </div>
-          <div className="px-3 mt-2 mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-tertiary">
+          <div className="px-3 mt-2 mb-1.5 flex items-center gap-1.5 text-[calc(10px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-text-tertiary">
             <History size={10} />
             이전 세션 {sessions.length > 0 && (q ? `(${filteredSessions.length}/${sessions.length})` : `(${sessions.length})`)}
             <div className="flex-1" />
@@ -186,16 +186,16 @@ export default function ClaudeCodeSessionsView({ active = true }: { active?: boo
           </div>
           <div className="flex-1 overflow-y-auto py-1">
             {loading ? (
-              <div className="px-3 py-4 text-[11px] text-text-tertiary text-center">로딩...</div>
+              <div className="px-3 py-4 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary text-center">로딩...</div>
             ) : sessions.length === 0 ? (
-              <div className="px-3 py-4 text-[11px] text-text-tertiary text-center">저장된 세션 없음</div>
+              <div className="px-3 py-4 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary text-center">저장된 세션 없음</div>
             ) : filteredSessions.length === 0 ? (
-              <div className="px-3 py-4 text-[11px] text-text-tertiary text-center">검색 결과 없음</div>
+              <div className="px-3 py-4 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary text-center">검색 결과 없음</div>
             ) : (
               <>
                 {starredSessions.length > 0 && (
                   <>
-                    <div className="px-3 pt-1 pb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-clauday-orange">
+                    <div className="px-3 pt-1 pb-1 flex items-center gap-1.5 text-[calc(10px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-clauday-orange">
                       <Star size={10} className="fill-current" />
                       즐겨찾기 ({starredSessions.length})
                     </div>
@@ -220,7 +220,7 @@ export default function ClaudeCodeSessionsView({ active = true }: { active?: boo
                 {unstarredSessions.length > 0 && (
                   <>
                     {starredSessions.length > 0 && (
-                      <div className="px-3 pt-1 pb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-tertiary">
+                      <div className="px-3 pt-1 pb-1 flex items-center gap-1.5 text-[calc(10px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-text-tertiary">
                         <History size={10} />
                         전체 ({unstarredSessions.length})
                       </div>
@@ -255,7 +255,7 @@ export default function ClaudeCodeSessionsView({ active = true }: { active?: boo
             <Sparkles size={36} className="text-clauday-orange/60" />
             <div className="text-center">
               <div className="text-sm font-medium text-text-primary">Claude Code</div>
-              <div className="text-[11px] mt-1">왼쪽에서 이전 세션을 고르거나 "새 채팅"을 시작하세요</div>
+              <div className="text-[calc(11px_*_var(--app-font-scale,1))] mt-1">왼쪽에서 이전 세션을 고르거나 "새 채팅"을 시작하세요</div>
             </div>
             <button onClick={startNewChat}
               className="mt-2 flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm hover:opacity-90"
@@ -318,7 +318,7 @@ function SessionRow({
               else if (e.key === 'Escape') { e.preventDefault(); onCancelRename() }
             }}
             placeholder={session.title || '세션 이름'}
-            className="flex-1 px-2 py-0.5 rounded text-[11px] bg-bg-primary border border-bg-border text-text-primary focus:outline-none focus:border-clauday-orange"
+            className="flex-1 px-2 py-0.5 rounded text-[calc(11px_*_var(--app-font-scale,1))] bg-bg-primary border border-bg-border text-text-primary focus:outline-none focus:border-clauday-orange"
           />
           <button onClick={onCommitRename}
             className="p-1 rounded hover:bg-emerald-500/15 text-emerald-400">
@@ -352,7 +352,7 @@ function SessionRow({
         >
           <Star size={13} className={session.starred ? 'fill-current' : ''} />
         </button>
-        <div className={`flex-1 text-[12px] line-clamp-2 leading-tight ${isActive ? 'text-clauday-orange font-medium' : 'text-text-primary'}`}>
+        <div className={`flex-1 text-[calc(12px_*_var(--app-font-scale,1))] line-clamp-2 leading-tight ${isActive ? 'text-clauday-orange font-medium' : 'text-text-primary'}`}>
           {displayTitle}
         </div>
         <button
@@ -362,7 +362,7 @@ function SessionRow({
           <Edit3 size={12} />
         </button>
       </div>
-      <div className="flex items-center gap-2 text-[10px] text-text-tertiary mt-0.5 pl-6">
+      <div className="flex items-center gap-2 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5 pl-6">
         <span>{formatRelative(session.lastActivityAt)}</span>
         <span>·</span>
         <span>{session.messageCount}개</span>

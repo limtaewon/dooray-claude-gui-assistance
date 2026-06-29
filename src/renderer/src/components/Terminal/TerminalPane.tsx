@@ -547,7 +547,7 @@ function TerminalPane({ sessionId, isActive, initialOutput }: TerminalPaneProps)
       {/* #2 이미지 사이드 패널 토글 — 우측 가장자리 작은 탭 */}
       <button
         onClick={() => setImageSidebarOpen((o) => !o)}
-        className="absolute z-20 flex items-center gap-1 px-2 py-1 rounded-l-md shadow-md text-[11px] font-medium"
+        className="absolute z-20 flex items-center gap-1 px-2 py-1 rounded-l-md shadow-md text-[calc(11px_*_var(--app-font-scale,1))] font-medium"
         style={{
           top: 10,
           right: imageSidebarOpen ? 220 : 0,
@@ -575,21 +575,21 @@ function TerminalPane({ sessionId, isActive, initialOutput }: TerminalPaneProps)
         >
           <div className="px-3 py-2 border-b border-bg-border flex items-center gap-1.5">
             <ImageIcon size={12} className="text-clauday-blue" />
-            <span className="text-[11px] font-semibold text-text-primary">최근 이미지</span>
-            <span className="text-[10px] text-text-tertiary">{recentImages.length}</span>
+            <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">최근 이미지</span>
+            <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">{recentImages.length}</span>
             <div className="flex-1" />
             {recentImages.length > 0 && (
               <button onClick={() => setRecentImages([])}
-                className="text-[10px] text-text-tertiary hover:text-text-primary">
+                className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-primary">
                 지우기
               </button>
             )}
           </div>
           {recentImages.length === 0 ? (
             <div className="flex-1 flex items-center justify-center px-3 text-center">
-              <span className="text-[10.5px] text-text-tertiary leading-relaxed">
+              <span className="text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-tertiary leading-relaxed">
                 터미널 출력에 이미지 경로가 보이면 여기 모입니다.
-                <br /><span className="text-[10px] opacity-70">예: ~/screenshots/foo.png</span>
+                <br /><span className="text-[calc(10px_*_var(--app-font-scale,1))] opacity-70">예: ~/screenshots/foo.png</span>
               </span>
             </div>
           ) : (
@@ -670,7 +670,7 @@ function ImageRow({ path }: { path: string }): JSX.Element {
           <ImageIcon size={13} className={failed ? 'text-text-tertiary' : 'text-clauday-blue'} />
         )}
       </div>
-      <span className="text-[11px] text-text-primary truncate flex-1">{filename}</span>
+      <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary truncate flex-1">{filename}</span>
       <ExternalLink size={9} className="text-text-tertiary opacity-0 group-hover:opacity-100 flex-shrink-0" />
     </button>
   )

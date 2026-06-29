@@ -167,9 +167,9 @@ function PreviewMockup({ palette, active, onPick }: {
       <div className="px-4 pt-3 pb-2" style={{ background: v['--bg-base'] }}>
         <div className="flex items-center justify-between">
           <span className="text-sm font-semibold" style={{ color: v['--text-primary'] }}>{palette.name}</span>
-          {active && <span className="flex items-center gap-1 text-[10px] text-clauday-blue"><Check size={11} /> 적용됨</span>}
+          {active && <span className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-clauday-blue"><Check size={11} /> 적용됨</span>}
         </div>
-        <p className="text-[10px] mt-0.5" style={{ color: v['--text-tertiary'] }}>{palette.description}</p>
+        <p className="text-[calc(10px_*_var(--app-font-scale,1))] mt-0.5" style={{ color: v['--text-tertiary'] }}>{palette.description}</p>
       </div>
 
       {/* 3레이어 미니 프리뷰 */}
@@ -215,7 +215,7 @@ function PreviewMockup({ palette, active, onPick }: {
 
       {/* 팔레트 스와치 */}
       <div className="flex items-center gap-1 px-4 py-2" style={{ background: v['--bg-surface'], borderTop: `1px solid ${v['--bg-border']}` }}>
-        <span className="text-[9px]" style={{ color: v['--text-tertiary'] }}>배경 레이어</span>
+        <span className="text-[calc(9px_*_var(--app-font-scale,1))]" style={{ color: v['--text-tertiary'] }}>배경 레이어</span>
         {[v['--bg-sidebar'], v['--bg-base'], v['--bg-surface'], v['--bg-surface-raised']].map((c, i) => (
           <span key={i} className="w-3 h-3 rounded-sm"
             style={{ background: c, border: `1px solid ${v['--bg-border']}` }} title={c} />
@@ -242,7 +242,7 @@ function ThemePicker(): JSX.Element {
         </div>
         <div>
           <h3 className="text-sm font-semibold text-text-primary">라이트 팔레트 고르기</h3>
-          <p className="text-[10px] text-text-tertiary">마음에 드는 걸 클릭하면 즉시 적용됩니다</p>
+          <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">마음에 드는 걸 클릭하면 즉시 적용됩니다</p>
         </div>
       </div>
 
@@ -252,7 +252,7 @@ function ThemePicker(): JSX.Element {
         ))}
       </div>
 
-      <div className="mt-4 flex items-center justify-between text-[10px] text-text-tertiary">
+      <div className="mt-4 flex items-center justify-between text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
         <span>💡 다크모드에서는 이 선택이 무시되고 기본 다크 팔레트가 적용됩니다</span>
         <button onClick={() => setSelected('cool-minimal')}
           className="px-2 py-1 rounded hover:text-text-secondary">

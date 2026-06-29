@@ -293,6 +293,17 @@ prefersDark.addEventListener('change', (e) => {
 })
 ```
 
+## 글꼴 / 글자 크기
+
+색 모드(테마)와 별개로, 글꼴 패밀리와 글자 크기도 사용자가 조절할 수 있습니다. `useFontSettings`
+훅이 `--app-font-family` 와 `--app-font-scale` 를 `<html>` 에 설정하고 localStorage `fontSettings`
+키에 저장합니다 (테마의 `theme` 키와 동일한 패턴).
+
+- **글꼴 패밀리**: `--app-font-family` (Inter / Pretendard / Noto Sans KR 등)
+- **글자 크기**: `--app-font-scale` (0.75~1.6). **font-size 에만 적용** → 여백/레이아웃은 그대로,
+  글자만 커집니다. root `html` font-size 는 16px 고정. 자세한 메커니즘·작성 규칙은
+  [tokens.md](tokens.md) 의 "글자 크기 스케일" 참고.
+
 ## 문제 해결
 
 ### 전환 시 색이 어색합니다

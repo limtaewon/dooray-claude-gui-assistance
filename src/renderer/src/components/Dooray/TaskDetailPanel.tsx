@@ -75,11 +75,11 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
           <h3 className="text-sm font-semibold text-text-primary leading-snug">{task.subject}</h3>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             {task.projectCode && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-clauday-blue/10 text-clauday-blue font-mono">{task.projectCode}</span>
+              <span className="text-[calc(10px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded bg-clauday-blue/10 text-clauday-blue font-mono">{task.projectCode}</span>
             )}
-            <span className="text-[10px] text-text-secondary">{wfName}</span>
+            <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">{wfName}</span>
             {task.dueDateAt && (
-              <span className="flex items-center gap-0.5 text-[10px] text-text-secondary">
+              <span className="flex items-center gap-0.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">
                 <Clock size={9} /> {new Date(task.dueDateAt).toLocaleDateString('ko-KR')}
               </span>
             )}
@@ -108,7 +108,7 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
         <div className="mx-3 mt-3 p-3 rounded-lg bg-gradient-to-r from-clauday-orange/5 to-clauday-blue/5 border border-clauday-orange/20 flex-shrink-0">
           <div className="flex items-center gap-1.5 mb-2">
             <Sparkles size={12} className="text-clauday-orange" />
-            <span className="text-[11px] font-semibold text-clauday-orange">AI 분석</span>
+            <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-clauday-orange">AI 분석</span>
           </div>
           <div className="text-xs text-text-primary leading-relaxed markdown-body">
             <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>{summary}</ReactMarkdown>
@@ -131,7 +131,7 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
         {/* 담당자 */}
         {detail?.users?.to && detail.users.to.length > 0 && (
           <div className="mt-4 pt-4 border-t border-bg-border">
-            <h4 className="text-[11px] font-semibold text-text-secondary mb-2 flex items-center gap-1">
+            <h4 className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-secondary mb-2 flex items-center gap-1">
               <User size={11} /> 담당자
             </h4>
             <div className="flex flex-wrap gap-1.5">
@@ -139,7 +139,7 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
                 const name = u?.member?.name || u?.emailUser?.emailAddress || '알 수 없음'
                 const key = u?.member?.id || u?.emailUser?.emailAddress || `user-${i}`
                 return (
-                  <span key={key} className="text-[10px] px-2 py-0.5 rounded-full bg-bg-surface border border-bg-border text-text-primary">
+                  <span key={key} className="text-[calc(10px_*_var(--app-font-scale,1))] px-2 py-0.5 rounded-full bg-bg-surface border border-bg-border text-text-primary">
                     {name}
                   </span>
                 )
@@ -151,18 +151,18 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
         {/* 댓글 */}
         {comments.length > 0 && (
           <div className="mt-4 pt-4 border-t border-bg-border">
-            <h4 className="text-[11px] font-semibold text-text-secondary mb-3 flex items-center gap-1">
+            <h4 className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-secondary mb-3 flex items-center gap-1">
               <MessageCircle size={11} /> 댓글 {comments.length}
             </h4>
             <div className="space-y-3">
               {comments.map((c) => (
                 <div key={c.id} className="bg-bg-surface rounded-lg p-3 border border-bg-border">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[10px] font-semibold text-text-primary">
+                    <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-text-primary">
                       {c.creator?.member?.name || '알 수 없음'}
                     </span>
                     {c.createdAt && (
-                      <span className="text-[9px] text-text-tertiary">
+                      <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">
                         {new Date(c.createdAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </span>
                     )}
@@ -178,7 +178,7 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
           </div>
         )}
         {loadingComments && (
-          <div className="mt-4 text-[10px] text-text-tertiary text-center">댓글 로딩 중...</div>
+          <div className="mt-4 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center">댓글 로딩 중...</div>
         )}
       </div>
     </div>

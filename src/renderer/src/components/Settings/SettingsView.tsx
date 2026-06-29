@@ -116,7 +116,7 @@ function ModelSettings(): JSX.Element {
     <div className="p-6 max-w-3xl mx-auto">
       <div className="mb-4">
         <h3 className="text-sm font-semibold text-text-primary">기능별 AI 모델</h3>
-        <p className="text-[10px] text-text-tertiary mt-0.5">
+        <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
           각 기능마다 원하는 모델을 선택하세요. Haiku는 빠르고 저렴, Opus는 품질 최상.
         </p>
       </div>
@@ -127,10 +127,10 @@ function ModelSettings(): JSX.Element {
           return (
             <div key={m} className="p-2.5 rounded-lg bg-bg-surface border border-bg-border">
               <div className="flex items-center gap-1.5 mb-1">
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${info.color}`}>{info.label}</span>
-                <span className="text-[9px] text-text-tertiary">{info.cost}</span>
+                <span className={`text-[calc(10px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded font-semibold ${info.color}`}>{info.label}</span>
+                <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">{info.cost}</span>
               </div>
-              <div className="text-[9px] text-text-secondary">속도 {info.speed} · 품질 {info.quality}</div>
+              <div className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-secondary">속도 {info.speed} · 품질 {info.quality}</div>
             </div>
           )
         })}
@@ -146,12 +146,12 @@ function ModelSettings(): JSX.Element {
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-text-primary">{feat.label}</span>
                   {!current && (
-                    <span className="text-[9px] text-text-tertiary px-1.5 py-0.5 rounded bg-bg-primary">
+                    <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary px-1.5 py-0.5 rounded bg-bg-primary">
                       기본 · {MODEL_INFO[feat.defaultModel].label}
                     </span>
                   )}
                 </div>
-                <p className="text-[10px] text-text-tertiary mt-0.5">{feat.description}</p>
+                <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">{feat.description}</p>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 {(['default', 'haiku', 'sonnet', 'opus'] as const).map((m) => {
@@ -159,7 +159,7 @@ function ModelSettings(): JSX.Element {
                   const label = m === 'default' ? '기본' : MODEL_INFO[m].label
                   return (
                     <button key={m} onClick={() => setFeatureModel(feat.key, m)}
-                      className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-colors ${
+                      className={`px-2.5 py-1 rounded-md text-[calc(10px_*_var(--app-font-scale,1))] font-medium transition-colors ${
                         isActive
                           ? m === 'default' ? 'bg-bg-border text-text-primary' : MODEL_INFO[m as AIModelName].color
                           : 'bg-bg-primary text-text-secondary hover:text-text-primary border border-bg-border'
@@ -233,7 +233,7 @@ function DoorayTokenSettings(): JSX.Element {
     <div className="p-6 max-w-2xl mx-auto">
       <div className="mb-4">
         <h3 className="text-sm font-semibold text-text-primary">두레이 API 토큰</h3>
-        <p className="text-[10px] text-text-tertiary mt-0.5">
+        <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
           Dooray의 태스크/위키/캘린더에 접근하려면 개인 API 토큰이 필요합니다.
         </p>
       </div>
@@ -244,22 +244,22 @@ function DoorayTokenSettings(): JSX.Element {
           <div>
             <p className="text-xs text-text-primary font-medium">현재 연결 상태</p>
             {hasToken === null ? (
-              <p className="text-[10px] text-text-tertiary mt-0.5">확인 중...</p>
+              <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">확인 중...</p>
             ) : hasToken && validation?.valid ? (
-              <p className="text-[10px] text-emerald-400 mt-0.5 flex items-center gap-1">
+              <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-emerald-400 mt-0.5 flex items-center gap-1">
                 <Check size={10} /> 연결됨 · {validation.name}
               </p>
             ) : hasToken && !validation?.valid ? (
-              <p className="text-[10px] text-red-400 mt-0.5">
+              <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-red-400 mt-0.5">
                 토큰은 있지만 유효하지 않음: {validation?.error}
               </p>
             ) : (
-              <p className="text-[10px] text-text-tertiary mt-0.5">토큰이 설정되지 않음</p>
+              <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">토큰이 설정되지 않음</p>
             )}
           </div>
           {hasToken && (
             <button onClick={handleDelete}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 text-[11px] hover:bg-red-500/20">
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 text-[calc(11px_*_var(--app-font-scale,1))] hover:bg-red-500/20">
               <LogOut size={11} /> 연결 해제
             </button>
           )}
@@ -268,24 +268,24 @@ function DoorayTokenSettings(): JSX.Element {
 
       {/* 토큰 발급 안내 */}
       <div className="p-3 rounded-xl bg-clauday-blue/5 border border-clauday-blue/20 mb-3">
-        <p className="text-[11px] text-text-secondary mb-2">
+        <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary mb-2">
           <strong className="text-text-primary">토큰 발급 방법:</strong>
         </p>
-        <ol className="text-[10px] text-text-tertiary list-decimal list-inside space-y-0.5">
+        <ol className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary list-decimal list-inside space-y-0.5">
           <li>두레이 접속 → 우측 상단 프로필 클릭</li>
           <li>"내 정보" 또는 "인증" 메뉴 → "API 토큰" 섹션</li>
           <li>"새 토큰 발급" → 권한: 프로젝트/캘린더/위키 읽기·쓰기</li>
           <li>발급된 토큰을 아래 입력란에 붙여넣기</li>
         </ol>
         <a href="https://nhnent.dooray.com/setting/api/token" target="_blank" rel="noreferrer"
-          className="inline-flex items-center gap-1 mt-2 text-[10px] text-clauday-blue hover:underline">
+          className="inline-flex items-center gap-1 mt-2 text-[calc(10px_*_var(--app-font-scale,1))] text-clauday-blue hover:underline">
           <ExternalLink size={10} /> API 토큰 발급 페이지 열기
         </a>
       </div>
 
       {/* 토큰 입력 */}
       <div>
-        <label className="text-[11px] font-medium text-text-secondary block mb-1.5">
+        <label className="text-[calc(11px_*_var(--app-font-scale,1))] font-medium text-text-secondary block mb-1.5">
           {hasToken ? '새 토큰으로 교체' : '토큰 입력'}
         </label>
         <div className="relative">
@@ -382,14 +382,14 @@ function SocketModeSettings({ hasApiToken }: { hasApiToken: boolean }): JSX.Elem
         <Zap size={14} className="text-clauday-orange" />
         <div>
           <h3 className="text-sm font-semibold text-text-primary">Socket Mode (실시간 메시지 수신)</h3>
-          <p className="text-[10px] text-text-tertiary mt-0.5">
+          <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
             두레이 도메인을 입력하면 WebSocket으로 메시지를 실시간 수신합니다 (폴링 누락 0). API 토큰은 그대로 재사용해요.
           </p>
         </div>
       </div>
 
       {!hasApiToken && (
-        <div className="p-2 mb-3 rounded text-[11px] flex items-start gap-1.5"
+        <div className="p-2 mb-3 rounded text-[calc(11px_*_var(--app-font-scale,1))] flex items-start gap-1.5"
           style={{ background: 'var(--c-yellow-bg)', border: '1px solid color-mix(in oklab, var(--c-yellow-fg) 30%, transparent)', color: 'var(--c-yellow-fg)' }}>
           <AlertCircle size={12} className="flex-none mt-0.5" />
           <span>먼저 위에서 두레이 API 토큰을 등록하세요.</span>
@@ -400,7 +400,7 @@ function SocketModeSettings({ hasApiToken }: { hasApiToken: boolean }): JSX.Elem
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs text-text-primary font-medium">현재 상태</p>
-            <p className={`text-[10px] mt-0.5 flex items-center gap-1.5 ${
+            <p className={`text-[calc(10px_*_var(--app-font-scale,1))] mt-0.5 flex items-center gap-1.5 ${
               isActive ? 'text-emerald-400'
                 : isConnecting ? 'text-clauday-blue'
                 : isStandby ? 'text-amber-400'
@@ -416,13 +416,13 @@ function SocketModeSettings({ hasApiToken }: { hasApiToken: boolean }): JSX.Elem
           </div>
           {domain && (
             <button onClick={clear} disabled={saving}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 text-[11px] hover:bg-red-500/20">
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 text-[calc(11px_*_var(--app-font-scale,1))] hover:bg-red-500/20">
               <X size={11} /> 비활성화
             </button>
           )}
         </div>
         {status?.lastError && (
-          <div className="mt-2 p-2 rounded text-[10px] text-red-400"
+          <div className="mt-2 p-2 rounded text-[calc(10px_*_var(--app-font-scale,1))] text-red-400"
             style={{ background: 'var(--c-red-bg)', border: '1px solid color-mix(in oklab, var(--c-red-fg) 25%, transparent)' }}>
             {status.lastError}
           </div>
@@ -430,7 +430,7 @@ function SocketModeSettings({ hasApiToken }: { hasApiToken: boolean }): JSX.Elem
       </div>
 
       <div>
-        <label className="text-[11px] font-medium text-text-secondary block mb-1.5">두레이 도메인</label>
+        <label className="text-[calc(11px_*_var(--app-font-scale,1))] font-medium text-text-secondary block mb-1.5">두레이 도메인</label>
         <input
           type="text"
           value={domainDraft}
@@ -543,7 +543,7 @@ function CalDAVSettings(): JSX.Element {
     <div className="p-6 max-w-2xl mx-auto">
       <div className="mb-4">
         <h3 className="text-sm font-semibold text-text-primary">두레이 캘린더 (CalDAV)</h3>
-        <p className="text-[10px] text-text-tertiary mt-0.5">
+        <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
           두레이의 CalDAV 엔드포인트로 일정을 양방향 동기화합니다. 비밀번호는 두레이에서 별도 발급한 CalDAV 전용 비밀번호입니다.
         </p>
       </div>
@@ -554,18 +554,18 @@ function CalDAVSettings(): JSX.Element {
           <div>
             <p className="text-xs text-text-primary font-medium">현재 연결 상태</p>
             {status === null ? (
-              <p className="text-[10px] text-text-tertiary mt-0.5">확인 중...</p>
+              <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">확인 중...</p>
             ) : status.connected ? (
-              <p className="text-[10px] text-emerald-400 mt-0.5 flex items-center gap-1">
+              <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-emerald-400 mt-0.5 flex items-center gap-1">
                 <Check size={10} /> 연결됨 · {status.username}
               </p>
             ) : (
-              <p className="text-[10px] text-text-tertiary mt-0.5">연결되지 않음</p>
+              <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">연결되지 않음</p>
             )}
           </div>
           {status?.connected && (
             <button onClick={handleDisconnect}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 text-[11px] hover:bg-red-500/20">
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 text-[calc(11px_*_var(--app-font-scale,1))] hover:bg-red-500/20">
               <LogOut size={11} /> 연결 해제
             </button>
           )}
@@ -574,25 +574,25 @@ function CalDAVSettings(): JSX.Element {
 
       {/* 비번 발급 안내 */}
       <div className="p-3 rounded-xl bg-clauday-blue/5 border border-clauday-blue/20 mb-3">
-        <p className="text-[11px] text-text-secondary mb-2">
+        <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary mb-2">
           <strong className="text-text-primary">CalDAV 비밀번호 발급:</strong>
         </p>
-        <ol className="text-[10px] text-text-tertiary list-decimal list-inside space-y-0.5">
+        <ol className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary list-decimal list-inside space-y-0.5">
           <li>아래 링크에서 두레이 CalDAV 설정 페이지 접속</li>
           <li>"비밀번호" 필드 옆 <strong>새로받기</strong> 클릭 → 비밀번호 복사</li>
           <li>아이디(이메일)와 복사한 비밀번호를 아래에 입력</li>
         </ol>
         <a href="https://nhnent.dooray.com/setting/calendar/caldav" target="_blank" rel="noreferrer"
-          className="inline-flex items-center gap-1 mt-2 text-[10px] text-clauday-blue hover:underline">
+          className="inline-flex items-center gap-1 mt-2 text-[calc(10px_*_var(--app-font-scale,1))] text-clauday-blue hover:underline">
           <ExternalLink size={10} /> 두레이 CalDAV 설정 페이지 열기
         </a>
-        <p className="text-[9px] text-text-tertiary mt-2">서버: <code className="font-mono text-text-secondary">caldav.dooray.com</code> (고정)</p>
+        <p className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary mt-2">서버: <code className="font-mono text-text-secondary">caldav.dooray.com</code> (고정)</p>
       </div>
 
       {/* 입력 */}
       <div className="space-y-3">
         <div>
-          <label className="text-[11px] font-medium text-text-secondary block mb-1.5">아이디 (이메일)</label>
+          <label className="text-[calc(11px_*_var(--app-font-scale,1))] font-medium text-text-secondary block mb-1.5">아이디 (이메일)</label>
           <input
             type="email" autoComplete="username"
             value={username} onChange={(e) => setUsername(e.target.value)}
@@ -602,7 +602,7 @@ function CalDAVSettings(): JSX.Element {
         </div>
 
         <div>
-          <label className="text-[11px] font-medium text-text-secondary block mb-1.5">CalDAV 비밀번호</label>
+          <label className="text-[calc(11px_*_var(--app-font-scale,1))] font-medium text-text-secondary block mb-1.5">CalDAV 비밀번호</label>
           <div className="relative">
             <input
               type={showPw ? 'text' : 'password'} autoComplete="off"
@@ -619,7 +619,7 @@ function CalDAVSettings(): JSX.Element {
 
         {/* 결과 */}
         {testResult && (
-          <div className={`flex items-start gap-2 p-2.5 rounded-lg text-[11px] ${
+          <div className={`flex items-start gap-2 p-2.5 rounded-lg text-[calc(11px_*_var(--app-font-scale,1))] ${
             testResult.ok ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
           }`}>
             {testResult.ok ? <Check size={12} className="mt-0.5 flex-shrink-0" /> : <AlertCircle size={12} className="mt-0.5 flex-shrink-0" />}
@@ -641,7 +641,7 @@ function CalDAVSettings(): JSX.Element {
           </button>
         </div>
 
-        <p className="text-[9px] text-text-tertiary leading-relaxed">
+        <p className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary leading-relaxed">
           비밀번호는 OS 키체인(macOS Keychain / Windows Credential Vault)에 암호화 저장됩니다. 평문으로 디스크에 남지 않습니다.
         </p>
       </div>
@@ -659,11 +659,11 @@ function CalDAVSettings(): JSX.Element {
         dismissable={syncProgress.stage !== 'syncing'}>
         {syncProgress.stage === 'syncing' && (
           <div className="space-y-3">
-            <p className="text-[11px] text-text-secondary">
+            <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary">
               두레이 캘린더의 모든 일정을 받아 로컬에 저장하는 중입니다. 첫 동기화 후엔 빠르게 표시됩니다.
             </p>
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-[11px]">
+              <div className="flex items-center justify-between text-[calc(11px_*_var(--app-font-scale,1))]">
                 <span className="text-text-secondary truncate">{syncProgress.calendarName || '준비 중...'}</span>
                 <span className="text-text-tertiary tabular-nums flex-shrink-0">
                   {syncProgress.current} / {syncProgress.total || '?'}
@@ -678,11 +678,11 @@ function CalDAVSettings(): JSX.Element {
         )}
         {syncProgress.stage === 'complete' && (
           <div className="space-y-3">
-            <p className="text-[11px] text-text-primary">동기화 완료 — 일정 <strong>{syncProgress.totalObjects}건</strong> 저장됨</p>
-            <p className="text-[10px] text-text-tertiary">이후엔 45초 주기로 변경분만 자동 동기화됩니다.</p>
+            <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary">동기화 완료 — 일정 <strong>{syncProgress.totalObjects}건</strong> 저장됨</p>
+            <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">이후엔 45초 주기로 변경분만 자동 동기화됩니다.</p>
             <div className="flex justify-end">
               <button onClick={() => setSyncProgress({ stage: 'idle' })}
-                className="px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-[11px] font-medium hover:bg-clauday-blue/80">
+                className="px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-[calc(11px_*_var(--app-font-scale,1))] font-medium hover:bg-clauday-blue/80">
                 확인
               </button>
             </div>
@@ -690,10 +690,10 @@ function CalDAVSettings(): JSX.Element {
         )}
         {syncProgress.stage === 'error' && (
           <div className="space-y-3">
-            <p className="text-[11px] text-rose-400">{syncProgress.message}</p>
+            <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-rose-400">{syncProgress.message}</p>
             <div className="flex justify-end">
               <button onClick={() => setSyncProgress({ stage: 'idle' })}
-                className="px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-[11px] font-medium hover:bg-clauday-blue/80">
+                className="px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-[calc(11px_*_var(--app-font-scale,1))] font-medium hover:bg-clauday-blue/80">
                 닫기
               </button>
             </div>
@@ -736,7 +736,7 @@ function AppBehaviorSettings(): JSX.Element {
     <div className="p-6 max-w-2xl mx-auto">
       <div className="mb-4">
         <h3 className="text-sm font-semibold text-text-primary">앱 동작</h3>
-        <p className="text-[10px] text-text-tertiary mt-0.5">앱 실행 시 동작을 설정합니다.</p>
+        <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">앱 실행 시 동작을 설정합니다.</p>
       </div>
 
       {/* 테마 */}
@@ -756,7 +756,7 @@ function AppBehaviorSettings(): JSX.Element {
               <Icon size={16} className={theme === value ? 'text-clauday-blue' : 'text-text-tertiary'} />
               <div className="flex-1 min-w-0">
                 <p className={`text-xs ${theme === value ? 'text-clauday-blue font-medium' : 'text-text-primary'}`}>{label}</p>
-                <p className="text-[10px] text-text-tertiary mt-0.5">{description}</p>
+                <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">{description}</p>
               </div>
             </button>
           ))}
@@ -784,7 +784,7 @@ function AppBehaviorSettings(): JSX.Element {
         <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-text-primary">시작 시 열 화면</span>
-            {saved && <span className="flex items-center gap-1 text-[10px] text-emerald-400"><Check size={10} /> 저장됨</span>}
+            {saved && <span className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-emerald-400"><Check size={10} /> 저장됨</span>}
           </div>
         </div>
         <div className="p-2">
@@ -798,7 +798,7 @@ function AppBehaviorSettings(): JSX.Element {
                 className="accent-clauday-blue" />
               <div className="flex-1 min-w-0">
                 <p className={`text-xs ${startupView === opt.value ? 'text-clauday-blue font-medium' : 'text-text-primary'}`}>{opt.label}</p>
-                <p className="text-[10px] text-text-tertiary mt-0.5">{opt.description}</p>
+                <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">{opt.description}</p>
               </div>
             </label>
           ))}
@@ -809,7 +809,7 @@ function AppBehaviorSettings(): JSX.Element {
       <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden mt-3">
         <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30">
           <span className="text-xs font-medium text-text-primary">사이드바 항목</span>
-          <p className="text-[10px] text-text-tertiary mt-0.5">순서를 바꾸거나 자주 안 쓰는 항목을 숨길 수 있습니다. 설정/매뉴얼은 항상 노출됩니다.</p>
+          <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">순서를 바꾸거나 자주 안 쓰는 항목을 숨길 수 있습니다. 설정/매뉴얼은 항상 노출됩니다.</p>
         </div>
         <SidebarPrefsSection />
       </div>
@@ -824,7 +824,7 @@ function AppBehaviorSettings(): JSX.Element {
         </div>
       </div>
 
-      <p className="text-[10px] text-text-tertiary mt-3">
+      <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-3">
         💡 <strong className="text-text-secondary">AI 스킬 관리</strong>는 각 AI 기능 화면 우측의 <span className="text-amber-400 font-medium">스킬</span> 버튼에서 바로 할 수 있습니다.
       </p>
     </div>
@@ -889,7 +889,7 @@ function SidebarPrefsSection(): JSX.Element {
   }
 
   if (!loaded) {
-    return <div className="p-3 text-[10px] text-text-tertiary">불러오는 중...</div>
+    return <div className="p-3 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">불러오는 중...</div>
   }
 
   return (
@@ -918,7 +918,7 @@ function SidebarPrefsSection(): JSX.Element {
                 className="p-1 rounded hover:bg-bg-primary/50 text-text-tertiary hover:text-text-primary disabled:opacity-30 disabled:hover:bg-transparent">
                 <ChevronDown size={12} />
               </button>
-              <label className="flex items-center gap-1 cursor-pointer ml-1 text-[10px] text-text-tertiary hover:text-text-secondary">
+              <label className="flex items-center gap-1 cursor-pointer ml-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-secondary">
                 <input type="checkbox" checked={!isHidden} onChange={() => toggleHidden(item.view)}
                   className="accent-clauday-blue" />
                 <span>{isHidden ? '숨김' : '표시'}</span>
@@ -929,7 +929,7 @@ function SidebarPrefsSection(): JSX.Element {
       </div>
       <div className="mt-2 pt-2 border-t border-bg-border/50 flex justify-end">
         <button onClick={resetAll}
-          className="flex items-center gap-1.5 text-[10px] text-text-tertiary hover:text-text-primary px-2 py-1 rounded hover:bg-bg-surface-hover">
+          className="flex items-center gap-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-primary px-2 py-1 rounded hover:bg-bg-surface-hover">
           <RotateCcw size={10} /> 기본값으로 초기화
         </button>
       </div>
@@ -969,7 +969,7 @@ function AiRecommendNotifyToggle(): JSX.Element {
         className="accent-clauday-blue mt-0.5" />
       <div className="flex-1 min-w-0">
         <p className="text-xs text-text-primary">AI 추천 새 글 알림</p>
-        <p className="text-[10px] text-text-tertiary mt-0.5">
+        <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
           두레이 "AI 활용 사례" 프로젝트에 새 글이 올라오면 데스크톱 알림 (1시간 주기, 22~9시 보류)
         </p>
       </div>
@@ -996,8 +996,8 @@ function FontSettingsSection(): JSX.Element {
       {/* 폰트 패밀리 */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[11px] text-text-secondary">폰트</span>
-          <span className="text-[10px] text-text-tertiary">OS에 설치된 폰트만 표시됩니다</span>
+          <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary">폰트</span>
+          <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">OS에 설치된 폰트만 표시됩니다</span>
         </div>
         <div className="grid grid-cols-2 gap-1.5">
           {FAMILIES.map((f) => {
@@ -1010,7 +1010,7 @@ function FontSettingsSection(): JSX.Element {
                 <span className={`block text-xs ${active ? 'text-clauday-blue font-medium' : 'text-text-primary'}`}>
                   {FONT_FAMILY_LABELS[f]}
                 </span>
-                <span className="block text-[10px] text-text-tertiary mt-0.5">안녕하세요 Abc 123</span>
+                <span className="block text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">안녕하세요 Abc 123</span>
               </button>
             )
           })}
@@ -1020,8 +1020,8 @@ function FontSettingsSection(): JSX.Element {
       {/* 크기 배율 */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[11px] text-text-secondary">글자 크기</span>
-          <span className="text-[11px] text-text-primary font-mono">{pct}%</span>
+          <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary">글자 크기</span>
+          <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary font-mono">{pct}%</span>
         </div>
         <input
           type="range"
@@ -1035,7 +1035,7 @@ function FontSettingsSection(): JSX.Element {
         <div className="flex flex-wrap gap-1.5 mt-2">
           {SCALE_PRESETS.map((p) => (
             <button key={p.value} onClick={() => setScale(p.value)}
-              className={`px-2.5 py-1 rounded-md text-[10px] border transition-colors ${
+              className={`px-2.5 py-1 rounded-md text-[calc(10px_*_var(--app-font-scale,1))] border transition-colors ${
                 Math.abs(settings.scale - p.value) < 0.01
                   ? 'bg-clauday-blue/10 border-clauday-blue/40 text-clauday-blue font-medium'
                   : 'bg-bg-primary border-bg-border text-text-secondary hover:text-text-primary'
@@ -1044,7 +1044,7 @@ function FontSettingsSection(): JSX.Element {
             </button>
           ))}
           <button onClick={reset}
-            className="ml-auto px-2.5 py-1 rounded-md text-[10px] text-text-tertiary hover:text-text-secondary">
+            className="ml-auto px-2.5 py-1 rounded-md text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-secondary">
             기본값으로
           </button>
         </div>
@@ -1052,7 +1052,7 @@ function FontSettingsSection(): JSX.Element {
 
       {/* 미리보기 */}
       <div className="rounded-lg border border-bg-border bg-bg-primary p-3">
-        <p className="text-[10px] text-text-tertiary mb-1.5">미리보기</p>
+        <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mb-1.5">미리보기</p>
         <p className="text-sm text-text-primary leading-relaxed">
           안녕하세요. Clauday v1.1.0 입니다. The quick brown fox jumps over the lazy dog. 1234567890
         </p>

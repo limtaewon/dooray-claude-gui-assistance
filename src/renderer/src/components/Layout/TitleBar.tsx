@@ -19,8 +19,8 @@ function TitleBar({ onOpenCommandPalette }: TitleBarProps): JSX.Element {
     >
       <div className="flex items-center gap-1.5 no-drag relative z-10">
         <Clover size={15} className="text-clauday-orange" />
-        <span className="text-[12px] font-semibold text-text-primary leading-none">Clauday</span>
-        <span className="text-[10px] text-text-secondary leading-none ml-0.5">Claude Code GUI</span>
+        <span className="text-[calc(12px_*_var(--app-font-scale,1))] font-semibold text-text-primary leading-none">Clauday</span>
+        <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary leading-none ml-0.5">Claude Code GUI</span>
       </div>
 
       {/* 중앙: 전역 AI 작업 인디케이터 */}

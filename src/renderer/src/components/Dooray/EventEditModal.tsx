@@ -163,10 +163,10 @@ function EventEditModal({ event, calendars, onClose, onSaved }: Props): JSX.Elem
   const titleNode = (
     <span className="flex items-center gap-1.5">
       <Edit2 size={13} className="text-clauday-blue flex-shrink-0" />
-      <span className="truncate max-w-[200px] text-text-primary font-medium text-[13px]">
+      <span className="truncate max-w-[200px] text-text-primary font-medium text-[calc(13px_*_var(--app-font-scale,1))]">
         {isReadOnly ? event.summary : '일정 편집'}
       </span>
-      <span className={`ml-1 px-1.5 py-0.5 rounded text-[9px] font-medium flex-shrink-0 ${
+      <span className={`ml-1 px-1.5 py-0.5 rounded text-[calc(9px_*_var(--app-font-scale,1))] font-medium flex-shrink-0 ${
         event.source === 'local' ? 'bg-emerald-500/15 text-emerald-400'
           : event.source === 'caldav' ? 'bg-clauday-blue/15 text-clauday-blue'
           : 'bg-rose-500/15 text-rose-400'
@@ -188,7 +188,7 @@ function EventEditModal({ event, calendars, onClose, onSaved }: Props): JSX.Elem
             <button
               onClick={handleDelete}
               disabled={deleting || saving}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] text-rose-400 hover:bg-rose-500/10 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[calc(11px_*_var(--app-font-scale,1))] text-rose-400 hover:bg-rose-500/10 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
               {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
               {deleting ? '삭제 중…' : '삭제'}
             </button>
@@ -210,18 +210,18 @@ function EventEditModal({ event, calendars, onClose, onSaved }: Props): JSX.Elem
           </div>
         )
       }>
-      <div className="space-y-3 text-[11px]">
+      <div className="space-y-3 text-[calc(11px_*_var(--app-font-scale,1))]">
         {/* 읽기 전용 안내 (공휴일) */}
         {isReadOnly && (
           <div className="flex items-center gap-2 p-2.5 rounded-lg bg-clauday-orange/5 border border-clauday-orange/20">
             <AlertTriangle size={13} className="text-clauday-orange flex-shrink-0" />
-            <span className="text-[11px] text-text-secondary">공휴일 일정은 편집할 수 없습니다.</span>
+            <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary">공휴일 일정은 편집할 수 없습니다.</span>
           </div>
         )}
 
         {/* 캘린더 표시 (읽기 전용) */}
-        <div className="flex items-center gap-2 text-[11px] text-text-secondary">
-          <span className="text-text-tertiary uppercase tracking-wide text-[9px] font-semibold w-14 flex-shrink-0">캘린더</span>
+        <div className="flex items-center gap-2 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary">
+          <span className="text-text-tertiary uppercase tracking-wide text-[calc(9px_*_var(--app-font-scale,1))] font-semibold w-14 flex-shrink-0">캘린더</span>
           <span className="text-text-primary">{calendarName}</span>
         </div>
 
@@ -304,7 +304,7 @@ function EventEditModal({ event, calendars, onClose, onSaved }: Props): JSX.Elem
 
         {/* 오류 */}
         {error && (
-          <p className="text-[11px] text-rose-400">{error}</p>
+          <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-rose-400">{error}</p>
         )}
       </div>
     </Modal>
@@ -315,7 +315,7 @@ function EventEditModal({ event, calendars, onClose, onSaved }: Props): JSX.Elem
 function Field({ label, children }: { label: string; children: React.ReactNode }): JSX.Element {
   return (
     <div className="space-y-1">
-      <label className="block text-[9px] text-text-tertiary uppercase tracking-wide font-semibold">{label}</label>
+      <label className="block text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary uppercase tracking-wide font-semibold">{label}</label>
       {children}
     </div>
   )

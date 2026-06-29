@@ -379,13 +379,13 @@ function BranchWorkspace({ onOpenTerminal: _onOpenTerminal }: BranchWorkspacePro
     const total = status.modifiedFiles + status.untrackedFiles
     if (total === 0 && status.aheadBehind.ahead === 0 && status.aheadBehind.behind === 0) {
       return (
-        <span className="flex items-center gap-0.5 text-[9px] text-emerald-400">
+        <span className="flex items-center gap-0.5 text-[calc(9px_*_var(--app-font-scale,1))] text-emerald-400">
           <CheckCircle2 size={10} /> clean
         </span>
       )
     }
     return (
-      <div className="flex items-center gap-2 text-[9px]">
+      <div className="flex items-center gap-2 text-[calc(9px_*_var(--app-font-scale,1))]">
         {total > 0 && (
           <span className="text-clauday-orange">{total} 변경</span>
         )}
@@ -437,14 +437,14 @@ function BranchWorkspace({ onOpenTerminal: _onOpenTerminal }: BranchWorkspacePro
           <div className="flex items-center gap-2">
             <GitBranchIcon size={15} className="text-clauday-blue" />
             <h2 className="text-sm font-semibold text-text-primary">브랜치 병렬 작업</h2>
-            <span className="text-[9px] text-text-tertiary bg-bg-surface px-1.5 py-0.5 rounded">
+            <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary bg-bg-surface px-1.5 py-0.5 rounded">
               {repoPath.split('/').pop()}
             </span>
           </div>
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => setShowBranchPicker(true)}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-clauday-blue text-white text-[11px] font-medium hover:bg-clauday-blue/80 transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-clauday-blue text-white text-[calc(11px_*_var(--app-font-scale,1))] font-medium hover:bg-clauday-blue/80 transition-colors"
             >
               <Plus size={12} /> 브랜치 추가
             </button>
@@ -465,7 +465,7 @@ function BranchWorkspace({ onOpenTerminal: _onOpenTerminal }: BranchWorkspacePro
           </div>
         </div>
         {error && (
-          <div className="flex items-center gap-1 mt-1.5 text-[10px] text-red-400">
+          <div className="flex items-center gap-1 mt-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-red-400">
             <AlertCircle size={10} /> {error}
             <button onClick={() => setError('')} className="ml-auto"><X size={10} /></button>
           </div>
@@ -480,24 +480,24 @@ function BranchWorkspace({ onOpenTerminal: _onOpenTerminal }: BranchWorkspacePro
           <div className="p-3 rounded-xl bg-bg-surface/50 border border-bg-border/50">
             <div className="flex items-center gap-1.5 mb-2">
               <ArrowUpDown size={11} className="text-clauday-blue" />
-              <span className="text-[10px] font-medium text-text-secondary">브랜치 비교</span>
+              <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-medium text-text-secondary">브랜치 비교</span>
             </div>
             <div className="flex items-center gap-1.5">
               <select
                 value={compareBranches[0]}
                 onChange={(e) => setCompareBranches([e.target.value, compareBranches[1]])}
-                className="flex-1 min-w-0 px-2 py-1 bg-bg-primary border border-bg-border rounded text-[10px] text-text-primary focus:outline-none focus:border-clauday-blue"
+                className="flex-1 min-w-0 px-2 py-1 bg-bg-primary border border-bg-border rounded text-[calc(10px_*_var(--app-font-scale,1))] text-text-primary focus:outline-none focus:border-clauday-blue"
               >
                 <option value="">브랜치 1</option>
                 {worktrees.map((w) => (
                   <option key={w.path} value={w.branch}>{w.branch}</option>
                 ))}
               </select>
-              <span className="text-[10px] text-text-tertiary flex-shrink-0">vs</span>
+              <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">vs</span>
               <select
                 value={compareBranches[1]}
                 onChange={(e) => setCompareBranches([compareBranches[0], e.target.value])}
-                className="flex-1 min-w-0 px-2 py-1 bg-bg-primary border border-bg-border rounded text-[10px] text-text-primary focus:outline-none focus:border-clauday-blue"
+                className="flex-1 min-w-0 px-2 py-1 bg-bg-primary border border-bg-border rounded text-[calc(10px_*_var(--app-font-scale,1))] text-text-primary focus:outline-none focus:border-clauday-blue"
               >
                 <option value="">브랜치 2</option>
                 {worktrees.map((w) => (
@@ -507,14 +507,14 @@ function BranchWorkspace({ onOpenTerminal: _onOpenTerminal }: BranchWorkspacePro
               <button
                 onClick={runCompare}
                 disabled={!compareBranches[0] || !compareBranches[1] || compareBranches[0] === compareBranches[1]}
-                className="flex-shrink-0 px-2.5 py-1 rounded bg-clauday-blue/10 text-clauday-blue text-[10px] font-medium hover:bg-clauday-blue/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="flex-shrink-0 px-2.5 py-1 rounded bg-clauday-blue/10 text-clauday-blue text-[calc(10px_*_var(--app-font-scale,1))] font-medium hover:bg-clauday-blue/20 disabled:opacity-30 disabled:cursor-not-allowed"
                 title={compareBranches[0] === compareBranches[1] && compareBranches[0] ? '같은 브랜치는 비교할 수 없습니다' : ''}
               >
                 비교
               </button>
             </div>
             {compareBranches[0] && compareBranches[1] && compareBranches[0] === compareBranches[1] && (
-              <p className="mt-1.5 text-[9px] text-amber-400">같은 브랜치를 선택했습니다</p>
+              <p className="mt-1.5 text-[calc(9px_*_var(--app-font-scale,1))] text-amber-400">같은 브랜치를 선택했습니다</p>
             )}
           </div>
 
@@ -542,34 +542,34 @@ function BranchWorkspace({ onOpenTerminal: _onOpenTerminal }: BranchWorkspacePro
                       <GitBranchIcon size={12} className={wt.isMain ? 'text-emerald-400' : 'text-clauday-blue'} />
                       <span className="text-xs font-medium text-text-primary truncate">{wt.branch}</span>
                       {wt.isMain && (
-                        <span className="text-[8px] px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">main</span>
+                        <span className="text-[calc(8px_*_var(--app-font-scale,1))] px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">main</span>
                       )}
                     </div>
                     {statusBadge(status)}
                   </div>
                   <div className="flex items-center gap-1 mt-1 ml-5">
-                    <span className="text-[9px] text-text-tertiary truncate">{wt.path}</span>
-                    <span className="text-[9px] text-text-tertiary font-mono">{wt.head.substring(0, 7)}</span>
+                    <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary truncate">{wt.path}</span>
+                    <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary font-mono">{wt.head.substring(0, 7)}</span>
                   </div>
 
                   {/* 액션 버튼 */}
                   <div className="flex items-center gap-1 mt-2 ml-5">
                     <button
                       onClick={() => openTerminal(wt)}
-                      className="flex items-center gap-1 px-2 py-1 rounded-md bg-bg-primary border border-bg-border text-[10px] text-text-secondary hover:text-text-primary hover:border-clauday-blue/30 transition-colors"
+                      className="flex items-center gap-1 px-2 py-1 rounded-md bg-bg-primary border border-bg-border text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary hover:text-text-primary hover:border-clauday-blue/30 transition-colors"
                     >
                       <Terminal size={10} /> 터미널
                     </button>
                     <button
                       onClick={() => viewDiff(wt)}
-                      className="flex items-center gap-1 px-2 py-1 rounded-md bg-bg-primary border border-bg-border text-[10px] text-text-secondary hover:text-text-primary hover:border-clauday-blue/30 transition-colors"
+                      className="flex items-center gap-1 px-2 py-1 rounded-md bg-bg-primary border border-bg-border text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary hover:text-text-primary hover:border-clauday-blue/30 transition-colors"
                     >
                       <FileCode size={10} /> 변경사항
                     </button>
                     {!wt.isMain && (
                       <button
                         onClick={() => removeWorktree(wt)}
-                        className="flex items-center gap-1 px-2 py-1 rounded-md bg-bg-primary border border-bg-border text-[10px] text-red-400/60 hover:text-red-400 hover:border-red-400/30 transition-colors ml-auto"
+                        className="flex items-center gap-1 px-2 py-1 rounded-md bg-bg-primary border border-bg-border text-[calc(10px_*_var(--app-font-scale,1))] text-red-400/60 hover:text-red-400 hover:border-red-400/30 transition-colors ml-auto"
                       >
                         <Trash2 size={10} /> 제거
                       </button>
@@ -610,13 +610,13 @@ function BranchWorkspace({ onOpenTerminal: _onOpenTerminal }: BranchWorkspacePro
                     <div key={path}
                       onClick={() => setActiveTermPath(path)}
                       title={shortcutKey ? `${modKey}${shortcutKey} 로 전환` : undefined}
-                      className={`group flex items-center gap-1.5 px-3 py-2 text-[11px] cursor-pointer border-r border-bg-border transition-colors ${
+                      className={`group flex items-center gap-1.5 px-3 py-2 text-[calc(11px_*_var(--app-font-scale,1))] cursor-pointer border-r border-bg-border transition-colors ${
                         isActive
                           ? 'bg-bg-primary text-clauday-blue border-b-2 border-b-clauday-blue'
                           : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
                       }`}>
                       {shortcutKey && (
-                        <span className={`text-[9px] font-mono px-1 rounded ${
+                        <span className={`text-[calc(9px_*_var(--app-font-scale,1))] font-mono px-1 rounded ${
                           isActive ? 'bg-clauday-blue/20 text-clauday-blue' : 'bg-bg-border text-text-tertiary'
                         }`}>
                           {shortcutKey}
@@ -644,7 +644,7 @@ function BranchWorkspace({ onOpenTerminal: _onOpenTerminal }: BranchWorkspacePro
               </div>
             ) : (
               <div className="px-3 py-2 border-b border-bg-border flex items-center justify-between flex-shrink-0">
-                <span className="text-[11px] font-medium text-text-primary flex items-center gap-1.5">
+                <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-medium text-text-primary flex items-center gap-1.5">
                   {activePanel === 'diff' && `${selectedWorktree?.branch} 변경사항`}
                   {activePanel === 'compare' && `${compareBranches[0]} ↔ ${compareBranches[1]}`}
                   {activePanel === 'file-compare' && fileCompare?.file}
@@ -746,10 +746,10 @@ function BranchWorkspace({ onOpenTerminal: _onOpenTerminal }: BranchWorkspacePro
                       <GitBranchIcon size={11} className={b.isRemote ? 'text-text-tertiary' : 'text-clauday-blue'} />
                       <span className="text-xs text-text-primary">{b.name}</span>
                       {b.isRemote && (
-                        <span className="text-[8px] text-text-tertiary px-1 py-0.5 rounded bg-bg-primary">remote</span>
+                        <span className="text-[calc(8px_*_var(--app-font-scale,1))] text-text-tertiary px-1 py-0.5 rounded bg-bg-primary">remote</span>
                       )}
                     </div>
-                    <div className="text-[9px] text-text-tertiary mt-0.5 ml-4">
+                    <div className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5 ml-4">
                       {b.lastCommit} · {b.lastCommitDate ? new Date(b.lastCommitDate).toLocaleDateString('ko-KR') : ''}
                     </div>
                   </button>
@@ -780,13 +780,13 @@ function ChangedFilesList({ worktreePath }: { worktreePath: string }): JSX.Eleme
     return () => { cancelled = true }
   }, [worktreePath])
 
-  if (loading) return <div className="text-[9px] text-text-tertiary">로딩...</div>
-  if (files.length === 0) return <div className="text-[9px] text-text-tertiary">변경 파일 없음</div>
+  if (loading) return <div className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">로딩...</div>
+  if (files.length === 0) return <div className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">변경 파일 없음</div>
 
   return (
     <div className="space-y-0.5">
       {files.slice(0, 10).map((f) => (
-        <div key={f.file} className="flex items-center gap-1.5 text-[9px]">
+        <div key={f.file} className="flex items-center gap-1.5 text-[calc(9px_*_var(--app-font-scale,1))]">
           <span className={`font-mono w-4 text-center ${
             f.status === 'M' ? 'text-clauday-orange' :
             f.status === 'A' ? 'text-emerald-400' :
@@ -796,7 +796,7 @@ function ChangedFilesList({ worktreePath }: { worktreePath: string }): JSX.Eleme
         </div>
       ))}
       {files.length > 10 && (
-        <div className="text-[9px] text-text-tertiary">+{files.length - 10}개 더...</div>
+        <div className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">+{files.length - 10}개 더...</div>
       )}
     </div>
   )
@@ -844,15 +844,15 @@ function DiffPanel({
 
   return (
     <div className="p-3 space-y-1.5">
-      <div className="text-[10px] text-text-tertiary mb-2">
+      <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mb-2">
         {result.files.length}개 파일 변경 · {result.summary}
       </div>
       {result.files.map((f) => (
         <div key={f.file} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-bg-surface/50 group">
-          <span className={`text-[8px] px-1 py-0.5 rounded font-medium ${statusColor(f.status)}`}>
+          <span className={`text-[calc(8px_*_var(--app-font-scale,1))] px-1 py-0.5 rounded font-medium ${statusColor(f.status)}`}>
             {statusIcon(f.status)}
           </span>
-          <span className="text-[11px] text-text-primary truncate flex-1 font-mono">{f.file}</span>
+          <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary truncate flex-1 font-mono">{f.file}</span>
           {onFileCompare && (
             <button
               onClick={() => onFileCompare(f.file)}
@@ -868,8 +868,8 @@ function DiffPanel({
       {/* Patch 미리보기 */}
       {result.patch && (
         <div className="mt-3">
-          <div className="text-[10px] text-text-tertiary mb-1">Diff 미리보기</div>
-          <pre className="text-[9px] leading-relaxed font-mono bg-bg-primary rounded-lg p-3 overflow-x-auto max-h-[400px] overflow-y-auto border border-bg-border">
+          <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mb-1">Diff 미리보기</div>
+          <pre className="text-[calc(9px_*_var(--app-font-scale,1))] leading-relaxed font-mono bg-bg-primary rounded-lg p-3 overflow-x-auto max-h-[400px] overflow-y-auto border border-bg-border">
             {result.patch.split('\n').map((line, i) => (
               <div
                 key={i}
@@ -895,25 +895,25 @@ function FileComparePanel({ result, onBack }: { result: CompareResult; onBack: (
   return (
     <div className="flex flex-col h-full">
       <div className="px-3 py-1.5 border-b border-bg-border flex items-center gap-2 flex-shrink-0">
-        <button onClick={onBack} className="text-[10px] text-clauday-blue hover:underline">← 목록으로</button>
-        <span className="text-[10px] text-text-tertiary font-mono">{result.file}</span>
+        <button onClick={onBack} className="text-[calc(10px_*_var(--app-font-scale,1))] text-clauday-blue hover:underline">← 목록으로</button>
+        <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary font-mono">{result.file}</span>
       </div>
       <div className="flex-1 flex overflow-hidden">
         {/* 좌측 브랜치 */}
         <div className="flex-1 flex flex-col border-r border-bg-border overflow-hidden">
-          <div className="px-3 py-1 bg-bg-surface/50 border-b border-bg-border text-[9px] text-text-tertiary flex-shrink-0">
+          <div className="px-3 py-1 bg-bg-surface/50 border-b border-bg-border text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">
             {result.leftBranch}
           </div>
-          <pre className="flex-1 text-[9px] leading-relaxed font-mono p-2 overflow-auto text-text-secondary">
+          <pre className="flex-1 text-[calc(9px_*_var(--app-font-scale,1))] leading-relaxed font-mono p-2 overflow-auto text-text-secondary">
             {result.leftContent}
           </pre>
         </div>
         {/* 우측 브랜치 */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="px-3 py-1 bg-bg-surface/50 border-b border-bg-border text-[9px] text-text-tertiary flex-shrink-0">
+          <div className="px-3 py-1 bg-bg-surface/50 border-b border-bg-border text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">
             {result.rightBranch}
           </div>
-          <pre className="flex-1 text-[9px] leading-relaxed font-mono p-2 overflow-auto text-text-secondary">
+          <pre className="flex-1 text-[calc(9px_*_var(--app-font-scale,1))] leading-relaxed font-mono p-2 overflow-auto text-text-secondary">
             {result.rightContent}
           </pre>
         </div>

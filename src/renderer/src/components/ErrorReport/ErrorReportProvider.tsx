@@ -131,16 +131,16 @@ function ErrorReportProvider({ children }: { children: ReactNode }): JSX.Element
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            <div className="text-[11px] text-text-secondary leading-relaxed">
+            <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary leading-relaxed">
               Claude CLI 호출 진단 + 시스템 정보를 묶어서 보냅니다. 민감정보가 있으면 직접 지우고 보내주세요.
               <br />
               <span className="text-text-tertiary">
-                로그 파일: <code className="text-[10px]">{logPath}</code>
+                로그 파일: <code className="text-[calc(10px_*_var(--app-font-scale,1))]">{logPath}</code>
               </span>
             </div>
 
             <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-text-primary">제목</span>
+              <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">제목</span>
               <input
                 type="text"
                 className="ds-input"
@@ -151,7 +151,7 @@ function ErrorReportProvider({ children }: { children: ReactNode }): JSX.Element
             </label>
 
             <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-text-primary">
+              <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">
                 현상 / 재현 절차 <span className="text-text-tertiary font-normal">(선택 — 어떤 작업 중에 났는지 한 줄이면 충분)</span>
               </span>
               <textarea
@@ -165,7 +165,7 @@ function ErrorReportProvider({ children }: { children: ReactNode }): JSX.Element
             </label>
 
             <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-text-primary">
+              <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">
                 진단 정보 <span className="text-text-tertiary font-normal">(자동 생성 — 필요 시 직접 편집)</span>
               </span>
               <textarea
@@ -178,7 +178,7 @@ function ErrorReportProvider({ children }: { children: ReactNode }): JSX.Element
               />
             </label>
 
-            <div className="text-[10px] text-text-tertiary flex items-center gap-1">
+            <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary flex items-center gap-1">
               <ExternalLink size={10} />
               "커뮤니티에 게시" 누르면 Clauday 두레이 커뮤니티 채널에 본인 계정으로 글이 등록됩니다.
             </div>

@@ -456,6 +456,7 @@ AI 설정(스킬 + MCP)을 기능별로 독립 관리하고, 필요하면 AI가 
 
 - 상단 우측 ☀/🌙 토글로 **라이트/다크** 전환
 - 라이트 팔레트 5종 선택 가능 (\`cool-minimal\`, \`crisp-white\`, \`soft-blue\`, \`graphite\`, \`paper\`)
+- **글자 크기** (⚙ 설정 → 글꼴): 슬라이더로 0.75~1.6배 조절. **글자만 커지고 여백/레이아웃은 그대로** 유지 (전체 화면 줌이 아님). 화면 전체를 키우고 싶으면 메뉴 \`View → Zoom In\`(\`Cmd +\`)을 사용. 터미널 글자는 별도라 이 설정의 영향을 받지 않음
 - 디자인 시스템 공용 컴포넌트:
   - \`.ds-btn\` variants: primary / ai / secondary / ghost / orange / icon / **skill-active**
   - \`.ds-seg\` (세그먼트 탭), \`.ds-chip\`, \`.ds-card\`, \`.ds-modal\`
@@ -1214,7 +1215,7 @@ function ClaudeManual(): JSX.Element {
           <div className="mt-2 relative">
             <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary" />
             <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="검색..."
-              className="w-full pl-6 pr-2 py-1 bg-bg-primary border border-bg-border rounded text-[10px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue" />
+              className="w-full pl-6 pr-2 py-1 bg-bg-primary border border-bg-border rounded text-[calc(10px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue" />
           </div>
         </div>
         <div className="flex-1 overflow-y-auto py-1">

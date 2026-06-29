@@ -64,7 +64,7 @@ function SkillCard({
       }}
     >
       {uploading && (
-        <div className="absolute top-1.5 right-8 inline-flex items-center gap-1 h-5 px-1.5 rounded-[4px] text-[9px] font-semibold"
+        <div className="absolute top-1.5 right-8 inline-flex items-center gap-1 h-5 px-1.5 rounded-[4px] text-[calc(9px_*_var(--app-font-scale,1))] font-semibold"
           style={{ background: 'var(--c-orange-bg)', color: 'var(--c-orange-fg)' }}>
           <Loader2 size={10} className="animate-spin" />
           업로드 중
@@ -75,9 +75,9 @@ function SkillCard({
           <Sparkles size={15} className="text-clauday-blue" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-semibold text-text-primary truncate">{skill.name}</div>
+          <div className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary truncate">{skill.name}</div>
           {description && (
-            <div className="text-[11px] text-text-secondary truncate mt-0.5">{description}</div>
+            <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary truncate mt-0.5">{description}</div>
           )}
         </div>
         {/* MCP 카드와 동일하게 인라인 액션 아이콘을 기본 노출 (편집/공유에 올리기/삭제) */}
@@ -113,12 +113,12 @@ function SkillCard({
       </div>
 
       <div className="flex items-center mt-2.5 pt-2 border-t border-bg-border/60">
-        <span className="text-[10px] text-text-tertiary">업데이트 {formatRelative(skill.updatedAt)}</span>
+        <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">업데이트 {formatRelative(skill.updatedAt)}</span>
         <div className="flex-1" />
         {onRun && (
           <button
             onClick={(e) => { e.stopPropagation(); onRun() }}
-            className="flex items-center gap-1 text-[11px] text-text-secondary hover:text-clauday-blue"
+            className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:text-clauday-blue"
           >
             <Play size={11} /> 실행
           </button>

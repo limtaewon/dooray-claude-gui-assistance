@@ -366,7 +366,12 @@ const Avatar = ({ name, tone }) => (
 
 ### 타입 스케일
 
-| 토큰 | 크기 | 용도 |
+> **모든 `--t-*` 토큰은 `calc(<기준px> * var(--app-font-scale, 1))`** 로 정의됩니다.
+> 아래 "기준 크기" 는 scale=1 일 때 값이며, 사용자의 글자 크기 설정(`--app-font-scale`)에
+> 비례해 커집니다. root `html` font-size 는 16px 로 고정되어 있어 여백(rem)은 스케일
+> 영향을 받지 않고 **글자만** 커집니다. (아래 "글자 크기 스케일" 참고)
+
+| 토큰 | 기준 크기 | 용도 |
 |------|------|------|
 | `--t-9` | 9px | 매우 작은 라벨 |
 | `--t-10` | 10px | 라벨, 캡션 |
@@ -394,6 +399,22 @@ const Avatar = ({ name, tone }) => (
 <div className="num-xl">999</div>
 <div className="num-lg">42</div>
 ```
+
+### 글자 크기 스케일 (--app-font-scale)
+
+사용자가 ⚙ 설정 → 글꼴에서 글자 크기를 조절하면 `useFontSettings` 가 `--app-font-scale`(0.75~1.6)
+을 `<html>` 에 설정합니다. **이 배율은 font-size 에만 적용되고 여백/레이아웃에는 적용되지 않습니다**
+(글자만 커지고 칸 크기는 그대로). 따라서 **모든 font-size 는 이 변수에 반응하도록** 정의해야 합니다.
+
+| 방식 | 예 | 스케일 반응 |
+|------|-----|------|
+| `--t-*` 토큰 | `font-size: var(--t-12)` | ✓ (토큰이 calc 처리) |
+| Tailwind named 유틸 | `text-xs` / `text-sm` / ... | ✓ (tailwind.config `fontSize` 테마가 calc 처리) |
+| Tailwind arbitrary | `text-[calc(12px_*_var(--app-font-scale,1))]` | ✓ |
+| **raw px (금지)** | `text-[12px]`, `font-size: 12px` | ✗ 스케일 무시 |
+
+> 회귀 가드: `src/renderer/src/hooks/fontScale.guard.test.ts` 가 raw px 폰트 재유입을 차단합니다.
+> 범위 외: 터미널(canvas 렌더링)·일부 차트/플로우 다이어그램의 inline `fontSize`.
 
 ## 토큰 작성 규칙
 

@@ -134,10 +134,10 @@ function TerminalView(): JSX.Element {
           title="새 터미널 (⌘T)">
           <Plus size={14} />
         </button>
-        <span className="text-[9px] text-text-tertiary ml-1 flex-shrink-0">⌘T 새탭 · ⌘W 닫기</span>
+        <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary ml-1 flex-shrink-0">⌘T 새탭 · ⌘W 닫기</span>
         {entries.length >= 3 && (
           <button onClick={closeAll}
-            className="ml-auto flex-shrink-0 flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-text-tertiary hover:text-red-400 hover:bg-red-500/10 transition-colors"
+            className="ml-auto flex-shrink-0 flex items-center gap-1 px-2 py-0.5 rounded text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-red-400 hover:bg-red-500/10 transition-colors"
             title={`${entries.length}개 터미널 모두 닫기`}>
             <Trash2 size={10} /> 모두 닫기 ({entries.length})
           </button>
@@ -156,7 +156,7 @@ function TerminalView(): JSX.Element {
               className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-clauday-blue text-white text-sm hover:bg-clauday-blue/80 transition-colors">
               <Terminal size={14} /> 새 터미널
             </button>
-            <p className="text-[10px] text-text-tertiary">⌘T로 언제든 새 탭을 열 수 있습니다</p>
+            <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">⌘T로 언제든 새 탭을 열 수 있습니다</p>
           </div>
         ) : (
           entries.map(({ session, savedOutput }) => (
@@ -231,7 +231,7 @@ function TabLabel({
           }}
           onBlur={commit}
           onClick={(e) => e.stopPropagation()}
-          className="font-mono text-[11px] bg-transparent border border-clauday-blue/40 rounded px-1 outline-none focus:border-clauday-blue"
+          className="font-mono text-[calc(11px_*_var(--app-font-scale,1))] bg-transparent border border-clauday-blue/40 rounded px-1 outline-none focus:border-clauday-blue"
           style={{ minWidth: 80, maxWidth: 200 }}
         />
       ) : (

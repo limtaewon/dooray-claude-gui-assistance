@@ -35,13 +35,13 @@ function StatCard({ label, value, tone = 'neutral', loading }: {
 }): JSX.Element {
   return (
     <Card className="flex flex-col gap-1">
-      <div className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-wide text-text-secondary">
+      <div className="flex items-center gap-1.5 text-[calc(9px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-text-secondary">
         {tone !== 'neutral' && (
           <span className="w-[10px] h-[10px] rounded-[2px] flex-none" style={{ background: STAT_DOT[tone] }} />
         )}
         {label}
       </div>
-      <div className="text-[20px] font-bold leading-none" style={{ color: STAT_VALUE_COLOR[tone] }}>
+      <div className="text-[calc(20px_*_var(--app-font-scale,1))] font-bold leading-none" style={{ color: STAT_VALUE_COLOR[tone] }}>
         {loading ? <span className="text-sm text-text-tertiary">...</span> : value}
       </div>
     </Card>
@@ -345,7 +345,7 @@ JSON 형태로만 응답:
         {/* Page head — 좁은 폭에서 chip 가 줄바꿈 될 수 있게 */}
         <div className="flex items-center gap-2 flex-wrap">
           <LayoutDashboard size={15} className="text-text-primary" />
-          <span className="text-[14px] font-semibold text-text-primary">대시보드</span>
+          <span className="text-[calc(14px_*_var(--app-font-scale,1))] font-semibold text-text-primary">대시보드</span>
           {projectCodesLabel && (
             <span title={allProjectCodes} className="inline-flex max-w-full sm:max-w-[480px] min-w-0">
               <Chip tone="neutral" className="truncate max-w-full">{projectCodesLabel}</Chip>
@@ -408,8 +408,8 @@ JSON 형태로만 응답:
               ? <ChevronDown size={12} className="text-text-secondary" />
               : <ChevronRight size={12} className="text-text-secondary" />}
             <Plus size={12} className="text-clauday-blue" />
-            <span className="text-[12px] font-semibold text-text-primary">빠른 태스크 생성</span>
-            <span className="text-[10px] text-text-tertiary">· 템플릿 · AI · 직접 입력 모두 가능</span>
+            <span className="text-[calc(12px_*_var(--app-font-scale,1))] font-semibold text-text-primary">빠른 태스크 생성</span>
+            <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">· 템플릿 · AI · 직접 입력 모두 가능</span>
             <div className="flex-1" />
             <Kbd>⌘N</Kbd>
           </div>
@@ -437,8 +437,8 @@ JSON 형태로만 응답:
               >
                 <div className="flex items-center gap-2">
                   <Wand2 size={12} className="text-clauday-orange" />
-                  <span className="text-[11px] font-semibold text-text-primary">AI 자동작성</span>
-                  <span className="text-[10px] text-text-tertiary">자연어 + 이미지로 제목·본문·태그까지 한 번에</span>
+                  <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">AI 자동작성</span>
+                  <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">자연어 + 이미지로 제목·본문·태그까지 한 번에</span>
                   <div className="flex-1" />
                   <AIToolsPopover feature="task" size="sm" />
                   <SkillQuickToggle target="task" />
@@ -456,7 +456,7 @@ JSON 형태로만 응답:
                         <div className="fixed inset-0 z-30" onClick={() => setTemplateMenuOpen(false)} />
                         <div className="ds-menu" style={{ top: 'calc(100% + 4px)', right: 0, minWidth: 220 }}>
                           {templates.length === 0 ? (
-                            <div className="px-3 py-2 text-[10px] text-text-tertiary">
+                            <div className="px-3 py-2 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
                               저장된 템플릿이 없습니다
                             </div>
                           ) : (
@@ -477,7 +477,7 @@ JSON 형태로만 응답:
                 {/* Textarea — 높이 ↑, paste 이미지 핸들 */}
                 <Textarea
                   rows={4}
-                  className="!text-[12px]"
+                  className="!text-[calc(12px_*_var(--app-font-scale,1))]"
                   style={{ resize: 'vertical' }}
                   placeholder={'예: "로그인 세션 만료 이슈 — 30분으로 늘리는 작업"\n또는 화면 스크린샷을 붙여넣기/드래그하여 첨부하세요'}
                   value={aiHint}
@@ -496,7 +496,7 @@ JSON 형태로만 응답:
                   <div className="flex flex-wrap gap-1.5">
                     {aiImages.map((p, i) => (
                       <div key={`${p}-${i}`}
-                        className="flex items-center gap-1 px-2 py-1 rounded bg-bg-surface border border-bg-border text-[10px] text-text-secondary">
+                        className="flex items-center gap-1 px-2 py-1 rounded bg-bg-surface border border-bg-border text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">
                         <ImageIcon size={10} className="text-clauday-orange" />
                         <span className="font-mono truncate max-w-[180px]" title={p}>{p.split(/[/\\]/).pop()}</span>
                         <button
@@ -512,7 +512,7 @@ JSON 형태로만 응답:
                 )}
 
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-text-tertiary flex-1">
+                  <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary flex-1">
                     {aiImages.length > 0 ? `🖼 이미지 ${aiImages.length}장 첨부됨 — Vision 으로 함께 분석` : '⌘+Enter 로 실행 · 이미지는 paste/drop'}
                   </span>
                   <Button variant="ai" onClick={composeWithAI}
@@ -538,9 +538,9 @@ JSON 형태로만 응답:
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
                   <FieldLabel className="!mb-0">본문</FieldLabel>
-                  <span className="text-[10px] text-text-tertiary">· 마크다운</span>
+                  <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">· 마크다운</span>
                   {activeTemplateName && (
-                    <span className="text-[10px] text-text-tertiary">· 템플릿: <span className="text-text-secondary font-medium">{activeTemplateName}</span></span>
+                    <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">· 템플릿: <span className="text-text-secondary font-medium">{activeTemplateName}</span></span>
                   )}
                 </div>
 
@@ -582,9 +582,9 @@ JSON 형태로만 응답:
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <Target size={13} className="text-text-secondary" />
-            <span className="text-[12px] font-semibold text-text-primary">오늘 집중할 태스크</span>
+            <span className="text-[calc(12px_*_var(--app-font-scale,1))] font-semibold text-text-primary">오늘 집중할 태스크</span>
             <Chip tone="neutral">{focus.filter((t) => t.workflowClass !== 'closed').length}</Chip>
-            <span className="text-[10px] text-text-tertiary">진행 중 + 오늘 마감</span>
+            <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">진행 중 + 오늘 마감</span>
             <div className="flex-1" />
           </div>
 
@@ -616,14 +616,14 @@ JSON 형태로만 응답:
                     <span title={`workflowClass: ${t.workflowClass}`} className="inline-flex">
                       <Chip tone={chip.tone}>{workflowLabel}</Chip>
                     </span>
-                    <span className="flex-1 text-[12px] text-text-primary truncate">{t.subject}</span>
+                    <span className="flex-1 text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary truncate">{t.subject}</span>
                     {assigneeName && <Avatar name={assigneeName} size="sm" />}
                     {t.projectCode && (
-                      <span className="font-mono text-[10px] text-text-tertiary">{t.projectCode}</span>
+                      <span className="font-mono text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">{t.projectCode}</span>
                     )}
                     {dueStr && (
                       <span
-                        className="text-[10px] whitespace-nowrap"
+                        className="text-[calc(10px_*_var(--app-font-scale,1))] whitespace-nowrap"
                         style={{ color: isDueToday ? '#F87171' : 'var(--text-tertiary)' }}
                       >
                         {dueStr}
@@ -687,14 +687,14 @@ function TagPickerSection({ tags, selectedIds, onChange }: TagPickerSectionProps
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
         <FieldLabel className="!mb-0">태그</FieldLabel>
-        <span className="text-[10px] text-text-tertiary">
+        <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
           그룹별 1개씩 선택 권장 (프로젝트에 따라 일부 그룹은 필수)
         </span>
       </div>
       <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">
         {groups.map(([groupName, items]) => (
           <div key={groupName} className="flex items-start gap-2">
-            <span className="text-[10px] font-semibold text-text-secondary mt-0.5 min-w-[80px] max-w-[120px] truncate">
+            <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-text-secondary mt-0.5 min-w-[80px] max-w-[120px] truncate">
               {groupName}
             </span>
             <div className="flex flex-wrap gap-1 flex-1">
@@ -708,7 +708,7 @@ function TagPickerSection({ tags, selectedIds, onChange }: TagPickerSectionProps
                     key={tag.id}
                     type="button"
                     onClick={() => toggle(tag.id)}
-                    className="text-[10px] px-2 py-0.5 rounded-full border transition-colors"
+                    className="text-[calc(10px_*_var(--app-font-scale,1))] px-2 py-0.5 rounded-full border transition-colors"
                     style={{
                       background: selected
                         ? `color-mix(in oklab, ${hex} 35%, var(--bg-surface))`

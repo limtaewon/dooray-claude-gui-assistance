@@ -46,7 +46,7 @@ function MCPCard({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <h3 className="text-[13px] font-semibold text-text-primary truncate">{name}</h3>
+            <h3 className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary truncate">{name}</h3>
             <span
               className={`ds-chip ${active ? 'emerald' : 'red'}`}
               style={{ flex: 'none' }}
@@ -55,13 +55,13 @@ function MCPCard({
               {active ? '활성' : '비활성'}
             </span>
             <span
-              className="px-1.5 py-0.5 rounded-[4px] text-[9px] font-mono uppercase bg-bg-surface-hover text-text-tertiary border border-bg-border"
+              className="px-1.5 py-0.5 rounded-[4px] text-[calc(9px_*_var(--app-font-scale,1))] font-mono uppercase bg-bg-surface-hover text-text-tertiary border border-bg-border"
               style={{ flex: 'none' }}
             >
               {transport}
             </span>
           </div>
-          <p className="text-[11px] text-text-secondary font-mono mt-0.5 truncate">
+          <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary font-mono mt-0.5 truncate">
             {isRemote ? (
               <>
                 {config.url || <span className="text-text-tertiary">URL 없음</span>}
@@ -123,7 +123,7 @@ function MCPCard({
           {config.args.map((arg, i) => (
             <span
               key={i}
-              className="px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono bg-bg-surface-hover text-text-secondary border border-bg-border"
+              className="px-1.5 py-0.5 rounded-[4px] text-[calc(10px_*_var(--app-font-scale,1))] font-mono bg-bg-surface-hover text-text-secondary border border-bg-border"
             >
               {arg}
             </span>
@@ -135,7 +135,7 @@ function MCPCard({
           {Object.keys(config.headers || {}).map((h) => (
             <span
               key={h}
-              className="px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono bg-bg-surface-hover text-text-secondary border border-bg-border"
+              className="px-1.5 py-0.5 rounded-[4px] text-[calc(10px_*_var(--app-font-scale,1))] font-mono bg-bg-surface-hover text-text-secondary border border-bg-border"
             >
               {h}
             </span>

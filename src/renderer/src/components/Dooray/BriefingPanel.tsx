@@ -91,10 +91,10 @@ function BriefingPanel(): JSX.Element {
           {/* 이전 브리핑이 있으면 흐리게 배경 표시 (기다리는 동안 참고) */}
           {briefing && (
             <div className="max-w-3xl mx-auto mt-6 opacity-30">
-              <p className="text-[10px] text-text-tertiary mb-2">↓ 이전 브리핑 (참고용)</p>
+              <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mb-2">↓ 이전 브리핑 (참고용)</p>
               <p className="text-sm font-semibold text-text-primary mb-3">{briefing.greeting}</p>
               {briefing.urgent.length > 0 && (
-                <div className="text-[11px] text-text-secondary">
+                <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary">
                   긴급: {briefing.urgent.map((u) => u.subject).join(', ')}
                 </div>
               )}
@@ -115,14 +115,14 @@ function BriefingPanel(): JSX.Element {
           {history.length > 0 && (
             <button
               onClick={() => setShowHistory(!showHistory)}
-              className="flex items-center gap-1 text-[10px] text-text-tertiary hover:text-text-secondary px-1.5 py-0.5 rounded bg-bg-surface"
+              className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-secondary px-1.5 py-0.5 rounded bg-bg-surface"
             >
               히스토리 {history.length}개
               <ChevronDown size={10} className={`transition-transform ${showHistory ? 'rotate-180' : ''}`} />
             </button>
           )}
           {briefing && (
-            <span className="text-[10px] text-text-tertiary">
+            <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
               · {new Date((briefing as StoredBriefing).savedAt || Date.now()).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 생성
             </span>
           )}
@@ -158,7 +158,7 @@ function BriefingPanel(): JSX.Element {
               onClick={() => selectBriefing(h)}
             >
               <div className="flex items-center gap-2 min-w-0">
-                <span className="text-[10px] text-text-tertiary font-mono">
+                <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary font-mono">
                   {new Date(h.savedAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 </span>
                 <span className="text-xs text-text-secondary truncate">{h.greeting}</span>
@@ -198,7 +198,7 @@ function BriefingPanel(): JSX.Element {
                 border: '1px solid rgba(234,88,12,0.45)'
               }}
             >
-              <div className="text-[13px] leading-relaxed text-text-primary">{briefing.greeting}</div>
+              <div className="text-[calc(13px_*_var(--app-font-scale,1))] leading-relaxed text-text-primary">{briefing.greeting}</div>
               <div className="flex items-center gap-1.5 mt-2">
                 {briefing.urgent.length > 0 && <Chip tone="orange" dot>긴급 {briefing.urgent.length}</Chip>}
                 {briefing.focus.length > 0 && <Chip tone="blue" dot>집중 {briefing.focus.length}</Chip>}
@@ -209,7 +209,7 @@ function BriefingPanel(): JSX.Element {
                   토글한 프로젝트 태스크 + 토글한 캘린더 일정은 항상 base 로 들어감.
                   스킬/MCP 가 활성이면 추가 보강 분석이 그 위에서 일어남. */}
               {briefing.sourceMeta && (
-                <div className="mt-2 text-[10px] text-text-tertiary">
+                <div className="mt-2 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
                   <div>
                     참고: 내 태스크 {briefing.sourceMeta.taskCount}개 · CC {briefing.sourceMeta.ccTaskCount}개 · 오늘 마감 {briefing.sourceMeta.dueTodayCount}개 · 일정 {briefing.sourceMeta.eventCount}개
                     {briefing.sourceMeta.eventRange ? ` (${briefing.sourceMeta.eventRange})` : ''}
@@ -294,8 +294,8 @@ function Section({ icon: Icon, iconColor, title, count, bgColor, children }: {
     <div className={`rounded-xl bg-gradient-to-r ${bgColor} border px-3.5 py-3`}>
       <div className="flex items-center gap-2 mb-2">
         <Icon size={14} className={iconColor} />
-        <span className={`text-[12px] font-semibold ${iconColor}`}>{title}</span>
-        {count !== undefined && <span className="text-[10px] text-text-tertiary">· {count}</span>}
+        <span className={`text-[calc(12px_*_var(--app-font-scale,1))] font-semibold ${iconColor}`}>{title}</span>
+        {count !== undefined && <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">· {count}</span>}
       </div>
       <div className="space-y-1">{children}</div>
     </div>
@@ -333,7 +333,7 @@ function linkifyText(text: string): React.ReactNode {
     } catch { /* keep raw */ }
     parts.push(
       <a key={`url-${i++}`} href={url} target="_blank" rel="noopener noreferrer"
-        className="inline-flex items-center gap-0.5 mx-0.5 px-1.5 py-0.5 rounded border border-bg-border-strong bg-bg-surface text-text-secondary hover:text-clauday-blue hover:border-clauday-blue text-[10px] font-mono align-baseline"
+        className="inline-flex items-center gap-0.5 mx-0.5 px-1.5 py-0.5 rounded border border-bg-border-strong bg-bg-surface text-text-secondary hover:text-clauday-blue hover:border-clauday-blue text-[calc(10px_*_var(--app-font-scale,1))] font-mono align-baseline"
         title={url}>
         {label}
       </a>
@@ -383,9 +383,9 @@ function RecommendationItem({ text, index }: { text: string; index: number }): J
 
   return (
     <div className="flex items-start gap-2 py-1 px-1.5 -mx-1.5 rounded-md hover:bg-bg-surface-hover transition-colors">
-      <span className="flex-none w-4 text-[10px] text-text-tertiary font-mono mt-1 text-right">{index + 1}.</span>
-      <span className="flex-1 text-[12px] text-text-primary leading-relaxed">
-        {leadingEmoji && <span className="mr-1 text-[13px]">{leadingEmoji}</span>}
+      <span className="flex-none w-4 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary font-mono mt-1 text-right">{index + 1}.</span>
+      <span className="flex-1 text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary leading-relaxed">
+        {leadingEmoji && <span className="mr-1 text-[calc(13px_*_var(--app-font-scale,1))]">{leadingEmoji}</span>}
         {anchor && (
           <span className="inline-block align-middle mr-1.5">
             <Chip tone="orange">{anchor}</Chip>
@@ -395,7 +395,7 @@ function RecommendationItem({ text, index }: { text: string; index: number }): J
         {taskIds.map((id, i) => (
           <a key={`${id}-${i}`} href={`https://nhnent.dooray.com/project/posts/${id}`}
              target="_blank" rel="noopener noreferrer"
-             className="inline-flex items-center gap-0.5 ml-1 px-1.5 py-0.5 rounded border border-bg-border-strong bg-bg-surface text-text-secondary hover:text-clauday-blue hover:border-clauday-blue text-[10px] font-mono align-middle"
+             className="inline-flex items-center gap-0.5 ml-1 px-1.5 py-0.5 rounded border border-bg-border-strong bg-bg-surface text-text-secondary hover:text-clauday-blue hover:border-clauday-blue text-[calc(10px_*_var(--app-font-scale,1))] font-mono align-middle"
              title={`두레이에서 ${id} 열기`}>
             #{id.slice(-4)}
           </a>
@@ -408,7 +408,7 @@ function RecommendationItem({ text, index }: { text: string; index: number }): J
 function TaskItem({ taskId, subject, detail }: { taskId?: string; subject: string; detail: string }): JSX.Element {
   // detail 안에 URL 이 있으면 outer anchor 로 감쌀 수 없음(nested <a>) — subject 만 링크화하고 detail 은 별도 줄.
   const detailNode = detail
-    ? <div className="text-text-secondary text-[11px] leading-relaxed mt-0.5">{linkifyText(detail)}</div>
+    ? <div className="text-text-secondary text-[calc(11px_*_var(--app-font-scale,1))] leading-relaxed mt-0.5">{linkifyText(detail)}</div>
     : null
   if (taskId) {
     return (
@@ -449,7 +449,7 @@ function BriefingFeedback(): JSX.Element {
 
   if (submitted) {
     return (
-      <div className="text-center text-[10px] text-emerald-400 py-2">
+      <div className="text-center text-[calc(10px_*_var(--app-font-scale,1))] text-emerald-400 py-2">
         ✓ 피드백 고마워요! 개선에 활용할게요.
       </div>
     )
@@ -458,7 +458,7 @@ function BriefingFeedback(): JSX.Element {
   return (
     <div className="pt-3 border-t border-bg-border/50">
       {feedback === null ? (
-        <div className="flex items-center justify-center gap-3 text-[11px] text-text-tertiary">
+        <div className="flex items-center justify-center gap-3 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
           이번 브리핑 어땠나요?
           <button onClick={() => submit('up')}
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-400/10 text-emerald-400 hover:bg-emerald-400/20">
@@ -471,14 +471,14 @@ function BriefingFeedback(): JSX.Element {
         </div>
       ) : feedback === 'down' ? (
         <div className="space-y-2">
-          <p className="text-[10px] text-text-secondary text-center">뭐가 아쉬웠나요? (선택)</p>
+          <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary text-center">뭐가 아쉬웠나요? (선택)</p>
           <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={2}
             placeholder="예: 긴급 기준이 안 맞아요, 참고사항 태스크를 더 강조해주세요"
-            className="w-full px-3 py-2 bg-bg-surface border border-bg-border rounded-lg text-[11px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue resize-none" />
+            className="w-full px-3 py-2 bg-bg-surface border border-bg-border rounded-lg text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue resize-none" />
           <div className="flex justify-end gap-2">
-            <button onClick={() => setFeedback(null)} className="text-[10px] text-text-tertiary hover:text-text-secondary">취소</button>
+            <button onClick={() => setFeedback(null)} className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-secondary">취소</button>
             <button onClick={() => submit('down', comment)}
-              className="px-3 py-1 rounded-md bg-clauday-blue text-white text-[10px] font-medium hover:bg-clauday-blue/80">
+              className="px-3 py-1 rounded-md bg-clauday-blue text-white text-[calc(10px_*_var(--app-font-scale,1))] font-medium hover:bg-clauday-blue/80">
               제출
             </button>
           </div>

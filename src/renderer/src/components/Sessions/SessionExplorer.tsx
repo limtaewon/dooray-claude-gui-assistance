@@ -110,7 +110,7 @@ function SessionExplorer(): JSX.Element {
             <div className="flex items-center gap-1.5">
               <MessageSquare size={15} className="text-clauday-blue" />
               <h2 className="text-sm font-semibold text-text-primary">세션 탐색기</h2>
-              <span className="text-[9px] text-text-tertiary">{filtered.length}/{sessions.length}</span>
+              <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">{filtered.length}/{sessions.length}</span>
             </div>
             <button onClick={load} className="ds-btn xs primary">
               <RefreshCw size={11} className={loading ? 'animate-spin' : ''} />
@@ -126,7 +126,7 @@ function SessionExplorer(): JSX.Element {
           </div>
           {/* 프로젝트 필터 */}
           <select value={projectFilter} onChange={(e) => { setProjectFilter(e.target.value); setRenderCount(50) }}
-            className="w-full px-2 py-1 bg-bg-surface border border-bg-border rounded text-[10px] text-text-secondary focus:outline-none focus:border-clauday-blue">
+            className="w-full px-2 py-1 bg-bg-surface border border-bg-border rounded text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary focus:outline-none focus:border-clauday-blue">
             <option value="">전체 프로젝트</option>
             {projects.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
@@ -154,7 +154,7 @@ function SessionExplorer(): JSX.Element {
                 />
               ))}
               {renderCount < filtered.length && (
-                <div className="py-2 text-center text-[9px] text-text-tertiary">{visible.length}/{filtered.length} · 스크롤하면 더 표시</div>
+                <div className="py-2 text-center text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">{visible.length}/{filtered.length} · 스크롤하면 더 표시</div>
               )}
             </>
           )}
@@ -169,7 +169,7 @@ function SessionExplorer(): JSX.Element {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-text-primary font-medium line-clamp-1">{selectedSession.firstMsg}</p>
-                  <div className="flex items-center gap-3 mt-1 text-[9px] text-text-tertiary">
+                  <div className="flex items-center gap-3 mt-1 text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">
                     <span><FolderOpen size={9} className="inline" /> {selectedSession.project}</span>
                     <span><Clock size={9} className="inline" /> {selectedSession.timestamp?.substring(0, 16)}</span>
                     <span className="font-mono">{selectedSession.id.substring(0, 8)}...</span>
@@ -177,14 +177,14 @@ function SessionExplorer(): JSX.Element {
                 </div>
                 <div className="flex gap-1.5">
                   <button onClick={summarizeSession} disabled={summarizing || !messages.length}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-clauday-orange/20 to-clauday-blue/20 border border-clauday-orange/30 text-[10px] font-medium text-text-primary disabled:opacity-40">
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-clauday-orange/20 to-clauday-blue/20 border border-clauday-orange/30 text-[calc(10px_*_var(--app-font-scale,1))] font-medium text-text-primary disabled:opacity-40">
                     {summarizing ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} className="text-clauday-orange" />}
                     AI 요약
                   </button>
                   <button onClick={async () => {
                     await navigator.clipboard.writeText(`claude -r ${selectedSession.id}`)
                     setCopied(true); setTimeout(() => setCopied(false), 2000)
-                  }} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-bg-surface border border-bg-border text-[10px] text-text-secondary hover:text-text-primary"
+                  }} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-bg-surface border border-bg-border text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary hover:text-text-primary"
                     title="claude -r <id> — 권한 확인 살림">
                     {copied ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
                     resume 복사
@@ -193,7 +193,7 @@ function SessionExplorer(): JSX.Element {
                   <button onClick={async () => {
                     await navigator.clipboard.writeText(`claude -r ${selectedSession.id} --dangerously-skip-permissions`)
                     setCopied(true); setTimeout(() => setCopied(false), 2000)
-                  }} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-clauday-orange/10 border border-clauday-orange/40 text-[10px] text-clauday-orange hover:bg-clauday-orange/15"
+                  }} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-clauday-orange/10 border border-clauday-orange/40 text-[calc(10px_*_var(--app-font-scale,1))] text-clauday-orange hover:bg-clauday-orange/15"
                     title="claude -r <id> --dangerously-skip-permissions — 권한 확인 건너뜀 (조심)">
                     {copied ? <Check size={10} /> : <Copy size={10} />}
                     bypass 복사
@@ -204,7 +204,7 @@ function SessionExplorer(): JSX.Element {
                 <div className="mt-2 p-2.5 rounded-lg bg-gradient-to-r from-clauday-orange/5 to-clauday-blue/5 border border-clauday-orange/20">
                   <div className="flex items-center gap-1 mb-1">
                     <Sparkles size={10} className="text-clauday-orange" />
-                    <span className="text-[9px] font-semibold text-clauday-orange">AI 요약</span>
+                    <span className="text-[calc(9px_*_var(--app-font-scale,1))] font-semibold text-clauday-orange">AI 요약</span>
                   </div>
                   <p className="text-xs text-text-primary leading-relaxed">{summary}</p>
                 </div>
@@ -232,7 +232,7 @@ function SessionExplorer(): JSX.Element {
           <div className="flex flex-col items-center justify-center h-full text-text-secondary gap-2">
             <MessageSquare size={32} className="text-text-tertiary" />
             <p className="text-sm">좌측에서 세션을 선택하세요</p>
-            <p className="text-[10px] text-text-tertiary">검색으로 원하는 세션을 빠르게 찾을 수 있습니다</p>
+            <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">검색으로 원하는 세션을 빠르게 찾을 수 있습니다</p>
           </div>
         )}
       </div>
@@ -258,13 +258,13 @@ const SessionRow = memo(function SessionRow({ session, isSelected, onSelect, for
     >
       <div className="flex items-start justify-between gap-2">
         <p className="text-xs text-text-primary line-clamp-2 flex-1">{session.firstMsg}</p>
-        <span className="text-[9px] text-text-tertiary flex-shrink-0">{formattedTime}</span>
+        <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">{formattedTime}</span>
       </div>
       <div className="flex items-center gap-2 mt-1">
-        <span className="text-[9px] text-text-tertiary flex items-center gap-0.5">
+        <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary flex items-center gap-0.5">
           <FolderOpen size={8} /> {session.project}
         </span>
-        <span className="text-[9px] text-text-tertiary flex items-center gap-0.5">
+        <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary flex items-center gap-0.5">
           <Hash size={8} /> {session.lines}줄
         </span>
       </div>

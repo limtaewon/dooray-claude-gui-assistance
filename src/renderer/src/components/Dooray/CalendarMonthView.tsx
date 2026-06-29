@@ -673,11 +673,11 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
           </h3>
           <div className="flex items-center gap-0.5 ml-1">
             <button onClick={() => jumpMonths(-1)} className="ds-btn icon sm" title="이전 달"><ChevronLeft size={14} /></button>
-            <button onClick={jumpToToday} className="ds-btn sm px-2 text-[11px]">오늘</button>
+            <button onClick={jumpToToday} className="ds-btn sm px-2 text-[calc(11px_*_var(--app-font-scale,1))]">오늘</button>
             <button onClick={() => jumpMonths(1)} className="ds-btn icon sm" title="다음 달"><ChevronRight size={14} /></button>
           </div>
         </div>
-        <span className="text-[10px] text-text-tertiary">
+        <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
           {loading ? '불러오는 중…' : error ? <span className="text-rose-400">{error}</span> : `${events.length}개 일정`}
         </span>
       </div>
@@ -686,7 +686,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
       <div className="grid grid-cols-7 border-b border-bg-border flex-shrink-0 bg-bg-surface">
         {WEEKDAYS.map((w, i) => (
           <div key={w}
-            className={`px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-right ${
+            className={`px-2 py-1.5 text-[calc(10px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-right ${
               i === 0 ? 'text-rose-400' : i === 6 ? 'text-clauday-blue' : 'text-text-secondary'
             }`}>{w}</div>
         ))}
@@ -718,11 +718,11 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                       <div className="absolute top-1 right-1.5 z-[1] flex items-center gap-0.5 pointer-events-none">
                         {isToday ? (
                           <>
-                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-clauday-blue text-white text-[11px] font-bold leading-none">{day.getDate()}</span>
-                            <span className="text-[11px] font-medium text-text-secondary">일</span>
+                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-clauday-blue text-white text-[calc(11px_*_var(--app-font-scale,1))] font-bold leading-none">{day.getDate()}</span>
+                            <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-medium text-text-secondary">일</span>
                           </>
                         ) : (
-                          <span className={`text-[11px] font-medium ${
+                          <span className={`text-[calc(11px_*_var(--app-font-scale,1))] font-medium ${
                             di === 0
                               ? inMonth ? 'text-rose-400' : 'text-rose-400/45'
                               : di === 6
@@ -737,7 +737,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                         <span
                           onMouseDown={(e) => e.stopPropagation()}
                           onClick={(e) => { e.stopPropagation(); setMoreDate(day) }}
-                          className="absolute bottom-1.5 left-2 right-2 text-[10px] text-text-tertiary hover:text-clauday-blue text-left cursor-pointer">
+                          className="absolute bottom-1.5 left-2 right-2 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-clauday-blue text-left cursor-pointer">
                           +{hCount}개 더 보기
                         </span>
                       )}
@@ -775,7 +775,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                         className="row-start-1 px-[2px]">
                         <div
                           style={{ height: SLOT_H, backgroundColor: c.barBg, color: c.barText }}
-                          className={`flex items-center px-1.5 text-[11px] leading-none font-medium ring-2 ring-clauday-blue ${rL} ${rR}`}>
+                          className={`flex items-center px-1.5 text-[calc(11px_*_var(--app-font-scale,1))] leading-none font-medium ring-2 ring-clauday-blue ${rL} ${rR}`}>
                           <span className="truncate">{barDrag.event.summary}</span>
                         </div>
                       </div>
@@ -820,7 +820,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                             if (!barDragMovedRef.current && !barDragSaving) setSelected(seg.event)
                           }}
                           style={{ ...barStyle, opacity: isBeingDragged ? 0.35 : 1 }}
-                          className={`relative flex items-center gap-1 px-1.5 truncate text-[11px] leading-none font-medium hover:brightness-110 ${radiusL} ${radiusR} ${draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}>
+                          className={`relative flex items-center gap-1 px-1.5 truncate text-[calc(11px_*_var(--app-font-scale,1))] leading-none font-medium hover:brightness-110 ${radiusL} ${radiusR} ${draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}>
                           {/* 좌측 리사이즈 핸들 — 막대의 실제 시작 segment 에서만 노출 */}
                           {draggable && seg.startsHere && (
                             <span
@@ -877,14 +877,14 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
           <div className="flex items-center gap-1">
             <button
               onClick={() => { setEditingEvent(selected); setSelected(null) }}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] text-clauday-blue hover:bg-clauday-blue/10 transition-colors">
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[calc(11px_*_var(--app-font-scale,1))] text-clauday-blue hover:bg-clauday-blue/10 transition-colors">
               <Edit2 size={12} />
               편집
             </button>
             <button
               onClick={() => handleDelete(selected)}
               disabled={deleting}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] text-rose-400 hover:bg-rose-500/10 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[calc(11px_*_var(--app-font-scale,1))] text-rose-400 hover:bg-rose-500/10 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
               {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
               {deleting ? '삭제 중…' : '삭제'}
             </button>
@@ -922,7 +922,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
             return (
               <button key={`${e.source}:${e.id}`}
                 onClick={() => { setMoreDate(null); setSelected(e) }}
-                className="w-full text-left px-3 py-1.5 hover:bg-bg-surface-hover flex items-center gap-2 text-[11px]">
+                className="w-full text-left px-3 py-1.5 hover:bg-bg-surface-hover flex items-center gap-2 text-[calc(11px_*_var(--app-font-scale,1))]">
                 {isMulti
                   ? <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: c.barBg }} />
                   : <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: c.dotBg }} />}
@@ -955,14 +955,14 @@ function EventDetailBody({ event, calendarName, colorBg }: {
     <div className="space-y-4">
       {/* 제목 + 우측 캘린더 표시 */}
       <div className="flex items-start gap-4">
-        <h2 className="flex-1 text-[17px] font-semibold leading-snug text-text-primary break-words">
+        <h2 className="flex-1 text-[calc(17px_*_var(--app-font-scale,1))] font-semibold leading-snug text-text-primary break-words">
           {event.summary || '(제목 없음)'}
-          {statusBadge && <span className={`align-middle ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium ${statusBadge.cls}`}>{statusBadge.label}</span>}
+          {statusBadge && <span className={`align-middle ml-2 px-1.5 py-0.5 rounded text-[calc(10px_*_var(--app-font-scale,1))] font-medium ${statusBadge.cls}`}>{statusBadge.label}</span>}
         </h2>
-        <div className="flex items-center gap-1.5 text-[11px] text-text-secondary flex-shrink-0 mt-1">
+        <div className="flex items-center gap-1.5 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary flex-shrink-0 mt-1">
           <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colorBg }} />
           <span className="truncate max-w-[140px]">{calendarName}</span>
-          <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${
+          <span className={`px-1.5 py-0.5 rounded text-[calc(9px_*_var(--app-font-scale,1))] font-medium ${
             event.source === 'local' ? 'bg-emerald-500/15 text-emerald-400'
               : event.source === 'caldav' ? 'bg-clauday-blue/15 text-clauday-blue'
               : 'bg-rose-500/15 text-rose-400'
@@ -970,7 +970,7 @@ function EventDetailBody({ event, calendarName, colorBg }: {
         </div>
       </div>
 
-      <div className="space-y-3 text-[12px] leading-relaxed">
+      <div className="space-y-3 text-[calc(12px_*_var(--app-font-scale,1))] leading-relaxed">
         {/* 시간 */}
         <DetailRow icon={<Clock size={14} />}>
           <span className="text-text-primary">{fmtRange(new Date(event.start), new Date(event.end), event.allDay)}</span>
@@ -979,7 +979,7 @@ function EventDetailBody({ event, calendarName, colorBg }: {
         {/* 등록 시간 — createdAt 있을 때만 (공휴일은 없음) */}
         {event.createdAt && (
           <DetailRow icon={<CalendarPlus size={14} />}>
-            <span className="text-text-tertiary text-[11px]">{fmtCreatedAt(event.createdAt)}</span>
+            <span className="text-text-tertiary text-[calc(11px_*_var(--app-font-scale,1))]">{fmtCreatedAt(event.createdAt)}</span>
           </DetailRow>
         )}
 
@@ -994,7 +994,7 @@ function EventDetailBody({ event, calendarName, colorBg }: {
         {event.organizer && (event.organizer.name || event.organizer.email) && (
           <DetailRow icon={<UserCheck size={14} />}>
             <span className="text-text-primary">{event.organizer.name || event.organizer.email}</span>
-            <span className="ml-2 text-[10px] text-text-tertiary px-1.5 py-0.5 rounded bg-bg-surface border border-bg-border">등록자</span>
+            <span className="ml-2 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary px-1.5 py-0.5 rounded bg-bg-surface border border-bg-border">등록자</span>
           </DetailRow>
         )}
 
@@ -1013,7 +1013,7 @@ function EventDetailBody({ event, calendarName, colorBg }: {
                   <li key={i} className="flex items-center gap-1 text-text-secondary">
                     <PartstatIcon partstat={a.partstat} />
                     <span className="truncate max-w-[180px]">{a.name || a.email || '(이름 없음)'}</span>
-                    {a.role === 'OPT-PARTICIPANT' && <span className="text-text-tertiary text-[9px]">선택</span>}
+                    {a.role === 'OPT-PARTICIPANT' && <span className="text-text-tertiary text-[calc(9px_*_var(--app-font-scale,1))]">선택</span>}
                   </li>
                 ))}
                 {event.attendees.length > 12 && (
@@ -1029,7 +1029,7 @@ function EventDetailBody({ event, calendarName, colorBg }: {
           <DetailRow icon={<Bell size={14} />}>
             <div className="flex flex-wrap gap-1.5">
               {event.alarms.map((a, i) => (
-                <span key={i} className="px-2 py-0.5 rounded-md bg-clauday-orange/10 text-clauday-orange text-[11px] font-medium">
+                <span key={i} className="px-2 py-0.5 rounded-md bg-clauday-orange/10 text-clauday-orange text-[calc(11px_*_var(--app-font-scale,1))] font-medium">
                   {fmtTrigger(a.trigger)}
                 </span>
               ))}
@@ -1050,7 +1050,7 @@ function EventDetailBody({ event, calendarName, colorBg }: {
       {event.description && (
         <div className="flex items-start gap-3">
           <Edit2 size={14} className="text-text-tertiary mt-1.5 flex-shrink-0" />
-          <div className="flex-1 min-w-0 rounded-lg border border-bg-border bg-bg-surface/30 p-3 markdown-body text-[12px] leading-relaxed">
+          <div className="flex-1 min-w-0 rounded-lg border border-bg-border bg-bg-surface/30 p-3 markdown-body text-[calc(12px_*_var(--app-font-scale,1))] leading-relaxed">
             <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
               {event.description}
             </ReactMarkdown>
@@ -1087,7 +1087,7 @@ function AttendeeSummary({ attendees }: { attendees: UnifiedEvent['attendees'] }
   if (tentative) parts.push(`임시 ${tentative}`)
   if (declined) parts.push(`거절 ${declined}`)
   if (pending) parts.push(`미응답 ${pending}`)
-  return <span className="text-text-tertiary text-[10px] font-normal">{parts.join(' · ')}</span>
+  return <span className="text-text-tertiary text-[calc(10px_*_var(--app-font-scale,1))] font-normal">{parts.join(' · ')}</span>
 }
 
 function PartstatIcon({ partstat }: { partstat?: string }): JSX.Element {
@@ -1198,7 +1198,7 @@ function NewEventModal({ range, calendars, onClose, onCreate }: {
           </Button>
         </div>
       }>
-      <div className="space-y-3 text-[11px]">
+      <div className="space-y-3 text-[calc(11px_*_var(--app-font-scale,1))]">
         <Field label="제목">
           <Input value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="일정 제목" />
         </Field>
@@ -1228,7 +1228,7 @@ function NewEventModal({ range, calendars, onClose, onCreate }: {
         )}
         <Field label="장소"><Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="회의실 / 주소" /></Field>
         <Field label="메모"><Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="설명" /></Field>
-        {error && <p className="text-[11px] text-rose-400">{error}</p>}
+        {error && <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-rose-400">{error}</p>}
       </div>
     </Modal>
   )
@@ -1237,7 +1237,7 @@ function NewEventModal({ range, calendars, onClose, onCreate }: {
 function Field({ label, children }: { label: string; children: React.ReactNode }): JSX.Element {
   return (
     <div className="space-y-1">
-      <label className="block text-[9px] text-text-tertiary uppercase tracking-wide font-semibold">{label}</label>
+      <label className="block text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary uppercase tracking-wide font-semibold">{label}</label>
       {children}
     </div>
   )

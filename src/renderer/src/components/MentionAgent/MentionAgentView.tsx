@@ -87,7 +87,7 @@ function MentionAgentView(): JSX.Element {
                 두레이 채팅방에서 본인이 <code className="px-1 rounded bg-bg-surface text-clauday-blue">@clauday</code> 라고
                 호출하면, 그 채널 전용 작업 폴더와 세션이 자동으로 시작됩니다.
               </p>
-              <p className="text-[10px] text-text-tertiary mt-3">
+              <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-3">
                 작업물 위치: ~/Clauday-Workspaces/agent/{'{channelId}'}/
               </p>
             </div>

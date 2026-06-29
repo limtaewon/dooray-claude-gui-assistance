@@ -140,7 +140,7 @@ function UsageDashboard(): JSX.Element {
               <Sparkles size={13} className="text-clauday-orange" />
               <span className="text-xs font-semibold text-text-primary">AI 사용 인사이트 (한국어)</span>
             </div>
-            <button onClick={() => setInsightReport(null)} className="text-[9px] text-text-tertiary hover:text-text-secondary">닫기</button>
+            <button onClick={() => setInsightReport(null)} className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-secondary">닫기</button>
           </div>
           <div className="p-5 max-h-[60vh] overflow-y-auto markdown-body text-sm leading-relaxed">
             <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{insightReport}</ReactMarkdown>
@@ -269,7 +269,7 @@ function StatCard({ icon: Icon, iconColor, label, value }: {
     <div className="bg-bg-surface border border-bg-border rounded-xl p-3">
       <div className="flex items-center gap-1.5 mb-1">
         <Icon size={12} className={iconColor} />
-        <span className="text-[10px] text-text-secondary">{label}</span>
+        <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">{label}</span>
       </div>
       <p className="text-lg font-bold text-text-primary">{value}</p>
     </div>

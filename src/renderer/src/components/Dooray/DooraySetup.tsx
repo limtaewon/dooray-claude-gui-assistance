@@ -97,14 +97,14 @@ function DooraySetup({ onConfigured }: DooraySetupProps): JSX.Element {
           {/* 토큰 발급 안내 */}
           <div className="bg-bg-primary border border-bg-border rounded-lg p-3 space-y-2">
             <p className="text-xs font-medium text-text-primary">API 토큰 발급 방법</p>
-            <ol className="text-[11px] text-text-secondary space-y-1 list-decimal list-inside">
+            <ol className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary space-y-1 list-decimal list-inside">
               <li>두레이 우측 상단 프로필 → 설정</li>
               <li>보안 탭 → "개인 API 토큰" 섹션</li>
               <li>토큰 생성 후 복사</li>
             </ol>
             <button
               onClick={openTokenPage}
-              className="flex items-center gap-1.5 text-[11px] text-clauday-blue hover:text-clauday-blue/80 transition-colors"
+              className="flex items-center gap-1.5 text-[calc(11px_*_var(--app-font-scale,1))] text-clauday-blue hover:text-clauday-blue/80 transition-colors"
             >
               <ExternalLink size={11} />
               두레이 토큰 설정 페이지 열기
@@ -137,7 +137,7 @@ function DooraySetup({ onConfigured }: DooraySetupProps): JSX.Element {
             </div>
           )}
 
-          <p className="text-[10px] text-text-secondary leading-relaxed">
+          <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary leading-relaxed">
             토큰은 macOS 키체인에 안전하게 저장됩니다.
           </p>
 

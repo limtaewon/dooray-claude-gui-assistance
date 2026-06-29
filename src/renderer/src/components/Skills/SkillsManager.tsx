@@ -436,10 +436,10 @@ function SkillsManager(): JSX.Element {
           style={{ background: 'var(--bg-surface-raised)' }}>
           <Loader2 size={14} className="animate-spin text-clauday-blue" />
           <div className="flex flex-col">
-            <span className="text-[12px] text-text-primary font-medium">
+            <span className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary font-medium">
               {uploadProgress.wikiName} 에 업로드 중 ({uploadProgress.current}/{uploadProgress.total})
             </span>
-            <span className="text-[10px] text-text-tertiary truncate max-w-[260px]">{uploadProgress.currentName}</span>
+            <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary truncate max-w-[260px]">{uploadProgress.currentName}</span>
           </div>
         </div>
       )}
@@ -447,7 +447,7 @@ function SkillsManager(): JSX.Element {
         {/* PageHeader */}
         <div className="flex items-center gap-3 flex-wrap">
           <Sparkles size={18} className="text-clauday-blue" />
-          <h2 className="text-[14px] font-semibold text-text-primary">Claude 스킬</h2>
+          <h2 className="text-[calc(14px_*_var(--app-font-scale,1))] font-semibold text-text-primary">Claude 스킬</h2>
           <span className="ds-chip neutral">
             {tab === 'mine' ? `${skills.length}개` : `${wikiItems.length}개 공유됨`}
           </span>
@@ -520,7 +520,7 @@ function SkillsManager(): JSX.Element {
                 if (selected.size === all.length) setSelected(new Set())
                 else setSelected(new Set(all))
               }}
-              className="text-[11px] text-clauday-orange hover:underline"
+              className="text-[calc(11px_*_var(--app-font-scale,1))] text-clauday-orange hover:underline"
             >
               {(() => {
                 const all = tab === 'mine' ? filteredSkills.length : filteredWikiItems.length
@@ -583,13 +583,13 @@ function SkillsManager(): JSX.Element {
             <div className="py-16 text-center">
               <Sparkles size={32} className="mx-auto text-text-tertiary mb-3" />
               <p className="text-sm font-medium text-text-primary mb-1">스킬이 없습니다</p>
-              <p className="text-[11px] text-text-tertiary mb-4">'스킬 추가' 버튼으로 첫 스킬을 만들어보세요</p>
+              <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mb-4">'스킬 추가' 버튼으로 첫 스킬을 만들어보세요</p>
               <Button variant="primary" onClick={() => setCreating(true)} leftIcon={<Plus size={13} />}>
                 스킬 추가
               </Button>
             </div>
           ) : filteredSkills.length === 0 ? (
-            <div className="py-12 text-center text-[12px] text-text-tertiary">
+            <div className="py-12 text-center text-[calc(12px_*_var(--app-font-scale,1))] text-text-tertiary">
               "{search}"에 일치하는 스킬이 없습니다
             </div>
           ) : (
@@ -614,18 +614,18 @@ function SkillsManager(): JSX.Element {
             <div className="py-16 text-center">
               <Sparkles size={32} className="mx-auto text-text-tertiary mb-3" />
               <p className="text-sm font-medium text-text-primary mb-1">위키를 등록하세요</p>
-              <p className="text-[11px] text-text-tertiary">상단 톱니바퀴 → 위키를 체크하거나 수동 추가로 등록하면, 해당 위키에서 공유 중인 스킬이 여기 표시됩니다</p>
+              <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">상단 톱니바퀴 → 위키를 체크하거나 수동 추가로 등록하면, 해당 위키에서 공유 중인 스킬이 여기 표시됩니다</p>
             </div>
           ) : wikiLoading ? (
-            <div className="py-12 text-center text-[12px] text-text-tertiary">공유 스킬 불러오는 중...</div>
+            <div className="py-12 text-center text-[calc(12px_*_var(--app-font-scale,1))] text-text-tertiary">공유 스킬 불러오는 중...</div>
           ) : wikiItems.length === 0 ? (
             <div className="py-16 text-center">
               <Upload size={32} className="mx-auto text-text-tertiary mb-3" />
               <p className="text-sm font-medium text-text-primary mb-1">아직 공유된 스킬이 없습니다</p>
-              <p className="text-[11px] text-text-tertiary">'내 스킬 공유하기' 버튼으로 위키에 스킬을 업로드해보세요</p>
+              <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">'내 스킬 공유하기' 버튼으로 위키에 스킬을 업로드해보세요</p>
             </div>
           ) : filteredWikiItems.length === 0 ? (
-            <div className="py-12 text-center text-[12px] text-text-tertiary">
+            <div className="py-12 text-center text-[calc(12px_*_var(--app-font-scale,1))] text-text-tertiary">
               "{search}"에 일치하는 공유 스킬이 없습니다
             </div>
           ) : (
@@ -663,13 +663,13 @@ function SkillsManager(): JSX.Element {
                         <Sparkles size={15} className="text-clauday-blue" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-[13px] font-semibold text-text-primary truncate">{item.name}</div>
+                        <div className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary truncate">{item.name}</div>
                         {description ? (
-                          <div className="text-[11px] text-text-secondary mt-0.5 leading-relaxed line-clamp-2">
+                          <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary mt-0.5 leading-relaxed line-clamp-2">
                             {description}
                           </div>
                         ) : null}
-                        <div className="text-[10px] text-text-tertiary mt-1">
+                        <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-1">
                           {item.updatedAt ? new Date(item.updatedAt).toLocaleString('ko-KR') : '날짜 없음'}
                         </div>
                       </div>
@@ -678,11 +678,11 @@ function SkillsManager(): JSX.Element {
                       <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-bg-border/60">
                         <div className="flex-1" />
                         <button onClick={(e) => { e.stopPropagation(); handleDownloadFromWiki(item) }}
-                          className="flex items-center gap-1 text-[11px] text-text-secondary hover:text-clauday-blue">
+                          className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:text-clauday-blue">
                           <Download size={11} /> 내려받기
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); handleDeleteFromWiki(item) }}
-                          className="flex items-center gap-1 text-[11px] text-text-secondary hover:text-red-400">
+                          className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:text-red-400">
                           <Trash2 size={11} /> 삭제
                         </button>
                       </div>
@@ -716,7 +716,7 @@ function SkillsManager(): JSX.Element {
                 return next
               })}
               disabled={pickerVisibleSkills.length === 0}
-              className="text-[11px] text-text-secondary hover:text-text-primary px-2 py-1 disabled:opacity-40">
+              className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:text-text-primary px-2 py-1 disabled:opacity-40">
               {pickerAllVisibleSelected ? '전체 해제' : '전체 선택'}
             </button>
             <div className="flex items-center gap-2">
@@ -741,7 +741,7 @@ function SkillsManager(): JSX.Element {
         ) : undefined}
       >
         <div className="p-4">
-          <p className="text-[11px] text-text-tertiary mb-3">
+          <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mb-3">
             위키에 공유할 내 스킬을 선택하세요. 여러 개를 한 번에 올릴 수 있습니다.
           </p>
           {skills.length === 0 ? (
@@ -840,7 +840,7 @@ function SkillsManager(): JSX.Element {
         footer={
           <>
             {previewShared && previewShared.authorName && (
-              <span className="text-[11px] text-text-tertiary flex items-center gap-1">
+              <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary flex items-center gap-1">
                 <User size={11} />
                 {previewShared.authorName}
               </span>
@@ -871,10 +871,10 @@ function SkillsManager(): JSX.Element {
       >
         {previewShared && (
           !previewShared.content ? (
-            <div className="text-[12px] text-text-tertiary py-8 text-center">(본문 없음)</div>
+            <div className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-tertiary py-8 text-center">(본문 없음)</div>
           ) : (
             // 스킬은 frontmatter(---) + 마크다운 본문 형식 — GFM 으로 렌더
-            <div className="markdown-body text-[12px] leading-relaxed text-text-primary"
+            <div className="markdown-body text-[calc(12px_*_var(--app-font-scale,1))] leading-relaxed text-text-primary"
               style={{ maxHeight: '60vh', overflow: 'auto' }}>
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {previewShared.content}
@@ -897,8 +897,8 @@ function SkillsManager(): JSX.Element {
             style={{ background: 'var(--bg-surface-raised)' }}
           >
             <div className="px-4 py-3 border-b border-bg-border">
-              <div className="text-[13px] font-semibold text-text-primary">공유할 위키 선택</div>
-              <div className="text-[11px] text-text-tertiary mt-0.5">
+              <div className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary">공유할 위키 선택</div>
+              <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
                 {shareTargetPicker.skills.length}개 스킬을 어느 위키에 올릴까요?
               </div>
             </div>
@@ -911,7 +911,7 @@ function SkillsManager(): JSX.Element {
                     setShareTargetPicker(null)
                     await uploadSkillsToWiki(skillsToUpload, w.wikiId)
                   }}
-                  className="w-full flex items-center gap-2 px-4 py-2 text-left text-[12px] text-text-secondary hover:bg-bg-surface-hover transition-colors"
+                  className="w-full flex items-center gap-2 px-4 py-2 text-left text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary hover:bg-bg-surface-hover transition-colors"
                   type="button"
                 >
                   <Sparkles size={12} className="text-clauday-blue" />

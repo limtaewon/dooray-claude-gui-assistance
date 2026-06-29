@@ -442,8 +442,8 @@ function RecentViewsPalette({ open, items, index, onHover, onPick, onClose }: {
         style={{ background: 'var(--bg-surface-raised)', border: '1px solid var(--bg-border)' }}
       >
         <div className="px-3 py-2 border-b border-bg-border flex items-center gap-2">
-          <span className="text-[10px] font-semibold text-text-secondary">최근 뷰</span>
-          <span className="text-[10px] text-text-tertiary">⌘E 다음 · ↑↓ 이동 · Enter 선택 · Esc 닫기</span>
+          <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-text-secondary">최근 뷰</span>
+          <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">⌘E 다음 · ↑↓ 이동 · Enter 선택 · Esc 닫기</span>
         </div>
         <div className="py-1 max-h-[60vh] overflow-y-auto">
           {items.map((it, i) => {
@@ -462,10 +462,10 @@ function RecentViewsPalette({ open, items, index, onHover, onPick, onClose }: {
                 <span className={hi ? 'text-clauday-blue' : isCurrent ? 'text-text-tertiary' : 'text-text-secondary'}>
                   {icon}
                 </span>
-                <span className={`text-[12px] flex-1 truncate ${hi ? 'text-text-primary font-medium' : isCurrent ? 'text-text-tertiary' : 'text-text-primary'}`}>
+                <span className={`text-[calc(12px_*_var(--app-font-scale,1))] flex-1 truncate ${hi ? 'text-text-primary font-medium' : isCurrent ? 'text-text-tertiary' : 'text-text-primary'}`}>
                   {label}
                 </span>
-                {isCurrent && <span className="text-[9px] text-text-tertiary">현재</span>}
+                {isCurrent && <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">현재</span>}
               </button>
             )
           })}

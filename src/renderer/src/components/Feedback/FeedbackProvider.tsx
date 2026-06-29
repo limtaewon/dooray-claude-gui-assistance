@@ -215,7 +215,7 @@ function FeedbackProvider({ children }: { children: ReactNode }): JSX.Element {
               ))}
             </div>
 
-            <div className="text-[11px] text-text-secondary leading-relaxed">
+            <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary leading-relaxed">
               {category === 'bug'
                 ? '오류 발생 시 진단 정보가 자동 포함됩니다. 민감정보가 있으면 직접 지우고 보내주세요.'
                 : category === 'feature'
@@ -227,7 +227,7 @@ function FeedbackProvider({ children }: { children: ReactNode }): JSX.Element {
             </div>
 
             <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-text-primary">제목</span>
+              <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">제목</span>
               <input
                 type="text"
                 className="ds-input"
@@ -246,7 +246,7 @@ function FeedbackProvider({ children }: { children: ReactNode }): JSX.Element {
             </label>
 
             <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-text-primary">
+              <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">
                 내용 <span className="text-text-tertiary font-normal">(선택)</span>
               </span>
               <textarea
@@ -262,7 +262,7 @@ function FeedbackProvider({ children }: { children: ReactNode }): JSX.Element {
 
             {category === 'bug' && diagnostic && (
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold text-text-primary">
+                <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">
                   진단 정보 <span className="text-text-tertiary font-normal">(자동 생성 — 필요 시 편집 가능)</span>
                 </span>
                 <textarea

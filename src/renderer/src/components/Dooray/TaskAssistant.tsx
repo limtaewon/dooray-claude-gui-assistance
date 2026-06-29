@@ -110,7 +110,7 @@ function TaskAssistant({ onDisconnect }: TaskAssistantProps): JSX.Element {
           {onDisconnect && (
             <button
               onClick={onDisconnect}
-              className="flex items-center gap-1 text-[10px] text-text-secondary hover:text-red-400 transition-colors"
+              className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary hover:text-red-400 transition-colors"
               title="토큰 재설정"
             >
               <LogOut size={12} />
@@ -144,7 +144,7 @@ function TaskAssistant({ onDisconnect }: TaskAssistantProps): JSX.Element {
                   <button
                     key={wf}
                     onClick={() => toggleFilter(wf)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[calc(11px_*_var(--app-font-scale,1))] font-medium border transition-all ${
                       isActive
                         ? WORKFLOW_BG[wf]
                         : 'bg-transparent border-bg-border text-text-tertiary hover:border-bg-border-light'
@@ -154,7 +154,7 @@ function TaskAssistant({ onDisconnect }: TaskAssistantProps): JSX.Element {
                       {WORKFLOW_LABELS[wf]}
                     </span>
                     {count > 0 && (
-                      <span className={`text-[10px] ${isActive ? 'opacity-80' : 'opacity-50'}`}>
+                      <span className={`text-[calc(10px_*_var(--app-font-scale,1))] ${isActive ? 'opacity-80' : 'opacity-50'}`}>
                         {count}
                       </span>
                     )}
@@ -170,7 +170,7 @@ function TaskAssistant({ onDisconnect }: TaskAssistantProps): JSX.Element {
             ) : error ? (
               <div className="flex flex-col items-center justify-center h-40 gap-3">
                 <p className="text-xs text-red-400 text-center px-4">{error}</p>
-                <p className="text-[10px] text-text-secondary text-center">
+                <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary text-center">
                   토큰이 잘못됐다면 우측 상단 "연결 해제" 후 재설정하세요.
                 </p>
               </div>
@@ -195,13 +195,13 @@ function TaskAssistant({ onDisconnect }: TaskAssistantProps): JSX.Element {
                         <p className="text-sm text-text-primary truncate">{task.subject}</p>
                         <div className="flex items-center gap-2 mt-1">
                           {task.projectCode && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-bg-primary text-text-secondary font-mono">
+                            <span className="text-[calc(10px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded bg-bg-primary text-text-secondary font-mono">
                               {task.projectCode}
                             </span>
                           )}
-                          <span className={`text-[10px] ${color}`}>{label}</span>
+                          <span className={`text-[calc(10px_*_var(--app-font-scale,1))] ${color}`}>{label}</span>
                           {task.dueDateAt && (
-                            <span className="text-[10px] text-text-secondary">
+                            <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">
                               마감: {new Date(task.dueDateAt).toLocaleDateString('ko-KR')}
                             </span>
                           )}

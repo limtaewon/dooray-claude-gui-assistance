@@ -9,6 +9,10 @@
 - YYYY-MM-DD — [<제목>](feature/<도메인>/<task-id>/adr.md) — <한 줄 요약>. <영향 도메인>.
 ```
 
+## 결정 이력 (워크플로우 도입 후)
+
+- 2026-06-23 — **글자 크기 스케일을 root font-size 가 아니라 font-size 속성에만 적용** — 기존 `html` root font-size 배율 방식은 px 하드코딩 텍스트(~680곳)·`.ds-*` 공용 컴포넌트·`--t-*` 토큰을 스케일에서 누락시켜 "확대만 되고 글자는 안 커진다"는 체감. `html` 16px 고정 + tailwind `fontSize` 테마·`--t-*`·`.ds-*` 를 `calc(* var(--app-font-scale))` 로 전환 → 여백/레이아웃 고정, 글자만 스케일. scale=1 은 이전과 픽셀 단위 동일. 터미널(canvas)·일부 inline fontSize 는 범위 외. 영향: renderer.
+
 ## 시드 — 과거 큰 결정 (CLAUDE.md / CHANGELOG.md 기반 재구성)
 
 > 아래는 본 워크플로우 도입 *이전* 의 결정들을 후행 재구성. 원본 ADR 파일은 없음 (PR/커밋 메시지 참조).

@@ -132,7 +132,7 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
         title="표시할 프로젝트 설정">
         <Settings size={14} />
         {pinnedCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-clauday-blue text-[8px] text-white flex items-center justify-center font-bold">
+          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-clauday-blue text-[calc(8px_*_var(--app-font-scale,1))] text-white flex items-center justify-center font-bold">
             {pinnedCount}
           </span>
         )}
@@ -143,8 +143,8 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div className="absolute left-0 top-full mt-1 w-72 bg-bg-surface border border-bg-border rounded-xl shadow-2xl z-40 overflow-hidden">
             <div className="px-3 py-2 border-b border-bg-border bg-bg-surface-hover">
-              <span className="text-[11px] font-semibold text-text-primary">표시할 프로젝트 선택</span>
-              <span className="text-[9px] text-text-tertiary ml-2">{pinnedCount > 0 ? `${pinnedCount}개 선택` : '전체 표시'}</span>
+              <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">표시할 프로젝트 선택</span>
+              <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary ml-2">{pinnedCount > 0 ? `${pinnedCount}개 선택` : '전체 표시'}</span>
             </div>
             {/* 검색 */}
             <div className="px-2 py-1.5 border-b border-bg-border">
@@ -156,7 +156,7 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="프로젝트 검색..."
-                  className="w-full pl-6 pr-6 py-1 bg-bg-primary border border-bg-border rounded text-[11px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
+                  className="w-full pl-6 pr-6 py-1 bg-bg-primary border border-bg-border rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
                 />
                 {searchQuery && (
                   <button onClick={() => setSearchQuery('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary">
@@ -168,9 +168,9 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
             {/* 프로젝트 목록 */}
             <div className="max-h-72 overflow-y-auto py-1">
               {loading ? (
-                <div className="text-[10px] text-text-tertiary text-center py-4">로딩...</div>
+                <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">로딩...</div>
               ) : filtered.length === 0 ? (
-                <div className="text-[10px] text-text-tertiary text-center py-4">검색 결과 없음</div>
+                <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">검색 결과 없음</div>
               ) : filtered.map((p) => {
                 const checked = pinnedIds.includes(p.id)
                 const isCustom = customIds.has(p.id)
@@ -188,7 +188,7 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
                       ) : (
                         <FolderOpen size={11} className={`flex-shrink-0 ${checked ? 'text-clauday-blue' : 'text-text-tertiary'}`} />
                       )}
-                      <span className={`text-[11px] truncate min-w-0 ${checked ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>{p.code}</span>
+                      <span className={`text-[calc(11px_*_var(--app-font-scale,1))] truncate min-w-0 ${checked ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>{p.code}</span>
                     </button>
                     {isCustom && (
                       <button onClick={() => removeCustomProject(p.id)}
@@ -212,20 +212,20 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
                       onChange={(e) => { setAddInput(e.target.value); setAddError('') }}
                       onKeyDown={(e) => e.key === 'Enter' && handleAddProject()}
                       placeholder="프로젝트 ID 또는 URL"
-                      className="flex-1 px-2 py-1 bg-bg-primary border border-bg-border rounded text-[11px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
+                      className="flex-1 px-2 py-1 bg-bg-primary border border-bg-border rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
                       autoFocus
                     />
                     <button onClick={handleAddProject} disabled={adding || !addInput.trim()}
-                      className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-text-tertiary rounded text-[10px] text-white transition-colors">
+                      className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-text-tertiary rounded text-[calc(10px_*_var(--app-font-scale,1))] text-white transition-colors">
                       {adding ? '...' : '추가'}
                     </button>
                   </div>
-                  {addError && <div className="text-[9px] text-red-400 px-1">{addError}</div>}
-                  <div className="text-[9px] text-gray-600 px-1">예: 3787724725029315943 또는 Dooray URL</div>
+                  {addError && <div className="text-[calc(9px_*_var(--app-font-scale,1))] text-red-400 px-1">{addError}</div>}
+                  <div className="text-[calc(9px_*_var(--app-font-scale,1))] text-gray-600 px-1">예: 3787724725029315943 또는 Dooray URL</div>
                 </div>
               ) : (
                 <button onClick={() => setShowAddForm(true)}
-                  className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-surface-hover transition-colors">
+                  className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-secondary hover:bg-bg-surface-hover transition-colors">
                   <Plus size={10} />
                   프로젝트 수동 추가 (ID/URL)
                 </button>

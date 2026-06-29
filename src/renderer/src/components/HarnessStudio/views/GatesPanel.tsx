@@ -194,7 +194,7 @@ export function GatesPanel({ model, sourcePath }: GatesPanelProps): JSX.Element 
                             {/* 그룹 소제목 */}
                             <div className="flex items-center gap-1">
                               <RuleGroupIcon category={group.category} />
-                              <span className="text-[10px] font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
+                              <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
                                 {group.label}
                               </span>
                             </div>

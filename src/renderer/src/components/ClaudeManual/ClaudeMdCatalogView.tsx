@@ -60,7 +60,7 @@ function ClaudeMdCatalogView(): JSX.Element {
         <FileCode size={20} className="text-clauday-blue" />
         <h2 className="text-lg font-semibold text-text-primary">CLAUDE.md 카탈로그</h2>
       </div>
-      <p className="text-[12px] text-text-secondary mb-5 leading-relaxed">
+      <p className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary mb-5 leading-relaxed">
         앱 내장 템플릿을 한 번에 프로젝트 폴더에 적용합니다. 적용 버튼을 누르면 폴더 선택 다이얼로그가 열리고,
         선택한 위치의 <code className="font-mono text-text-primary px-1 bg-bg-surface rounded">CLAUDE.md</code> 에 본문이 저장돼요.
         기존 파일이 있으면 덮어쓸지 한 번 확인합니다.
@@ -68,17 +68,17 @@ function ClaudeMdCatalogView(): JSX.Element {
 
       <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg border border-clauday-orange/30 bg-clauday-orange/5">
         <AlertCircle size={12} className="text-clauday-orange flex-shrink-0" />
-        <span className="text-[11px] text-text-secondary">
+        <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary">
           템플릿은 시작점일 뿐 — 적용 후 본인 프로젝트에 맞게 수정해서 사용하세요.
         </span>
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 py-12 text-text-tertiary text-[12px]">
+        <div className="flex items-center gap-2 py-12 text-text-tertiary text-[calc(12px_*_var(--app-font-scale,1))]">
           <Loader2 size={14} className="animate-spin" /> 템플릿 목록 불러오는 중...
         </div>
       ) : templates.length === 0 ? (
-        <div className="text-[12px] text-text-tertiary py-12 text-center">템플릿이 없습니다.</div>
+        <div className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-tertiary py-12 text-center">템플릿이 없습니다.</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {templates.map((t) => {
@@ -89,8 +89,8 @@ function ClaudeMdCatalogView(): JSX.Element {
                 <div className="flex items-start gap-2">
                   <FileCode size={16} className="text-clauday-blue mt-0.5 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-semibold text-text-primary">{t.name}</div>
-                    <div className="text-[10.5px] text-text-tertiary mt-0.5 leading-relaxed">{t.description}</div>
+                    <div className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary">{t.name}</div>
+                    <div className="text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5 leading-relaxed">{t.description}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
@@ -113,7 +113,7 @@ function ClaudeMdCatalogView(): JSX.Element {
 
       <div className="flex items-start gap-2 mt-6 px-3 py-2.5 rounded-lg bg-bg-surface/60 border border-bg-border">
         <Check size={12} className="text-emerald-400 mt-0.5 flex-shrink-0" />
-        <div className="text-[11px] text-text-tertiary leading-relaxed">
+        <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary leading-relaxed">
           새 템플릿 제안은 <code className="font-mono text-text-secondary px-1 bg-bg-primary rounded">src/main/claudeMdCatalog.ts</code> 에 객체 하나 추가하면 됩니다.
         </div>
       </div>

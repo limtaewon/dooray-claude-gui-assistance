@@ -95,7 +95,7 @@ function AIToolsPopover({ feature, size = 'sm', onChange }: AIToolsPopoverProps)
         <Wrench size={size === 'md' ? 13 : 12} />
         {count > 0 && (
           <span
-            className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-[3px] rounded-full bg-clauday-blue text-white text-[9px] font-bold flex items-center justify-center border-2 border-bg-primary"
+            className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-[3px] rounded-full bg-clauday-blue text-white text-[calc(9px_*_var(--app-font-scale,1))] font-bold flex items-center justify-center border-2 border-bg-primary"
             style={{ lineHeight: 1 }}
           >
             {count}
@@ -108,11 +108,11 @@ function AIToolsPopover({ feature, size = 'sm', onChange }: AIToolsPopoverProps)
           className="ds-menu absolute right-0 top-full mt-1 z-40"
           style={{ minWidth: 240, maxHeight: 320, overflowY: 'auto' }}
         >
-          <div className="px-3 pt-2 pb-1.5 text-[10px] font-semibold text-text-tertiary border-b border-bg-border">
+          <div className="px-3 pt-2 pb-1.5 text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary border-b border-bg-border">
             AI에게 허용할 MCP 서버
           </div>
           {servers.length === 0 ? (
-            <div className="px-3 py-3 text-[11px] text-text-tertiary">
+            <div className="px-3 py-3 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
               설치된 MCP 서버가 없습니다
             </div>
           ) : (
@@ -132,13 +132,13 @@ function AIToolsPopover({ feature, size = 'sm', onChange }: AIToolsPopoverProps)
                     >
                       {checked && <Check size={10} className="text-white" />}
                     </span>
-                    <span className="text-[12px] text-text-primary font-medium flex-1 truncate">{name}</span>
+                    <span className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary font-medium flex-1 truncate">{name}</span>
                   </button>
                 )
               })}
             </div>
           )}
-          <div className="px-3 py-2 border-t border-bg-border text-[10px] text-text-tertiary leading-snug">
+          <div className="px-3 py-2 border-t border-bg-border text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary leading-snug">
             선택한 MCP만 AI가 호출 가능. 아무것도 선택하지 않으면 MCP 없이 실행됨.
           </div>
         </div>

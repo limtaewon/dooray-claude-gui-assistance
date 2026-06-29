@@ -410,10 +410,10 @@ function MCPManager(): JSX.Element {
           style={{ background: 'var(--bg-surface-raised)' }}>
           <RefreshCw size={14} className="animate-spin text-clauday-blue" />
           <div className="flex flex-col">
-            <span className="text-[12px] text-text-primary font-medium">
+            <span className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary font-medium">
               {uploadProgress.wikiName} 에 업로드 중 ({uploadProgress.current}/{uploadProgress.total})
             </span>
-            <span className="text-[10px] text-text-tertiary truncate max-w-[260px]">{uploadProgress.currentName}</span>
+            <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary truncate max-w-[260px]">{uploadProgress.currentName}</span>
           </div>
         </div>
       )}
@@ -421,8 +421,8 @@ function MCPManager(): JSX.Element {
         {/* DS PageHeader */}
         <div className="flex items-center gap-3 flex-wrap">
           <Server size={18} className="text-clauday-blue" />
-          <h2 className="text-[14px] font-semibold text-text-primary">MCP 서버</h2>
-          <span className="text-[11px] text-text-tertiary">
+          <h2 className="text-[calc(14px_*_var(--app-font-scale,1))] font-semibold text-text-primary">MCP 서버</h2>
+          <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
             · {entries.length}개 · 활성 {activeCount}
           </span>
           <SegTabs<Tab>
@@ -500,7 +500,7 @@ function MCPManager(): JSX.Element {
                 if (selected.size === all.length) setSelected(new Set())
                 else setSelected(new Set(all))
               }}
-              className="text-[11px] text-clauday-orange hover:underline"
+              className="text-[calc(11px_*_var(--app-font-scale,1))] text-clauday-orange hover:underline"
             >
               {(() => {
                 const all = tab === 'local' ? entries.length : wikiItems.length
@@ -608,10 +608,10 @@ function MCPManager(): JSX.Element {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <h3 className="text-[13px] font-semibold text-text-primary truncate">{item.name}</h3>
+                          <h3 className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary truncate">{item.name}</h3>
                           {transport && (
                             <span
-                              className="px-1.5 py-0.5 rounded-[4px] text-[9px] font-mono uppercase bg-bg-surface-hover text-text-tertiary border border-bg-border"
+                              className="px-1.5 py-0.5 rounded-[4px] text-[calc(9px_*_var(--app-font-scale,1))] font-mono uppercase bg-bg-surface-hover text-text-tertiary border border-bg-border"
                               style={{ flex: 'none' }}
                             >
                               {transport}
@@ -619,7 +619,7 @@ function MCPManager(): JSX.Element {
                           )}
                         </div>
                         {config && (
-                          <p className="text-[11px] text-text-secondary font-mono mt-0.5 truncate">
+                          <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary font-mono mt-0.5 truncate">
                             {isRemote ? (
                               <>
                                 {config.url || <span className="text-text-tertiary">URL 없음</span>}
@@ -637,7 +637,7 @@ function MCPManager(): JSX.Element {
                             )}
                           </p>
                         )}
-                        <div className="text-[10px] text-text-tertiary mt-1">
+                        <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-1">
                           {item.updatedAt ? new Date(item.updatedAt).toLocaleString('ko-KR') : '날짜 없음'}
                         </div>
                       </div>
@@ -647,7 +647,7 @@ function MCPManager(): JSX.Element {
                         {config.args.map((arg, i) => (
                           <span
                             key={i}
-                            className="px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono bg-bg-surface-hover text-text-secondary border border-bg-border"
+                            className="px-1.5 py-0.5 rounded-[4px] text-[calc(10px_*_var(--app-font-scale,1))] font-mono bg-bg-surface-hover text-text-secondary border border-bg-border"
                           >
                             {arg}
                           </span>
@@ -659,7 +659,7 @@ function MCPManager(): JSX.Element {
                         {Object.keys(config.headers || {}).map((h) => (
                           <span
                             key={h}
-                            className="px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono bg-bg-surface-hover text-text-secondary border border-bg-border"
+                            className="px-1.5 py-0.5 rounded-[4px] text-[calc(10px_*_var(--app-font-scale,1))] font-mono bg-bg-surface-hover text-text-secondary border border-bg-border"
                           >
                             {h}
                           </span>
@@ -670,11 +670,11 @@ function MCPManager(): JSX.Element {
                       <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-bg-border/60">
                         <div className="flex-1" />
                         <button onClick={(e) => { e.stopPropagation(); handleDownloadFromWiki(item) }}
-                          className="flex items-center gap-1 text-[11px] text-text-secondary hover:text-clauday-blue">
+                          className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:text-clauday-blue">
                           <Download size={11} /> 적용
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); handleDeleteFromWiki(item) }}
-                          className="flex items-center gap-1 text-[11px] text-text-secondary hover:text-red-400">
+                          className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:text-red-400">
                           <Trash2 size={11} /> 삭제
                         </button>
                       </div>
@@ -686,7 +686,7 @@ function MCPManager(): JSX.Element {
           )
         )}
 
-        <div className="flex items-center gap-2 text-[11px] text-text-tertiary pt-1">
+        <div className="flex items-center gap-2 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary pt-1">
           <span>💡</span>
           <span>
             설정은 <span className="font-mono text-text-secondary">~/.claude.json</span>에 저장됩니다. 새로고침으로 외부 변경 반영.
@@ -704,7 +704,7 @@ function MCPManager(): JSX.Element {
         footer={
           <>
             {previewItem && (
-              <span className="text-[11px] text-text-tertiary">
+              <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
                 {previewItem.updatedAt ? new Date(previewItem.updatedAt).toLocaleString('ko-KR') : ''}
               </span>
             )}
@@ -727,7 +727,7 @@ function MCPManager(): JSX.Element {
         }
       >
         {previewItem && (
-          <pre className="font-mono text-[11.5px] leading-relaxed text-text-primary whitespace-pre-wrap break-words"
+          <pre className="font-mono text-[calc(11.5px_*_var(--app-font-scale,1))] leading-relaxed text-text-primary whitespace-pre-wrap break-words"
             style={{ maxHeight: '60vh', overflow: 'auto' }}>
             {previewItem.content || '(본문 없음)'}
           </pre>
@@ -747,8 +747,8 @@ function MCPManager(): JSX.Element {
             style={{ background: 'var(--bg-surface-raised)' }}
           >
             <div className="px-4 py-3 border-b border-bg-border">
-              <div className="text-[13px] font-semibold text-text-primary">공유할 위키 선택</div>
-              <div className="text-[11px] text-text-tertiary mt-0.5">
+              <div className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary">공유할 위키 선택</div>
+              <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
                 {shareTargetPicker.names.length}개 MCP 를 어느 위키에 올릴까요?
               </div>
             </div>
@@ -761,7 +761,7 @@ function MCPManager(): JSX.Element {
                     setShareTargetPicker(null)
                     await uploadNamesToWiki(names, w.wikiId)
                   }}
-                  className="w-full flex items-center gap-2 px-4 py-2 text-left text-[12px] text-text-secondary hover:bg-bg-surface-hover transition-colors"
+                  className="w-full flex items-center gap-2 px-4 py-2 text-left text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary hover:bg-bg-surface-hover transition-colors"
                   type="button"
                 >
                   <FolderOpen size={12} className="text-clauday-blue" />

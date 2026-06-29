@@ -146,10 +146,10 @@ function TeamInsights(): JSX.Element {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono font-semibold text-text-primary">{p.code}</span>
-                    <span className="text-[10px] text-text-tertiary">{p.total}개</span>
+                    <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">{p.total}개</span>
                   </div>
                   {p.overdueCount > 0 && (
-                    <span className="flex items-center gap-1 text-[10px] text-red-400">
+                    <span className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-red-400">
                       <AlertTriangle size={10} />
                       지연 {p.overdueCount}
                     </span>
@@ -165,7 +165,7 @@ function TeamInsights(): JSX.Element {
                     </>
                   )}
                 </div>
-                <div className="flex gap-3 mt-1.5 text-[10px] text-text-tertiary">
+                <div className="flex gap-3 mt-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
                   <span>등록 {p.registered}</span>
                   <span>진행 {p.working}</span>
                   <span>완료 {p.closed}</span>
@@ -188,7 +188,7 @@ function StatCard({
     <div className="bg-bg-surface border border-bg-border rounded-lg p-3">
       <div className="flex items-center gap-1.5 mb-1">
         <Icon size={12} className={color} />
-        <span className="text-[10px] text-text-secondary">{label}</span>
+        <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">{label}</span>
       </div>
       <span className="text-xl font-bold text-text-primary">{value}</span>
     </div>
@@ -199,7 +199,7 @@ function Legend({ color, label, count }: { color: string; label: string; count: 
   return (
     <div className="flex items-center gap-1">
       <div className={`w-2 h-2 rounded-full ${color}`} />
-      <span className="text-[10px] text-text-secondary">{label} {count}</span>
+      <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">{label} {count}</span>
     </div>
   )
 }

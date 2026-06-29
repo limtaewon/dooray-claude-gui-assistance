@@ -68,7 +68,7 @@ function DoorayAssistant({ onDisconnect }: DoorayAssistantProps): JSX.Element {
           {onDisconnect && (
             <button
               onClick={onDisconnect}
-              className="flex items-center gap-1 text-[10px] text-text-secondary hover:text-red-400 transition-colors"
+              className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary hover:text-red-400 transition-colors"
             >
               <LogOut size={11} />
               연결 해제

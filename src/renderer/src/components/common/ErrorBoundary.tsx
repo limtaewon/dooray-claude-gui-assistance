@@ -29,7 +29,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode; label?: stri
             <div className="text-sm font-semibold text-red-400 mb-2">
               ⚠ 화면 렌더 중 문제가 발생했습니다{this.props.label ? ` (${this.props.label})` : ''}
             </div>
-            <pre className="text-[11px] font-mono text-text-secondary whitespace-pre-wrap break-words mb-3"
+            <pre className="text-[calc(11px_*_var(--app-font-scale,1))] font-mono text-text-secondary whitespace-pre-wrap break-words mb-3"
               style={{ maxHeight: 240, overflow: 'auto' }}>
               {this.state.err.message}
               {'\n\n'}

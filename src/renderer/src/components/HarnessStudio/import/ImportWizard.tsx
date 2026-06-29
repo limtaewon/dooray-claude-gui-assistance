@@ -144,7 +144,7 @@ function StepIndicator({ label, index, active, done, isLast }: StepIndicatorProp
       <div className="flex items-center gap-1.5 flex-none">
         <span
           className={[
-            'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold',
+            'w-5 h-5 rounded-full flex items-center justify-center text-[calc(10px_*_var(--app-font-scale,1))] font-bold',
             done
               ? 'bg-[color:var(--c-emerald-bg)] text-[color:var(--c-emerald-fg)]'
               : active

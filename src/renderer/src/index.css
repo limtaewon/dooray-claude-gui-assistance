@@ -49,17 +49,17 @@
   --font-mono:  'JetBrains Mono', ui-monospace, SFMono-Regular, 'Menlo', monospace;
 
   /* type scale (px, 16px 기준) */
-  --t-9:  9px;
-  --t-10: 10px;
-  --t-11: 11px;
-  --t-12: 12px;
-  --t-13: 13px;
-  --t-14: 14px;
-  --t-15: 15px;
-  --t-16: 16px;
-  --t-18: 18px;
-  --t-20: 20px;
-  --t-24: 24px;
+  --t-9:  calc(9px * var(--app-font-scale, 1));
+  --t-10: calc(10px * var(--app-font-scale, 1));
+  --t-11: calc(11px * var(--app-font-scale, 1));
+  --t-12: calc(12px * var(--app-font-scale, 1));
+  --t-13: calc(13px * var(--app-font-scale, 1));
+  --t-14: calc(14px * var(--app-font-scale, 1));
+  --t-15: calc(15px * var(--app-font-scale, 1));
+  --t-16: calc(16px * var(--app-font-scale, 1));
+  --t-18: calc(18px * var(--app-font-scale, 1));
+  --t-20: calc(20px * var(--app-font-scale, 1));
+  --t-24: calc(24px * var(--app-font-scale, 1));
 
   /* app font scaling hook (useFontSettings에서 덮어씀) */
   --app-font-scale: 1;
@@ -421,10 +421,11 @@ html, body, #root {
   width: 100%;
 }
 
-/* Tailwind가 rem 기반이라 html 단위 font-size를 바꿔야 전체 스케일됨.
-   기본 16px × scale. scale=1이면 Tailwind 기본과 동일. */
+/* root font-size 는 고정. 글자 크기 스케일(--app-font-scale)은 여백(rem)이 아니라
+   font-size 속성에만 적용한다 → 레이아웃은 그대로, 글자만 커짐.
+   (named 유틸은 tailwind.config fontSize, --t-* 토큰/ds 컴포넌트는 calc(*var)로 대응) */
 html {
-  font-size: calc(16px * var(--app-font-scale, 1));
+  font-size: 16px;
 }
 
 body {

@@ -260,7 +260,7 @@ export function AgentInspector({ agent, provenance, onClose, bundlePath, gate }:
                       <div key={group.category} className="flex flex-col gap-1">
                         <div className="flex items-center gap-1">
                           <RuleGroupIcon category={group.category} />
-                          <span className="text-[10px] font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
+                          <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
                             {group.label}
                           </span>
                         </div>

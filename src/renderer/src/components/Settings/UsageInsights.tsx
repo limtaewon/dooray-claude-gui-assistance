@@ -114,13 +114,13 @@ function UsageInsights(): JSX.Element {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-text-primary">내 사용 인사이트</h3>
-          <p className="text-[10px] text-text-tertiary mt-0.5 flex items-center gap-1">
+          <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5 flex items-center gap-1">
             <Shield size={10} /> 로컬에만 저장 · 외부 전송 없음
           </p>
         </div>
         <div className="flex items-center gap-1.5">
           <select value={days} onChange={(e) => setDays(Number(e.target.value))}
-            className="px-2 py-1 bg-bg-surface border border-bg-border rounded text-[11px] text-text-primary focus:outline-none">
+            className="px-2 py-1 bg-bg-surface border border-bg-border rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary focus:outline-none">
             <option value={7}>최근 7일</option>
             <option value={30}>최근 30일</option>
             <option value={90}>최근 90일</option>
@@ -142,12 +142,12 @@ function UsageInsights(): JSX.Element {
       {/* 개인화 제안 */}
       {suggestions.length > 0 && (
         <section className="p-4 rounded-xl bg-gradient-to-r from-clauday-orange/5 to-clauday-blue/5 border border-clauday-orange/20">
-          <h4 className="text-[11px] font-semibold text-clauday-orange flex items-center gap-1.5 mb-2">
+          <h4 className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-clauday-orange flex items-center gap-1.5 mb-2">
             <Lightbulb size={11} /> 개선 제안
           </h4>
           <ul className="space-y-1">
             {suggestions.map((s, i) => (
-              <li key={i} className="text-[11px] text-text-primary flex gap-2">
+              <li key={i} className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary flex gap-2">
                 <span className="text-clauday-orange flex-shrink-0">·</span>{s.text}
               </li>
             ))}
@@ -157,22 +157,22 @@ function UsageInsights(): JSX.Element {
 
       {/* 가장 많이 쓰는 기능 */}
       <section>
-        <h4 className="text-[11px] font-semibold text-text-secondary mb-2">가장 많이 쓰는 기능 Top 5</h4>
+        <h4 className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-secondary mb-2">가장 많이 쓰는 기능 Top 5</h4>
         <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden">
           {summary.topFeatures.length === 0 ? (
-            <div className="text-center py-6 text-[11px] text-text-tertiary">아직 데이터가 부족해요</div>
+            <div className="text-center py-6 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">아직 데이터가 부족해요</div>
           ) : (
             summary.topFeatures.map((item, i) => {
               const max = summary.topFeatures[0]?.count || 1
               const pct = (item.count / max) * 100
               return (
                 <div key={item.feature} className={`flex items-center gap-3 px-4 py-2.5 ${i > 0 ? 'border-t border-bg-border/50' : ''}`}>
-                  <span className="text-[10px] text-text-tertiary font-mono w-5">#{i + 1}</span>
+                  <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary font-mono w-5">#{i + 1}</span>
                   <span className="text-xs text-text-primary w-28 flex-shrink-0">{label(item.feature)}</span>
                   <div className="flex-1 h-2 bg-bg-primary rounded-full overflow-hidden">
                     <div className="h-full bg-gradient-to-r from-clauday-blue to-clauday-orange" style={{ width: `${pct}%` }} />
                   </div>
-                  <span className="text-[11px] text-text-secondary font-mono w-10 text-right">{item.count}</span>
+                  <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary font-mono w-10 text-right">{item.count}</span>
                 </div>
               )
             })
@@ -183,15 +183,15 @@ function UsageInsights(): JSX.Element {
       {/* 뷰별 체류 시간 */}
       {Object.keys(summary.viewDwell).length > 0 && (
         <section>
-          <h4 className="text-[11px] font-semibold text-text-secondary mb-2">뷰별 체류 시간</h4>
+          <h4 className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-secondary mb-2">뷰별 체류 시간</h4>
           <div className="grid grid-cols-2 gap-2">
             {Object.entries(summary.viewDwell)
               .sort((a, b) => b[1] - a[1])
               .slice(0, 8)
               .map(([view, sec]) => (
                 <div key={view} className="flex items-center justify-between px-3 py-2 bg-bg-surface border border-bg-border rounded-lg">
-                  <span className="text-[11px] text-text-primary">{label(`view.${view}`)}</span>
-                  <span className="text-[10px] text-text-tertiary font-mono">{formatDwell(sec)}</span>
+                  <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary">{label(`view.${view}`)}</span>
+                  <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary font-mono">{formatDwell(sec)}</span>
                 </div>
               ))}
           </div>
@@ -201,9 +201,9 @@ function UsageInsights(): JSX.Element {
       {/* AI 기능별 성과 */}
       {Object.keys(summary.aiUsage).length > 0 && (
         <section>
-          <h4 className="text-[11px] font-semibold text-text-secondary mb-2">AI 기능별 성과</h4>
+          <h4 className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-secondary mb-2">AI 기능별 성과</h4>
           <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden">
-            <div className="grid grid-cols-[1fr_60px_80px_60px] gap-2 px-4 py-2 bg-bg-primary/30 border-b border-bg-border/50 text-[9px] font-semibold text-text-tertiary uppercase">
+            <div className="grid grid-cols-[1fr_60px_80px_60px] gap-2 px-4 py-2 bg-bg-primary/30 border-b border-bg-border/50 text-[calc(9px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary uppercase">
               <span>기능</span>
               <span className="text-right">호출</span>
               <span className="text-right">평균 시간</span>
@@ -212,11 +212,11 @@ function UsageInsights(): JSX.Element {
             {Object.entries(summary.aiUsage).map(([key, v]) => (
               <div key={key} className="grid grid-cols-[1fr_60px_80px_60px] gap-2 px-4 py-2 border-b border-bg-border/30 last:border-0 items-center">
                 <span className="text-xs text-text-primary">{label(`ai.${key}`)}</span>
-                <span className="text-[11px] text-text-secondary font-mono text-right">{v.count}</span>
-                <span className="text-[11px] text-text-secondary font-mono text-right">
+                <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary font-mono text-right">{v.count}</span>
+                <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary font-mono text-right">
                   {v.avgDurationMs > 0 ? formatMs(v.avgDurationMs) : '-'}
                 </span>
-                <span className={`text-[11px] font-mono text-right ${v.successRate >= 90 ? 'text-emerald-400' : v.successRate >= 60 ? 'text-amber-400' : 'text-red-400'}`}>
+                <span className={`text-[calc(11px_*_var(--app-font-scale,1))] font-mono text-right ${v.successRate >= 90 ? 'text-emerald-400' : v.successRate >= 60 ? 'text-amber-400' : 'text-red-400'}`}>
                   {v.successRate}%
                 </span>
               </div>
@@ -228,7 +228,7 @@ function UsageInsights(): JSX.Element {
       {/* 브리핑 피드백 */}
       {feedbackTotal > 0 && (
         <section>
-          <h4 className="text-[11px] font-semibold text-text-secondary mb-2">브리핑 피드백</h4>
+          <h4 className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-secondary mb-2">브리핑 피드백</h4>
           <div className="grid grid-cols-2 gap-2">
             <div className="flex items-center justify-between p-3 bg-emerald-400/5 border border-emerald-400/20 rounded-lg">
               <span className="text-xs text-text-primary flex items-center gap-1.5"><ThumbsUp size={11} className="text-emerald-400" /> 좋아요</span>
@@ -245,16 +245,16 @@ function UsageInsights(): JSX.Element {
       {/* 데이터 관리 */}
       <section className="pt-3 border-t border-bg-border/50">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[10px] text-text-tertiary">
+          <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
             데이터는 <code className="text-text-secondary">~/Library/Application Support/Clauday/analytics/</code>에만 저장됩니다.
           </p>
           <div className="flex gap-1.5">
             <button onClick={handleExport}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-bg-surface border border-bg-border text-[10px] text-text-secondary hover:text-text-primary">
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-bg-surface border border-bg-border text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary hover:text-text-primary">
               <Download size={10} /> 내보내기
             </button>
             <button onClick={handleClear}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500/10 text-red-400 text-[10px] hover:bg-red-500/20">
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500/10 text-red-400 text-[calc(10px_*_var(--app-font-scale,1))] hover:bg-red-500/20">
               <Trash2 size={10} /> 초기화
             </button>
           </div>
@@ -269,7 +269,7 @@ function SummaryCard({ icon: Icon, label, value, color }: {
 }): JSX.Element {
   return (
     <div className="p-3 bg-bg-surface border border-bg-border rounded-xl">
-      <div className="flex items-center gap-1.5 text-[10px] text-text-tertiary mb-1">
+      <div className="flex items-center gap-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mb-1">
         <Icon size={11} className={color} /> {label}
       </div>
       <div className={`text-lg font-semibold ${color}`}>{value}</div>

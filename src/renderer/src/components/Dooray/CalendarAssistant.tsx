@@ -56,7 +56,7 @@ function ColorPickerPopover({ currentHex, anchor, overridden, onPick, onReset, o
         style={{ position: 'fixed', top, left, width: WIDTH }}
         className="z-[61] bg-bg-surface border border-bg-border rounded-lg shadow-2xl p-3"
         onClick={(e) => e.stopPropagation()}>
-        <div className="text-[10px] font-semibold text-text-tertiary uppercase tracking-wide mb-1.5">인기 색상</div>
+        <div className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary uppercase tracking-wide mb-1.5">인기 색상</div>
         <div className="grid grid-cols-6 gap-1.5">
           {COLOR_PALETTE.map((p) => {
             const selected = currentHex.toLowerCase() === p.toLowerCase()
@@ -73,7 +73,7 @@ function ColorPickerPopover({ currentHex, anchor, overridden, onPick, onReset, o
         </div>
 
         <div className="mt-3 pt-2 border-t border-bg-border">
-          <div className="text-[10px] font-semibold text-text-tertiary uppercase tracking-wide mb-1.5">사용자 지정</div>
+          <div className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary uppercase tracking-wide mb-1.5">사용자 지정</div>
           <div className="flex items-center gap-1.5">
             <input
               type="color"
@@ -91,17 +91,17 @@ function ColorPickerPopover({ currentHex, anchor, overridden, onPick, onReset, o
               onBlur={commitHexInput}
               placeholder="#RRGGBB"
               spellCheck={false}
-              className={`flex-1 min-w-0 text-[11px] px-2 py-1 rounded bg-bg-surface-hover border ${invalid ? 'border-rose-500' : 'border-bg-border'} text-text-primary outline-none focus:border-clauday-blue font-mono`}
+              className={`flex-1 min-w-0 text-[calc(11px_*_var(--app-font-scale,1))] px-2 py-1 rounded bg-bg-surface-hover border ${invalid ? 'border-rose-500' : 'border-bg-border'} text-text-primary outline-none focus:border-clauday-blue font-mono`}
             />
           </div>
-          {invalid && <div className="text-[9px] text-rose-400 mt-1">올바른 hex 값을 입력하세요 (예: #3b82f6)</div>}
-          <div className="mt-1.5 text-[9px] text-text-tertiary">창을 닫으면 자동 적용됩니다</div>
+          {invalid && <div className="text-[calc(9px_*_var(--app-font-scale,1))] text-rose-400 mt-1">올바른 hex 값을 입력하세요 (예: #3b82f6)</div>}
+          <div className="mt-1.5 text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">창을 닫으면 자동 적용됩니다</div>
         </div>
 
         {overridden && (
           <button
             onClick={onReset}
-            className="mt-2 w-full text-[10px] text-text-tertiary hover:text-text-secondary border-t border-bg-border pt-1.5">
+            className="mt-2 w-full text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-secondary border-t border-bg-border pt-1.5">
             기본 색상으로 되돌리기
           </button>
         )}
@@ -180,9 +180,9 @@ function CalendarFilter({ events, filterIds, onFilter, colorOverrides, onChangeC
           {checked && <Check size={9} className="text-white" />}
         </button>
         <button onClick={() => toggle(c.id)} className="text-left flex-1 min-w-0">
-          <span className={`text-[11px] truncate ${checked ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>{c.name}</span>
+          <span className={`text-[calc(11px_*_var(--app-font-scale,1))] truncate ${checked ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>{c.name}</span>
         </button>
-        {c.count > 0 && <span className="text-[9px] text-text-tertiary flex-shrink-0">{c.count}</span>}
+        {c.count > 0 && <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">{c.count}</span>}
         <button
           onClick={(e) => {
             e.stopPropagation()
@@ -215,7 +215,7 @@ function CalendarFilter({ events, filterIds, onFilter, colorOverrides, onChangeC
         title="표시할 캘린더 선택">
         <Settings size={15} />
         {filterIds.length > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-clauday-blue text-[8px] text-white flex items-center justify-center font-bold">
+          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-clauday-blue text-[calc(8px_*_var(--app-font-scale,1))] text-white flex items-center justify-center font-bold">
             {filterIds.length}
           </span>
         )}
@@ -225,25 +225,25 @@ function CalendarFilter({ events, filterIds, onFilter, colorOverrides, onChangeC
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div className="absolute left-0 top-full mt-1 w-64 bg-bg-surface border border-bg-border rounded-xl shadow-2xl z-40 overflow-hidden">
             <div className="px-3 py-2 border-b border-bg-border bg-bg-surface-hover">
-              <span className="text-[11px] font-semibold text-text-primary">표시할 캘린더 선택</span>
-              <span className="text-[9px] text-text-tertiary ml-2">{filterIds.length > 0 ? `${filterIds.length}개` : '전체'}</span>
+              <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">표시할 캘린더 선택</span>
+              <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary ml-2">{filterIds.length > 0 ? `${filterIds.length}개` : '전체'}</span>
             </div>
             <div className="max-h-72 overflow-y-auto py-1">
               {groups.local.length > 0 && (
                 <>
-                  <div className="px-3 pt-2 pb-1 text-[9px] font-semibold text-text-tertiary uppercase tracking-wide">Clauday</div>
+                  <div className="px-3 pt-2 pb-1 text-[calc(9px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary uppercase tracking-wide">Clauday</div>
                   {groups.local.map(renderItem)}
                 </>
               )}
               {groups.caldav.length > 0 && (
                 <>
-                  <div className="px-3 pt-2 pb-1 text-[9px] font-semibold text-text-tertiary uppercase tracking-wide">두레이</div>
+                  <div className="px-3 pt-2 pb-1 text-[calc(9px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary uppercase tracking-wide">두레이</div>
                   {groups.caldav.map(renderItem)}
                 </>
               )}
               {/* 공휴일은 필터로 끌 수 없음 — 항상 표시되므로 필터 UI 에서 제외 */}
             </div>
-            <div className="px-3 py-1.5 border-t border-bg-border text-[9px] text-text-tertiary">선택 없으면 전체 표시</div>
+            <div className="px-3 py-1.5 border-t border-bg-border text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">선택 없으면 전체 표시</div>
           </div>
         </>
       )}
@@ -552,7 +552,7 @@ function CalendarAssistant(): JSX.Element {
         <div className="flex items-center gap-2">
           <CalendarDays size={18} className="text-clauday-blue" />
           <h2 className="text-lg font-semibold text-text-primary">이번 주 일정</h2>
-          <span className="text-[10px] text-text-tertiary">{displayEvents.length}개{filterIds.length > 0 ? ` / ${events.length}` : ''}</span>
+          <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">{displayEvents.length}개{filterIds.length > 0 ? ` / ${events.length}` : ''}</span>
           <CalendarFilter events={events} filterIds={filterIds} onFilter={setFilterIds} colorOverrides={colorOverrides} onChangeColor={handleChangeColor} />
           <button
             onClick={handleRefresh}
@@ -580,7 +580,7 @@ function CalendarAssistant(): JSX.Element {
         <ListTodo size={14} className="text-clauday-blue flex-shrink-0" />
         <input
           type="text"
-          className="flex-1 bg-bg-surface border border-bg-border hover:border-clauday-blue/40 focus:border-clauday-blue/60 outline-none rounded-lg px-3 py-1.5 text-[13px] text-text-primary placeholder-text-tertiary transition-colors"
+          className="flex-1 bg-bg-surface border border-bg-border hover:border-clauday-blue/40 focus:border-clauday-blue/60 outline-none rounded-lg px-3 py-1.5 text-[calc(13px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary transition-colors"
           placeholder='오늘 할 일 입력 후 Enter'
           value={quickTodo}
           onChange={(e) => setQuickTodo(e.target.value)}
@@ -603,14 +603,14 @@ function CalendarAssistant(): JSX.Element {
         <div className="mx-6 mt-3 p-3 rounded-xl bg-clauday-orange/5 border border-clauday-orange/20 flex items-center gap-3 flex-shrink-0">
           <AlertCircle size={14} className="text-clauday-orange flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-[11px] text-text-primary font-medium">두레이 CalDAV가 연결되지 않았습니다</p>
-            <p className="text-[10px] text-text-tertiary mt-0.5">
+            <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary font-medium">두레이 CalDAV가 연결되지 않았습니다</p>
+            <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
               회사 일정을 동기화하려면 설정에서 CalDAV 자격증명을 입력해주세요. 지금은 로컬 캘린더만 표시됩니다.
             </p>
           </div>
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('goto-settings', { detail: { tab: 'caldav' } }))}
-            className="px-2.5 py-1 rounded-md bg-clauday-blue text-white text-[10px] font-medium hover:bg-clauday-blue/80 flex-shrink-0">
+            className="px-2.5 py-1 rounded-md bg-clauday-blue text-white text-[calc(10px_*_var(--app-font-scale,1))] font-medium hover:bg-clauday-blue/80 flex-shrink-0">
             연결하러 가기
           </button>
         </div>
@@ -666,18 +666,18 @@ function CalendarAssistant(): JSX.Element {
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <p className="text-xs text-text-primary">{event.subject || '(제목 없음)'}</p>
                             {isOngoing && (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-400/15 text-emerald-400 font-medium">진행 중</span>
+                              <span className="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-emerald-400/15 text-emerald-400 font-medium">진행 중</span>
                             )}
                             {isUpcoming && (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-clauday-blue/15 text-clauday-blue font-medium">예정</span>
+                              <span className="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-clauday-blue/15 text-clauday-blue font-medium">예정</span>
                             )}
                           </div>
                           <div className="flex items-center gap-3 mt-0.5">
-                            <div className="flex items-center gap-1 text-[10px] text-text-secondary">
+                            <div className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">
                               <Clock size={9} /> {periodStr}
                             </div>
                             {event.location && (
-                              <div className="flex items-center gap-1 text-[10px] text-text-secondary">
+                              <div className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">
                                 <MapPin size={9} /> {event.location}
                               </div>
                             )}
@@ -713,12 +713,12 @@ function CalendarAssistant(): JSX.Element {
                             <div className="flex-1 min-w-0">
                               <p className="text-xs text-text-primary">{event.subject || '(제목 없음)'}</p>
                               <div className="flex items-center gap-3 mt-0.5">
-                                <div className="flex items-center gap-1 text-[10px] text-text-secondary">
+                                <div className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">
                                   <Clock size={9} />
                                   {isAllDay ? '종일' : `${safeTime(getStart(event))} - ${safeTime(getEnd(event))}`}
                                 </div>
                                 {event.location && (
-                                  <div className="flex items-center gap-1 text-[10px] text-text-secondary">
+                                  <div className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">
                                     <MapPin size={9} /> {event.location}
                                   </div>
                                 )}

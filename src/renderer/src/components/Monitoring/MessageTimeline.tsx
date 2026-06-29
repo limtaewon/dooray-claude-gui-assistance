@@ -99,7 +99,7 @@ function renderMentions(text: string, terms: string[]): JSX.Element {
         if (MENTION_RE.test(p)) {
           MENTION_RE.lastIndex = 0
           return (
-            <span key={i} className="px-1 rounded bg-clauday-blue/15 text-clauday-blue font-medium text-[11.5px]">
+            <span key={i} className="px-1 rounded bg-clauday-blue/15 text-clauday-blue font-medium text-[calc(11.5px_*_var(--app-font-scale,1))]">
               {p}
             </span>
           )
@@ -180,7 +180,7 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
         <Clock size={32} className="text-text-tertiary/60" />
         <div className="text-center">
           <p className="text-sm font-medium text-text-primary">수집된 메시지가 없습니다</p>
-          <p className="text-[11px] text-text-tertiary mt-1 leading-relaxed">
+          <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mt-1 leading-relaxed">
             실시간 수신 · 최근 3일 보관<br/>
             규칙과 매치되는 메시지가 없거나 아직 첫 수신 전일 수 있습니다
           </p>
@@ -205,8 +205,8 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
               칩 하나로 압축하고 wrapper 배경은 투명. 칩에 자체 배경+그림자만 부여. */}
           <div className="sticky top-0 z-10 mb-3 py-1 pointer-events-none">
             <div className="inline-flex items-center gap-1.5 h-5 px-2 rounded-full bg-bg-surface border border-bg-border shadow-sm">
-              <span className="text-[10px] font-bold text-text-secondary leading-none">{g.label}</span>
-              <span className="text-[9px] text-text-tertiary leading-none">{g.items.length}건</span>
+              <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-bold text-text-secondary leading-none">{g.label}</span>
+              <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary leading-none">{g.items.length}건</span>
             </div>
           </div>
 
@@ -226,7 +226,7 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
                   )}
 
                   {/* Avatar */}
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold"
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[calc(11px_*_var(--app-font-scale,1))] font-bold"
                     style={{ background: colors.bg, color: colors.text }}>
                     {initials}
                   </div>
@@ -236,15 +236,15 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
                     {/* Meta row */}
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-xs font-semibold text-text-primary">{m.authorName}</span>
-                      <span className="flex items-center gap-1 text-[10px] text-text-tertiary px-1.5 py-0.5 rounded bg-bg-primary/60">
+                      <span className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary px-1.5 py-0.5 rounded bg-bg-primary/60">
                         <Hash size={9} />
                         {m.channelName}
                       </span>
-                      <span className="ml-auto text-[10px] text-text-tertiary">{formatTime(m.createdAt)}</span>
+                      <span className="ml-auto text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">{formatTime(m.createdAt)}</span>
                     </div>
 
                     {/* Body */}
-                    <div className="text-[12.5px] text-text-primary whitespace-pre-wrap break-words leading-relaxed">
+                    <div className="text-[calc(12.5px_*_var(--app-font-scale,1))] text-text-primary whitespace-pre-wrap break-words leading-relaxed">
                       {renderContent(cleanText(m.text), m.matchedTerms)}
                     </div>
 
@@ -254,7 +254,7 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
                       target="_blank"
                       rel="noreferrer"
                       title="이 채널을 두레이 메신저에서 열기"
-                      className="absolute bottom-2 right-3 inline-flex items-center gap-1 text-[10px] text-text-tertiary hover:text-clauday-blue opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute bottom-2 right-3 inline-flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-clauday-blue opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <ExternalLink size={10} />
                       채널 열기
@@ -263,10 +263,10 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
                     {/* Matched terms chips */}
                     {m.matchedTerms.length > 0 && (
                       <div className="flex flex-wrap items-center gap-1 mt-2 pt-2 border-t border-bg-border/40">
-                        <span className="text-[9px] text-text-tertiary leading-none">매치:</span>
+                        <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary leading-none">매치:</span>
                         {m.matchedTerms.slice(0, 6).map((t, i) => (
                           <span key={i}
-                            className="inline-flex items-center h-[14px] px-1.5 rounded-full bg-clauday-orange/15 text-clauday-orange font-medium text-[9px] leading-none">
+                            className="inline-flex items-center h-[14px] px-1.5 rounded-full bg-clauday-orange/15 text-clauday-orange font-medium text-[calc(9px_*_var(--app-font-scale,1))] leading-none">
                             {t}
                           </span>
                         ))}

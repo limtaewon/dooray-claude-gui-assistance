@@ -75,11 +75,11 @@ function QuickTodoModal({ open, onClose }: { open: boolean; onClose: () => void 
           disabled={submitting}
           className="w-full px-3 py-2 rounded-lg bg-bg-surface border border-bg-border text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-emerald-500"
         />
-        <p className="text-[10px] text-text-tertiary mt-2">
+        <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-2">
           오늘 자 종일 일정으로 로컬 캘린더에 등록됩니다. Enter 로 저장, Esc 로 취소.
         </p>
         {submitting && (
-          <div className="flex items-center gap-1.5 mt-2 text-[11px] text-text-secondary">
+          <div className="flex items-center gap-1.5 mt-2 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary">
             <Loader2 size={12} className="animate-spin" /> 등록 중...
           </div>
         )}

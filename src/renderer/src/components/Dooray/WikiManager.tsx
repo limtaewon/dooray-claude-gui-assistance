@@ -236,7 +236,7 @@ function WikiManager(): JSX.Element {
       {!domainCollapsed && (
         <div className="w-44 flex-shrink-0 bg-bg-surface border-r border-bg-border flex flex-col">
           <div className="flex items-center justify-between px-3 py-2 border-b border-bg-border">
-            <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-wide">위키</span>
+            <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-secondary uppercase tracking-wide">위키</span>
             <div className="flex items-center gap-1">
               <ProjectFilter settingsKey="pinnedWikis" useWikiDomains onChanged={loadDomains} />
               <button onClick={loadDomains} className="ds-btn icon sm" title="새로고침"><RefreshCw size={14} className={loadingDomains ? 'animate-spin' : ''} /></button>
@@ -253,7 +253,7 @@ function WikiManager(): JSX.Element {
                       isSelected ? 'bg-clauday-blue/10 text-clauday-blue border-r-2 border-clauday-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
                     }`}>
                     <FolderOpen size={11} className={`flex-shrink-0 ${isSelected ? 'text-clauday-blue' : 'text-text-tertiary'}`} />
-                    <span className="text-[11px] font-medium truncate min-w-0">{d.name}</span>
+                    <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-medium truncate min-w-0">{d.name}</span>
                   </button>
                   <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity mr-1">
                     <button onClick={() => moveDomain(d.id, -1)} disabled={idx === 0}
@@ -277,7 +277,7 @@ function WikiManager(): JSX.Element {
       {/* 중앙: 페이지 트리 */}
       <div className="w-60 flex-shrink-0 border-r border-bg-border flex flex-col">
         {domainCollapsed && (
-          <button onClick={() => setDomainCollapsed(false)} className="px-3 py-2 border-b border-bg-border text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover flex items-center gap-1.5 text-[12px] font-medium">
+          <button onClick={() => setDomainCollapsed(false)} className="px-3 py-2 border-b border-bg-border text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover flex items-center gap-1.5 text-[calc(12px_*_var(--app-font-scale,1))] font-medium">
             <PanelLeftOpen size={14} /> 위키 목록
           </button>
         )}
@@ -291,12 +291,12 @@ function WikiManager(): JSX.Element {
               <div className="relative">
                 <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary" />
                 <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="페이지 검색..."
-                  className="w-full pl-6 pr-2 py-1 bg-bg-primary border border-bg-border rounded text-[10px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue" />
+                  className="w-full pl-6 pr-2 py-1 bg-bg-primary border border-bg-border rounded text-[calc(10px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue" />
               </div>
             </div>
             <div className="flex-1 overflow-y-auto py-1">
-              {loadingPages ? <div className="text-[10px] text-text-tertiary text-center py-4">로딩...</div>
-                : filteredNodes.length === 0 ? <div className="text-[10px] text-text-tertiary text-center py-4">{searchQuery ? '검색 결과 없음' : '페이지 없음'}</div>
+              {loadingPages ? <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">로딩...</div>
+                : filteredNodes.length === 0 ? <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">{searchQuery ? '검색 결과 없음' : '페이지 없음'}</div>
                 : renderTree(filteredNodes, 0)}
             </div>
           </>
@@ -311,7 +311,7 @@ function WikiManager(): JSX.Element {
             <div className="px-4 py-3 border-b border-bg-border flex-shrink-0">
               <h3 className="text-sm font-semibold text-text-primary mb-2">{pageTitle(selectedPage)}</h3>
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-[10px] text-text-tertiary mr-1">AI (Opus):</span>
+                <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mr-1">AI (Opus):</span>
                 {[
                   { key: 'proofread', label: '교정', desc: '맞춤법·문법 교정' },
                   { key: 'improve', label: '개선', desc: '가독성·구조 개선' },
@@ -319,7 +319,7 @@ function WikiManager(): JSX.Element {
                   { key: 'structure', label: '구조 분석', desc: '구조 개선 제안' }
                 ].map((a) => (
                   <button key={a.key} onClick={() => runAi(a.key)} disabled={aiLoading || !pageContent} title={a.desc}
-                    className={`flex items-center gap-1 px-2 py-1 rounded-md border text-[10px] transition-colors disabled:opacity-40 ${
+                    className={`flex items-center gap-1 px-2 py-1 rounded-md border text-[calc(10px_*_var(--app-font-scale,1))] transition-colors disabled:opacity-40 ${
                       aiAction === a.key && aiResult ? 'bg-clauday-orange/10 border-clauday-orange/30 text-clauday-orange' : 'bg-bg-surface border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light'
                     }`}>
                     <Sparkles size={9} className="text-clauday-orange" /> {a.label}
@@ -349,7 +349,7 @@ function WikiManager(): JSX.Element {
                   <div className="flex items-center justify-between px-4 py-2 border-b border-bg-border bg-bg-surface/50 flex-shrink-0">
                     <div className="flex items-center gap-1.5">
                       <Sparkles size={12} className="text-clauday-orange" />
-                      <span className="text-[11px] font-semibold text-clauday-orange">
+                      <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-clauday-orange">
                         {aiAction === 'proofread' ? '교정 결과' : aiAction === 'improve' ? '개선 결과' : 'AI 결과'}
                       </span>
                     </div>
@@ -357,24 +357,24 @@ function WikiManager(): JSX.Element {
                       {canPush && (
                         <>
                           <button onClick={() => { if (editMode) setEditMode(false); else { setEditContent(aiResult || ''); setEditMode(true) } }}
-                            className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] ${editMode ? 'bg-clauday-blue/10 text-clauday-blue' : 'text-text-secondary hover:text-text-primary'}`}>
+                            className={`flex items-center gap-1 px-2 py-1 rounded text-[calc(10px_*_var(--app-font-scale,1))] ${editMode ? 'bg-clauday-blue/10 text-clauday-blue' : 'text-text-secondary hover:text-text-primary'}`}>
                             {editMode ? <><Eye size={9} /> 미리보기</> : <><Edit3 size={9} /> 편집</>}
                           </button>
                           <button onClick={pushToWiki} disabled={pushing}
-                            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-[10px] text-emerald-400 font-medium hover:bg-emerald-500/30 disabled:opacity-40">
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-[calc(10px_*_var(--app-font-scale,1))] text-emerald-400 font-medium hover:bg-emerald-500/30 disabled:opacity-40">
                             {pushing ? <Loader2 size={9} className="animate-spin" /> : <Upload size={9} />}
                             {pushing ? '반영 중...' : '위키에 반영'}
                           </button>
                         </>
                       )}
-                      <button onClick={copyResult} className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-text-secondary hover:text-text-primary">
+                      <button onClick={copyResult} className="flex items-center gap-1 px-2 py-1 rounded text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary hover:text-text-primary">
                         {copied ? <Check size={9} className="text-emerald-400" /> : <Copy size={9} />}
                         {copied ? '복사됨' : '복사'}
                       </button>
                     </div>
                   </div>
                   {pushResult && (
-                    <div className={`px-4 py-1.5 text-[10px] ${pushResult.includes('실패') ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                    <div className={`px-4 py-1.5 text-[calc(10px_*_var(--app-font-scale,1))] ${pushResult.includes('실패') ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
                       {pushResult}
                     </div>
                   )}
@@ -425,7 +425,7 @@ const TreeRow = memo(function TreeRow({ node, depth, isSelected, onToggle, onSel
           {node.expanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
         </button>
         <FileText size={11} className="flex-shrink-0 text-text-tertiary" />
-        <span onClick={() => onSelect(node.page)} className="text-[11px] truncate flex-1">{pageTitle(node.page)}</span>
+        <span onClick={() => onSelect(node.page)} className="text-[calc(11px_*_var(--app-font-scale,1))] truncate flex-1">{pageTitle(node.page)}</span>
       </div>
       {children}
     </div>

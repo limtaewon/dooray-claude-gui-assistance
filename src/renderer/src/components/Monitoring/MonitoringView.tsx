@@ -213,7 +213,7 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-sm font-bold text-text-primary leading-tight">모니터링</h2>
-              <p className="text-[10px] text-text-tertiary leading-tight">실시간 수신 · 3일 보관</p>
+              <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary leading-tight">실시간 수신 · 3일 보관</p>
             </div>
             <button onClick={handleRefresh} disabled={refreshing}
               className="p-1.5 rounded-lg hover:bg-bg-surface text-text-tertiary hover:text-text-secondary disabled:opacity-40"
@@ -251,7 +251,7 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
                 actionLabel="새 와처 만들기" onAction={() => setEditing('new')} />
             )
             : filteredWatchers.length === 0 ? (
-              <div className="px-4 py-6 text-center text-[11px] text-text-tertiary">검색 결과 없음</div>
+              <div className="px-4 py-6 text-center text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">검색 결과 없음</div>
             )
             : filteredWatchers.map((w) => {
                 const active = w.id === selectedId
@@ -271,12 +271,12 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
                       <div className={`text-xs font-medium truncate ${active ? 'text-clauday-orange' : 'text-text-primary'}`}>
                         {w.name}
                       </div>
-                      <div className="text-[9px] text-text-tertiary truncate">
+                      <div className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary truncate">
                         {w.channelNames.length}개 채널 · {w.filter.description || '규칙 없음'}
                       </div>
                     </div>
                     {count > 0 && (
-                      <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-clauday-orange text-white font-bold">
+                      <span className="px-1.5 py-0.5 rounded-full text-[calc(9px_*_var(--app-font-scale,1))] bg-clauday-orange text-white font-bold">
                         {count > 99 ? '99+' : count}
                       </span>
                     )}
@@ -297,7 +297,7 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
         </div>
 
         {watchers.length > 0 && (
-          <div className="px-4 py-2 border-t border-bg-border text-[10px] text-text-tertiary flex-shrink-0">
+          <div className="px-4 py-2 border-t border-bg-border text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">
             총 와처 {watchers.length} · 신규 {totalUnread}
           </div>
         )}
@@ -312,8 +312,8 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
             <div className="px-5 py-2.5 border-b border-bg-border flex items-center gap-2 flex-shrink-0">
               <Power size={14} className={selected.enabled ? 'text-emerald-400' : 'text-text-tertiary'} />
               <div className="flex-1 min-w-0">
-                <h3 className="text-[13px] font-semibold text-text-primary truncate leading-tight">{selected.name}</h3>
-                <p className="text-[10px] text-text-tertiary truncate">
+                <h3 className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary truncate leading-tight">{selected.name}</h3>
+                <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary truncate">
                   {selected.filter.description || '규칙 없음'} · 채널 {selected.channelNames.length}
                 </p>
               </div>
@@ -340,7 +340,7 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
                 {activeKeywords.map((k) => {
                   const saved = savedKeywords.includes(k)
                   return (
-                    <span key={k} className="inline-flex items-center gap-1 h-5 px-1.5 rounded-[4px] font-mono text-[10.5px] font-semibold"
+                    <span key={k} className="inline-flex items-center gap-1 h-5 px-1.5 rounded-[4px] font-mono text-[calc(10.5px_*_var(--app-font-scale,1))] font-semibold"
                       style={{ background: 'var(--c-orange-bg)', color: 'var(--c-orange-fg)' }}>
                       {k}
                       {!saved && (
@@ -363,14 +363,14 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
                   }}
                   placeholder="결과 좁히기 (AND)… 키워드 입력 후 Enter"
                   title="여기에 추가한 키워드는 이미 수집된 결과를 더 좁힙니다 (AND 필터)"
-                  className="bg-transparent border-0 outline-none text-[11.5px] text-text-primary placeholder-text-tertiary"
+                  className="bg-transparent border-0 outline-none text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary"
                   style={{ minWidth: 80, height: 20, flex: 1 }}
                 />
               </div>
             </div>
 
             {/* Stats row */}
-            <div className="px-5 py-1.5 border-b border-bg-border flex items-center gap-2 flex-shrink-0 text-[10px] text-text-tertiary">
+            <div className="px-5 py-1.5 border-b border-bg-border flex items-center gap-2 flex-shrink-0 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
               <span>매치된 메시지 <span className="text-text-secondary font-semibold">{filteredMessages.length}</span>{messages.length !== filteredMessages.length && <span className="text-text-tertiary"> / {messages.length}</span>}</span>
               {newCount > 0 && <span>· 신규 <span className="text-clauday-orange font-semibold">{newCount}</span></span>}
               <span>· 마지막 스캔: {lastScanText}</span>

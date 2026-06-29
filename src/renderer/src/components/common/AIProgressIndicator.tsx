@@ -65,7 +65,7 @@ function AIProgressIndicator({
         <span className={`font-medium text-text-primary flex-1 ${isLarge ? 'text-sm' : 'text-xs'}`}>
           {progress.message || STAGE_LABEL[progress.stage] || 'AI 작업 중...'}
         </span>
-        <span className={`flex items-center gap-1 text-text-tertiary font-mono ${isLarge ? 'text-xs' : 'text-[10px]'}`}>
+        <span className={`flex items-center gap-1 text-text-tertiary font-mono ${isLarge ? 'text-xs' : 'text-[calc(10px_*_var(--app-font-scale,1))]'}`}>
           <Clock size={isLarge ? 12 : 10} />
           {formatElapsed(progress.elapsedMs)}
         </span>
@@ -94,7 +94,7 @@ function AIProgressIndicator({
 
       {/* 스테이지 라벨 */}
       {isLarge && (
-        <div className="flex items-center gap-1 mt-1 text-[9px] text-text-tertiary">
+        <div className="flex items-center gap-1 mt-1 text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">
           {(['collecting', 'thinking', 'streaming', 'parsing'] as const).map((s) => (
             <span key={s} className="flex-1 text-center">{STAGE_LABEL[s]}</span>
           ))}
@@ -103,7 +103,7 @@ function AIProgressIndicator({
 
       {/* 예상 시간 안내 */}
       {expectedTime && isLarge && (
-        <div className="mt-3 flex items-center gap-1.5 text-[10px] text-text-tertiary">
+        <div className="mt-3 flex items-center gap-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
           <Info size={10} /> {expectedTime}
         </div>
       )}
@@ -114,7 +114,7 @@ function AIProgressIndicator({
           ref={preRef}
           onScroll={handleScroll}
           className={`mt-3 text-text-secondary font-mono p-3 bg-bg-primary/60 rounded-lg border border-bg-border/50 whitespace-pre-wrap overflow-y-auto leading-relaxed ${
-            isLarge ? 'text-[11px] max-h-80' : 'text-[10px] max-h-24'
+            isLarge ? 'text-[calc(11px_*_var(--app-font-scale,1))] max-h-80' : 'text-[calc(10px_*_var(--app-font-scale,1))] max-h-24'
           }`}
         >
           {progress.streamedText.length > 2000
