@@ -20,6 +20,21 @@ function subscribeTerminalOutput(cb: (payload: TerminalOutputPayload) => void): 
   return () => { terminalOutputHandlers.delete(cb) }
 }
 import { IPC_CHANNELS } from '../shared/types/ipc'
+// 터미널 종료 구독: TERMINAL_OUTPUT 과 동일한 단일 리스너 공유 패턴 (ADR-v2-terminal-p1-01)
+const terminalExitHandlers = new Set<(payload: TerminalExitPayload) => void>()
+let terminalExitSubscribed = false
+function subscribeTerminalExit(cb: (payload: TerminalExitPayload) => void): () => void {
+  terminalExitHandlers.add(cb)
+  if (!terminalExitSubscribed) {
+    terminalExitSubscribed = true
+    ipcRenderer.on(IPC_CHANNELS.TERMINAL_EXIT, (_: IpcRendererEvent, payload: TerminalExitPayload) => {
+      for (const h of terminalExitHandlers) {
+        try { h(payload) } catch { /* ignore */ }
+      }
+    })
+  }
+  return () => { terminalExitHandlers.delete(cb) }
+}
 
 // CalDAV 데이터 변경 알림 (sync 결과 → main → 여기 → renderer 구독자)
 // #7 OS 알림 클릭 → renderer 가 subscribe 한 콜백으로 라우팅 (contextIsolation 이라 dispatchEvent 불가)
@@ -108,7 +123,7 @@ import type {
   LocalCalendarUpdate
 } from '../shared/types/calendar'
 import type { AIBriefing, AIReport, AIProgressEvent, AIModelConfig, AIModelName } from '../shared/types/ai'
-import type { TerminalSession, TerminalCreateOptions, TerminalResizeOptions } from '../shared/types/terminal'
+import type { TerminalSession, TerminalCreateOptions, TerminalResizeOptions, TerminalExitPayload } from '../shared/types/terminal'
 import type {
   GitWorktree,
   GitWorktreeStatus,
@@ -381,6 +396,11 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_RENAME, { id, name }),
     onOutput: (callback: (payload: { id: string; data: string }) => void): (() => void) =>
       subscribeTerminalOutput(callback),
+    /** v2.0 B-1: PTY 종료 통지 구독. suppression·at-most-once 판정은 main 이 수행. */
+    onExit: (callback: (payload: TerminalExitPayload) => void): (() => void) =>
+      subscribeTerminalExit(callback),
+    /** v2.0 B-8: 드래그로 바뀐 탭 순서를 main 세션 순서에 반영 (fire-and-forget) */
+    reorder: (ids: string[]): void => ipcRenderer.send(IPC_CHANNELS.TERMINAL_REORDER, ids),
     /** v1.4: 두레이 멘션이 main에서 새 터미널을 열었을 때 렌더러로 푸시되는 메타 */
     onMentionOpened: (callback: (meta: TerminalSession) => void): (() => void) => {
       const handler = (_: unknown, meta: TerminalSession): void => callback(meta)

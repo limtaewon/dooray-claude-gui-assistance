@@ -147,9 +147,13 @@ export const IPC_CHANNELS = {
   TERMINAL_KILL: 'terminal:kill',
   TERMINAL_LIST: 'terminal:list',
   TERMINAL_OUTPUT: 'terminal:output',
+  /** v2.0 B-1: PTY 종료 push (main → renderer). handle 등록 대상 아님 */
+  TERMINAL_EXIT: 'terminal:exit',
   TERMINAL_SAVE_OUTPUT: 'terminal:save-output',
   TERMINAL_RESTORE: 'terminal:restore',
   TERMINAL_RENAME: 'terminal:rename',
+  /** v2.0 B-8: 렌더러 탭 순서를 main 세션 순서에 반영 (fire-and-forget) */
+  TERMINAL_REORDER: 'terminal:reorder',
   /** v1.4: 두레이 멘션이 새 터미널을 열었음을 렌더러에 알림 (entries 추가/활성화 요청) */
   MENTION_TERMINAL_OPENED: 'mention:terminal:opened',
   /** v1.4: 기존 채널 탭을 재사용 — 렌더러에 활성화만 요청 (id 페이로드) */

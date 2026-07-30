@@ -956,6 +956,9 @@ function registerIpcHandlers(): void {
   ipcMain.on(IPC_CHANNELS.TERMINAL_RESIZE, (_, opts: TerminalResizeOptions) =>
     terminalManager.resize(opts)
   )
+  ipcMain.on(IPC_CHANNELS.TERMINAL_REORDER, (_, ids: string[]) =>
+    terminalManager.reorder(ids)
+  )
   ipcMain.handle(IPC_CHANNELS.TERMINAL_KILL, (_, id: string) =>
     terminalManager.kill(id)
   )

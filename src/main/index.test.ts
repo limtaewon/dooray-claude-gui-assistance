@@ -333,6 +333,7 @@ describe('main/index.ts IPC 라우터 (channel registration)', () => {
     // 이 채널들은 main → renderer push 전용 (webContents.send). handle 대상 아님.
     const eventOnly = [
       IPC_CHANNELS.TERMINAL_OUTPUT,
+      IPC_CHANNELS.TERMINAL_EXIT,
       IPC_CHANNELS.DOORAY_TASKS_PARTIAL,
       IPC_CHANNELS.MENTION_RECEIVED,
       IPC_CHANNELS.MENTION_TERMINAL_OPENED,
@@ -355,5 +356,12 @@ describe('main/index.ts IPC 라우터 (channel registration)', () => {
     const onSet = new Set(onCalls)
     expect(onSet.has(IPC_CHANNELS.TERMINAL_INPUT) || onSet.has(IPC_CHANNELS.TERMINAL_RESIZE) || onSet.has(IPC_CHANNELS.ANALYTICS_TRACK))
       .toBe(true)
+  })
+
+  it('TERMINAL_REORDER 는 ipcMain.on 으로 등록되고 ipcMain.handle 에는 없다 (ADR-v2-terminal-p1-05)', () => {
+    const onSet = new Set(onCalls)
+    const handleSet = new Set(handleCalls)
+    expect(onSet.has(IPC_CHANNELS.TERMINAL_REORDER)).toBe(true)
+    expect(handleSet.has(IPC_CHANNELS.TERMINAL_REORDER)).toBe(false)
   })
 })

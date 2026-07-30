@@ -3,24 +3,36 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { SearchAddon } from '@xterm/addon-search'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
-import { ChevronUp, ChevronDown, X, Image as ImageIcon, ExternalLink } from 'lucide-react'
+import { Image as ImageIcon, ExternalLink } from 'lucide-react'
 import { shouldFollowOutput } from './scrollFollow'
+import useTerminalSearch from './useTerminalSearch'
+import TerminalSearchBar from './TerminalSearchBar'
+import Button from '../common/ds/Button'
 import '@xterm/xterm/css/xterm.css'
 
 interface TerminalPaneProps {
   sessionId: string
   isActive: boolean
   initialOutput?: string
+  /** v2.0 B-1: PTY 종료 정보 — 있으면 종료 오버레이를 그리고 입력을 차단한다 (ADR-02). */
+  exitInfo?: { exitCode: number; signal: number | null } | null
+  /** v2.0 B-1: 종료 오버레이의 "닫기" 버튼. 없으면 버튼을 숨긴다. */
+  onRequestClose?: () => void
 }
 
-function TerminalPane({ sessionId, isActive, initialOutput }: TerminalPaneProps): JSX.Element {
+function TerminalPane({ sessionId, isActive, initialOutput, exitInfo, onRequestClose }: TerminalPaneProps): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const searchAddonRef = useRef<SearchAddon | null>(null)
-  const searchInputRef = useRef<HTMLInputElement>(null)
-  const [searchOpen, setSearchOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
+  const search = useTerminalSearch({ sessionId, searchAddonRef, terminalRef })
+
+  // mount effect(onData/attachCustomKeyEventHandler) 클로저는 한 번만 만들어지므로 prop 을 직접
+  // 읽으면 stale 해진다 — ref 로 최신 값을 동기화해서 입력 차단 판정에 쓴다 (ADR-02 §결정 4).
+  const exitInfoRef = useRef<{ exitCode: number; signal: number | null } | null>(exitInfo ?? null)
+  useEffect(() => {
+    exitInfoRef.current = exitInfo ?? null
+  }, [exitInfo])
 
   // #2 PTY 출력에서 잡힌 이미지 path 들 — 최근 N개. 클릭 시 OS open.
   const [recentImages, setRecentImages] = useState<Array<{ path: string; seenAt: number }>>([])
@@ -60,7 +72,9 @@ function TerminalPane({ sessionId, isActive, initialOutput }: TerminalPaneProps)
       lineHeight: 1.4,
       cursorBlink: true,
       scrollback: 10000,
-      allowProposedApi: true
+      allowProposedApi: true,
+      // v2.0 B-2: 이 값이 없으면 xterm 이 overview ruler(우측 매치 마커 스트립) 자체를 렌더하지 않는다.
+      overviewRulerWidth: 14
     })
 
     const fitAddon = new FitAddon()
@@ -81,6 +95,8 @@ function TerminalPane({ sessionId, isActive, initialOutput }: TerminalPaneProps)
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
     searchAddonRef.current = searchAddon
+    // 검색 결과 카운트를 useTerminalSearch 훅으로 전달 — decoration 이 켜져 있을 때만 발화한다.
+    const searchResultsDisposable = searchAddon.onDidChangeResults((e) => search.handleResultsChanged(e))
 
     // 1) 컨테이너 크기에 맞춰 fit, 2) PTY 에 실제 cols/rows 통지, 3) 그 후에 저장된 출력 복원.
     // Why: open() 직후엔 xterm 이 기본 80x24 grid 로 동작하므로, fit 전에 write() 하면
@@ -187,7 +203,11 @@ function TerminalPane({ sessionId, isActive, initialOutput }: TerminalPaneProps)
     //  - Win/Linux:  Home/End/Ctrl+Backspace/Ctrl+Delete/Ctrl+←→ — 이미 PTY 가 받지만 Ctrl+Backspace
     //    같은 일부는 기본적으로 \x7f 만 보내므로 word-delete 로 보강.
     const isMac = navigator.platform.toUpperCase().includes('MAC')
-    const send = (s: string): void => { try { window.api.terminal.input(sessionId, s) } catch { /* ok */ } }
+    // v2.0 B-1: 세션이 종료된 pane 은 제어문자 송신도 막는다 (입력 차단 경로 ①) — ADR-02.
+    const send = (s: string): void => {
+      if (exitInfoRef.current) return
+      try { window.api.terminal.input(sessionId, s) } catch { /* ok */ }
+    }
     terminal.attachCustomKeyEventHandler((e) => {
       if (e.type !== 'keydown') return true
       // IME(한글/일본어/중국어) 조합 중에는 어떤 단축키도 가로채지 않는다.
@@ -204,8 +224,7 @@ function TerminalPane({ sessionId, isActive, initialOutput }: TerminalPaneProps)
       // 검색바 — Cmd+F (mac) / Ctrl+F (Win/Linux)
       if ((meta || ctrl) && !alt && (k === 'f' || k === 'F')) {
         e.preventDefault()
-        setSearchOpen(true)
-        requestAnimationFrame(() => searchInputRef.current?.focus())
+        search.openSearch()
         return false
       }
 
@@ -363,6 +382,8 @@ function TerminalPane({ sessionId, isActive, initialOutput }: TerminalPaneProps)
     })
 
     terminal.onData((data) => {
+      // v2.0 B-1: 입력 차단 경로 ② — 타이핑/붙여넣기로 xterm 이 만든 data 는 여기로 모인다.
+      if (exitInfoRef.current) return
       window.api.terminal.input(sessionId, data)
     })
 
@@ -440,6 +461,7 @@ function TerminalPane({ sessionId, isActive, initialOutput }: TerminalPaneProps)
 
     return () => {
       cleanup()
+      searchResultsDisposable.dispose()
       resizeObserver.disconnect()
       if (resizeTimer !== null) clearTimeout(resizeTimer)
       terminal.dispose()
@@ -476,7 +498,9 @@ function TerminalPane({ sessionId, isActive, initialOutput }: TerminalPaneProps)
 
   // 이미지/파일 → PTY 에 path 입력. drag-drop / clipboard paste 공용 (#2 후속 / 사용자 요청).
   // Claude Code TUI 가 이미지 path 를 알아채면 read 도구로 자동 첨부.
+  // v2.0 B-1: 입력 차단 경로 ③ — 파일 드롭·이미지 paste 모두 이 함수를 거친다.
   const sendFileAsPath = useCallback(async (file: File): Promise<void> => {
+    if (exitInfoRef.current) return
     try {
       const fileWithPath = file as File & { path?: string }
       let path = typeof fileWithPath.path === 'string' && fileWithPath.path ? fileWithPath.path : ''
@@ -511,28 +535,18 @@ function TerminalPane({ sessionId, isActive, initialOutput }: TerminalPaneProps)
     return () => document.removeEventListener('paste', onPaste)
   }, [isActive, sendFileAsPath])
 
-  const findNext = (): void => {
-    if (searchQuery) searchAddonRef.current?.findNext(searchQuery, { caseSensitive: false })
-  }
-  const findPrev = (): void => {
-    if (searchQuery) searchAddonRef.current?.findPrevious(searchQuery, { caseSensitive: false })
-  }
-  const closeSearch = (): void => {
-    setSearchOpen(false)
-    setSearchQuery('')
-    try { searchAddonRef.current?.clearDecorations() } catch { /* ok */ }
-    terminalRef.current?.focus()
-  }
-
   return (
     <div
       className={`absolute inset-0 ${isActive ? 'z-10' : 'z-0 pointer-events-none invisible'}`}
       onDragOver={(e) => {
+        // v2.0 B-1: 파일 드롭도 입력 차단 대상 (경로 ③, sendFileAsPath 로 귀결).
+        if (exitInfoRef.current) return
         if (!e.dataTransfer?.types?.includes('Files')) return
         e.preventDefault()
         e.dataTransfer.dropEffect = 'copy'
       }}
       onDrop={async (e) => {
+        if (exitInfoRef.current) return
         const files = Array.from(e.dataTransfer?.files || [])
         if (files.length === 0) return
         e.preventDefault()
@@ -601,37 +615,41 @@ function TerminalPane({ sessionId, isActive, initialOutput }: TerminalPaneProps)
           )}
         </div>
       )}
-      {searchOpen && (
-        <div
-          className="absolute top-2 right-3 z-20 flex items-center gap-1 px-2 py-1 rounded-md shadow-lg"
-          style={{ background: 'var(--bg-surface-raised)', border: '1px solid var(--bg-border)' }}
-        >
-          <input
-            ref={searchInputRef}
-            type="text"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value)
-              if (e.target.value) searchAddonRef.current?.findNext(e.target.value, { caseSensitive: false })
-            }}
-            onKeyDown={(e) => {
-              if (e.nativeEvent.isComposing || e.keyCode === 229) return
-              if (e.key === 'Enter') { e.preventDefault(); e.shiftKey ? findPrev() : findNext() }
-              else if (e.key === 'Escape') { e.preventDefault(); closeSearch() }
-            }}
-            placeholder="터미널 검색"
-            className="text-xs bg-transparent border-none outline-none text-text-primary placeholder-text-tertiary"
-            style={{ width: 180 }}
-          />
-          <button onClick={findPrev} className="p-1 rounded hover:bg-bg-surface-hover text-text-tertiary hover:text-text-primary" title="이전 (Shift+Enter)">
-            <ChevronUp size={12} />
-          </button>
-          <button onClick={findNext} className="p-1 rounded hover:bg-bg-surface-hover text-text-tertiary hover:text-text-primary" title="다음 (Enter)">
-            <ChevronDown size={12} />
-          </button>
-          <button onClick={closeSearch} className="p-1 rounded hover:bg-bg-surface-hover text-text-tertiary hover:text-text-primary" title="닫기 (Esc)">
-            <X size={12} />
-          </button>
+      {search.open && (
+        <TerminalSearchBar
+          query={search.query}
+          toggles={search.toggles}
+          countLabel={search.countLabel}
+          hasError={search.hasError}
+          onQueryChange={search.setQuery}
+          onCompositionStart={search.onCompositionStart}
+          onCompositionEnd={search.onCompositionEnd}
+          onToggle={search.toggleOption}
+          onNext={search.findNext}
+          onPrev={search.findPrev}
+          onClose={search.closeSearch}
+        />
+      )}
+
+      {/* v2.0 B-1: 종료 오버레이 — 자동으로 사라지지 않는다. pointer-events-none 으로 감싸서
+          스크롤/드래그-선택은 아래 터미널로 통과시키고, 배지/버튼만 클릭 가능하게 한다 (ADR-02). */}
+      {exitInfo && (
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 pointer-events-none">
+          <div className="pointer-events-auto flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg bg-[var(--bg-surface-raised)] border border-[var(--bg-border)]">
+            <span
+              className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                exitInfo.exitCode === 0 ? 'bg-[var(--c-emerald-solid)]' : 'bg-[var(--c-red-solid)]'
+              }`}
+            />
+            <span className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary">
+              세션이 종료되었습니다 <span className="text-text-tertiary">(exit {exitInfo.exitCode})</span>
+            </span>
+          </div>
+          {onRequestClose && (
+            <Button variant="secondary" size="sm" className="pointer-events-auto" onClick={onRequestClose}>
+              닫기
+            </Button>
+          )}
         </div>
       )}
     </div>

@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { X, Bot } from 'lucide-react'
 import TerminalPane from '../Terminal/TerminalPane'
-import type { TerminalSession } from '../../../../shared/types/terminal'
+import type { TerminalExitPayload, TerminalSession } from '../../../../shared/types/terminal'
 
 interface Entry {
   session: TerminalSession
+  /** v2.0 B-1: PTY 종료 정보 — onExit 로 수신되면 채워지고 이후 덮어쓰지 않는다(렌더러측 at-most-once). */
+  exitInfo?: TerminalExitPayload | null
 }
 
 /**
@@ -52,10 +54,24 @@ function MentionAgentView(): JSX.Element {
     return off
   }, [])
 
+  // v2.0 B-1: PTY 종료 통지 구독 — 자기 entries 에 있는 id 만 반영, 이미 exitInfo 있으면 덮지 않는다.
+  useEffect(() => {
+    const off = window.api.terminal.onExit((payload) => {
+      setEntries((prev) => {
+        const idx = prev.findIndex((e) => e.session.id === payload.id)
+        if (idx === -1 || prev[idx].exitInfo) return prev
+        const next = prev.slice()
+        next[idx] = { ...next[idx], exitInfo: payload }
+        return next
+      })
+    })
+    return off
+  }, [])
+
   return (
     <div className="flex flex-col h-full bg-bg-primary">
       <div className="ds-tabbar">
-        {entries.map(({ session }) => (
+        {entries.map(({ session, exitInfo }) => (
           <button
             key={session.id}
             onClick={() => setActiveId(session.id)}
@@ -63,11 +79,14 @@ function MentionAgentView(): JSX.Element {
               activeId === session.id
                 ? 'bg-bg-surface text-text-primary'
                 : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
-            }`}
-            title={session.cwd}
+            } ${exitInfo ? 'opacity-50' : ''}`}
+            title={exitInfo ? '종료됨' : session.cwd}
           >
             <Bot size={12} className="flex-shrink-0 opacity-70" />
             <span className="truncate max-w-[180px]">{session.name}</span>
+            {exitInfo && (
+              <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">종료됨</span>
+            )}
             <X
               size={12}
               className="opacity-0 group-hover:opacity-60 hover:opacity-100 hover:text-red-400 transition-opacity"
@@ -93,11 +112,13 @@ function MentionAgentView(): JSX.Element {
             </div>
           </div>
         ) : (
-          entries.map(({ session }) => (
+          entries.map(({ session, exitInfo }) => (
             <TerminalPane
               key={session.id}
               sessionId={session.id}
               isActive={session.id === activeId}
+              exitInfo={exitInfo}
+              onRequestClose={() => void closeSession(session.id)}
             />
           ))
         )}

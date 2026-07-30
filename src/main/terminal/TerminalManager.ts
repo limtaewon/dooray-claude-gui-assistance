@@ -4,7 +4,13 @@ import { randomUUID } from 'crypto'
 import { homedir } from 'os'
 import { join, delimiter as pathDelimiter } from 'path'
 import { IPC_CHANNELS } from '../../shared/types/ipc'
-import type { TerminalSession, TerminalCreateOptions, TerminalResizeOptions } from '../../shared/types/terminal'
+import type {
+  TerminalSession,
+  TerminalCreateOptions,
+  TerminalResizeOptions,
+  TerminalExitPayload
+} from '../../shared/types/terminal'
+import { applySessionOrder } from './sessionOrder'
 
 interface PtySession {
   pty: pty.IPty
@@ -82,6 +88,10 @@ export class TerminalManager {
   private mainWindow: BrowserWindow | null = null
   /** 외부 output listener — 멘션 작업 종료 마커 감지 등에 사용 */
   private outputListeners: Set<(id: string, data: string) => void> = new Set()
+  /** 외부 exit listener — addOutputListener 와 대칭 (C-2 AgentRunSpawner 등이 사용 예정) */
+  private exitListeners: Set<(payload: TerminalExitPayload) => void> = new Set()
+  /** kill() 로 예약된 "의도적 종료" id — onExit 에서 소비되면 통지를 생략한다 (ADR-v2-terminal-p1-01) */
+  private suppressedExitIds: Set<string> = new Set()
 
   setMainWindow(win: BrowserWindow): void {
     this.mainWindow = win
@@ -91,6 +101,12 @@ export class TerminalManager {
   addOutputListener(cb: (id: string, data: string) => void): () => void {
     this.outputListeners.add(cb)
     return () => { this.outputListeners.delete(cb) }
+  }
+
+  /** PTY 종료 listener 등록. unsubscribe 함수 반환. */
+  addExitListener(cb: (payload: TerminalExitPayload) => void): () => void {
+    this.exitListeners.add(cb)
+    return () => { this.exitListeners.delete(cb) }
   }
 
   create(options: TerminalCreateOptions = {}): TerminalSession {
@@ -145,10 +161,34 @@ export class TerminalManager {
       if (this.mainWindow && !this.mainWindow.isDestroyed()) {
         this.mainWindow.webContents.send(IPC_CHANNELS.TERMINAL_OUTPUT, { id, data })
       }
+
+      for (const listener of this.outputListeners) {
+        try {
+          listener(id, data)
+        } catch (error) {
+          console.warn('[TerminalManager] output listener 실패', { sessionId: id, error })
+        }
+      }
     })
 
-    ptyProcess.onExit(() => {
+    let exitHandled = false
+    ptyProcess.onExit(({ exitCode, signal }) => {
+      if (exitHandled) return
+      exitHandled = true
       this.sessions.delete(id)
+      if (this.suppressedExitIds.delete(id)) return // 의도적 종료 — 통지 생략
+
+      const payload: TerminalExitPayload = { id, exitCode: exitCode ?? 0, signal: signal ?? null }
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        this.mainWindow.webContents.send(IPC_CHANNELS.TERMINAL_EXIT, payload)
+      }
+      for (const listener of this.exitListeners) {
+        try {
+          listener(payload)
+        } catch (error) {
+          console.warn('[TerminalManager] exit listener 실패', { sessionId: id, error })
+        }
+      }
     })
 
     this.sessions.set(id, session)
@@ -171,10 +211,25 @@ export class TerminalManager {
 
   kill(id: string): void {
     const session = this.sessions.get(id)
-    if (session) {
-      session.pty.kill()
-      this.sessions.delete(id)
+    if (!session) return // 이미 사라진 id — 억제 예약을 새로 만들지 않는다 (누수 방지)
+    this.suppressedExitIds.add(id)
+    session.pty.kill()
+    this.sessions.delete(id)
+  }
+
+  /** 렌더러의 탭 순서를 세션 Map 순서에 반영. 유효한 id 가 하나도 없으면 no-op. */
+  reorder(ids: string[]): void {
+    const currentIds = Array.from(this.sessions.keys())
+    if (!ids.some((id) => this.sessions.has(id))) {
+      console.warn('[TerminalManager] reorder — 요청에 유효한 세션 id 가 없음', { ids })
+      return
     }
+    const newOrder = applySessionOrder(currentIds, ids)
+    const rebuilt = new Map<string, PtySession>()
+    for (const orderedId of newOrder) {
+      rebuilt.set(orderedId, this.sessions.get(orderedId)!)
+    }
+    this.sessions = rebuilt
   }
 
   listSessions(): TerminalSession[] {
