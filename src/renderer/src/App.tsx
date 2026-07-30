@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   Calendar as CalendarIcon, Terminal as TerminalIcon, GitBranch, Users, Server, Sparkles,
   MessageSquare, BarChart3, BookOpen, Settings as SettingsIcon, Radar, Moon, Sun, Lightbulb, Bot,
-  LayoutDashboard, ListTodo, MessageCircle, FileText, CheckSquare, Workflow, KanbanSquare
+  LayoutDashboard, ListTodo, MessageCircle, FileText, CheckSquare, Workflow
 } from 'lucide-react'
 import Sidebar from './components/Layout/Sidebar'
 import TitleBar from './components/Layout/TitleBar'
@@ -23,7 +23,6 @@ import CommunityView from './components/Community/CommunityView'
 import MonitoringView from './components/Monitoring/MonitoringView'
 import AIRecommendView from './components/AIRecommend/AIRecommendView'
 import HarnessStudioView from './components/HarnessStudio/HarnessStudioView'
-import WorkspaceView from './components/Workspace/WorkspaceView'
 import QuickTodoModal from './components/Dooray/QuickTodoModal'
 import { ToastHost, CommandPalette, type CommandGroup, type CommandItem } from './components/common/ds'
 import ErrorReportProvider from './components/ErrorReport/ErrorReportProvider'
@@ -250,10 +249,9 @@ function App(): JSX.Element {
         { id: 'go-dooray:messenger', label: '두레이 — 메신저', icon: <MessageCircle size={13} /> },
         { id: 'go-dooray:briefing', label: '두레이 — AI 브리핑', icon: <Sparkles size={13} /> },
         { id: 'go-dooray:report', label: '두레이 — AI 보고서', icon: <FileText size={13} /> },
-        { id: 'go-workspace', label: '워크스페이스', icon: <KanbanSquare size={13} /> },
         { id: 'go-monitoring', label: '모니터링', icon: <Radar size={13} />, hint: '⌘2' },
         { id: 'go-agent', label: '에이전트', icon: <Bot size={13} /> },
-        { id: 'go-terminal', label: '터미널', icon: <TerminalIcon size={13} />, hint: '⌘3' },
+        { id: 'go-terminal', label: '워크스페이스 (터미널)', icon: <TerminalIcon size={13} />, hint: '⌘3' },
         { id: 'go-git', label: '브랜치 작업', icon: <GitBranch size={13} />, hint: '⌘4' },
         { id: 'go-harness', label: 'Harness Studio', icon: <Workflow size={13} /> },
         { id: 'go-community', label: '커뮤니티', icon: <Users size={13} /> },
@@ -325,11 +323,6 @@ function App(): JSX.Element {
               ) : (
                 <DooraySetup onConfigured={() => setDoorayConfigured(true)} />
               )}
-            </div>
-            <div className={`absolute inset-0 ${vis('workspace')}`}>
-              <ErrorBoundary>
-                <WorkspaceView active={activeView === 'workspace'} />
-              </ErrorBoundary>
             </div>
             <div className={`absolute inset-0 ${vis('terminal')}`}>
               <TerminalView active={activeView === 'terminal'} />
@@ -412,7 +405,7 @@ function RecentViewsPalette({ open, items, index, onHover, onPick, onClose }: {
       switch (v) {
         case 'dooray': return { label: '두레이', icon: <CalendarIcon size={13} /> }
         case 'monitoring': return { label: '모니터링', icon: <Radar size={13} /> }
-        case 'terminal': return { label: '터미널', icon: <TerminalIcon size={13} /> }
+        case 'terminal': return { label: '워크스페이스', icon: <TerminalIcon size={13} /> }
         case 'git': return { label: '브랜치 작업', icon: <GitBranch size={13} /> }
         case 'community': return { label: '커뮤니티', icon: <Users size={13} /> }
         case 'mcp': return { label: 'MCP 서버', icon: <Server size={13} /> }
@@ -424,7 +417,6 @@ function RecentViewsPalette({ open, items, index, onHover, onPick, onClose }: {
         case 'settings': return { label: '설정', icon: <SettingsIcon size={13} /> }
         case 'agent': return { label: '에이전트', icon: <Bot size={13} /> }
         case 'harness': return { label: 'Harness Studio', icon: <Workflow size={13} /> }
-        case 'workspace': return { label: '워크스페이스', icon: <KanbanSquare size={13} /> }
         default: return { label: v, icon: <BookOpen size={13} /> }
       }
     })()

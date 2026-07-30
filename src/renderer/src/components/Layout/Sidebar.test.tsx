@@ -33,11 +33,11 @@ describe('Sidebar (integration)', () => {
 
     // 핵심 nav 항목들 노출
     expect(screen.getByRole('button', { name: '두레이' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '터미널' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '워크스페이스' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'MCP 서버' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '설정' })).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: '터미널' }))
+    await userEvent.click(screen.getByRole('button', { name: '워크스페이스' }))
     expect(onChange).toHaveBeenCalledWith('terminal')
   })
 

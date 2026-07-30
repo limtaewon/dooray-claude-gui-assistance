@@ -123,7 +123,7 @@ function KeybindingSettings(): JSX.Element {
   const modifiedCount = Object.keys(overrides).length
 
   return (
-    <div className="p-5 max-w-3xl flex flex-col gap-4">
+    <div className="p-6 max-w-3xl mx-auto flex flex-col gap-4">
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary" />

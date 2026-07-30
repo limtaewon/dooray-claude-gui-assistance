@@ -24,7 +24,9 @@
 .ds-chip.neutral  { background: var(--bg-surface); color: var(--text-secondary); border: 1px solid var(--bg-border); }
 .ds-chip .dot     { width: 5px; height: 5px; border-radius: 999px; background: currentColor; }
 
-/* ---------- Buttons ---------- */
+/* ---------- Buttons ----------
+ * v2.0: 다크에서 주 버튼은 '밝은 면'이다 (--btn-primary-*). 라이트 테마는 기존 남색 유지.
+ */
 .ds-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   height: 32px; padding: 0 12px;
@@ -38,18 +40,15 @@
 }
 .ds-btn:disabled, .ds-btn[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
 .ds-btn.primary {
-  background: linear-gradient(180deg, #3B5BA5 0%, #1E3A7F 100%);
-  color: #E2E8F0;
-  border: 1px solid rgba(148, 175, 230, 0.22);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: var(--btn-primary-bg, linear-gradient(180deg, #3B5BA5 0%, #1E3A7F 100%));
+  color: var(--btn-primary-fg, #E2E8F0);
+  border: 1px solid transparent;
+  font-weight: 600;
 }
 .ds-btn.primary:hover {
-  background: linear-gradient(180deg, #4868B8 0%, #264897 100%);
-  border-color: rgba(148, 175, 230, 0.32);
+  background: var(--btn-primary-bg-hover, linear-gradient(180deg, #4868B8 0%, #264897 100%));
 }
-.ds-btn.primary:active {
-  background: linear-gradient(180deg, #1E3A7F 0%, #1E3A7F 100%);
-}
+.ds-btn.primary:active { filter: brightness(0.94); }
 .ds-btn.ai {
   background-image: var(--ai-gradient);
   background-color: transparent;
@@ -123,8 +122,8 @@
 .ds-card {
   background: var(--bg-surface);
   border: 1px solid var(--bg-border);
-  border-radius: 8px;
-  padding: 10px;
+  border-radius: 10px;
+  padding: 12px;
 }
 .ds-card.raised { background: var(--bg-surface-raised); box-shadow: var(--elev-1); }
 .ds-card.flat   { background: transparent; border-color: var(--bg-border); }
@@ -230,7 +229,7 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
   width: 460px; max-width: calc(100vw - 32px);
   background: var(--bg-surface-raised);
   border: 1px solid var(--bg-border);
-  border-radius: 10px;
+  border-radius: 14px;
   box-shadow: var(--elev-3);
   overflow: hidden;
   animation: ds-modalIn .18s cubic-bezier(.2,.9,.2,1);

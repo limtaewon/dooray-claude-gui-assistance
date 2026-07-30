@@ -111,13 +111,13 @@ describe('App (integration: view routing)', () => {
     })
   })
 
-  it('switches to 터미널 view when sidebar 터미널 button is clicked', async () => {
+  it('switches to 워크스페이스(터미널) view when sidebar button is clicked', async () => {
     vi.mocked(window.api.settings.get).mockResolvedValue(null)
 
     render(<App />)
     await screen.findByTestId('view-dooray-setup')
 
-    const terminalNavBtn = screen.getByRole('button', { name: '터미널' })
+    const terminalNavBtn = screen.getByRole('button', { name: '워크스페이스' })
     await userEvent.click(terminalNavBtn)
 
     await waitFor(() => {

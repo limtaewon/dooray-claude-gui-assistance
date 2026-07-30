@@ -17,6 +17,9 @@ interface StartWorkModalProps {
   mappedRepoId?: string
   /** 태스크 본문 요약 — 프롬프트 기본값 조립에 쓴다 */
   defaultPrompt?: string
+  /** 호출부가 이미 계산한 브랜치 미리보기 (없으면 모달이 자체 계산) */
+  branchPreviewHint?: string
+  busy?: boolean
   onClose: () => void
   onStart: (options: StartWorkOptions) => void
 }
@@ -55,6 +58,8 @@ function StartWorkModal({
   settings,
   mappedRepoId,
   defaultPrompt,
+  branchPreviewHint,
+  busy = false,
   onClose,
   onStart
 }: StartWorkModalProps): JSX.Element {
@@ -74,6 +79,7 @@ function StartWorkModal({
 
   const suggestedBranch = useMemo(
     () =>
+      branchPreviewHint ??
       buildBranchName({
         template: settings.branchTemplate,
         projectCode: task.projectCode,
@@ -82,7 +88,7 @@ function StartWorkModal({
         subject: task.subject,
         prefix: repo?.branchPrefix
       }),
-    [settings.branchTemplate, task.projectCode, task.number, task.id, task.subject, repo?.branchPrefix]
+    [branchPreviewHint, settings.branchTemplate, task.projectCode, task.number, task.id, task.subject, repo?.branchPrefix]
   )
 
   // 모달을 새로 열 때마다 태스크 기준으로 초기화 — 이전 태스크 입력이 남지 않게
@@ -141,8 +147,8 @@ function StartWorkModal({
           <Button variant="ghost" onClick={onClose}>
             취소
           </Button>
-          <Button variant="primary" onClick={submit} disabled={!repoId || !branchValid}>
-            <Play size={13} /> 작업 시작
+          <Button variant="primary" onClick={submit} disabled={!repoId || !branchValid || busy}>
+            <Play size={13} /> {busy ? '시작 중…' : '워크스페이스 시작'}
           </Button>
         </>
       }

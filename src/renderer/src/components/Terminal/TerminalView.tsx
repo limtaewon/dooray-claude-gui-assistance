@@ -459,6 +459,38 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     notifyLayoutChanged()
   }, [activateTab, notifyLayoutChanged])
 
+  /**
+   * v2.0 C-3: 이미 만들어진 PTY 세션을 탭으로 받아들인다 — 워크스페이스 시작으로 main 이 spawn 한
+   * run 터미널을 여기서 연다. 같은 세션이 이미 탭으로 있으면 그 탭을 활성화만 한다.
+   */
+  const adoptSession = useCallback((sessionId: string, name: string, cwd?: string) => {
+    const existing = tabsRef.current.find((t) => Object.values(t.panes).some((p) => p.sessionId === sessionId))
+    if (existing) {
+      activateTab(existing.tabId)
+      return
+    }
+    const leafId = crypto.randomUUID()
+    const tabId = crypto.randomUUID()
+    setTabs((prev) => [...prev, {
+      tabId,
+      name,
+      tree: { type: 'leaf', leafId },
+      focusedLeafId: leafId,
+      panes: { [leafId]: { sessionId, cwd, generation: 0 } }
+    }])
+    activateTab(tabId)
+    notifyLayoutChanged()
+  }, [activateTab, notifyLayoutChanged])
+
+  useEffect(() => {
+    const handler = (e: Event): void => {
+      const d = (e as CustomEvent<{ sessionId?: string; name?: string; cwd?: string }>).detail
+      if (d?.sessionId) adoptSession(d.sessionId, d.name || '워크스페이스', d.cwd)
+    }
+    window.addEventListener('adopt-terminal', handler)
+    return () => window.removeEventListener('adopt-terminal', handler)
+  }, [adoptSession])
+
   /** v2.0 B-4: split 은 항상 새 PTY — 현재 focused pane 의 cwd 를 상속한다(ADR-02 §7). */
   const splitFocusedPane = useCallback(async (direction: SplitDirection) => {
     const tabId = activeTabIdRef.current
@@ -698,7 +730,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
   }
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex h-full w-full min-h-0 overflow-hidden">
     <div className="flex flex-col h-full min-w-0 flex-1 bg-bg-primary">
       <DndContext
         sensors={sensors}
@@ -758,7 +790,11 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
         {/* v2.0 B-4: xterm 은 트리 밖에서 산다 — 모든 탭의 leaf 를 leafId 키로 한 번씩만 portal 로
             붙인다. 트리 모양이 바뀌어도 이 목록은 collectLeafIds 순서로만 바뀌므로 TerminalPane 이
             리마운트되지 않는다(ADR-v2-terminal-p2-02 §4, 함정 #8). */}
-        {tabs.flatMap((tab) => collectLeafIds(tab.tree).map((leafId) => {
+        {tabs.flatMap((tab) => {
+          const leafIds = collectLeafIds(tab.tree)
+          // 분할하지 않은 탭은 "어느 pane 이 활성인지" 가 자명하므로 포커스 링/dim 을 그리지 않는다.
+          const isSplit = leafIds.length > 1
+          return leafIds.map((leafId) => {
           const pane = tab.panes[leafId]
           if (!pane) return null
           const visible = tab.tabId === activeTabId
@@ -770,7 +806,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
               sessionId={pane.sessionId}
               isVisible={visible}
               isFocused={focused}
-              showFocusRing
+              showFocusRing={isSplit}
               onFocusRequest={() => setFocusedLeaf(tab.tabId, leafId)}
               restore={pane.restoreSnapshot}
               exitInfo={pane.exitInfo}
@@ -785,7 +821,8 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
             />,
             getOrCreateHost(leafId)
           )
-        }))}
+          })
+        })}
 
         {tabs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-4">

@@ -199,26 +199,28 @@
 }
 
 /* ============================================================
-   THEME — dark (warmer neutral, 덜 푸르게)
+   THEME — dark (v2.0)
+   거의 순검정 캔버스 + 표면 간 대비 최소화 + 무채색 지배.
+   컬러는 상태 칩과 AI 액션에만 쓰고, 나머지는 회색조 위계로만 표현한다.
    ============================================================ */
 [data-theme='dark'] {
-  --bg-sidebar:        #0F1115;
-  --bg-base:           #15181E;
-  --bg-surface:        #1C2027;
-  --bg-surface-raised: #232831;
+  --bg-sidebar:        #08080A;
+  --bg-base:           #0C0C0E;
+  --bg-surface:        #131316;
+  --bg-surface-raised: #1A1A1E;
   --bg-primary:        var(--bg-base);
-  --bg-surface-hover:  #262C36;
-  --bg-subtle:         #1A1D24;
-  --bg-hover:          #262C36;
-  --bg-active:         #2E343F;
-  --bg-border:         #2E343F;
-  --bg-border-light:   #3A4150;
-  --bg-border-strong:  #4A5160;
+  --bg-surface-hover:  #1D1D21;
+  --bg-subtle:         #101013;
+  --bg-hover:          #1D1D21;
+  --bg-active:         #26262B;
+  /* 선이 '보이는' 게 아니라 면이 '나뉘는' 정도로만 — rgba 화이트 6~14% */
+  --bg-border:         #212125;
+  --bg-border-light:   #2B2B30;
+  --bg-border-strong:  #3A3A41;
 
-  /* 순백 대신 한 단계 낮춰 눈 피로 감소 */
-  --text-primary:      #ECEEF2;
-  --text-secondary:    #A9AEBA;
-  --text-tertiary:     #6B7180;
+  --text-primary:      #F1F1F3;
+  --text-secondary:    #9B9BA3;
+  --text-tertiary:     #66666E;
 
   --accent-blue:         #3B82F6;
   --accent-blue-light:   #60A5FA;
@@ -228,38 +230,43 @@
   --accent-orange-light: #FDBA74;
   --accent-orange-soft:  rgba(251,146,60,0.18);
 
-  /* Mode-aware semantic — DARK (밝은 fg on dark tint bg) */
-  --c-blue-bg:       rgba(59,130,246,0.16);
-  --c-blue-fg:       #93C5FD;
+  /* Mode-aware semantic — DARK. 칩은 채도를 낮추고 텍스트를 밝게: 검정 위에서 '빛나는 알약'. */
+  --c-blue-bg:       rgba(59,130,246,0.22);
+  --c-blue-fg:       #A9C9FF;
   --c-blue-solid:    #3B82F6;
-  --c-orange-bg:     rgba(251,146,60,0.16);
+  --c-orange-bg:     rgba(251,146,60,0.18);
   --c-orange-fg:     #FDBA74;
   --c-orange-solid:  #FB923C;
-  --c-red-bg:        rgba(248,113,113,0.16);
+  --c-red-bg:        rgba(248,113,113,0.18);
   --c-red-fg:        #FCA5A5;
   --c-red-solid:     #F87171;
-  --c-emerald-bg:    rgba(34,197,94,0.16);
-  --c-emerald-fg:    #86EFAC;
-  --c-emerald-solid: #22C55E;
-  --c-violet-bg:     rgba(167,139,250,0.16);
+  --c-emerald-bg:    rgba(52,211,153,0.18);
+  --c-emerald-fg:    #7EE2B8;
+  --c-emerald-solid: #34D399;
+  --c-violet-bg:     rgba(167,139,250,0.18);
   --c-violet-fg:     #C4B5FD;
   --c-violet-solid:  #A78BFA;
   --c-yellow-bg:     rgba(250,204,21,0.16);
   --c-yellow-fg:     #FDE68A;
   --c-yellow-solid:  #EAB308;
-  --c-neutral-bg:    rgba(148,163,184,0.14);
-  --c-neutral-fg:    #CBD5E1;
-  --c-neutral-solid: #94A3B8;
+  --c-neutral-bg:    rgba(255,255,255,0.07);
+  --c-neutral-fg:    #A8A8B0;
+  --c-neutral-solid: #66666E;
+
+  /* v2.0 — 밝은 주 버튼(Orca 식). 검정 캔버스에서 유일하게 '튀는' 면. */
+  --btn-primary-bg:       #E9E9EC;
+  --btn-primary-bg-hover: #F6F6F8;
+  --btn-primary-fg:       #101012;
 
   --link:              var(--c-blue-fg);
-  --code-bg:           #1C2027;
+  --code-bg:           #131316;
   --code-text:         #FDBA74;
   --mark-bg:           rgba(251,146,60,0.25);
   --mark-text:         #FDBA74;
   --scrollbar-track:   transparent;
   --scrollbar-thumb:   rgba(148,148,155,0.28);
   --scrollbar-thumb-hover: rgba(148,148,155,0.5);
-  --overlay-bg:        rgba(0,0,0,0.6);
+  --overlay-bg:        rgba(0,0,0,0.68);
 
   --shadow-sm:      0 1px 2px rgba(0,0,0,0.30);
   --shadow-md:      0 4px 14px rgba(0,0,0,0.36);
@@ -272,16 +279,16 @@
   --elev-2: var(--shadow-md);
   --elev-3: var(--shadow-lg);
 
-  --ring-focus-color:    rgba(96,165,250,0.40);
+  --ring-focus-color:    rgba(255,255,255,0.22);
   --ring-focus:          0 0 0 3px var(--ring-focus-color);
   --ring-error-color:    rgba(248,113,113,0.35);
   --ring-error:          0 0 0 3px var(--ring-error-color);
   --ring-selected-color: rgba(251,146,60,0.75);
   --ring-selected:       0 0 0 2px var(--ring-selected-color);
 
-  --bg-disabled:     #1A1D24;
-  --text-disabled:   #4A5160;
-  --border-disabled: #2E343F;
+  --bg-disabled:     #131316;
+  --text-disabled:   #4A4A52;
+  --border-disabled: #212125;
 
   --wf-backlog-bg:    var(--c-neutral-bg);      --wf-backlog-fg:    var(--c-neutral-fg);  --wf-backlog-dot:    #94A3B8;
   --wf-registered-bg: var(--c-orange-bg);       --wf-registered-fg: var(--c-orange-fg);   --wf-registered-dot: #FB923C;

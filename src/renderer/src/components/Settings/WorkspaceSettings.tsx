@@ -85,7 +85,7 @@ function WorkspaceSettings(): JSX.Element {
   if (loading || !settings) return <LoadingView label="워크스페이스 설정을 불러오는 중" />
 
   return (
-    <div className="p-5 max-w-3xl flex flex-col gap-5">
+    <div className="p-6 max-w-3xl mx-auto flex flex-col gap-5">
       <section className="ds-card">
         <h3 className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary mb-1">저장소</h3>
         <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mb-3">
@@ -206,7 +206,7 @@ function WorkspaceSettings(): JSX.Element {
             브랜치명 댓글 남기기
           </label>
           <div className="flex items-center gap-2 mt-1">
-            <FieldLabel className="mb-0">동시 실행 상한</FieldLabel>
+            <FieldLabel className="mb-0 whitespace-nowrap">동시 실행 상한</FieldLabel>
             <Input
               type="number"
               size="sm"
@@ -214,10 +214,10 @@ function WorkspaceSettings(): JSX.Element {
               max={8}
               value={settings.maxConcurrentRuns}
               onChange={(e) => void patch({ maxConcurrentRuns: Number(e.target.value) || 1 })}
-              className="w-20"
+              className="w-20 flex-none"
               aria-label="동시 실행 상한"
             />
-            <span className="text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-tertiary">초과분은 순차 대기</span>
+            <span className="text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-tertiary whitespace-nowrap">초과분은 순차 대기</span>
           </div>
         </div>
       </section>
