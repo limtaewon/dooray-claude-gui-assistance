@@ -40,6 +40,7 @@ import { useKeybindingOverrides } from '../../hooks/useKeybindings'
 import { matchesBinding } from '@shared/keybindings/binding'
 import TaskDrawer, { TASK_DRAG_MIME, type TaskDragPayload } from './TaskDrawer'
 import { buildTaskDropSteps } from './taskDrop'
+import type { DoorayTask } from '@shared/types/dooray'
 import type {
   TerminalExitPayload,
   TerminalSession,
@@ -288,25 +289,20 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
   }, [])
 
   /**
-   * 태스크를 활성 탭의 포커스 pane 에 떨어뜨렸을 때: 매핑 저장소로 `cd` → claude 실행.
-   * 세션이 이미 연결돼 있으면 `--resume`, 아니면 새로 띄우고 완료 후 세션을 매핑한다.
+   * 업무 하나를 지정한 pane 에서 시작한다: 매핑 저장소로 `cd` → claude 실행 → 업무 내용 전달.
+   * 세션이 이미 연결돼 있으면 `--resume` 으로 이어가고 프롬프트를 다시 넣지 않는다.
+   * 드래그&드롭과 상세의 "터미널에서 시작" 이 같은 경로를 쓴다.
    */
-  const onTaskDrop = useCallback(async (e: React.DragEvent, tabId: string): Promise<void> => {
-    const payload = readTaskPayload(e)
-    setDropHint(null)
-    if (!payload) return
-    e.preventDefault()
-
-    const tab = tabsRef.current.find((t) => t.tabId === tabId)
-    const pane = tab?.panes[tab.focusedLeafId]
-    if (!tab || !pane) return
+  const runTaskInPane = useCallback(async (
+    task: { projectId: string; taskId: string; subject: string },
+    pane: PaneRuntime
+  ): Promise<void> => {
     if (pane.exitInfo) {
-      setDropBusy('종료된 pane 에는 놓을 수 없습니다')
+      setDropBusy('종료된 pane 에서는 실행할 수 없습니다')
       setTimeout(() => setDropBusy(null), 2500)
       return
     }
-
-    const target = await window.api.workspace.taskDrop.resolve(payload.projectId, payload.taskId).catch(() => null)
+    const target = await window.api.workspace.taskDrop.resolve(task.projectId, task.taskId).catch(() => null)
     if (!target) {
       setDropBusy('저장소가 등록되어 있지 않습니다 — 설정 → 워크스페이스')
       setTimeout(() => setDropBusy(null), 4000)
@@ -314,12 +310,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     }
 
     const since = Date.now()
-    const steps = buildTaskDropSteps({
-      target,
-      subject: payload.subject,
-      taskNumber: undefined
-    })
-    for (const step of steps) {
+    for (const step of buildTaskDropSteps({ target, subject: task.subject })) {
       setDropBusy(step.label)
       window.api.terminal.input(pane.sessionId, step.data)
       if (step.delayMs > 0) await new Promise((r) => setTimeout(r, step.delayMs))
@@ -330,7 +321,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     if (!target.claudeSessionId) {
       setTimeout(() => {
         void window.api.workspace.taskDrop
-          .link(payload.projectId, payload.taskId, target.cwd, since)
+          .link(task.projectId, task.taskId, target.cwd, since)
           .then((sid) => {
             if (sid) window.dispatchEvent(new CustomEvent('task-session-linked'))
           })
@@ -338,6 +329,33 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       }, 8000)
     }
   }, [])
+
+  // createTab 은 아래에서 선언되므로 ref 로 우회한다 (선언 순서 의존 제거)
+  const createTabRef = useRef<((opts?: { cwd?: string; initialCommand?: string }) => Promise<void>) | null>(null)
+
+  /** 상세 오버레이의 "터미널에서 시작" — 활성 탭의 포커스 pane 을 쓴다. 탭이 없으면 하나 만든다. */
+  const runTaskInFocusedPane = useCallback(async (task: DoorayTask): Promise<void> => {
+    let tab = tabsRef.current.find((t) => t.tabId === activeTabIdRef.current)
+    if (!tab) {
+      await createTabRef.current?.()
+      await new Promise((r) => setTimeout(r, 400))
+      tab = tabsRef.current.find((t) => t.tabId === activeTabIdRef.current)
+    }
+    const pane = tab?.panes[tab.focusedLeafId]
+    if (!pane) return
+    await runTaskInPane({ projectId: task.projectId, taskId: task.id, subject: task.subject }, pane)
+  }, [runTaskInPane])
+
+  const onTaskDrop = useCallback(async (e: React.DragEvent, tabId: string): Promise<void> => {
+    const payload = readTaskPayload(e)
+    setDropHint(null)
+    if (!payload) return
+    e.preventDefault()
+    const tab = tabsRef.current.find((t) => t.tabId === tabId)
+    const pane = tab?.panes[tab.focusedLeafId]
+    if (!pane) return
+    await runTaskInPane({ projectId: payload.projectId, taskId: payload.taskId, subject: payload.subject }, pane)
+  }, [runTaskInPane])
 
   const setFocusedLeaf = useCallback((tabId: string, leafId: string) => {
     setTabs((prev) => prev.map((t) => (
@@ -872,7 +890,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
               />
               {dropHint && tab.tabId === activeTabId && (
                 <div className="absolute inset-2 z-20 pointer-events-none rounded-lg border-2 border-dashed border-clauday-blue bg-clauday-blue/5 flex items-center justify-center">
-                  <span className="px-3 py-1.5 rounded-md bg-bg-surface-raised border border-bg-border text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-primary shadow">
+                  <span className="px-3 py-1.5 rounded-md bg-bg-surface border border-bg-border text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-primary shadow">
                     {dropHint}
                   </span>
                 </div>
@@ -881,13 +899,13 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
           ))
         )}
         {dropBusy && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-md bg-bg-surface-raised border border-bg-border text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary shadow">
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-md bg-bg-surface border border-bg-border text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary shadow">
             {dropBusy}
           </div>
         )}
       </div>
     </div>
-    {drawerOpen && <TaskDrawer onClose={toggleDrawer} />}
+    {drawerOpen && <TaskDrawer onClose={toggleDrawer} onRunInTerminal={runTaskInFocusedPane} />}
     </div>
   )
 }

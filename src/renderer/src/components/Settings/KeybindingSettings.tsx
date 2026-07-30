@@ -131,7 +131,7 @@ function KeybindingSettings(): JSX.Element {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="액션 또는 키로 검색"
-            className="pl-7"
+            style={{ paddingLeft: 28 }}
             aria-label="단축키 검색"
           />
         </div>

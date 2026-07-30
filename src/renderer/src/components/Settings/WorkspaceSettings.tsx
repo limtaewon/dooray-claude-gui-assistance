@@ -3,6 +3,10 @@ import { FolderPlus, Trash2 } from 'lucide-react'
 import type { RepoRegistryEntry, WorkspaceSettings as WorkspaceSettingsShape } from '@shared/types/workspace'
 import { DEFAULT_BRANCH_TEMPLATE, buildBranchName } from '@shared/workspace/branchName'
 import { Button, Chip, FieldLabel, Input, LoadingView, useToast } from '../common/ds'
+import ProjectFilter from '../common/ProjectFilter'
+
+/** 터미널 우측 두레이 패널이 보여줄 프로젝트 — TaskDrawer 와 같은 키를 쓴다. */
+const TASK_PROJECTS_KEY = 'terminalTaskProjects'
 
 /** 브랜치 템플릿 미리보기용 샘플 — 목업(docs/mockups/v2/workspace-settings.html)의 값과 동일. */
 const SAMPLE = { projectCode: 'D-TF', taskNumber: 2619, taskId: 'a1b2c39f3a2c' }
@@ -87,10 +91,20 @@ function WorkspaceSettings(): JSX.Element {
   return (
     <div className="p-6 max-w-3xl mx-auto flex flex-col gap-5">
       <section className="ds-card">
+        <h3 className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary mb-1">
+          두레이 프로젝트
+        </h3>
+        <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mb-3">
+          터미널 우측 업무 패널에 어떤 프로젝트의 내 업무를 띄울지 고릅니다. 고르지 않으면 패널이 비어 있습니다.
+        </p>
+        <ProjectFilter settingsKey={TASK_PROJECTS_KEY} />
+      </section>
+
+      <section className="ds-card">
         <h3 className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary mb-1">저장소</h3>
         <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mb-3">
-          업무를 시작할 때 워크트리를 만들 git 저장소입니다. 두레이 프로젝트별로 다른 저장소를 쓰려면 작업 시작 모달에서
-          &ldquo;이 프로젝트에 기억&rdquo; 을 선택하세요.
+          업무 카드를 터미널에 끌어다 놓으면 여기 등록한 저장소로 <code>cd</code> 합니다. 목록의 첫 저장소가 기본이며,
+          워크트리 생성은 &lsquo;브랜치 작업&rsquo; 뷰가 담당합니다.
         </p>
 
         <div className="flex flex-col gap-2">

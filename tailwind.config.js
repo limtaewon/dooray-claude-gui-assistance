@@ -18,7 +18,13 @@ module.exports = {
           'surface-hover': 'var(--bg-surface-hover)',
           subtle: 'var(--bg-subtle)',
           border: 'var(--bg-border)',
-          'border-light': 'var(--bg-border-light)'
+          'border-light': 'var(--bg-border-light)',
+          'border-strong': 'var(--bg-border-strong)',
+          base: 'var(--bg-base)',
+          'surface-raised': 'var(--bg-surface-raised)',
+          sidebar: 'var(--bg-sidebar)',
+          hover: 'var(--bg-hover)',
+          active: 'var(--bg-active)'
         },
         text: {
           primary: 'var(--text-primary)',

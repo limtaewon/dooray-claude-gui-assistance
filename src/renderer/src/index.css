@@ -204,19 +204,20 @@
    컬러는 상태 칩과 AI 액션에만 쓰고, 나머지는 회색조 위계로만 표현한다.
    ============================================================ */
 [data-theme='dark'] {
-  --bg-sidebar:        #08080A;
-  --bg-base:           #0C0C0E;
-  --bg-surface:        #131316;
-  --bg-surface-raised: #1A1A1E;
+  /* 캔버스(터미널/에디터)만 가장 어둡고, 크롬(사이드바·패널·카드)은 한 톤 밝게 떠 있다.
+     전부 같은 검정으로 눌러버리면 영역 구분이 사라진다 — Orca 대조 후 교정(2026-07-30). */
+  --bg-base:           #0A0A0B;   /* 캔버스 — 가장 어두움 */
   --bg-primary:        var(--bg-base);
-  --bg-surface-hover:  #1D1D21;
-  --bg-subtle:         #101013;
-  --bg-hover:          #1D1D21;
-  --bg-active:         #26262B;
-  /* 선이 '보이는' 게 아니라 면이 '나뉘는' 정도로만 — rgba 화이트 6~14% */
-  --bg-border:         #212125;
-  --bg-border-light:   #2B2B30;
-  --bg-border-strong:  #3A3A41;
+  --bg-sidebar:        #171719;   /* 크롬 */
+  --bg-surface:        #151517;   /* 패널·카드 */
+  --bg-surface-raised: #212125;   /* 모달·팝오버 */
+  --bg-surface-hover:  #212125;
+  --bg-subtle:         #121214;
+  --bg-hover:          #1E1E22;
+  --bg-active:         #2A2A30;
+  --bg-border:         #292930;
+  --bg-border-light:   #35353D;
+  --bg-border-strong:  #45454E;
 
   --text-primary:      #F1F1F3;
   --text-secondary:    #9B9BA3;
@@ -259,7 +260,7 @@
   --btn-primary-fg:       #101012;
 
   --link:              var(--c-blue-fg);
-  --code-bg:           #131316;
+  --code-bg:           #151517;
   --code-text:         #FDBA74;
   --mark-bg:           rgba(251,146,60,0.25);
   --mark-text:         #FDBA74;
@@ -286,7 +287,7 @@
   --ring-selected-color: rgba(251,146,60,0.75);
   --ring-selected:       0 0 0 2px var(--ring-selected-color);
 
-  --bg-disabled:     #131316;
+  --bg-disabled:     #151517;
   --text-disabled:   #4A4A52;
   --border-disabled: #212125;
 

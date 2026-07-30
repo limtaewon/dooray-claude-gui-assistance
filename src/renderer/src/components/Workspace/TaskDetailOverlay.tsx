@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowRight, Copy, ExternalLink, GitBranch, Send, X } from 'lucide-react'
+import { Copy, ExternalLink, Send, TerminalSquare, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -17,11 +17,9 @@ const markdownComponents = {
 
 interface TaskDetailOverlayProps {
   task: DoorayTask
-  /** 이 태스크로 이미 워크스페이스가 있으면 시작 버튼 대신 안내를 보여준다 */
-  hasWorkspace?: boolean
   onClose: () => void
-  onStart: () => void
-  onStartHere: () => void
+  /** 활성 터미널에서 이 업무로 claude 를 띄운다 (드래그&드롭과 같은 동작) */
+  onRunInTerminal?: () => void
   /** 에이전트에 넣을 프롬프트 — 복사용 */
   promptText: (detail: DoorayTaskDetail | null) => string
 }
@@ -30,14 +28,7 @@ interface TaskDetailOverlayProps {
  * 업무 상세 오버레이 — 화면 오른쪽 절반을 덮고, 본문 옆에 액션 레일과 하단 댓글 입력을 둔다.
  * 좁은 사이드 패널로는 두레이 본문(체크리스트·표)이 읽히지 않아 오버레이로 띄운다.
  */
-function TaskDetailOverlay({
-  task,
-  hasWorkspace = false,
-  onClose,
-  onStart,
-  onStartHere,
-  promptText
-}: TaskDetailOverlayProps): JSX.Element {
+function TaskDetailOverlay({ task, onClose, onRunInTerminal, promptText }: TaskDetailOverlayProps): JSX.Element {
   const toast = useToast()
   const [detail, setDetail] = useState<DoorayTaskDetail | null>(null)
   const [comments, setComments] = useState<DoorayTaskComment[]>([])
@@ -116,7 +107,7 @@ function TaskDetailOverlay({
         onClick={onClose}
         className="flex-1 bg-black/55 backdrop-blur-[2px] cursor-default"
       />
-      <div className="w-[min(1040px,72%)] flex-none flex flex-col min-h-0 bg-bg-base border-l border-bg-border shadow-2xl">
+      <div className="w-[min(1040px,72%)] flex-none flex flex-col min-h-0 bg-bg-surface border-l border-bg-border shadow-2xl">
         <div className="flex items-start gap-3 px-7 pt-6 pb-4 flex-none">
           <div className="flex-1 min-w-0">
             <div className="font-mono text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">{ref}</div>
@@ -127,9 +118,9 @@ function TaskDetailOverlay({
               <Chip tone={task.workflowClass === 'working' ? 'blue' : 'neutral'}>{getWorkflowName(task)}</Chip>
             </div>
           </div>
-          {!hasWorkspace && (
-            <Button variant="primary" onClick={onStart}>
-              워크스페이스 시작 <ArrowRight size={14} />
+          {onRunInTerminal && (
+            <Button variant="primary" onClick={onRunInTerminal}>
+              <TerminalSquare size={14} /> 터미널에서 시작
             </Button>
           )}
           <button
@@ -178,11 +169,6 @@ function TaskDetailOverlay({
           </div>
 
           <aside className="w-[248px] flex-none border-l border-t border-bg-border pt-5 px-4 flex flex-col gap-1">
-            {!hasWorkspace && (
-              <Button variant="secondary" size="sm" className="justify-start w-full" onClick={onStartHere}>
-                <GitBranch size={13} /> 현재 설정으로 시작
-              </Button>
-            )}
             <Button
               variant="ghost"
               size="sm"

@@ -1,14 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronsRight, RefreshCw, Search, Unlink } from 'lucide-react'
 import type { DoorayTask } from '@shared/types/dooray'
-import type { RepoRegistryEntry, WorkspaceSettings } from '@shared/types/workspace'
 import { workspaceKey } from '@shared/workspace/workspaceKey'
-import { buildBranchName } from '@shared/workspace/branchName'
-import { Button, Input, LoadingView, useToast } from '../common/ds'
+import { Button, Input, LoadingView } from '../common/ds'
+import ProjectFilter from '../common/ProjectFilter'
 import TaskCard from '../Workspace/TaskCard'
 import TaskDetailOverlay from '../Workspace/TaskDetailOverlay'
-import StartWorkModal, { type StartWorkOptions } from '../Workspace/StartWorkModal'
-import { activeRunOf, findWorkspace, useWorkspaces } from '../Workspace/useWorkspaces'
 
 /** 드래그 페이로드 — pane 의 dragover/drop 이 이 타입으로 식별한다. */
 export const TASK_DRAG_MIME = 'application/x-clauday-task'
@@ -20,36 +17,37 @@ export interface TaskDragPayload {
   linked: boolean
 }
 
+/** 이 패널이 보여줄 프로젝트 — 두레이 뷰의 핀과 분리해 별도 키로 관리한다. */
+const PROJECTS_SETTINGS_KEY = 'terminalTaskProjects'
+
 type WorkflowFilter = 'mine' | 'all' | 'done'
 
 interface TaskDrawerProps {
   onClose: () => void
+  /** 카드를 특정 pane 없이 "터미널에서 시작" 할 때 — 호스트가 활성 pane 에 실행한다 */
+  onRunInTerminal?: (task: DoorayTask) => void
 }
 
 /**
- * 터미널 우측 두레이 패널. 업무 목록에서 바로 워크스페이스(워크트리+브랜치+claude)를 시작하고,
- * 시작된 터미널은 이 뷰의 탭으로 열린다. 카드를 pane 에 끌어다 놓으면 워크트리 없이 가볍게 실행한다.
+ * 터미널 우측 두레이 패널. 설정에서 고른 프로젝트의 내 업무를 보여주고,
+ * 카드를 pane 에 끌어다 놓으면 매핑된 저장소로 `cd` 하고 claude 를 띄운다(세션은 태스크에 매핑).
+ * 워크트리 생성은 이 패널의 책임이 아니다 — '브랜치 작업' 뷰가 담당한다.
  */
-function TaskDrawer({ onClose }: TaskDrawerProps): JSX.Element {
-  const toast = useToast()
-  const { byKey, upsert } = useWorkspaces()
+function TaskDrawer({ onClose, onRunInTerminal }: TaskDrawerProps): JSX.Element {
   const [tasks, setTasks] = useState<DoorayTask[]>([])
   const [linked, setLinked] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<WorkflowFilter>('mine')
-
   const [selected, setSelected] = useState<DoorayTask | null>(null)
-  const [modalTask, setModalTask] = useState<DoorayTask | null>(null)
-  const [repos, setRepos] = useState<RepoRegistryEntry[]>([])
-  const [settings, setSettings] = useState<WorkspaceSettings | null>(null)
-  const [starting, setStarting] = useState<string | null>(null)
 
   const load = useCallback(async (force = false): Promise<void> => {
     setLoading(true)
     try {
+      const projectIds = ((await window.api.settings.get(PROJECTS_SETTINGS_KEY)) as string[] | null) ?? []
       const [list, links] = await Promise.all([
-        window.api.dooray.tasks.list(undefined, force),
+        // 프로젝트를 고르지 않았으면 목록을 비운다 — 수백 건을 쏟아붓지 않는다
+        projectIds.length > 0 ? window.api.dooray.tasks.list(projectIds, force) : Promise.resolve([]),
         window.api.workspace.taskDrop.linked().catch(() => [] as string[])
       ])
       setTasks(list)
@@ -63,13 +61,6 @@ function TaskDrawer({ onClose }: TaskDrawerProps): JSX.Element {
 
   useEffect(() => {
     void load()
-    void Promise.all([
-      window.api.workspace.repos.list().catch(() => [] as RepoRegistryEntry[]),
-      window.api.workspace.settings.get().catch(() => null)
-    ]).then(([r, s]) => {
-      setRepos(r)
-      if (s) setSettings(s)
-    })
     const onLinked = (): void => {
       void window.api.workspace.taskDrop
         .linked()
@@ -90,80 +81,6 @@ function TaskDrawer({ onClose }: TaskDrawerProps): JSX.Element {
     })
   }, [tasks, query, filter])
 
-  const repoIdFor = useCallback(
-    (task: DoorayTask): string | undefined => settings?.lastStart?.repoId ?? repos[0]?.id,
-    [settings?.lastStart?.repoId, repos]
-  )
-
-  /** 워크스페이스를 시작하고, main 이 만든 run 터미널을 이 뷰의 탭으로 연다. */
-  const runStart = useCallback(
-    async (task: DoorayTask, options: StartWorkOptions): Promise<void> => {
-      setStarting(task.id)
-      try {
-        const result = await window.api.workspace.startTask({
-          projectId: task.projectId,
-          taskId: task.id,
-          ...options
-        })
-        upsert(result.workspace)
-        if (result.run.terminalSessionId) {
-          window.dispatchEvent(
-            new CustomEvent('adopt-terminal', {
-              detail: { sessionId: result.run.terminalSessionId, name: result.run.branch, cwd: result.run.worktreePath }
-            })
-          )
-        }
-        toast[result.reused ? 'info' : 'success'](
-          result.reused ? '이미 진행 중인 작업입니다' : '워크스페이스 시작됨',
-          result.run.branch
-        )
-        for (const w of result.warnings) toast.warn('일부 단계 건너뜀', w)
-      } catch (err) {
-        toast.error('워크스페이스 시작 실패', err instanceof Error ? err.message : String(err))
-      } finally {
-        setStarting(null)
-      }
-    },
-    [toast, upsert]
-  )
-
-  const quickStart = useCallback(
-    (task: DoorayTask): void => {
-      if (!settings) return
-      const repoId = repoIdFor(task)
-      if (!repoId) {
-        toast.error('저장소가 등록되어 있지 않습니다', '설정 → 워크스페이스에서 저장소를 추가하세요')
-        return
-      }
-      void runStart(task, {
-        repoId,
-        autoApprove: settings.autoApproveDefault,
-        transitionDooray: settings.transitionDoorayDefault,
-        commentBranch: settings.commentBranchDefault,
-        fetchBeforeCreate: settings.lastStart?.fetchBeforeCreate ?? true
-      })
-    },
-    [settings, repoIdFor, runStart, toast]
-  )
-
-  /** 워크스페이스가 이미 있으면 그 터미널 탭으로 이동, 없으면 상세 오버레이를 연다. */
-  const onCardClick = useCallback(
-    (task: DoorayTask): void => {
-      const ws = findWorkspace(byKey, task.projectId, task.id)
-      const run = activeRunOf(ws)
-      if (run?.terminalSessionId) {
-        window.dispatchEvent(
-          new CustomEvent('adopt-terminal', {
-            detail: { sessionId: run.terminalSessionId, name: run.branch, cwd: run.worktreePath }
-          })
-        )
-        return
-      }
-      setSelected(task)
-    },
-    [byKey]
-  )
-
   const unlink = async (task: DoorayTask): Promise<void> => {
     await window.api.workspace.taskDrop.unlink(task.projectId, task.id)
     setLinked((prev) => {
@@ -173,22 +90,9 @@ function TaskDrawer({ onClose }: TaskDrawerProps): JSX.Element {
     })
   }
 
-  const branchPreview = (task: DoorayTask): string => {
-    if (!settings) return ''
-    const repo = repos.find((r) => r.id === repoIdFor(task))
-    return buildBranchName({
-      template: settings.branchTemplate,
-      projectCode: task.projectCode,
-      taskNumber: task.number,
-      taskId: task.id,
-      subject: task.subject,
-      prefix: repo?.branchPrefix
-    })
-  }
-
   return (
     <>
-      <div className="w-[320px] flex-none flex flex-col min-h-0 border-l border-bg-border bg-bg-base">
+      <div className="w-[320px] flex-none flex flex-col min-h-0 border-l border-bg-border bg-bg-surface">
         <div className="flex items-center gap-1 px-3 py-2.5 flex-none">
           <span className="text-[calc(12px_*_var(--app-font-scale,1))] font-semibold text-text-primary">두레이 업무</span>
           <Button variant="ghost" size="xs" className="ml-auto" onClick={() => void load(true)} aria-label="업무 새로고침">
@@ -200,13 +104,14 @@ function TaskDrawer({ onClose }: TaskDrawerProps): JSX.Element {
         </div>
 
         <div className="px-3 pb-2.5 flex flex-col gap-2 flex-none">
+          <ProjectFilter settingsKey={PROJECTS_SETTINGS_KEY} onChanged={() => void load(true)} />
           <div className="relative">
             <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="업무 검색"
-              className="pl-7"
+              style={{ paddingLeft: 28 }}
               aria-label="업무 검색"
             />
           </div>
@@ -234,12 +139,14 @@ function TaskDrawer({ onClose }: TaskDrawerProps): JSX.Element {
           {loading ? (
             <LoadingView label="업무 불러오는 중" />
           ) : filtered.length === 0 ? (
-            <p className="p-4 text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-tertiary">표시할 업무가 없습니다.</p>
+            <p className="p-4 text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-tertiary leading-relaxed">
+              {tasks.length === 0
+                ? '위의 프로젝트 선택에서 작업할 두레이 프로젝트를 고르면 내 업무가 여기 표시됩니다.'
+                : '조건에 맞는 업무가 없습니다.'}
+            </p>
           ) : (
             filtered.map((task) => {
               const key = workspaceKey(task.projectId, task.id)
-              const ws = byKey.get(key)
-              const run = activeRunOf(ws)
               const isLinked = linked.has(key)
               const payload: TaskDragPayload = {
                 projectId: task.projectId,
@@ -251,10 +158,8 @@ function TaskDrawer({ onClose }: TaskDrawerProps): JSX.Element {
                 <TaskCard
                   key={task.id}
                   task={task}
-                  branch={ws?.branch}
-                  runStatus={run?.status}
                   linked={isLinked}
-                  onSelect={onCardClick}
+                  onSelect={setSelected}
                   draggableProps={{
                     draggable: true,
                     onDragStart: (e) => {
@@ -263,7 +168,7 @@ function TaskDrawer({ onClose }: TaskDrawerProps): JSX.Element {
                     }
                   }}
                 >
-                  {isLinked && !ws && (
+                  {isLinked && (
                     <button
                       type="button"
                       onClick={(e) => {
@@ -290,38 +195,19 @@ function TaskDrawer({ onClose }: TaskDrawerProps): JSX.Element {
       {selected && (
         <TaskDetailOverlay
           task={selected}
-          hasWorkspace={Boolean(findWorkspace(byKey, selected.projectId, selected.id)?.activeRunId)}
           onClose={() => setSelected(null)}
-          onStart={() => {
-            setModalTask(selected)
-            setSelected(null)
-          }}
-          onStartHere={() => {
-            const task = selected
-            setSelected(null)
-            quickStart(task)
-          }}
+          onRunInTerminal={
+            onRunInTerminal
+              ? () => {
+                  const task = selected
+                  setSelected(null)
+                  onRunInTerminal(task)
+                }
+              : undefined
+          }
           promptText={(detail) =>
             `다음 두레이 업무를 구현해줘: ${selected.subject}\n\n${detail?.body?.content ?? ''}`.trim()
           }
-        />
-      )}
-
-      {modalTask && settings && (
-        <StartWorkModal
-          open
-          task={modalTask}
-          repos={repos}
-          settings={settings}
-          mappedRepoId={repoIdFor(modalTask)}
-          branchPreviewHint={branchPreview(modalTask)}
-          busy={starting === modalTask.id}
-          onClose={() => setModalTask(null)}
-          onStart={(options) => {
-            const task = modalTask
-            setModalTask(null)
-            void runStart(task, options)
-          }}
         />
       )}
     </>
