@@ -159,6 +159,8 @@ export const IPC_CHANNELS = {
   TERMINAL_REQUEST_STATE: 'terminal:request-state',
   /** v2.0 B-7: 링크 후보 존재 검증 배치 (invoke) */
   TERMINAL_RESOLVE_PATH: 'terminal:resolve-path',
+  /** 세션의 **현재** cwd. 셸이 OSC7 을 안 쏘는 환경에서 `cd` 를 따라가려면 이 실측이 필요하다. */
+  TERMINAL_SESSION_CWD: 'terminal:session-cwd',
   /** v1.4: 두레이 멘션이 새 터미널을 열었음을 렌더러에 알림 (entries 추가/활성화 요청) */
   MENTION_TERMINAL_OPENED: 'mention:terminal:opened',
   /** v1.4: 기존 채널 탭을 재사용 — 렌더러에 활성화만 요청 (id 페이로드) */

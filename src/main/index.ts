@@ -961,6 +961,14 @@ function registerIpcHandlers(): void {
     return resolveCandidates({ cwd: cwd || homedir(), candidates: req.candidates })
   })
 
+  // v2.0: 세션의 현재 cwd — 소스 제어 패널이 "지금 보고 있는 터미널의 저장소"를 따라가는 근거.
+  // spawn cwd 는 `cd` 이후를 반영하지 못하므로 pid probe 를 먼저 시도한다(POSIX 한정).
+  ipcMain.handle(IPC_CHANNELS.TERMINAL_SESSION_CWD, async (_, sessionId: string) => {
+    const pid = terminalManager.getPid(sessionId)
+    const probed = pid ? await probePtyCwd(pid) : null
+    return probed ?? terminalManager.listSessions().find((s) => s.id === sessionId)?.cwd ?? null
+  })
+
   // Claude Code Task Bridge - 태스크 컨텍스트로 Claude Code 세션 시작
   ipcMain.handle(
     IPC_CHANNELS.CLAUDE_START_TASK,

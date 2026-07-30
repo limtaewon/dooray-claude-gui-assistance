@@ -45,7 +45,7 @@ import GitHistoryPanel from '../Git/scm/GitHistoryPanel'
 import BranchesPanel from '../Git/scm/BranchesPanel'
 import DiffViewerOverlay, { type DiffRequest } from '../Git/scm/DiffViewerOverlay'
 import DrawerRepoEmptyState from '../Git/scm/DrawerRepoEmptyState'
-import { useRepoRoot } from '../Git/scm/useRepoRoot'
+import { useTerminalRepo } from '../Git/scm/useRepoRoot'
 import { buildTaskDropSteps } from './taskDrop'
 import TerminalEmptyState from './TerminalEmptyState'
 import { tabNameFromCwd, tabNameFromTitle } from './tabAutoName'
@@ -542,30 +542,56 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       return next
     })
   }, [])
+  /** OSC7 로 받은 cwd 를 pane 에 반영한다 — 스냅샷 저장과 소스 제어 판정이 같은 값을 본다. */
+  const updatePaneCwd = useCallback((tabId: string, leafId: string, cwd: string) => {
+    setTabs((prev) =>
+      prev.map((t) => {
+        if (t.tabId !== tabId) return t
+        const pane = t.panes[leafId]
+        if (!pane || pane.cwd === cwd) return t
+        return { ...t, panes: { ...t.panes, [leafId]: { ...pane, cwd } } }
+      })
+    )
+  }, [])
+
   const changeDrawerTab = useCallback((tab: DrawerTab) => {
     setDrawerTab(tab)
     void window.api.settings.set('terminalDrawerTab', tab)
   }, [])
 
   /** 소스 제어 패널은 지금 보고 있는 터미널의 저장소를 따라간다 — 별도 선택 UI 를 두지 않는다. */
-  const focusedCwd = (() => {
+  const focusedPane = (() => {
     const tab = tabs.find((t) => t.tabId === activeTabId)
-    return tab?.panes[tab.focusedLeafId]?.cwd
+    return tab ? tab.panes[tab.focusedLeafId] : undefined
   })()
-  const { repoRoot, resolving: repoResolving } = useRepoRoot(focusedCwd)
+  const {
+    repoRoot,
+    cwd: focusedCwd,
+    resolving: repoResolving,
+    refresh: refreshRepoRoot
+  } = useTerminalRepo({ sessionId: focusedPane?.sessionId, cwd: focusedPane?.cwd })
 
   /** 패널이 git 을 다시 읽게 하는 신호. 스테이징/커밋 등 쓰기 직후 탭 간에 공유한다. */
   const notifyRepoChanged = useCallback(() => {
     window.dispatchEvent(new CustomEvent('git-repo-maybe-changed'))
   }, [])
 
-  // 터미널에서 직접 git 을 쓰는 경우가 많다 — 창으로 돌아올 때 한 번 다시 읽는다.
-  // (셸 통합 없이 명령 종료를 알 방법이 없어, 폴링 대신 이 경계만 잡는다)
+  // 터미널에서 직접 `cd` / git 을 쓰는 경우가 많다 — 이 경계들에서 cwd·상태를 다시 읽는다.
+  // (셸 통합 없이 명령 종료를 알 방법이 없어, 폴링 대신 사용자 시선이 옮겨오는 순간만 잡는다)
   useEffect(() => {
     if (!drawerOpen) return
-    window.addEventListener('focus', notifyRepoChanged)
-    return () => window.removeEventListener('focus', notifyRepoChanged)
-  }, [drawerOpen, notifyRepoChanged])
+    const resync = (): void => {
+      refreshRepoRoot()
+      notifyRepoChanged()
+    }
+    window.addEventListener('focus', resync)
+    return () => window.removeEventListener('focus', resync)
+  }, [drawerOpen, refreshRepoRoot, notifyRepoChanged])
+
+  // 드로어를 열거나 git 탭으로 옮길 때도 cwd 를 다시 잰다 — 그 사이 `cd` 했을 수 있다.
+  useEffect(() => {
+    if (drawerOpen && drawerTab !== 'tasks') refreshRepoRoot()
+  }, [drawerOpen, drawerTab, activeTabId, refreshRepoRoot])
 
   /** v2.0 B-4: split 은 항상 새 PTY — 현재 focused pane 의 cwd 를 상속한다(ADR-02 §7). */
   const splitFocusedPane = useCallback(async (direction: SplitDirection) => {
@@ -919,6 +945,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
               rendererSetting={rendererSetting}
               onWebglUnavailable={handleWebglUnavailable}
               onTitleChange={focused ? (title) => applyAutoName(tab.tabId, title) : undefined}
+              onCwdChange={(cwd) => updatePaneCwd(tab.tabId, leafId, cwd)}
             />,
             getOrCreateHost(leafId)
           )
@@ -969,7 +996,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
         {drawerTab === 'tasks' ? (
           <TaskDrawer onRunInTerminal={runTaskInFocusedPane} />
         ) : !repoRoot ? (
-          <DrawerRepoEmptyState tab={drawerTab} cwd={focusedCwd} resolving={repoResolving} />
+          <DrawerRepoEmptyState tab={drawerTab} cwd={focusedCwd ?? undefined} resolving={repoResolving} />
         ) : drawerTab === 'changes' ? (
           <SourceControlPanel repoPath={repoRoot} onOpenDiff={setDiffRequest} onRepoChanged={notifyRepoChanged} />
         ) : drawerTab === 'history' ? (

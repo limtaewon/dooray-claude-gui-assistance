@@ -153,6 +153,7 @@ export function createMockWindowApi(): Record<string, unknown> {
       onRequestState: vi.fn().mockReturnValue(noopUnsub),
       // v2.0 M-B: 링크 존재 검증
       resolvePath: vi.fn().mockResolvedValue([]),
+      sessionCwd: vi.fn().mockResolvedValue(null),
       onMentionOpened: vi.fn().mockReturnValue(noopUnsub),
       onMentionFocus: vi.fn().mockReturnValue(noopUnsub)
     },
