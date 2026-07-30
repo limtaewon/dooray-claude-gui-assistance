@@ -479,6 +479,15 @@ function TerminalPaneInner(
     }
     // 조합 중 Shift/Alt+Enter 를 조합 종료 후로 미루고, 재발행 Enter 를 흡수한다.
     const deferredEnter = createDeferredEnterSender()
+    /**
+     * 클립보드 텍스트 붙여넣기. raw 로 쓰면 TUI 가 한 글자씩 타이핑된 것으로 보아
+     * claude CLI 의 "[Pasted text +N lines]" 축약이 동작하지 않는다 —
+     * xterm.paste() 를 거쳐 bracketed paste(ESC[200~ … ESC[201~) 로 보낸다.
+     */
+    const pasteText = (text: string): void => {
+      if (exitInfoRef.current) return
+      try { terminal.paste(text) } catch { send(text) }
+    }
     terminal.attachCustomKeyEventHandler((e) => {
       if (e.type !== 'keydown') return true
 
@@ -574,11 +583,11 @@ function TerminalPaneInner(
                     }
                   }
                   const text = await navigator.clipboard.readText()
-                  if (text && validatePasteTokenRef.current(pasteToken)) send(text)
+                  if (text && validatePasteTokenRef.current(pasteToken)) pasteText(text)
                 } catch {
                   // read() 거부 시 텍스트만 fallback
                   navigator.clipboard.readText()
-                    .then((t) => { if (t && validatePasteTokenRef.current(pasteToken)) send(t) })
+                    .then((t) => { if (t && validatePasteTokenRef.current(pasteToken)) pasteText(t) })
                     .catch(() => { /* ok */ })
                 }
               })()
@@ -637,10 +646,10 @@ function TerminalPaneInner(
                 }
               }
               const text = await navigator.clipboard.readText()
-              if (text && validatePasteTokenRef.current(pasteToken)) send(text)
+              if (text && validatePasteTokenRef.current(pasteToken)) pasteText(text)
             } catch {
               navigator.clipboard.readText()
-                .then((t) => { if (t && validatePasteTokenRef.current(pasteToken)) send(t) })
+                .then((t) => { if (t && validatePasteTokenRef.current(pasteToken)) pasteText(t) })
                 .catch(() => { /* ok */ })
             }
           })()
@@ -664,7 +673,7 @@ function TerminalPaneInner(
         if (shift && k === 'Insert') {
           // xterm 의 기본 paste 시도 — 실패하면 그냥 통과
           e.preventDefault()
-          navigator.clipboard.readText().then((t) => send(t)).catch(() => { /* ok */ })
+          navigator.clipboard.readText().then((t) => pasteText(t)).catch(() => { /* ok */ })
           return false
         }
         // Ctrl+A 가 브라우저의 select-all 로 가로채지지 않도록 명시적으로 control char 송신

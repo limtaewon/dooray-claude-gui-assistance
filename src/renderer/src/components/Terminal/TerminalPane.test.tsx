@@ -114,6 +114,10 @@ vi.mock('@xterm/xterm', () => {
       registeredLinkProviders.push(provider)
       return { dispose: () => {} }
     }
+    paste(data: string): void {
+      // 실제 xterm 은 bracketed paste 로 감싸 onData 로 흘린다
+      this.dataHandler?.(`\x1b[200~${data}\x1b[201~`)
+    }
     onTitleChange(): { dispose: () => void } {
       return { dispose: () => {} }
     }
