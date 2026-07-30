@@ -18,6 +18,7 @@ import userEvent from '@testing-library/user-event'
 import { installMockWindowApi, resetMockWindowApi } from '../../../../../test/helpers/mockWindowApi'
 import { renderWithDs } from '../../../../../test/helpers/renderWithDs'
 import type { TerminalWorkspaceSnapshotV2 } from '@shared/types/terminal'
+import { collectLeafIds, isValidTree } from './splitTree'
 
 // TerminalPane 은 xterm 의 native 모듈을 끌어와서 jsdom 에서 무거움 → forwardRef stub 으로 교체.
 vi.mock('./TerminalPane', () => ({
@@ -486,6 +487,96 @@ describe('TerminalView (integration)', () => {
       expect(createSpy).not.toHaveBeenCalled()
       expect(killSpy).not.toHaveBeenCalled()
       expect(screen.getByTestId('term-pane-sess-1')).toBeInTheDocument()
+    })
+  })
+
+  describe('v2.0 B-5 보강 — 스냅샷 저장→복원 왕복 (트리 불변식·leafId 매핑)', () => {
+    // jsdom 의 navigator.platform 은 빈 문자열 — ⌘D/⌘⇧D 판정에 필요(B-4 섹션과 동일한 이유).
+    beforeEach(() => {
+      Object.defineProperty(window.navigator, 'platform', { value: 'MacIntel', configurable: true })
+    })
+
+    /** onRequestState 로 등록된 마지막 flush 콜백을 발화시키고, saveState 에 전달된 스냅샷을 꺼낸다. */
+    async function flushAndCaptureSnapshot(): Promise<TerminalWorkspaceSnapshotV2> {
+      const saveStateSpy = vi.mocked(window.api.terminal.saveState)
+      const before = saveStateSpy.mock.calls.length
+      const flush = vi.mocked(window.api.terminal.onRequestState).mock.calls.at(-1)?.[0] as (() => void) | undefined
+      expect(flush).toBeTypeOf('function')
+      act(() => flush?.())
+      await waitFor(() => expect(saveStateSpy.mock.calls.length).toBeGreaterThan(before))
+      return saveStateSpy.mock.calls.at(-1)![0] as TerminalWorkspaceSnapshotV2
+    }
+
+    it('3분할 트리를 만들어 저장한 스냅샷은 트리 불변식을 만족하고, 그 스냅샷을 새 인스턴스가 복원하면 pane 수·트리 모양·포커스가 그대로 재현된다', async () => {
+      // ---- 1단계: 저장 — 탭 1개 안에 row(A, column(B, C)) 3leaf 트리를 만든다 ----
+      let saveCounter = 0
+      vi.mocked(window.api.terminal.create).mockImplementation(async () => ({
+        id: `orig-${++saveCounter}`,
+        name: '~',
+        cwd: '/tmp',
+        pid: saveCounter,
+        createdAt: Date.now()
+      } as unknown as Awaited<ReturnType<typeof window.api.terminal.create>>))
+
+      const first = renderWithDs(<TerminalView active />)
+      await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+      await screen.findByTestId('term-pane-orig-1')
+
+      fireEvent.keyDown(window, { key: 'd', metaKey: true }) // ⌘D — row(A, B), B 가 focused
+      await screen.findByTestId('term-pane-orig-2')
+      fireEvent.keyDown(window, { key: 'd', metaKey: true, shiftKey: true }) // ⌘⇧D — B 를 column(B, C) 로, C 가 focused
+      await screen.findByTestId('term-pane-orig-3')
+      expect(await screen.findByTitle('분할된 pane 3개')).toBeInTheDocument()
+
+      const snap = await flushAndCaptureSnapshot()
+
+      // ---- 트리 불변식 ----
+      expect(snap.tabs).toHaveLength(1)
+      const savedTab = snap.tabs[0]
+      expect(isValidTree(savedTab.tree)).toBe(true)
+      const savedLeafIds = collectLeafIds(savedTab.tree)
+      expect(savedLeafIds).toHaveLength(3)
+      expect(new Set(savedLeafIds).size).toBe(3)
+      // leafId 매핑 — panes 키 집합이 트리의 leaf 집합과 정확히 일치(orphan/누락 없음).
+      expect(Object.keys(savedTab.panes).sort()).toEqual([...savedLeafIds].sort())
+      // 포커스는 항상 leaf 집합 안에 있어야 한다.
+      expect(savedLeafIds).toContain(savedTab.focusedLeafId)
+      const focusedIndex = savedLeafIds.indexOf(savedTab.focusedLeafId)
+
+      // notifyLayoutChanged() 의 1초 debounce 는 실타이머라 unmount 후에도 살아있으면 그대로 발화해
+      // 다음 테스트로 새는 위험이 있다(TerminalView 는 실제 앱에서 항상 마운트 상태라 unmount cleanup
+      // 이 없다 — App.tsx "뷰별 visibility — 항상 마운트" 참조) — 언마운트 전에 자연 소멸을 기다린다.
+      await new Promise((r) => setTimeout(r, 1050))
+      first.unmount()
+      resetMockWindowApi()
+
+      // ---- 2단계: 복원 — 방금 저장한 스냅샷을 그대로 새 TerminalView 인스턴스에 먹인다 ----
+      vi.mocked(window.api.terminal.restoreState).mockResolvedValue(snap)
+      let restoreCounter = 0
+      vi.mocked(window.api.terminal.create).mockImplementation(async () => ({
+        id: `restored-${restoreCounter++}`,
+        name: '~',
+        cwd: '/tmp',
+        pid: restoreCounter,
+        createdAt: Date.now()
+      } as unknown as Awaited<ReturnType<typeof window.api.terminal.create>>))
+
+      renderWithDs(<TerminalView active />)
+
+      // 복원 effect 는 collectLeafIds(tree) 순서로 leaf 마다 create() 를 순차 호출한다 —
+      // 호출 횟수(=leaf 개수)와 순서(=leafId 순서)가 곧 leafId↔세션 매핑의 증거다.
+      await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(3))
+      expect(await screen.findByTitle('분할된 pane 3개')).toBeInTheDocument()
+      for (let i = 0; i < 3; i++) {
+        expect(await screen.findByTestId(`term-pane-restored-${i}`)).toBeInTheDocument()
+      }
+
+      // 원래 focusedLeafId 가 savedLeafIds 에서 몇 번째였는지 == 복원 후 몇 번째 create() 호출로
+      // 태어난 세션이 focused 여야 하는지. 트리 모양(row(A, column(B,C)))이 보존됐다는 방증이다.
+      for (let i = 0; i < 3; i++) {
+        const pane = screen.getByTestId(`term-pane-restored-${i}`)
+        expect(pane).toHaveAttribute('data-active', String(i === focusedIndex))
+      }
     })
   })
 })

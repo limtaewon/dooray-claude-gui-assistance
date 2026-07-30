@@ -34,6 +34,20 @@ function makeStorage(initial: Record<string, unknown> = {}): SnapshotStorage {
   }
 }
 
+/**
+ * `makeStorage` 와 달리 실제 electron-store 처럼 JSON.stringify/parse 를 거친다 — 참조 공유로
+ * 우연히 통과하는 가짜 왕복이 아니라 구조적 클론 이후에도 값이 살아남는지 검증하기 위한 저장소.
+ */
+function makeJsonStorage(): SnapshotStorage {
+  const data: Record<string, string> = {}
+  return {
+    get: <T>(key: string, def: T): T => (key in data ? (JSON.parse(data[key]) as T) : def),
+    set: (key: string, value: unknown): void => {
+      data[key] = JSON.stringify(value)
+    }
+  }
+}
+
 describe('shouldPersistSnapshot', () => {
   it('renderer + 빈 incoming + existing 있음 → true (사용자가 진짜 다 닫은 것)', () => {
     const existing = makeSnapshot([makeTab('a')])
@@ -184,5 +198,52 @@ describe('SnapshotStore', () => {
   it('getCachedSnapshot — saveSnapshot 이전에는 null', () => {
     const store = new SnapshotStore(storage)
     expect(store.getCachedSnapshot()).toBeNull()
+  })
+
+  /**
+   * v2.0 B-5 보강 — 스냅샷 저장→복원 왕복 테스트(트리 불변식·leafId 매핑). 지금까지의 케이스는
+   * 전부 단일 leaf 탭(`makeTab`)만 다뤘다 — split(중첩 분기) 트리가 JSON 직렬화를 거쳐도 구조·
+   * ratio·leafId↔panes 매핑이 그대로 보존되는지는 별도로 고정해야 한다(ADR-v2-terminal-p2-03 §1/§7).
+   */
+  it('중첩 split 트리(3leaf)를 가진 스냅샷도 저장→로드 왕복에서 트리 구조·ratio·leafId 매핑·undefined cwd 를 그대로 보존한다', () => {
+    const jsonStorage = makeJsonStorage()
+    const store = new SnapshotStore(jsonStorage)
+    const tree: TerminalTabSnapshot['tree'] = {
+      type: 'split',
+      direction: 'row',
+      ratio: 0.333,
+      first: { type: 'leaf', leafId: 'leaf-a' },
+      second: {
+        type: 'split',
+        direction: 'column',
+        first: { type: 'leaf', leafId: 'leaf-b' },
+        second: { type: 'leaf', leafId: 'leaf-c' }
+      }
+    }
+    const snap = makeSnapshot([
+      {
+        tabId: 'tab-1',
+        name: '분할탭',
+        tree,
+        focusedLeafId: 'leaf-b',
+        panes: {
+          'leaf-a': { cwd: '/repo/a', cols: 80, rows: 24, serialized: 'AAA' },
+          // leaf-b 는 cwd 없음(undefined) — JSON 직렬화 시 키 자체가 사라지는 경계 케이스.
+          'leaf-b': { cols: 100, rows: 30, serialized: '한글 👨‍👩‍👧‍👦 BBB' },
+          'leaf-c': { cwd: '/repo/c', cols: 80, rows: 24, serialized: 'CCC' }
+        }
+      }
+    ], 'tab-1')
+
+    store.saveSnapshot(snap, 'renderer')
+    const loaded = store.loadSnapshot()
+
+    expect(loaded?.tabs[0].tree).toEqual(tree)
+    expect(loaded?.tabs[0].focusedLeafId).toBe('leaf-b')
+    // leafId 매핑 — orphan pane 도, 빠진 leaf 도 없다.
+    expect(Object.keys(loaded?.tabs[0].panes ?? {}).sort()).toEqual(['leaf-a', 'leaf-b', 'leaf-c'])
+    expect(loaded?.tabs[0].panes['leaf-b'].cwd).toBeUndefined()
+    expect(loaded?.tabs[0].panes['leaf-b'].serialized).toBe('한글 👨‍👩‍👧‍👦 BBB')
+    expect(loaded?.tabs[0].panes['leaf-a'].cwd).toBe('/repo/a')
   })
 })

@@ -297,6 +297,107 @@ describe('WorkspaceService.startTask — best-effort 경고 (AC7-③)', () => {
     expect(result.warnings.some((w) => w.includes('hook 서버'))).toBe(true)
     rmSync(nullHookCtx.tmpRoot, { recursive: true, force: true })
   })
+
+  it('preApproveTrust 가 "failed" 를 반환해도 warnings 1건, startTask 는 성공', async () => {
+    ctx.claudeDir.preApproveTrust.mockReturnValueOnce('failed')
+    const result = await ctx.svc.startTask({ projectId: 'proj-1', taskId: 'task-1' })
+    expect(result.run.status).toBe('running')
+    expect(result.warnings.some((w) => w.includes('claude trust 사전 등록에 실패'))).toBe(true)
+  })
+
+  it('writeHookSettings 가 throw 해도 warnings 1건, startTask 는 성공', async () => {
+    ctx.claudeDir.writeHookSettings.mockImplementationOnce(() => {
+      throw new Error('디스크 가득 참')
+    })
+    const result = await ctx.svc.startTask({ projectId: 'proj-1', taskId: 'task-1' })
+    expect(result.run.status).toBe('running')
+    expect(result.warnings.some((w) => w.includes('.claude hook 설정 쓰기 실패'))).toBe(true)
+  })
+
+  it('두레이 워크플로우 중 "진행중"(working) 클래스가 없으면 warnings 1건, updateTaskStatus 미호출', async () => {
+    ctx.tasks.getProjectWorkflows.mockResolvedValueOnce([{ id: 'wf-1', name: '등록', class: 'registered' }])
+    const result = await ctx.svc.startTask({ projectId: 'proj-1', taskId: 'task-1' })
+    expect(result.warnings.some((w) => w.includes('진행중'))).toBe(true)
+    expect(ctx.tasks.updateTaskStatus).not.toHaveBeenCalled()
+  })
+
+  it('getProjectWorkflows 자체가 실패해도 두레이 상태 전환 실패 warning 으로 흡수', async () => {
+    ctx.tasks.getProjectWorkflows.mockRejectedValueOnce(new Error('네트워크 오류'))
+    const result = await ctx.svc.startTask({ projectId: 'proj-1', taskId: 'task-1' })
+    expect(result.warnings.some((w) => w.includes('두레이 상태 전환 실패'))).toBe(true)
+  })
+
+  it('여러 best-effort 단계가 동시에 실패해도 전부 독립적으로 warnings 에 누적되고 startTask 는 성공(부분 실패 매트릭스)', async () => {
+    ctx.git.fetchRemote.mockRejectedValueOnce(new Error('fetch 실패'))
+    ctx.claudeDir.preApproveTrust.mockReturnValueOnce('failed')
+    ctx.git.addToInfoExclude.mockRejectedValueOnce(new Error('exclude 실패'))
+    ctx.tasks.updateTaskStatus.mockRejectedValueOnce(new Error('두레이 다운'))
+    ctx.tasks.createTaskComment.mockRejectedValueOnce(new Error('댓글 실패'))
+
+    const result = await ctx.svc.startTask({
+      projectId: 'proj-1',
+      taskId: 'task-1',
+      fetchBeforeCreate: true,
+      commentBranch: true
+    })
+
+    // 실패가 겹쳐도 run 은 정상적으로 running 까지 도달한다 — 실패들이 서로를 가리거나 중단시키지 않는다.
+    expect(result.run.status).toBe('running')
+    expect(result.reused).toBe(false)
+    expect(existsSync(result.run.worktreePath)).toBe(true)
+
+    const joined = result.warnings.join(' | ')
+    expect(joined).toMatch(/원격 fetch 실패/)
+    expect(joined).toMatch(/claude trust 사전 등록에 실패/)
+    expect(joined).toMatch(/\.git\/info\/exclude/)
+    expect(joined).toMatch(/두레이 상태 전환 실패/)
+    expect(joined).toMatch(/두레이 댓글 작성 실패/)
+    expect(result.warnings).toHaveLength(5)
+  })
+})
+
+describe('WorkspaceService.resolveRunByCwd — 최장 경로 · "-2" 접미사 충돌 (ADR-v2-workspace-p1-05 (b))', () => {
+  // ADR 원문 예시: `.repo-worktrees/feature-a` 와 `.repo-worktrees/feature-a-2`(충돌 suffix) 는
+  // 브랜치 충돌 suffix(-2, resolveBranchNameConflict) 로 인해 실제로 생기는 조합이다.
+  function seedSuffixCollision(): { pathA: string; pathA2: string } {
+    const pathA = join(ctx.repoPath, '..', '.repo-worktrees', 'feature-a')
+    const pathA2 = join(ctx.repoPath, '..', '.repo-worktrees', 'feature-a-2')
+    const runA = makeRun({ runId: 'run-a', workspaceId: 'proj-1:task-a', worktreePath: pathA })
+    const runA2 = makeRun({ runId: 'run-a2', workspaceId: 'proj-1:task-a2', worktreePath: pathA2 })
+    ctx.store.saveWorkspace(
+      makeWorkspace({ id: 'proj-1:task-a', projectId: 'proj-1', taskId: 'task-a', runs: [runA], activeRunId: runA.runId })
+    )
+    ctx.store.saveWorkspace(
+      makeWorkspace({ id: 'proj-1:task-a2', projectId: 'proj-1', taskId: 'task-a2', runs: [runA2], activeRunId: runA2.runId })
+    )
+    return { pathA, pathA2 }
+  }
+
+  it('정확히 일치하는 경로는 각각 자기 run 으로만 매칭된다(원본 ↔ -2 서로 오염 없음)', () => {
+    const { pathA, pathA2 } = seedSuffixCollision()
+    expect(ctx.svc.resolveRunByCwd(pathA)?.run.runId).toBe('run-a')
+    expect(ctx.svc.resolveRunByCwd(pathA2)?.run.runId).toBe('run-a2')
+  })
+
+  it('각 워크트리 하위 경로도 자신의 run 으로만 매칭된다', () => {
+    const { pathA, pathA2 } = seedSuffixCollision()
+    expect(ctx.svc.resolveRunByCwd(join(pathA, 'src', 'index.ts'))?.run.runId).toBe('run-a')
+    expect(ctx.svc.resolveRunByCwd(join(pathA2, 'src', 'index.ts'))?.run.runId).toBe('run-a2')
+  })
+
+  it('두 워크트리 중 어느 것도 아닌 형제 경로는 null', () => {
+    seedSuffixCollision()
+    expect(ctx.svc.resolveRunByCwd(join(ctx.repoPath, '..', '.repo-worktrees', 'feature-a-2-extra'))).toBeNull()
+  })
+
+  it('activeRunId 가 없는(비활성) 워크스페이스의 경로는 null — 로그 없이 무시', () => {
+    const { pathA } = seedSuffixCollision()
+    const inactiveRun = makeRun({ runId: 'run-inactive', workspaceId: 'proj-1:task-inactive', worktreePath: join(pathA, '..', 'feature-inactive') })
+    ctx.store.saveWorkspace(
+      makeWorkspace({ id: 'proj-1:task-inactive', projectId: 'proj-1', taskId: 'task-inactive', runs: [inactiveRun], activeRunId: null })
+    )
+    expect(ctx.svc.resolveRunByCwd(inactiveRun.worktreePath)).toBeNull()
+  })
 })
 
 describe('WorkspaceService.startTask — spawn 실패 (AC7-④)', () => {
@@ -435,6 +536,29 @@ describe('WorkspaceService.resumeRun (AC9)', () => {
   it('없는 runId 는 RUN_NOT_FOUND', async () => {
     await expect(ctx.svc.resumeRun({ runId: 'ghost' })).rejects.toThrow(WorkspaceError)
   })
+
+  it('writeHookSettings 가 throw 해도 warnings 1건 남기고 resume 은 계속 진행', async () => {
+    const started = await ctx.svc.startTask({ projectId: 'proj-1', taskId: 'task-1' })
+    ctx.svc.recordStop(started.run.runId, { claudeSessionId: 'sess-123' })
+    ctx.claudeDir.writeHookSettings.mockImplementationOnce(() => {
+      throw new Error('갱신 실패')
+    })
+
+    const resumed = await ctx.svc.resumeRun({ runId: started.run.runId })
+    expect(resumed.warnings.some((w) => w.includes('.claude hook 설정 갱신 실패'))).toBe(true)
+    expect(resumed.run.status).toBe('running')
+  })
+
+  it('hookConfig 가 null 이면(hook 서버 미기동) warnings 1건 남기고 resume 은 계속 진행', async () => {
+    const nullHookCtx = makeContext({ hookConfig: null })
+    const started = await nullHookCtx.svc.startTask({ projectId: 'proj-1', taskId: 'task-1' })
+    nullHookCtx.svc.recordStop(started.run.runId, { claudeSessionId: 'sess-1' })
+
+    const resumed = await nullHookCtx.svc.resumeRun({ runId: started.run.runId })
+    expect(resumed.warnings.some((w) => w.includes('hook 서버'))).toBe(true)
+    expect(resumed.run.status).toBe('running')
+    rmSync(nullHookCtx.tmpRoot, { recursive: true, force: true })
+  })
 })
 
 describe('WorkspaceService.adoptRun / cleanupRun (AC9)', () => {
@@ -477,6 +601,35 @@ describe('WorkspaceService.adoptRun / cleanupRun (AC9)', () => {
 
   it('없는 runId 는 RUN_NOT_FOUND', async () => {
     await expect(ctx.svc.cleanupRun({ runId: 'ghost' })).rejects.toThrow(WorkspaceError)
+  })
+
+  it('repo 가 store 에서 이미 제거된 상태면 워크트리/브랜치 정리를 건너뛰고 warning 1건', async () => {
+    const started = await ctx.svc.startTask({ projectId: 'proj-1', taskId: 'task-1' })
+    ctx.store.removeRepo('repo-1')
+
+    const cleaned = await ctx.svc.cleanupRun({ runId: started.run.runId })
+    expect(cleaned.warnings.some((w) => w.includes('를 찾을 수 없어'))).toBe(true)
+    expect(ctx.git.removeWorktree).not.toHaveBeenCalled()
+    expect(ctx.git.deleteBranch).not.toHaveBeenCalled()
+  })
+
+  it('워크트리 제거 실패 시 warning 남기고 정리를 계속 진행(상태는 discarded)', async () => {
+    const started = await ctx.svc.startTask({ projectId: 'proj-1', taskId: 'task-1' })
+    ctx.git.removeWorktree.mockRejectedValueOnce(new Error('lock file 존재'))
+
+    const cleaned = await ctx.svc.cleanupRun({ runId: started.run.runId })
+    expect(cleaned.warnings.some((w) => w.includes('워크트리 제거 실패'))).toBe(true)
+    const found = ctx.store.findRunById(started.run.runId)
+    expect(found?.run.status).toBe('discarded')
+  })
+
+  it('브랜치 삭제 자체가 실패하면(adopted 가드와 별개) warning 남긴다', async () => {
+    const started = await ctx.svc.startTask({ projectId: 'proj-1', taskId: 'task-1' })
+    ctx.git.deleteBranch.mockRejectedValueOnce(new Error('브랜치가 다른 워크트리에서 사용 중'))
+
+    const cleaned = await ctx.svc.cleanupRun({ runId: started.run.runId, deleteBranch: true })
+    expect(cleaned.warnings.some((w) => w.includes('브랜치 삭제 실패'))).toBe(true)
+    expect(cleaned.warnings.some((w) => w.includes('채택(adopted)'))).toBe(false)
   })
 })
 
@@ -527,6 +680,45 @@ describe('WorkspaceService.reconcile (AC9)', () => {
     const found = ctx.store.findRunById('run-spawning')
     expect(found?.run.status).toBe('failed')
   })
+
+  it('외부에서 워크트리 폴더가 삭제된 경우 discard 뿐 아니라 workspace.activeRunId 도 null 로 정리된다', async () => {
+    const gone = await ctx.svc.startTask({ projectId: 'proj-1', taskId: 'task-gone-external' })
+    // cleanupRun 을 거치지 않고 사용자가 파일시스템에서 직접 삭제한 상황을 재현.
+    rmSync(gone.run.worktreePath, { recursive: true, force: true })
+
+    await ctx.svc.reconcile()
+    const ws = ctx.store.getWorkspace(gone.workspace.id)
+    expect(ws?.activeRunId).toBeNull()
+    expect(ws?.runs.find((r) => r.runId === gone.run.runId)?.status).toBe('discarded')
+  })
+
+  it('변경 사항이 없는 워크스페이스는 다시 저장하지 않는다(멱등 · 워크스페이스 간 격리)', async () => {
+    await ctx.svc.startTask({ projectId: 'proj-1', taskId: 'task-a' })
+    await ctx.svc.startTask({ projectId: 'proj-1', taskId: 'task-b' })
+    // 1차 reconcile — 두 run 모두 terminalSessionId 가 detach 된다(변경 있음).
+    await ctx.svc.reconcile()
+
+    const saveSpy = vi.spyOn(ctx.store, 'saveWorkspace')
+    // 2차 reconcile — claudeSessionId 없는 'running' 은 상태 전이가 없고(위 케이스 참조),
+    // terminalSessionId 도 이미 null 이라 더 이상 바뀔 것이 없어야 한다.
+    await ctx.svc.reconcile()
+    expect(saveSpy).not.toHaveBeenCalled()
+  })
+
+  it('reconcile 은 WorkspaceStore 의 activeRunId 불변식 경고를 발생시키지 않는다', async () => {
+    const gone = await ctx.svc.startTask({ projectId: 'proj-1', taskId: 'task-gone-invariant' })
+    rmSync(gone.run.worktreePath, { recursive: true, force: true })
+    const withSession = await ctx.svc.startTask({ projectId: 'proj-1', taskId: 'task-session-invariant' })
+    ctx.svc.recordStop(withSession.run.runId, { claudeSessionId: 'sess-inv' })
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await ctx.svc.reconcile()
+    const invariantWarnings = warnSpy.mock.calls.filter((args) =>
+      String(args[0]).includes('[WorkspaceStore] activeRunId 불일치')
+    )
+    expect(invariantWarnings).toEqual([])
+    warnSpy.mockRestore()
+  })
 })
 
 describe('WorkspaceService — 터미널 종료 구독 (exit listener)', () => {
@@ -546,6 +738,75 @@ describe('WorkspaceService — 터미널 종료 구독 (exit listener)', () => {
 
   it('dispose() 이후에는 구독 해제', () => {
     expect(() => ctx.svc.dispose()).not.toThrow()
+  })
+})
+
+describe('WorkspaceService — getHookConfig 은 값이 아니라 thunk (ADR-v2-workspace-p1-05 (d))', () => {
+  it('hook 서버가 startTask 이후에 기동해도 뒤이은 resumeRun 은 최신 hookConfig 를 읽는다', async () => {
+    // 값으로 주입하면(생성자 시점 스냅샷) hook 서버가 나중에 뜨더라도 영원히 이전 값(대개 null)을 쓰게 된다 —
+    // C-0 의 getAgentRoot 함정과 같은 종류. thunk 라면 매 호출이 "지금 시점"의 값을 본다.
+    const tmpRoot = mkdtempSync(join(tmpdir(), 'workspace-thunk-'))
+    const repoPath = join(tmpRoot, 'repo')
+    mkdirSync(repoPath, { recursive: true })
+    const store = new WorkspaceStore(new MemoryStorage())
+    store.addRepo({ id: 'repo-1', path: repoPath, name: 'repo' })
+
+    let currentHookConfig: { port: number; secret: string } | null = null
+    const writeHookSettings = vi.fn().mockReturnValue(true)
+    const svc = new WorkspaceService({
+      store,
+      git: {
+        isGitRepo: vi.fn().mockResolvedValue(true),
+        listBranches: vi.fn().mockResolvedValue([]),
+        listWorktrees: vi.fn().mockResolvedValue([]),
+        createWorktree: vi.fn(async ({ repoPath: rp, branch }: { repoPath: string; branch: string }) => {
+          const p = predictPath(rp, branch)
+          mkdirSync(p, { recursive: true })
+          return { path: p, branch, head: 'abc', isMain: false, isBare: false }
+        }),
+        removeWorktree: vi.fn(),
+        getWorktreeStatus: vi.fn(),
+        deleteBranch: vi.fn(),
+        addToInfoExclude: vi.fn().mockResolvedValue(true),
+        fetchRemote: vi.fn()
+      } as never,
+      tasks: {
+        getTaskDetail: vi.fn().mockResolvedValue({
+          id: 't',
+          projectId: 'p',
+          projectCode: 'PC',
+          subject: '제목',
+          number: 1,
+          workflowClass: '',
+          createdAt: '',
+          updatedAt: ''
+        }),
+        getProjectInfo: vi.fn(),
+        getProjectWorkflows: vi.fn().mockResolvedValue([]),
+        updateTaskStatus: vi.fn(),
+        createTaskComment: vi.fn()
+      } as never,
+      spawner: { spawn: vi.fn().mockResolvedValue({ terminalSessionId: 'term-1' }) } as never,
+      terminals: { addExitListener: vi.fn(() => () => {}) } as never,
+      getHookConfig: () => currentHookConfig,
+      getWorkspaceRoot: () => join(tmpRoot, 'clauday-root'),
+      getAgentRoot: () => join(tmpRoot, 'agent-root'),
+      claudeDir: { preApproveTrust: vi.fn().mockReturnValue('written'), writeHookSettings },
+      now: () => 1000,
+      newRunId: () => 'run-thunk-1'
+    })
+
+    const started = await svc.startTask({ projectId: 'proj-1', taskId: 'task-1' })
+    expect(writeHookSettings).toHaveBeenLastCalledWith(started.run.worktreePath, null)
+    expect(started.warnings.some((w) => w.includes('hook 서버'))).toBe(true)
+
+    // hook 서버가 이제 막 기동했다고 가정 — thunk 이므로 이 시점부터 새 값이 보여야 한다.
+    currentHookConfig = { port: 5555, secret: 'sec-new' }
+    svc.recordStop(started.run.runId, { claudeSessionId: 'sess-1' })
+    await svc.resumeRun({ runId: started.run.runId })
+    expect(writeHookSettings).toHaveBeenLastCalledWith(started.run.worktreePath, { port: 5555, secret: 'sec-new' })
+
+    rmSync(tmpRoot, { recursive: true, force: true })
   })
 })
 
