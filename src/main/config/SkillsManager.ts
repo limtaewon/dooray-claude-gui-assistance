@@ -1,9 +1,10 @@
-import { readFile, writeFile, readdir, unlink, mkdir } from 'fs/promises'
+import { readFile, writeFile, readdir, unlink, mkdir, lstat, rm } from 'fs/promises'
 import { existsSync, statSync, lstatSync } from 'fs'
-import { basename, join } from 'path'
+import { basename, join, resolve, sep } from 'path'
 import { homedir } from 'os'
 import { dialog } from 'electron'
-import type { Skill, SkillSaveRequest } from '../../shared/types/skills'
+import type { Skill, SkillSaveRequest, SkillDeleteManyResult } from '../../shared/types/skills'
+import { sanitizeSkillFilename } from '../../shared/utils/filename'
 
 export class SkillsManager {
   // Claude Code stores skills in ~/.claude/skills/{name}/SKILL.md
@@ -17,6 +18,18 @@ export class SkillsManager {
     if (!existsSync(this.skillsDir)) {
       await mkdir(this.skillsDir, { recursive: true })
     }
+  }
+
+  /**
+   * filename 이 skillsDir 하위 경로임을 보장한다 (traversal 봉쇄). 이름은 변형하지 않는다 —
+   * 정규화(sanitize)와 목적이 다르다: 이건 파일시스템 경계, sanitize 는 Windows 호환 (ADR-v2-windows-fix-05 §2).
+   */
+  private resolveSkillDir(filename: string): string {
+    const root = resolve(this.skillsDir)
+    const dir = resolve(root, filename)
+    if (dir !== root && !dir.startsWith(root + sep)) throw new Error('잘못된 스킬 이름')
+    if (dir === root) throw new Error('잘못된 스킬 이름')
+    return dir
   }
 
   async list(): Promise<Skill[]> {
@@ -50,13 +63,20 @@ export class SkillsManager {
     return skills.sort((a, b) => a.name.localeCompare(b.name))
   }
 
+  /** 이름을 변형하지 않는다 — 정제 전(레거시) 이름으로 만들어진 스킬도 계속 읽을 수 있어야 한다. */
   async read(filename: string): Promise<string> {
-    const skillFile = join(this.skillsDir, filename, 'SKILL.md')
-    return readFile(skillFile, 'utf-8')
+    const skillDir = this.resolveSkillDir(filename)
+    return readFile(join(skillDir, 'SKILL.md'), 'utf-8')
   }
 
+  /** 최종 권위 — 어떤 경로로 들어온 이름이든 여기서 Windows 호환 형태로 정제된다. */
   async save(req: SkillSaveRequest): Promise<void> {
-    const skillDir = join(this.skillsDir, req.filename)
+    const sanitized = sanitizeSkillFilename(req.filename)
+    if (sanitized !== req.filename) {
+      console.warn(`[SkillsManager] 파일명 정제 filename=${req.filename} sanitized=${sanitized}`)
+    }
+    // sanitize 후에도 봉쇄 검증을 한 번 더 통과시킨다 (이중 방어 — sanitize 규칙에 구멍이 나도 경계는 지켜진다).
+    const skillDir = this.resolveSkillDir(sanitized)
     if (!existsSync(skillDir)) {
       await mkdir(skillDir, { recursive: true })
     }
@@ -64,20 +84,39 @@ export class SkillsManager {
     await writeFile(skillFile, req.content, 'utf-8')
   }
 
+  /**
+   * 이름을 변형하지 않는다 (레거시 호환). 심볼릭 링크면 링크만 제거하고(공유 원본 보존),
+   * 실디렉터리면 재귀 삭제해 디렉터리 잔존을 막는다 (ADR-v2-windows-fix-05 §3).
+   */
   async delete(filename: string): Promise<void> {
-    const skillFile = join(this.skillsDir, filename, 'SKILL.md')
-    if (existsSync(skillFile)) {
-      await unlink(skillFile)
+    const skillDir = this.resolveSkillDir(filename)
+    let stat
+    try {
+      stat = await lstat(skillDir)
+    } catch {
+      return // 존재하지 않음 — no-op (throw 안 함, 현행과 동일)
+    }
+    if (stat.isSymbolicLink()) {
+      await unlink(skillDir)
+    } else {
+      await rm(skillDir, { recursive: true, force: true })
     }
   }
 
-  /** 다중 삭제 — 실패는 항목별로 무시(베스트 에포트). 삭제 성공 갯수 반환. */
-  async deleteMany(filenames: string[]): Promise<{ deleted: number }> {
+  /** 다중 삭제 — 항목별 best-effort 지만 실패를 조용히 삼키지 않는다 (건수 집계 + warn). */
+  async deleteMany(filenames: string[]): Promise<SkillDeleteManyResult> {
     let deleted = 0
+    let failed = 0
     for (const filename of filenames) {
-      try { await this.delete(filename); deleted++ } catch { /* skip */ }
+      try {
+        await this.delete(filename)
+        deleted++
+      } catch (err) {
+        failed++
+        console.warn(`[SkillsManager] 삭제 실패 filename=${filename}`, err)
+      }
     }
-    return { deleted }
+    return { deleted, failed }
   }
 
   /** 사용자가 선택한 .md 파일들을 임포트. 파일명 기준으로 디렉토리를 만들어 SKILL.md 로 저장. */
@@ -118,7 +157,9 @@ export class SkillsManager {
     for (const filename of filenames) {
       try {
         const content = await this.read(filename)
-        await writeFile(join(folder, `${filename}.md`), content, 'utf-8')
+        // 내보낼 파일명도 Windows 금지문자를 정제 — 사용자가 고른 폴더가 어느 OS 든 안전하게 쓰기 위함.
+        const exportName = sanitizeSkillFilename(filename)
+        await writeFile(join(folder, `${exportName}.md`), content, 'utf-8')
         exported++
       } catch { /* skip */ }
     }

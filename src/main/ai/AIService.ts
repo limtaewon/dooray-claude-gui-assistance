@@ -1,7 +1,8 @@
-import { execFile, execFileSync, spawn } from 'child_process'
+import { execFileSync, spawn } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, delimiter as pathDelimiter } from 'path'
 import { homedir } from 'os'
+import { StringDecoder } from 'string_decoder'
 import { BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '../../shared/types/ipc'
 import type { DoorayTask, DoorayCalendarEvent } from '../../shared/types/dooray'
@@ -10,7 +11,7 @@ import type { HarnessModel, HarnessTriage, DryRunResult } from '../../shared/typ
 import { buildNormalizeSystemPrompt, buildNormalizeUserPrompt, buildEstimateSystemPrompt, buildEstimateUserPrompt } from '../harness/normalizePrompt'
 import { buildEditSystemPrompt, buildEditUserPrompt } from './harnessEditPrompt'
 import type { AIEditProposal } from '../../shared/types/harness-edit'
-import { getClaudeBin as resolveClaudeBinCached } from '../utils/claudeBin'
+import { getClaudeBin as resolveClaudeBinCached, claudeSpawnCommand } from '../utils/claudeBin'
 
 interface ClaudeCliResult {
   type: string
@@ -104,10 +105,12 @@ import { startCliCall, setClaudeVersion } from '../utils/cliLogger'
  */
 function captureClaudeVersion(): void {
   try {
-    const out = execFileSync(CLAUDE_CLI, ['--version'], {
+    // command/shell 은 claudeSpawnCommand 단일 계약에서만 나온다 (ADR-v2-windows-fix-02 §2) — 인용된 bin 사용.
+    const { command, shell } = claudeSpawnCommand({ bin: CLAUDE_CLI })
+    const out = execFileSync(command, ['--version'], {
       timeout: 5000,
       env: { ...process.env, DISABLE_OMC: '1' },
-      shell: process.platform === 'win32',
+      shell,
       encoding: 'utf-8'
     })
     setClaudeVersion(out.toString().trim() || undefined)
@@ -340,49 +343,6 @@ ${skillBlock}`
     this.mainWindow.webContents.send(IPC_CHANNELS.AI_PROGRESS, event)
   }
 
-  /** 기본(non-streaming) claude 실행 */
-  private runClaude(args: string[]): Promise<ClaudeCliResult> {
-    return new Promise((resolve, reject) => {
-      execFile(
-        CLAUDE_CLI,
-        args,
-        {
-          maxBuffer: 1024 * 1024 * 5,
-          timeout: 120000,
-          env: enrichedEnv(),
-          // Windows cp949 mojibake 방지 — raw Buffer 로 받아 decodeProcessText 가
-          // utf-8/euc-kr 자동 판별 후 디코드.
-          encoding: 'buffer'
-        },
-        (error, stdoutBuf, stderrBuf) => {
-          const stdout = decodeProcessText(stdoutBuf as Buffer)
-          const stderr = decodeProcessText(stderrBuf as Buffer)
-          if (error && !stdout) {
-            reject(wrapClaudeError(error.message, stderr))
-            return
-          }
-          try {
-            const result = JSON.parse(stdout) as ClaudeCliResult
-            if (result.is_error) {
-              reject(wrapClaudeError(result.result, stderr))
-              return
-            }
-            resolve(result)
-          } catch {
-            resolve({
-              type: 'result',
-              result: stdout || stderr || '응답을 받지 못했습니다.',
-              duration_ms: 0,
-              session_id: '',
-              is_error: false,
-              total_cost_usd: 0
-            })
-          }
-        }
-      )
-    })
-  }
-
   /**
    * 스트리밍 claude 실행 (stream-json)
    * 각 텍스트 청크를 onChunk로 전달하고, 최종 결과 반환
@@ -446,12 +406,13 @@ ${stdinPrompt ?? ''}`
         }
       }
 
-      // Windows 호환 (Issue #11): claude 가 .cmd 면 Node 의 spawn 이 자동 추론 못함 → shell:true.
-      // windowsVerbatimArguments 로 cmd codepage 변환 차단 (한글 prompt 깨짐 방지).
-      const proc = spawn(CLAUDE_CLI, cleaned, {
+      // command/shell/windowsVerbatimArguments 는 claudeSpawnCommand 단일 계약에서만 나온다
+      // (ADR-v2-windows-fix-02 §2) — win32 인용 포함. argv(cleaned)는 위 블록 그대로 전달.
+      const { command, shell, windowsVerbatimArguments } = claudeSpawnCommand({ bin: CLAUDE_CLI })
+      const proc = spawn(command, cleaned, {
         env: enrichedEnv(),
-        shell: isWindows,
-        windowsVerbatimArguments: isWindows
+        shell,
+        windowsVerbatimArguments
       })
 
       if (stdinPrompt !== null && proc.stdin) {
@@ -462,6 +423,9 @@ ${stdinPrompt ?? ''}`
       let buffer = ''
       let finalResult: ClaudeCliResult | null = null
       let accumulated = ''
+      // stdout 은 프로세스(=호출)당 디코더 1개 — chunk 경계에서 멀티바이트가 쪼개져도
+      // U+FFFD 로 깨지지 않게 경계를 보존한다 (ADR-v2-windows-fix-02 §5). 모듈 전역 공유 금지.
+      const stdoutDecoder = new StringDecoder('utf8')
       // Windows cp949 mojibake 방지를 위해 raw Buffer 누적 — 사용 시점에서 디코드.
       const stderrChunks: Buffer[] = []
       const readStderr = (): string => decodeProcessText(Buffer.concat(stderrChunks))
@@ -500,7 +464,7 @@ ${stdinPrompt ?? ''}`
       const RAW_STDOUT_CAP = 200 * 1024  // 200KB — 평문 응답이라도 보통 이 안쪽
 
       proc.stdout.on('data', (data: Buffer) => {
-        const chunk = data.toString('utf-8')
+        const chunk = stdoutDecoder.write(data)
         diag.appendStdout(chunk)
         if (rawStdout.length < RAW_STDOUT_CAP) rawStdout += chunk
         buffer += chunk
@@ -604,6 +568,11 @@ ${stdinPrompt ?? ''}`
 
       proc.on('close', (code) => {
         if (timeout) clearTimeout(timeout)
+        // 불완전한 멀티바이트 시퀀스로 close 시점까지 남아있던 잔여 — 버리되 조용히 버리지 않는다.
+        const decoderTail = stdoutDecoder.end()
+        if (decoderTail) {
+          console.warn(`[AIService] stdout 디코더 잔여 바이트 폐기 len=${decoderTail.length}`)
+        }
         if (finalResult) {
           if (!finalResult.result && accumulated) finalResult.result = accumulated
           diag.complete({ exitCode: code })
@@ -669,11 +638,13 @@ ${stdinPrompt ?? ''}`
 
   isAvailable(): boolean {
     try {
-      // Windows: .cmd 추론을 위해 shell:true. `--version` 만 받으므로 codepage 변환 영향 없음.
-      execFileSync(CLAUDE_CLI, ['--version'], {
+      // command/shell 은 claudeSpawnCommand 단일 계약에서만 나온다 (ADR-v2-windows-fix-02 §2).
+      // `--version` 만 받으므로 codepage 변환 영향 없음.
+      const { command, shell } = claudeSpawnCommand({ bin: CLAUDE_CLI })
+      execFileSync(command, ['--version'], {
         timeout: 5000,
         env: enrichedEnv(),
-        shell: process.platform === 'win32'
+        shell
       })
       return true
     } catch {

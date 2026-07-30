@@ -154,6 +154,14 @@ export const IPC_CHANNELS = {
   TERMINAL_RENAME: 'terminal:rename',
   /** v2.0 B-8: 렌더러 탭 순서를 main 세션 순서에 반영 (fire-and-forget) */
   TERMINAL_REORDER: 'terminal:reorder',
+  /** v2.0 B-5: 렌더러 스냅샷 저장 (invoke). main 이 store 쓰기 + 메모리 캐시 갱신 */
+  TERMINAL_SAVE_STATE: 'terminal:save-state',
+  /** v2.0 B-5: 스냅샷 복원 (invoke). 최초 1회 legacy terminalSessions 마이그레이션 포함 */
+  TERMINAL_RESTORE_STATE: 'terminal:restore-state',
+  /** v2.0 B-5: main → renderer flush 요청 (push 전용). handle 등록 금지 */
+  TERMINAL_REQUEST_STATE: 'terminal:request-state',
+  /** v2.0 B-7: 링크 후보 존재 검증 배치 (invoke) */
+  TERMINAL_RESOLVE_PATH: 'terminal:resolve-path',
   /** v1.4: 두레이 멘션이 새 터미널을 열었음을 렌더러에 알림 (entries 추가/활성화 요청) */
   MENTION_TERMINAL_OPENED: 'mention:terminal:opened',
   /** v1.4: 기존 채널 탭을 재사용 — 렌더러에 활성화만 요청 (id 페이로드) */

@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import { release } from 'os'
 
 // IpcRenderer 리스너 한도 상향 (기본 10, 다중 터미널 탭 + 각종 IPC 구독 때문에 넉넉히)
 ipcRenderer.setMaxListeners(100)
@@ -90,7 +91,7 @@ import type {
   BackupEntry,
   AgentSourceMap
 } from '../shared/types/harness-edit'
-import type { Skill, SkillSaveRequest } from '../shared/types/skills'
+import type { Skill, SkillSaveRequest, SkillDeleteManyResult } from '../shared/types/skills'
 import type { UsageQueryParams, UsageSummary } from '../shared/types/usage'
 import type {
   DoorayProject,
@@ -157,7 +158,7 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.SKILLS_SAVE, req),
     delete: (filename: string): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.SKILLS_DELETE, filename),
-    deleteMany: (filenames: string[]): Promise<{ deleted: number }> =>
+    deleteMany: (filenames: string[]): Promise<SkillDeleteManyResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.SKILLS_DELETE_MANY, filenames),
     importFromFiles: (): Promise<{ imported: number; cancelled: boolean }> =>
       ipcRenderer.invoke(IPC_CHANNELS.SKILLS_IMPORT),
@@ -862,6 +863,14 @@ const api = {
       restore: (path: string, backupDir: string): Promise<{ restored: string[]; model: HarnessModel }> =>
         ipcRenderer.invoke(IPC_CHANNELS.HARNESS_RESTORE_BACKUP, { path, backupDir })
     }
+  },
+
+  // v2.0 windows-fix ADR-v2-windows-fix-03 §4: windowsPty 게이트(빌드번호 판정)에 쓰는 정적 값.
+  // IPC 채널이 아니다 — sandbox:false 라 preload 에서 동기로 읽어 노출한다. 값이 없어도(구버전 mock 등)
+  // 호출부는 optional chaining 으로 안전하게 undefined 처리한다.
+  system: {
+    platform: process.platform,
+    osRelease: release()
   }
 }
 

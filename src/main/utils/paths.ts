@@ -36,3 +36,16 @@ export function samePath(a: string, b: string, opts?: { platform?: NodeJS.Platfo
   const platform = opts?.platform ?? process.platform
   return normalizePathForCompare(a, platform) === normalizePathForCompare(b, platform)
 }
+
+/**
+ * `child` 가 `parent` 와 같거나 그 하위 경로인지 판정한다. 경로 세그먼트 기준이라
+ * 형제 경로(`/a/b-foo` 는 `/a/b` 의 하위가 아님)를 오판하지 않는다.
+ */
+export function isPathInside(parent: string, child: string, opts?: { platform?: NodeJS.Platform }): boolean {
+  const platform = opts?.platform ?? process.platform
+  const p = normalizePathForCompare(parent, platform)
+  const c = normalizePathForCompare(child, platform)
+  if (c === p) return true
+  const parentWithSep = p.endsWith('/') ? p : `${p}/`
+  return c.startsWith(parentWithSep)
+}

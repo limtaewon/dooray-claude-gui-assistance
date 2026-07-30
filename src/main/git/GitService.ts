@@ -1,7 +1,10 @@
 import { execFile } from 'child_process'
-import { existsSync } from 'fs'
-import { join, basename, dirname } from 'path'
+import { existsSync, readFileSync, mkdirSync } from 'fs'
+import { join, basename, dirname, isAbsolute, resolve as resolvePath } from 'path'
 import { decodeProcessText } from '../utils/procText'
+import { writeFileAtomic } from '../utils/atomicWrite'
+import { isSafeGitRef } from '../../shared/workspace/gitRef'
+import { samePath } from '../utils/paths'
 import type {
   GitWorktree,
   GitWorktreeStatus,
@@ -28,12 +31,15 @@ function git(args: string[], cwd: string): Promise<string> {
   })
 }
 
-/** git ref 이름 검증 (커맨드 인젝션 방지) */
+/** git ref 이름 검증 (커맨드 인젝션 방지 + git ref 문법). 규칙은 `isSafeGitRef` 가 단독 소유. */
 function assertSafeRef(ref: string): void {
-  if (ref.startsWith('-') || ref.includes('..') || /[;\|\&\$`\n\r]/.test(ref)) {
+  if (!isSafeGitRef(ref)) {
     throw new Error(`유효하지 않은 git 참조: ${ref}`)
   }
 }
+
+/** `.git/info/exclude` 에 추가하는 줄 앞에 붙는 식별 주석 — 정확한 라인 비교로 멱등성을 보장한다. */
+const INFO_EXCLUDE_SENTINEL = '# Clauday (v2.0 워크스페이스) — 자동 추가'
 
 export class GitService {
   /** 해당 경로가 git 저장소인지 확인 */
@@ -147,7 +153,7 @@ export class GitService {
 
     if (existsSync(worktreePath)) {
       const worktrees = await this.listWorktrees(repoPath)
-      const existing = worktrees.find((w) => w.path === worktreePath)
+      const existing = worktrees.find((w) => samePath(w.path, worktreePath))
       if (existing) return existing
       throw new Error(`경로 ${worktreePath}이(가) 이미 존재하지만 워크트리가 아닙니다. 수동으로 제거해주세요.`)
     }
@@ -170,7 +176,7 @@ export class GitService {
     }
 
     const worktrees = await this.listWorktrees(repoPath)
-    const created = worktrees.find((w) => w.path === worktreePath)
+    const created = worktrees.find((w) => samePath(w.path, worktreePath))
     if (!created) throw new Error('워크트리 생성 후 찾을 수 없음')
     return created
   }
@@ -307,5 +313,46 @@ export class GitService {
   /** 워크트리 정리 (삭제된 워크트리 참조 제거) */
   async pruneWorktrees(repoPath: string): Promise<void> {
     await git(['worktree', 'prune'], repoPath)
+  }
+
+  /** 로컬 브랜치 삭제. `force` 시 병합 여부와 무관하게(`-D`), 아니면 안전 삭제(`-d`)만 허용한다. */
+  async deleteBranch(repoPath: string, branch: string, opts?: { force?: boolean }): Promise<void> {
+    assertSafeRef(branch)
+    const flag = opts?.force ? '-D' : '-d'
+    await git(['branch', flag, '--', branch], repoPath)
+  }
+
+  /** worktree 의 공용(common) git 디렉터리 절대경로. 상대경로 응답은 worktreePath 기준으로 resolve. */
+  private async resolveGitCommonDir(worktreePath: string): Promise<string> {
+    const raw = await git(['rev-parse', '--git-common-dir'], worktreePath)
+    return isAbsolute(raw) ? raw : resolvePath(worktreePath, raw)
+  }
+
+  /**
+   * `.git/info/exclude`(워크트리별이 아니라 공용) 에 패턴을 추가한다.
+   * 정확히 같은 라인이 이미 있으면 아무것도 하지 않는다(멱등). 반환 true = 실제로 썼음(호출부 로그용).
+   */
+  async addToInfoExclude(worktreePath: string, patterns: string[]): Promise<boolean> {
+    const commonDir = await this.resolveGitCommonDir(worktreePath)
+    const infoExcludePath = join(commonDir, 'info', 'exclude')
+
+    const existing = existsSync(infoExcludePath) ? readFileSync(infoExcludePath, 'utf8') : ''
+    const existingLines = new Set(existing.split('\n').map((l) => l.trimEnd()))
+
+    const missing = patterns.filter((p) => !existingLines.has(p))
+    if (missing.length === 0) return false
+
+    const additions = existingLines.has(INFO_EXCLUDE_SENTINEL) ? missing : [INFO_EXCLUDE_SENTINEL, ...missing]
+    const separator = existing.length > 0 && !existing.endsWith('\n') ? '\n' : ''
+    const next = `${existing}${separator}${additions.join('\n')}\n`
+
+    mkdirSync(dirname(infoExcludePath), { recursive: true })
+    await writeFileAtomic(infoExcludePath, next)
+    return true
+  }
+
+  /** 원격 저장소 fetch. 호출부(`WorkspaceService`)에서 best-effort 로 처리한다. */
+  async fetchRemote(repoPath: string, remote = 'origin'): Promise<void> {
+    await git(['fetch', '--prune', remote], repoPath)
   }
 }

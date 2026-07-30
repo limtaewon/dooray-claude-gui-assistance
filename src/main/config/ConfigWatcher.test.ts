@@ -1,20 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 type Listener = (event: string, path: string) => void
-let watchInstances: Array<{ closeCalled: boolean; emit: (event: string, path: string) => void; pathsWatched: unknown }> = []
+type ErrorListener = (error: unknown) => void
+let watchInstances: Array<{
+  closeCalled: boolean
+  emit: (event: string, path: string) => void
+  emitError: (error: unknown) => void
+  pathsWatched: unknown
+}> = []
 
 vi.mock('chokidar', () => ({
   default: {
     watch: (paths: unknown) => {
       const handlers: Listener[] = []
+      const errorHandlers: ErrorListener[] = []
       const inst = {
         closeCalled: false,
         pathsWatched: paths,
-        on: (event: string, cb: Listener) => {
-          if (event === 'all') handlers.push(cb)
+        on: (event: string, cb: Listener | ErrorListener) => {
+          if (event === 'all') handlers.push(cb as Listener)
+          else if (event === 'error') errorHandlers.push(cb as ErrorListener)
         },
         close: () => { inst.closeCalled = true },
-        emit: (event: string, path: string) => handlers.forEach((h) => h(event, path))
+        emit: (event: string, path: string) => handlers.forEach((h) => h(event, path)),
+        emitError: (error: unknown) => errorHandlers.forEach((h) => h(error))
       }
       watchInstances.push(inst)
       return inst
@@ -22,10 +31,17 @@ vi.mock('chokidar', () => ({
   }
 }))
 
+const { mkdirSyncMock } = vi.hoisted(() => ({ mkdirSyncMock: vi.fn() }))
+vi.mock('fs', () => ({
+  mkdirSync: mkdirSyncMock,
+  default: { mkdirSync: mkdirSyncMock }
+}))
+
 import { ConfigWatcher } from './ConfigWatcher'
 
 beforeEach(() => {
   watchInstances = []
+  mkdirSyncMock.mockReset()
 })
 
 describe('ConfigWatcher', () => {
@@ -81,5 +97,37 @@ describe('ConfigWatcher', () => {
     w.start()
     w.stop()
     expect(() => w.stop()).not.toThrow()
+  })
+
+  it('start 는 watch 전에 skills/commands 디렉토리를 선생성한다 (신규 사용자 감지 결함 수복, ADR-v2-windows-fix-05 §4)', () => {
+    const w = new ConfigWatcher()
+    w.start()
+    const createdPaths = mkdirSyncMock.mock.calls.map((c) => String(c[0]).replace(/\\/g, '/'))
+    expect(createdPaths.some((p) => p.endsWith('.claude/skills'))).toBe(true)
+    expect(createdPaths.some((p) => p.endsWith('.claude/commands'))).toBe(true)
+    // settings.json 은 파일이므로 선생성하지 않는다 — 남의 설정 파일을 우리가 만들면 안 된다.
+    expect(createdPaths.some((p) => p.endsWith('settings.json'))).toBe(false)
+    for (const call of mkdirSyncMock.mock.calls) {
+      expect(call[1]).toEqual({ recursive: true })
+    }
+  })
+
+  it('mkdirSync 실패해도 warn 만 하고 watch 는 계속 진행된다', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mkdirSyncMock.mockImplementationOnce(() => { throw new Error('EACCES') })
+    const w = new ConfigWatcher()
+    expect(() => w.start()).not.toThrow()
+    expect(watchInstances).toHaveLength(1)
+    expect(warnSpy).toHaveBeenCalledWith('[ConfigWatcher] 디렉토리 생성 실패', expect.objectContaining({ dir: expect.any(String) }))
+    warnSpy.mockRestore()
+  })
+
+  it('watcher error 이벤트를 구독해 warn 로그를 남긴다', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const w = new ConfigWatcher()
+    w.start()
+    watchInstances[0].emitError(new Error('permission denied'))
+    expect(warnSpy).toHaveBeenCalledWith('[ConfigWatcher] watch 오류', expect.any(Error))
+    warnSpy.mockRestore()
   })
 })

@@ -116,6 +116,22 @@ describe('ClaudeChatService.handleJsonLine', () => {
     svc.cancel('c1')
   })
 
+  it('stdout chunk 경계에서 멀티바이트가 쪼개져도 깨지지 않는다 (StringDecoder 경계 보존, ADR-v2-windows-fix-02 §5)', () => {
+    const svc = new ClaudeChatService('/usr/bin/claude')
+    sendAndComplete(svc, { chatId: 'c1', prompt: '안녕' })
+    const prefix = Buffer.from('{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"', 'utf8')
+    const korean = Buffer.from('한글텍스트', 'utf8') // 한 글자당 3바이트
+    const suffix = Buffer.from('"}}}\n', 'utf8')
+    // '한'(3바이트) 중간(2바이트)에서 청크를 쪼갠다.
+    const firstChunk = Buffer.concat([prefix, korean.subarray(0, 2)])
+    const secondChunk = Buffer.concat([korean.subarray(2), suffix])
+    lastProc!.stdout.emit('data', firstChunk)
+    lastProc!.stdout.emit('data', secondChunk)
+    const ev = winSend.mock.calls.map((c) => c[1]).find((e) => e.type === 'assistant_text')
+    expect(ev?.delta).toBe('한글텍스트')
+    svc.cancel('c1')
+  })
+
   it('tool_use → tool_use 이벤트', () => {
     const svc = new ClaudeChatService('/usr/bin/claude')
     sendAndComplete(svc, { chatId: 'c1', prompt: 'x' })

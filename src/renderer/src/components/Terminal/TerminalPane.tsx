@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react'
+import type { ForwardedRef } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { SearchAddon } from '@xterm/addon-search'
@@ -8,11 +9,26 @@ import { shouldFollowOutput } from './scrollFollow'
 import useTerminalSearch from './useTerminalSearch'
 import TerminalSearchBar from './TerminalSearchBar'
 import Button from '../common/ds/Button'
+import { resolvePaneActivation } from './paneActivation'
+import { windowsPtyOptions } from '@shared/utils/windowsPty'
+import type { TerminalPaneSnapshot } from '@shared/types/terminal'
 import '@xterm/xterm/css/xterm.css'
 
 interface TerminalPaneProps {
   sessionId: string
-  isActive: boolean
+  /**
+   * @deprecated isVisible/isFocused 를 쓰세요. 레거시 3호스트(TerminalView/MentionAgentView/
+   * BranchWorkspace) 호환용 폴백이며 `resolvePaneActivation` 이 해석한다 (ADR-v2-terminal-p2-01).
+   */
+  isActive?: boolean
+  /** 컨테이너 가시성 — reveal 시 fit + PTY resize, B-6 WebGL attach 게이트. */
+  isVisible?: boolean
+  /** 포커스 — term.focus() + document paste 리스너(앱 전체 최대 1개) + 포커스 링. */
+  isFocused?: boolean
+  /** pointerdown/textarea focus 시 호스트에 포커스 이동을 요청한다. pane 은 자기 포커스를 스스로 정하지 않는다. */
+  onFocusRequest?: () => void
+  /** true 인 호스트(SplitLayout, B-4)만 포커스 링/dim 을 그린다 — 레거시 단일 pane 호스트는 표시하지 않는다. */
+  showFocusRing?: boolean
   initialOutput?: string
   /** v2.0 B-1: PTY 종료 정보 — 있으면 종료 오버레이를 그리고 입력을 차단한다 (ADR-02). */
   exitInfo?: { exitCode: number; signal: number | null } | null
@@ -20,12 +36,41 @@ interface TerminalPaneProps {
   onRequestClose?: () => void
 }
 
-function TerminalPane({ sessionId, isActive, initialOutput, exitInfo, onRequestClose }: TerminalPaneProps): JSX.Element {
+/** B-3 단계에서는 serialize() 가 null 스텁 — SerializeAddon 은 B-5(ADR-03)에서 붙인다. */
+export interface TerminalPaneHandle {
+  serialize(): TerminalPaneSnapshot | null
+  focus(): void
+  /** 컨테이너 크기에 맞춰 refit + PTY resize 1회. */
+  fit(): void
+}
+
+function TerminalPaneInner(
+  {
+    sessionId,
+    isActive,
+    isVisible,
+    isFocused,
+    onFocusRequest,
+    showFocusRing,
+    initialOutput,
+    exitInfo,
+    onRequestClose
+  }: TerminalPaneProps,
+  ref: ForwardedRef<TerminalPaneHandle>
+): JSX.Element {
+  const { visible, focused } = resolvePaneActivation({ isVisible, isFocused, isActive })
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const searchAddonRef = useRef<SearchAddon | null>(null)
   const search = useTerminalSearch({ sessionId, searchAddonRef, terminalRef })
+  // B-3: mount effect(1회 생성) 클로저 밖에서 최신 visible/onFocusRequest 를 참조하기 위한 ref.
+  const visibleRef = useRef(visible)
+  useEffect(() => { visibleRef.current = visible }, [visible])
+  const onFocusRequestRef = useRef(onFocusRequest)
+  useEffect(() => { onFocusRequestRef.current = onFocusRequest }, [onFocusRequest])
+  // TerminalPaneHandle.fit() 이 호출할 refit 함수 — mount effect 안에서 fitAddon 이 만들어질 때 배선된다.
+  const fitFnRef = useRef<(() => void) | null>(null)
 
   // mount effect(onData/attachCustomKeyEventHandler) 클로저는 한 번만 만들어지므로 prop 을 직접
   // 읽으면 stale 해진다 — ref 로 최신 값을 동기화해서 입력 차단 판정에 쓴다 (ADR-02 §결정 4).
@@ -40,6 +85,16 @@ function TerminalPane({ sessionId, isActive, initialOutput, exitInfo, onRequestC
 
   useEffect(() => {
     if (!containerRef.current) return
+
+    // v2.0 windows-fix ADR-v2-windows-fix-03 §4: 신형 ConPTY(빌드 21376+)에서만 reflow-off
+    // 휴리스틱을 켠다. preload 의 정적 노출값(api.system)을 쓰고, 없으면 navigator.platform
+    // 기반으로 최소 폴백한다 — 두 경우 다 osRelease 가 없으면 windowsPtyOptions 가 undefined 를
+    // 돌려주므로 현행 동작(옵션 미지정)이 그대로 유지된다.
+    const platformFallback = navigator.platform.toUpperCase().includes('WIN') ? 'win32' : navigator.platform
+    const windowsPty = windowsPtyOptions(
+      window.api?.system?.platform ?? platformFallback,
+      window.api?.system?.osRelease
+    )
 
     const terminal = new Terminal({
       theme: {
@@ -74,7 +129,8 @@ function TerminalPane({ sessionId, isActive, initialOutput, exitInfo, onRequestC
       scrollback: 10000,
       allowProposedApi: true,
       // v2.0 B-2: 이 값이 없으면 xterm 이 overview ruler(우측 매치 마커 스트립) 자체를 렌더하지 않는다.
-      overviewRulerWidth: 14
+      overviewRulerWidth: 14,
+      ...(windowsPty ? { windowsPty } : {})
     })
 
     const fitAddon = new FitAddon()
@@ -91,6 +147,13 @@ function TerminalPane({ sessionId, isActive, initialOutput, exitInfo, onRequestC
     try {
       terminal.open(containerRef.current)
     } catch {}
+
+    // B-3: onFocusRequest → 호스트가 focusedLeafId 를 갱신 (pane 은 자기 포커스를 스스로 정하지 않는다).
+    // pointerdown 캡처(컨테이너, JSX)뿐 아니라 xterm textarea 자체의 focus 도 알려야
+    // 마우스로 클릭한 뒤 xterm 이 textarea.focus() 를 호출하는 경로도 놓치지 않는다.
+    const paneTextarea = terminal.textarea
+    const handleTextareaFocus = (): void => { onFocusRequestRef.current?.() }
+    paneTextarea?.addEventListener('focus', handleTextareaFocus)
 
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
@@ -444,6 +507,8 @@ function TerminalPane({ sessionId, isActive, initialOutput, exitInfo, onRequestC
         if (wasAtBottom && term) term.scrollToBottom()
       } catch {}
     }
+    // TerminalPaneHandle.fit() 배선 — B-5 가 복원 순서(§7 13단계)에서, B-4 가 리페어런트에서 호출한다.
+    fitFnRef.current = () => safeResize(fitAddon)
 
     // ResizeObserver 를 디바운스해서 연속된 레이아웃 변경(이미지 사이드바 토글 등)에
     // fit() 이 여러 번 중복 호출되지 않도록 한다.
@@ -456,7 +521,11 @@ function TerminalPane({ sessionId, isActive, initialOutput, exitInfo, onRequestC
       resizeTimer = setTimeout(() => { resizeTimer = null; safeResize(fitAddon) }, 40)
     }
 
-    const resizeObserver = new ResizeObserver(() => debouncedSafeResize())
+    const resizeObserver = new ResizeObserver(() => {
+      // v2.0 B-3: 숨김 컨테이너의 0×0 fit 이 PTY 를 1×1 로 만드는 사고 방지 (ADR-01 §5).
+      if (!visibleRef.current) return
+      debouncedSafeResize()
+    })
     resizeObserver.observe(containerRef.current)
 
     return () => {
@@ -464,12 +533,14 @@ function TerminalPane({ sessionId, isActive, initialOutput, exitInfo, onRequestC
       searchResultsDisposable.dispose()
       resizeObserver.disconnect()
       if (resizeTimer !== null) clearTimeout(resizeTimer)
+      paneTextarea?.removeEventListener('focus', handleTextareaFocus)
       terminal.dispose()
     }
   }, [sessionId])
 
+  // v2.0 B-3: fit + PTY resize 는 visible 전환에서만 (ADR-01 §2/§5) — focus() 는 아래 별도 effect.
   useEffect(() => {
-    if (isActive && fitAddonRef.current) {
+    if (visible && fitAddonRef.current) {
       // hidden → block 전환 후 레이아웃 완료를 기다린 뒤 fit
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -477,8 +548,8 @@ function TerminalPane({ sessionId, isActive, initialOutput, exitInfo, onRequestC
           const term = terminalRef.current
           if (!fa) return
           try {
-            // 탭 전환 시 fit 후에도 bottom 을 유지한다.
-            // Why: isActive=true 로 바뀌면서 컨테이너가 visible 해지고 fitAddon 이 새 크기로
+            // reveal 후 fit 해도 bottom 을 유지한다.
+            // Why: visible=true 로 바뀌면서 컨테이너가 나타나고 fitAddon 이 새 크기로
             // resize() 를 호출하는데, 이때도 viewport 가 top 으로 튈 수 있다.
             const wasAtBottom = term
               ? term.buffer.active.viewportY >= term.buffer.active.baseY
@@ -490,11 +561,16 @@ function TerminalPane({ sessionId, isActive, initialOutput, exitInfo, onRequestC
             }
             if (wasAtBottom && term) term.scrollToBottom()
           } catch {}
-          term?.focus()
         })
       })
     }
-  }, [isActive, sessionId])
+  }, [visible, sessionId])
+
+  // v2.0 B-3: term.focus() 는 focused 전환에서만 — split 에서 "보이지만 포커스는 아닌 pane" 의
+  // 포커스를 fit 타이밍에 뺏지 않기 위해 가시성 effect 와 분리했다 (ADR-01 §2/§5).
+  useEffect(() => {
+    if (focused) terminalRef.current?.focus()
+  }, [focused])
 
   // 이미지/파일 → PTY 에 path 입력. drag-drop / clipboard paste 공용 (#2 후속 / 사용자 요청).
   // Claude Code TUI 가 이미지 path 를 알아채면 read 도구로 자동 첨부.
@@ -517,8 +593,10 @@ function TerminalPane({ sessionId, isActive, initialOutput, exitInfo, onRequestC
   }, [sessionId])
 
   // 클립보드 paste — 이미지 데이터 만 가로채고 그 외는 xterm 의 기본 paste (텍스트) 에 위임.
+  // v2.0 B-3: document 레벨 리스너라 focused 인 pane 에서만 등록한다 — 앱 전체 최대 1개
+  // (ADR-01 §2). split 이 들어와도 이 게이트 덕분에 이미지 붙여넣기 1회가 N개 PTY 로 새지 않는다.
   useEffect(() => {
-    if (!isActive) return
+    if (!focused) return
     const onPaste = (ev: Event): void => {
       const e = ev as ClipboardEvent
       const items = e.clipboardData?.items
@@ -533,11 +611,22 @@ function TerminalPane({ sessionId, isActive, initialOutput, exitInfo, onRequestC
     }
     document.addEventListener('paste', onPaste)
     return () => document.removeEventListener('paste', onPaste)
-  }, [isActive, sendFileAsPath])
+  }, [focused, sendFileAsPath])
+
+  // forwardRef handle — B-4 는 호스트가 focus()/fit() 을 명령형으로 부를 때, B-5 는 serialize()
+  // 로 스냅샷을 당길 때 쓴다. serialize() 는 B-3 단계에서 addon 미로드라 null 스텁이다.
+  useImperativeHandle(ref, () => ({
+    serialize: () => null,
+    focus: () => { terminalRef.current?.focus() },
+    fit: () => { fitFnRef.current?.() }
+  }), [])
 
   return (
     <div
-      className={`absolute inset-0 ${isActive ? 'z-10' : 'z-0 pointer-events-none invisible'}`}
+      className={`absolute inset-0 ${visible ? 'z-10' : 'z-0 pointer-events-none invisible'} ${
+        showFocusRing && focused ? 'border-[1.5px] border-clauday-blue rounded-sm' : ''
+      }`}
+      onPointerDownCapture={() => onFocusRequest?.()}
       onDragOver={(e) => {
         // v2.0 B-1: 파일 드롭도 입력 차단 대상 (경로 ③, sendFileAsPath 로 귀결).
         if (exitInfoRef.current) return
@@ -553,9 +642,10 @@ function TerminalPane({ sessionId, isActive, initialOutput, exitInfo, onRequestC
         for (const f of files) await sendFileAsPath(f)
       }}
     >
-      {/* terminal 컨테이너 — 사이드 패널 열린 만큼 right padding 줘서 안 가리게 */}
+      {/* terminal 컨테이너 — 사이드 패널 열린 만큼 right padding 줘서 안 가리게. showFocusRing
+          호스트(SplitLayout, B-4)에서만 비포커스 pane 출력을 dim 한다 (목업 .pane.dimmed .tout). */}
       <div ref={containerRef}
-        className="absolute inset-0"
+        className={`absolute inset-0 ${showFocusRing && !focused ? 'opacity-70' : ''}`}
         style={{ padding: '4px 8px', paddingRight: imageSidebarOpen ? 'calc(8px + 220px)' : 8 }} />
 
       {/* #2 이미지 사이드 패널 토글 — 우측 가장자리 작은 탭 */}
@@ -693,5 +783,9 @@ function ImageRow({ path }: { path: string }): JSX.Element {
     </button>
   )
 }
+
+// forwardRef 로 감싸면 devtools 컴포넌트 이름이 사라지므로 displayName 을 명시한다.
+const TerminalPane = forwardRef(TerminalPaneInner)
+TerminalPane.displayName = 'TerminalPane'
 
 export default TerminalPane

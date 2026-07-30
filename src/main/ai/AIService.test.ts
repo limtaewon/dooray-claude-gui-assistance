@@ -188,6 +188,48 @@ describe('AIService.ask (스트리밍)', () => {
     }
   })
 
+  it('claudeSpawnCommand 계약 — darwin 은 shell:false, windowsVerbatimArguments:false (ADR-v2-windows-fix-02 §2)', async () => {
+    const orig = process.platform
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+    try {
+      const svc = new AIService()
+      const promise = svc.ask('hello')
+      await Promise.resolve()
+      const cp = (await import('child_process')).spawn as unknown as { mock: { calls: unknown[][] } }
+      const opts = cp.mock.calls[cp.mock.calls.length - 1][2] as { shell: boolean; windowsVerbatimArguments: boolean }
+      expect(opts.shell).toBe(false)
+      expect(opts.windowsVerbatimArguments).toBe(false)
+      lastSpawn!.stdout.emit('data', Buffer.from(JSON.stringify({
+        type: 'result', result: 'ok', duration_ms: 0, session_id: '', is_error: false, total_cost_usd: 0
+      }) + '\n', 'utf8'))
+      lastSpawn!.emitClose(0)
+      await promise
+    } finally {
+      Object.defineProperty(process, 'platform', { value: orig, configurable: true })
+    }
+  })
+
+  it('claudeSpawnCommand 계약 — win32 은 shell:true, windowsVerbatimArguments:true (인용 포함, ADR-v2-windows-fix-02 §2)', async () => {
+    const orig = process.platform
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+    try {
+      const svc = new AIService()
+      const promise = svc.ask('hello')
+      await Promise.resolve()
+      const cp = (await import('child_process')).spawn as unknown as { mock: { calls: unknown[][] } }
+      const opts = cp.mock.calls[cp.mock.calls.length - 1][2] as { shell: boolean; windowsVerbatimArguments: boolean }
+      expect(opts.shell).toBe(true)
+      expect(opts.windowsVerbatimArguments).toBe(true)
+      lastSpawn!.stdout.emit('data', Buffer.from(JSON.stringify({
+        type: 'result', result: 'ok', duration_ms: 0, session_id: '', is_error: false, total_cost_usd: 0
+      }) + '\n', 'utf8'))
+      lastSpawn!.emitClose(0)
+      await promise
+    } finally {
+      Object.defineProperty(process, 'platform', { value: orig, configurable: true })
+    }
+  })
+
   it('raw stdout fallback — stream-json 라인이 없어도 평문 stdout 을 result 로 사용 (Windows 일부 환경 회복)', async () => {
     const svc = new AIService()
     const promise = svc.ask('안녕')
@@ -198,6 +240,21 @@ describe('AIService.ask (스트리밍)', () => {
     const result = await promise
     expect(result).toContain('오늘의 요약')
     expect(result).toContain('항목 1')
+  })
+
+  it('stdout chunk 경계에서 멀티바이트가 쪼개져도 깨지지 않는다 (StringDecoder 경계 보존, ADR-v2-windows-fix-02 §5)', async () => {
+    const svc = new AIService()
+    const promise = svc.ask('안녕')
+    await Promise.resolve()
+    const full = Buffer.from('## 한글 응답 테스트\n', 'utf8')
+    // '## ' 뒤 3바이트 멀티바이트 문자('한') 중간(2바이트만)에서 청크를 쪼갠다.
+    const splitAt = 5
+    lastSpawn!.stdout.emit('data', full.subarray(0, splitAt))
+    lastSpawn!.stdout.emit('data', full.subarray(splitAt))
+    lastSpawn!.emitClose(0)
+    const result = await promise
+    expect(result).not.toContain('�')
+    expect(result).toContain('한글 응답 테스트')
   })
 
   it('runClaudeStream 통합 — final result 가 result 필드 반환', async () => {

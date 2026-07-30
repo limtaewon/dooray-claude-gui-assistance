@@ -58,6 +58,9 @@ import { WatcherService } from './watcher/WatcherService'
 import { AiRecommendNotifier } from './ai-recommend/AiRecommendNotifier'
 import { cleanFirstMessage } from './claude/sessionPreview'
 import { AIService, setUserAnthropicApiKey, getClaudeBin } from './ai/AIService'
+import { claudeSpawnCommand } from './utils/claudeBin'
+import { formatProjectLabel } from './utils/claudeProjects'
+import { expandHome } from './utils/paths'
 import { ClaudeChatService } from './claude/ClaudeChatService'
 import { ClaudeSessionService } from './claude/ClaudeSessionService'
 import { AttachmentService } from './claude/AttachmentService'
@@ -462,12 +465,9 @@ function registerIpcHandlers(): void {
   const imageDataUrlCache = new Map<string, { url: string; mtimeMs: number; size: number }>()
   ipcMain.handle(IPC_CHANNELS.SHELL_READ_IMAGE_DATAURL, async (_, target: string): Promise<{ ok: boolean; dataUrl?: string; error?: string }> => {
     if (!target || typeof target !== 'string') return { ok: false, error: 'invalid target' }
-    const { homedir } = await import('os')
     const fs = await import('fs')
     const { extname, basename } = await import('path')
-    const expanded = target.startsWith('~/') || target === '~'
-      ? target.replace(/^~/, homedir())
-      : target
+    const expanded = expandHome(target)
     try {
       const stat = await fs.promises.stat(expanded)
       if (!stat.isFile()) return { ok: false, error: 'not a file' }
@@ -496,10 +496,7 @@ function registerIpcHandlers(): void {
   // Show in Finder / Explorer — 파일의 부모 폴더 열고 해당 파일을 highlight (Warp 풍 hover 액션).
   ipcMain.handle(IPC_CHANNELS.SHELL_SHOW_IN_FOLDER, async (_, target: string) => {
     if (!target || typeof target !== 'string') return { ok: false, error: 'invalid target' }
-    const { homedir } = await import('os')
-    const expanded = target.startsWith('~/') || target === '~'
-      ? target.replace(/^~/, homedir())
-      : target
+    const expanded = expandHome(target)
     try {
       shell.showItemInFolder(expanded)
       return { ok: true }
@@ -517,10 +514,7 @@ function registerIpcHandlers(): void {
       await shell.openExternal(target)
       return { ok: true }
     }
-    const { homedir } = await import('os')
-    const expanded = target.startsWith('~/') || target === '~'
-      ? target.replace(/^~/, homedir())
-      : target
+    const expanded = expandHome(target)
     const err = await shell.openPath(expanded)
     return err ? { ok: false, error: err } : { ok: true }
   })
@@ -1197,16 +1191,16 @@ function registerIpcHandlers(): void {
     const { homedir } = await import('os')
     const base = join(homedir(), '.claude', 'projects')
 
-    const parseFirstMessage = (fp: string): Promise<{ firstMsg: string; timestamp: string; lines: number }> =>
+    const parseFirstMessage = (fp: string): Promise<{ firstMsg: string; timestamp: string; lines: number; cwd?: string }> =>
       new Promise((resolve) => {
-        let firstMsg = '', timestamp = '', lines = 0, buf = ''
+        let firstMsg = '', timestamp = '', lines = 0, buf = '', cwd: string | undefined
         const stream = fs.createReadStream(fp, { encoding: 'utf-8', highWaterMark: 32 * 1024 })
         let done = false
         const finish = (): void => {
           if (done) return
           done = true
           stream.destroy()
-          resolve({ firstMsg, timestamp, lines })
+          resolve({ firstMsg, timestamp, lines, cwd })
         }
         stream.on('data', (chunk: string | Buffer) => {
           buf += chunk.toString()
@@ -1216,21 +1210,25 @@ function registerIpcHandlers(): void {
             buf = buf.substring(idx + 1)
             if (line) {
               lines++
-              if (!firstMsg) {
+              // firstMsg 를 이미 찾았어도 cwd 를 아직 못 찾았으면 계속 파싱 (같은 스트림, 추가 I/O 0).
+              if (!firstMsg || cwd === undefined) {
                 try {
                   const d = JSON.parse(line)
-                  if (d.type === 'user') {
+                  if (!firstMsg && d.type === 'user') {
                     const msg = d.message || {}
                     let c = msg.content || ''
                     if (Array.isArray(c)) c = c.map((x: Record<string, string>) => x.text || '').join(' ')
                     firstMsg = cleanFirstMessage(String(c))
                     timestamp = d.timestamp || ''
                   }
+                  if (cwd === undefined && typeof d.cwd === 'string') {
+                    cwd = d.cwd
+                  }
                 } catch {}
               }
             }
-            // 첫 메시지 찾고 50줄 샘플했으면 조기 종료
-            if (firstMsg && lines >= 50) { finish(); return }
+            // 첫 메시지와 cwd 를 모두 찾았으면 조기 종료. 못 찾았으면 50줄 상한에서 종료 (cwd 는 포기).
+            if (firstMsg && (cwd !== undefined || lines >= 50)) { finish(); return }
           }
         })
         stream.on('end', finish)
@@ -1251,11 +1249,6 @@ function registerIpcHandlers(): void {
         const entries = await fsp.readdir(projPath)
         files = entries.filter((f) => f.endsWith('.jsonl') && !f.includes('subagent'))
       } catch { return }
-      const rawPath = projDir.replace(/-/g, '/')
-      const homeNorm = require('os').homedir().replace(/\\/g, '/')
-      const project = rawPath.startsWith(homeNorm + '/')
-        ? '~/' + rawPath.slice(homeNorm.length + 1)
-        : rawPath.replace(/^\//, '')
 
       await Promise.all(files.map(async (file) => {
         const fp = join(projPath, file)
@@ -1271,6 +1264,8 @@ function registerIpcHandlers(): void {
         }
         const parsed = await parseFirstMessage(fp)
         if (parsed.firstMsg && !parsed.firstMsg.startsWith('Caveat:')) {
+          // 라벨은 jsonl 의 cwd 에서만 만든다. 역치환은 하지 않는다 — cwd 를 못 얻으면 인코딩된 디렉터리명 그대로 (ADR-v2-windows-fix-01 §3).
+          const project = formatProjectLabel({ cwd: parsed.cwd, encodedDirName: projDir })
           const meta: SessionMeta = { id: sid, project, firstMsg: parsed.firstMsg, timestamp: parsed.timestamp, lines: parsed.lines }
           sessionCache.set(sid, { meta, mtimeMs: stat.mtimeMs, size: stat.size, path: fp })
           sessions.push(meta)
@@ -1409,9 +1404,12 @@ ${data}`,
     // 사용자 PATH 우선 — extraPaths 는 fallback (구버전 claude 가 우리 prepend 로 잡히는 문제 방지)
     const richEnv = { ...process.env, PATH: [process.env.PATH || '', ...extraPaths].join(pathDelim), DISABLE_OMC: '1' }
     const { decodeProcessText } = require('./utils/procText') as typeof import('./utils/procText')
+    // command/shell 은 claudeSpawnCommand 단일 계약에서만 나온다 (ADR-v2-windows-fix-02 §2).
+    // 이전엔 문자열 'claude' 를 shell 미경유로 넘겨 PATHEXT 해석이 안 돼 Windows 에서 ENOENT 였다.
+    const { command, shell } = claudeSpawnCommand({ bin: getClaudeBin() })
     const run = (args: string[]): Promise<string> => new Promise((resolve) => {
       // Windows cp949 mojibake 방지 — raw Buffer 로 받아 자동 디코드.
-      execFile('claude', args, { timeout: 5000, env: richEnv, encoding: 'buffer' }, (err: Error | null, stdoutBuf: Buffer, stderrBuf: Buffer) => {
+      execFile(command, args, { timeout: 5000, env: richEnv, encoding: 'buffer', shell }, (err: Error | null, stdoutBuf: Buffer, stderrBuf: Buffer) => {
         const stdout = decodeProcessText(stdoutBuf)
         const stderr = decodeProcessText(stderrBuf)
         resolve(stdout || stderr || (err?.message ?? ''))

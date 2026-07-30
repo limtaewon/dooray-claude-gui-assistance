@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { homedir } from 'os'
-import { expandHome, samePath, normalizePathForCompare } from './paths'
+import { expandHome, samePath, normalizePathForCompare, isPathInside } from './paths'
 
 describe('expandHome', () => {
   const home = '/Users/nhn'
@@ -134,6 +134,49 @@ describe('normalizePathForCompare — platform 인자 생략 시 process.platfor
     Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
     try {
       expect(normalizePathForCompare('C:\\Repo')).toBe('c:/repo')
+    } finally {
+      Object.defineProperty(process, 'platform', { value: orig, configurable: true })
+    }
+  })
+})
+
+describe('isPathInside', () => {
+  it('동일 경로는 true', () => {
+    expect(isPathInside('/repo/wt', '/repo/wt', { platform: 'darwin' })).toBe(true)
+  })
+
+  it('하위 경로는 true (여러 단계)', () => {
+    expect(isPathInside('/repo/wt', '/repo/wt/src/nested/a.ts', { platform: 'darwin' })).toBe(true)
+  })
+
+  it('형제 경로(접두사만 같음)는 false — 세그먼트 기준 판정', () => {
+    expect(isPathInside('/repo/wt', '/repo/wt-2', { platform: 'darwin' })).toBe(false)
+    expect(isPathInside('/repo/agent', '/repo/agent-old/123', { platform: 'darwin' })).toBe(false)
+  })
+
+  it('부모 밖 경로는 false', () => {
+    expect(isPathInside('/repo/wt', '/other/path', { platform: 'darwin' })).toBe(false)
+  })
+
+  it('win32 는 대소문자를 무시한다', () => {
+    expect(isPathInside('C:\\repo\\wt', 'c:/repo/wt/sub', { platform: 'win32' })).toBe(true)
+  })
+
+  it('후행 구분자 유무를 무시한다', () => {
+    expect(isPathInside('/repo/wt/', '/repo/wt/sub', { platform: 'darwin' })).toBe(true)
+    expect(isPathInside('/repo/wt', '/repo/wt/', { platform: 'darwin' })).toBe(true)
+  })
+
+  it('win32 UNC 경로의 하위 판정', () => {
+    expect(isPathInside('\\\\server\\share', '//server/share/sub', { platform: 'win32' })).toBe(true)
+    expect(isPathInside('\\\\server\\share', '\\\\server\\other\\sub', { platform: 'win32' })).toBe(false)
+  })
+
+  it('platform 옵션 생략 시 process.platform 사용', () => {
+    const orig = process.platform
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+    try {
+      expect(isPathInside('C:\\repo', 'c:/repo/sub')).toBe(true)
     } finally {
       Object.defineProperty(process, 'platform', { value: orig, configurable: true })
     }

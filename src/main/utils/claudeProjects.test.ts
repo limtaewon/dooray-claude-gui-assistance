@@ -7,7 +7,8 @@ import {
   claudeProjectsRoot,
   readSessionCwd,
   findProjectDir,
-  findProjectDirDetailed
+  findProjectDirDetailed,
+  formatProjectLabel
 } from './claudeProjects'
 import { MEASURED_CLAUDE_PROJECT_DIRS, BOUNDARY_CLAUDE_PROJECT_DIRS } from './__fixtures__/claudeProjectDirs'
 
@@ -294,5 +295,49 @@ describe('findProjectDir', () => {
     // 3단 전체 스캔의 readdir 이 모두 ENOENT 로 실패하는 경로를 같이 방어하는지 확인.
     const cwd = '/' + 'c'.repeat(220)
     await expect(findProjectDir(cwd, { configDir })).resolves.toBeUndefined()
+  })
+})
+
+describe('formatProjectLabel — 세션 목록 표시 라벨 (ADR-v2-windows-fix-01 §3)', () => {
+  it('darwin: 홈 하위 경로는 ~/... 로 축약', () => {
+    const label = formatProjectLabel(
+      { cwd: '/Users/nhn/Desktop/x', encodedDirName: '-Users-nhn-Desktop-x' },
+      { home: '/Users/nhn', platform: 'darwin' }
+    )
+    expect(label).toBe('~/Desktop/x')
+  })
+
+  it('darwin: 홈 밖 경로는 절대경로 그대로', () => {
+    const label = formatProjectLabel(
+      { cwd: '/opt/work', encodedDirName: '-opt-work' },
+      { home: '/Users/nhn', platform: 'darwin' }
+    )
+    expect(label).toBe('/opt/work')
+  })
+
+  it('win32: 대소문자가 다른 홈이어도 ~/... 로 축약', () => {
+    const label = formatProjectLabel(
+      { cwd: 'C:\\Users\\me\\proj', encodedDirName: 'C--Users-me-proj' },
+      { home: 'C:\\Users\\Me', platform: 'win32' }
+    )
+    expect(label).toBe('~/proj')
+  })
+
+  it('cwd 를 모르면 인코딩된 디렉터리명을 그대로 반환한다 (추측 경로 생성 금지)', () => {
+    const label = formatProjectLabel(
+      { encodedDirName: '-Users-nhn-Desktop-2NEON' },
+      { home: '/Users/nhn', platform: 'darwin' }
+    )
+    expect(label).toBe('-Users-nhn-Desktop-2NEON')
+    // 역치환 재발 방지 — cwd 미상 라벨에는 '/' 가 섞여 나오면 안 된다 (인코딩 문자열은 '-' 만 씀).
+    expect(label.includes('/')).toBe(false)
+  })
+
+  it('cwd 가 홈과 정확히 같으면 ~ 하나만 반환', () => {
+    const label = formatProjectLabel(
+      { cwd: '/Users/nhn', encodedDirName: '-Users-nhn' },
+      { home: '/Users/nhn', platform: 'darwin' }
+    )
+    expect(label).toBe('~')
   })
 })

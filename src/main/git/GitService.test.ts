@@ -7,9 +7,29 @@ const requestLog: string[][] = []
 // fs.existsSync — 테스트에서는 기본 true (path 가 실제 fs 에 있는 척).
 // stale-worktree 케이스 별도 테스트는 mockReturnValueOnce(false) 로 override.
 const existsSyncMock = vi.fn((_p?: unknown) => true)
+// addToInfoExclude 용 — 기본은 파일 없음(빈 문자열) + mkdir/write 성공.
+const readFileSyncMock = vi.fn((_p?: unknown, _enc?: unknown) => '')
+const mkdirSyncMock = vi.fn()
+const writeFilePromiseMock = vi.fn(async (..._args: unknown[]) => undefined)
+const renamePromiseMock = vi.fn(async (..._args: unknown[]) => undefined)
+const unlinkPromiseMock = vi.fn(async (..._args: unknown[]) => undefined)
+
+function fsMockShape(): Record<string, unknown> {
+  return {
+    existsSync: (p: unknown) => existsSyncMock(p),
+    readFileSync: (p: unknown, enc?: unknown) => readFileSyncMock(p, enc),
+    mkdirSync: (p: unknown, opts?: unknown) => mkdirSyncMock(p, opts),
+    promises: {
+      writeFile: (...args: unknown[]) => writeFilePromiseMock(...args),
+      rename: (...args: unknown[]) => renamePromiseMock(...args),
+      unlink: (...args: unknown[]) => unlinkPromiseMock(...args)
+    }
+  }
+}
+
 vi.mock('fs', () => ({
-  existsSync: (p: unknown) => existsSyncMock(p),
-  default: { existsSync: (p: unknown) => existsSyncMock(p) }
+  ...fsMockShape(),
+  default: fsMockShape()
 }))
 
 vi.mock('child_process', () => {
@@ -48,6 +68,11 @@ import { GitService } from './GitService'
 beforeEach(() => {
   responses.clear()
   requestLog.length = 0
+  readFileSyncMock.mockReset().mockReturnValue('')
+  mkdirSyncMock.mockReset()
+  writeFilePromiseMock.mockReset().mockResolvedValue(undefined)
+  renamePromiseMock.mockReset().mockResolvedValue(undefined)
+  unlinkPromiseMock.mockReset().mockResolvedValue(undefined)
   existsSyncMock.mockReturnValue(true)
 })
 
@@ -273,5 +298,92 @@ describe('GitService.compareBranches / compareFile', () => {
     mockGitError('show feature:src/x.ts', 'fatal: bad revision')
     const r = await new GitService().compareFile('/r', 'src/x.ts', 'main', 'feature')
     expect(r.rightContent).toBe('(파일 없음)')
+  })
+})
+
+describe('GitService.deleteBranch', () => {
+  it('정상 argv — force 시 -D', async () => {
+    mockGit('branch -D', '')
+    await new GitService().deleteBranch('/r', 'feature/x', { force: true })
+    expect(requestLog.some((a) => a.join(' ') === 'branch -D -- feature/x')).toBe(true)
+  })
+
+  it('force 없으면 -d (안전 삭제)', async () => {
+    mockGit('branch -d', '')
+    await new GitService().deleteBranch('/r', 'feature/x')
+    expect(requestLog.some((a) => a.join(' ') === 'branch -d -- feature/x')).toBe(true)
+  })
+
+  it('위험 ref 는 git 호출 없이 throw', async () => {
+    const svc = new GitService()
+    await expect(svc.deleteBranch('/r', '-x')).rejects.toThrow(/유효하지 않은/)
+    await expect(svc.deleteBranch('/r', 'a..b')).rejects.toThrow(/유효하지 않은/)
+    await expect(svc.deleteBranch('/r', 'a;rm')).rejects.toThrow(/유효하지 않은/)
+    expect(requestLog).toHaveLength(0)
+  })
+
+  it('git 실패 시 stderr 그대로 전달', async () => {
+    mockGitError('branch -d', 'error: branch not fully merged')
+    await expect(new GitService().deleteBranch('/r', 'feature/x')).rejects.toThrow(/not fully merged/)
+  })
+})
+
+describe('GitService.addToInfoExclude', () => {
+  it('파일 없음 → 생성(sentinel + 패턴 기록, true 반환)', async () => {
+    existsSyncMock.mockReturnValue(false)
+    mockGit('rev-parse --git-common-dir', '/repo/.git')
+    const wrote = await new GitService().addToInfoExclude('/repo/.x-worktrees/feature-x', ['.claude/settings.local.json'])
+    expect(wrote).toBe(true)
+    expect(writeFilePromiseMock).toHaveBeenCalledTimes(1)
+    const written = writeFilePromiseMock.mock.calls[0][1] as string
+    expect(written).toContain('# Clauday (v2.0 워크스페이스) — 자동 추가')
+    expect(written).toContain('.claude/settings.local.json')
+  })
+
+  it('이미 정확히 같은 라인이 있으면 재기록 안 함(false)', async () => {
+    existsSyncMock.mockReturnValue(true)
+    readFileSyncMock.mockReturnValue('# Clauday (v2.0 워크스페이스) — 자동 추가\n.claude/settings.local.json\n')
+    mockGit('rev-parse --git-common-dir', '/repo/.git')
+    const wrote = await new GitService().addToInfoExclude('/repo/.x-worktrees/feature-x', ['.claude/settings.local.json'])
+    expect(wrote).toBe(false)
+    expect(writeFilePromiseMock).not.toHaveBeenCalled()
+  })
+
+  it('--git-common-dir 가 상대경로일 때 worktreePath 기준으로 resolve', async () => {
+    existsSyncMock.mockReturnValue(false)
+    mockGit('rev-parse --git-common-dir', '../../.git')
+    await new GitService().addToInfoExclude('/repo/.x-worktrees/feature-x', ['.claude/settings.local.json'])
+    const [writtenPath] = writeFilePromiseMock.mock.calls[0]
+    expect(String(writtenPath)).not.toMatch(/\.\./)
+    expect(String(writtenPath)).toContain('info')
+    expect(String(writtenPath)).toContain('exclude')
+  })
+
+  it('쓰기 실패 시 throw(호출부가 warning 으로 처리)', async () => {
+    existsSyncMock.mockReturnValue(false)
+    mockGit('rev-parse --git-common-dir', '/repo/.git')
+    writeFilePromiseMock.mockRejectedValueOnce(new Error('EACCES'))
+    await expect(
+      new GitService().addToInfoExclude('/repo/.x-worktrees/feature-x', ['.claude/settings.local.json'])
+    ).rejects.toThrow('EACCES')
+  })
+})
+
+describe('GitService.fetchRemote', () => {
+  it('기본 remote(origin) 로 fetch --prune', async () => {
+    mockGit('fetch --prune origin', '')
+    await new GitService().fetchRemote('/r')
+    expect(requestLog.some((a) => a.join(' ') === 'fetch --prune origin')).toBe(true)
+  })
+
+  it('remote 를 지정하면 그대로 전달', async () => {
+    mockGit('fetch --prune upstream', '')
+    await new GitService().fetchRemote('/r', 'upstream')
+    expect(requestLog.some((a) => a.join(' ') === 'fetch --prune upstream')).toBe(true)
+  })
+
+  it('실패는 그대로 throw(호출부가 best-effort 로 처리)', async () => {
+    mockGitError('fetch --prune', 'could not resolve host')
+    await expect(new GitService().fetchRemote('/r')).rejects.toThrow(/could not resolve host/)
   })
 })

@@ -3,7 +3,7 @@ import { createInterface } from 'readline'
 import { homedir } from 'os'
 import { join } from 'path'
 import { realpath } from 'fs/promises'
-import { samePath } from './paths'
+import { samePath, normalizePathForCompare } from './paths'
 
 const MAX_ENCODED_LEN = 200
 
@@ -207,4 +207,29 @@ export async function findProjectDirDetailed(
 export async function findProjectDir(cwd: string, opts?: FindProjectDirOptions): Promise<string | undefined> {
   const hit = await findProjectDirDetailed(cwd, opts)
   return hit?.dir
+}
+
+/**
+ * 세션 목록에 표시할 프로젝트 라벨. cwd 를 알면 홈 기준 `~/...` 로 축약, 모르면
+ * 인코딩된 디렉터리명을 그대로 노출한다 — 추측 경로를 만들지 않는다 (근거: ADR-v2-windows-fix-01 §3).
+ */
+export function formatProjectLabel(
+  params: { cwd?: string; encodedDirName: string },
+  opts?: { home?: string; platform?: NodeJS.Platform }
+): string {
+  const { cwd, encodedDirName } = params
+  if (!cwd) return encodedDirName
+
+  const platform = opts?.platform ?? process.platform
+  const home = opts?.home ?? homedir()
+  const normalizedCwd = normalizePathForCompare(cwd, platform)
+  const normalizedHome = normalizePathForCompare(home, platform)
+
+  if (normalizedCwd === normalizedHome) return '~'
+  if (normalizedCwd.startsWith(`${normalizedHome}/`)) {
+    // 비교는 정규화(소문자/구분자 통일)된 값으로 하되, 표시는 원본 cwd 기반 — 정규화가 화면에 새지 않게.
+    const suffix = cwd.slice(home.length).replace(/\\/g, '/')
+    return `~${suffix}`
+  }
+  return cwd
 }

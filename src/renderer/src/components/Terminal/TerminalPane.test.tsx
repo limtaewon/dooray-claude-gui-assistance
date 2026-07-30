@@ -1,5 +1,5 @@
 /**
- * TerminalPane 단위 테스트 — v2.0 B-1 종료 오버레이 · 입력 차단 회귀 게이트.
+ * TerminalPane 단위 테스트 — v2.0 B-1 종료 오버레이 · 입력 차단 회귀 게이트 + B-3 isVisible/isFocused 분리.
  *
  * xterm(@xterm/xterm, @xterm/addon-*)은 canvas/native 렌더러에 의존해 jsdom 에서 신뢰할 수
  * 없다 — TerminalManager.test.ts 의 node-pty mock 과 동일하게 boundary 에서 대체한다.
@@ -9,8 +9,12 @@
  * mount effect(onData/attachCustomKeyEventHandler)의 클로저는 한 번만 만들어지므로,
  * exitInfo prop 을 직접 읽으면 이후 prop 변경이 입력 차단에 반영되지 않는 회귀가 생긴다.
  * 아래 테스트는 "마운트 시점엔 exitInfo 가 없다가 리렌더로 생기는" 순서를 재현해 이 함정을 고정한다.
+ *
+ * B-3 섹션은 레거시 `isActive` 케이스(위)를 전부 수정 없이 통과시키는 것 자체가 무회귀 증거이고,
+ * 그 아래에 `isVisible`/`isFocused`/`forwardRef` 신규 계약을 추가로 고정한다 (ADR-v2-terminal-p2-01).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { createRef } from 'react'
 import { fireEvent, waitFor } from '@testing-library/react'
 import { installMockWindowApi, resetMockWindowApi } from '../../../../../test/helpers/mockWindowApi'
 import { renderWithDs } from '../../../../../test/helpers/renderWithDs'
@@ -34,15 +38,19 @@ interface FakeTerminalHandle {
 
 // 마지막으로 생성된 Terminal mock 인스턴스 핸들 — TerminalManager.test.ts 의 `lastPty` 패턴과 동일.
 let lastTerminal: FakeTerminalHandle | null = null
+// B-3: windowsPty 옵션이 생성자에 실제로 전달됐는지 검증하기 위한 마지막 생성자 인자 캡처.
+let lastTerminalOptions: Record<string, unknown> | undefined
 
 vi.mock('@xterm/xterm', () => {
   class FakeTerminal {
     buffer = { active: { viewportY: 0, baseY: 0, cursorX: 0, cursorY: 0 } }
     unicode = { activeVersion: '6' }
+    textarea: undefined = undefined
     private dataHandler: ((data: string) => void) | null = null
     private keyHandler: ((event: FakeKeyEvent) => boolean) | null = null
 
-    constructor() {
+    constructor(options?: Record<string, unknown>) {
+      lastTerminalOptions = options
       lastTerminal = {
         emitData: (data: string) => this.dataHandler?.(data),
         emitKey: (event: FakeKeyEvent) => (this.keyHandler ? this.keyHandler(event) : true)
@@ -75,7 +83,7 @@ vi.mock('@xterm/xterm', () => {
 vi.mock('@xterm/addon-fit', () => ({
   FitAddon: class {
     fit(): void {}
-    proposeDimensions(): undefined { return undefined }
+    proposeDimensions(): { cols: number; rows: number } { return { cols: 80, rows: 24 } }
   }
 }))
 
@@ -99,6 +107,7 @@ class FakeResizeObserver {
 }
 
 import TerminalPane from './TerminalPane'
+import type { TerminalPaneHandle } from './TerminalPane'
 
 function currentTerminal(): FakeTerminalHandle {
   if (!lastTerminal) throw new Error('Terminal mock 인스턴스가 아직 생성되지 않았다')
@@ -123,6 +132,7 @@ describe('TerminalPane — v2.0 B-1 종료 오버레이 / 입력 차단', () => 
     // @ts-expect-error jsdom 폴리필 — 프로덕션 전역엔 존재
     globalThis.ResizeObserver = FakeResizeObserver
     lastTerminal = null
+    lastTerminalOptions = undefined
   })
 
   afterEach(() => {
@@ -257,6 +267,103 @@ describe('TerminalPane — v2.0 B-1 종료 오버레이 / 입력 차단', () => 
       // 비동기 no-op 이 조용히 끝날 시간을 준다 — 이후에도 input 은 호출되지 않아야 한다.
       await new Promise((r) => setTimeout(r, 0))
       expect(window.api.terminal.input).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('v2.0 B-3 — isVisible/isFocused 분리 (ADR-v2-terminal-p2-01)', () => {
+    function makePathedFile(path: string): File {
+      const file = new File(['x'], 'shot.png', { type: 'image/png' })
+      Object.defineProperty(file, 'path', { value: path })
+      return file
+    }
+
+    it('focused: false 인 pane 은 document paste 리스너를 등록하지 않는다', () => {
+      const addSpy = vi.spyOn(document, 'addEventListener')
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused={false} />)
+      expect(addSpy.mock.calls.some(([type]) => type === 'paste')).toBe(false)
+      addSpy.mockRestore()
+    })
+
+    it('focused: true 인 pane 은 document paste 리스너를 등록한다', () => {
+      const addSpy = vi.spyOn(document, 'addEventListener')
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused />)
+      expect(addSpy.mock.calls.some(([type]) => type === 'paste')).toBe(true)
+      addSpy.mockRestore()
+    })
+
+    it('레거시 isActive={true} 는 isVisible/isFocused 를 생략해도 paste 리스너를 등록한다 (현행 동일)', () => {
+      const addSpy = vi.spyOn(document, 'addEventListener')
+      renderWithDs(<TerminalPane sessionId="s1" isActive />)
+      expect(addSpy.mock.calls.some(([type]) => type === 'paste')).toBe(true)
+      addSpy.mockRestore()
+    })
+
+    it('분할 시뮬레이션 — visible 2개 중 focused 1개일 때 이미지 붙여넣기 1회 → saveAttachment 1회', async () => {
+      renderWithDs(
+        <>
+          <TerminalPane sessionId="s1" isVisible isFocused />
+          <TerminalPane sessionId="s2" isVisible isFocused={false} />
+        </>
+      )
+      const dataTransfer = {
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => makePathedFile('/tmp/shot.png') }]
+      }
+      const pasteEvent = new Event('paste', { bubbles: true }) as unknown as ClipboardEvent
+      Object.defineProperty(pasteEvent, 'clipboardData', { value: dataTransfer })
+      document.dispatchEvent(pasteEvent)
+
+      await waitFor(() => {
+        expect(window.api.terminal.input).toHaveBeenCalledTimes(1)
+        expect(window.api.terminal.input).toHaveBeenCalledWith('s1', '/tmp/shot.png ')
+      })
+    })
+
+    it('visible 전환에서만 terminal.resize 가 발생하고, focused 단독 전환에서는 발생하지 않는다', async () => {
+      const { rerender } = renderWithDs(<TerminalPane sessionId="s1" isVisible={false} isFocused={false} />)
+      // 마운트 rAF(무조건 1회 fit+resize)가 끝나길 기다린 뒤 카운트를 리셋한다.
+      await waitFor(() => expect(window.api.terminal.resize).toHaveBeenCalled())
+      vi.mocked(window.api.terminal.resize).mockClear()
+
+      rerender(<TerminalPane sessionId="s1" isVisible={false} isFocused />)
+      await new Promise((r) => setTimeout(r, 50))
+      expect(window.api.terminal.resize).not.toHaveBeenCalled()
+
+      rerender(<TerminalPane sessionId="s1" isVisible isFocused />)
+      await waitFor(() => {
+        expect(window.api.terminal.resize).toHaveBeenCalledWith({ id: 's1', cols: 80, rows: 24 })
+      })
+    })
+
+    it('ref.current.serialize() 는 addon 미로드 상태에서도 null 을 반환한다 (throw 없음)', () => {
+      const ref = createRef<TerminalPaneHandle>()
+      renderWithDs(<TerminalPane ref={ref} sessionId="s1" isVisible isFocused />)
+      expect(ref.current?.serialize()).toBeNull()
+    })
+
+    it('ref.current.focus()/fit() 이 예외 없이 동작한다', () => {
+      const ref = createRef<TerminalPaneHandle>()
+      renderWithDs(<TerminalPane ref={ref} sessionId="s1" isVisible isFocused />)
+      expect(() => ref.current?.focus()).not.toThrow()
+      expect(() => ref.current?.fit()).not.toThrow()
+    })
+  })
+
+  describe('v2.0 windows-fix ADR-v2-windows-fix-03 §4 — windowsPty 게이트', () => {
+    it('api.system 이 win32/21376+ 이면 Terminal 생성자 옵션에 windowsPty 가 포함된다', () => {
+      window.api.system = { platform: 'win32', osRelease: '10.0.22621' }
+      renderWithDs(<TerminalPane sessionId="s1" isActive />)
+      expect(lastTerminalOptions?.windowsPty).toEqual({ backend: 'conpty', buildNumber: 22621 })
+    })
+
+    it('api.system 이 darwin 이면 windowsPty 가 포함되지 않는다 (mock 기본값)', () => {
+      renderWithDs(<TerminalPane sessionId="s1" isActive />)
+      expect(lastTerminalOptions?.windowsPty).toBeUndefined()
+    })
+
+    it('api.system 이 win32 라도 구형 빌드(21376 미만)면 windowsPty 가 포함되지 않는다', () => {
+      window.api.system = { platform: 'win32', osRelease: '10.0.19044' }
+      renderWithDs(<TerminalPane sessionId="s1" isActive />)
+      expect(lastTerminalOptions?.windowsPty).toBeUndefined()
     })
   })
 })

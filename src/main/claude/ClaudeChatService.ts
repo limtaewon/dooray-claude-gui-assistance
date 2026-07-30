@@ -1,10 +1,12 @@
 import { spawn, type ChildProcess } from 'child_process'
+import { StringDecoder } from 'string_decoder'
 import { decodeProcessText, isBenignStderr } from '../utils/procText'
 import { BrowserWindow } from 'electron'
 import { homedir } from 'os'
 import { join, delimiter as pathDelimiter } from 'path'
 import { IPC_CHANNELS } from '../../shared/types/ipc'
 import type { ClaudeChatEvent, ClaudeChatSendRequest } from '../../shared/types/claude-chat'
+import { claudeSpawnCommand } from '../utils/claudeBin'
 
 /**
  * Electron 패키징 앱은 GUI 에서 실행되어 PATH 가 부족하다 (.zshrc/.bashrc 미실행).
@@ -46,6 +48,8 @@ interface ChatSession {
   cwd: string
   /** stdout 버퍼 (개행 단위 파싱용) */
   buffer: string
+  /** stdout 전용 디코더 — 세션(=프로세스)당 1개. chunk 경계에서 멀티바이트가 쪼개져도 깨지지 않게 경계를 보존한다. */
+  stdoutDecoder: StringDecoder
   /** stderr 누적 (오류 메시지 표시용) — Windows cp949 mojibake 방지 위해 raw Buffer 로 누적, 사용 시점 디코드 */
   stderrChunks: Buffer[]
   lastTextMsgId: string
@@ -171,22 +175,23 @@ export class ClaudeChatService {
       args.push('--resume', opts.resumeSessionId)
     }
 
-    // Windows: claude 가 .cmd / .ps1 형태일 수 있어 spawn 의 .cmd 추론을 위해 shell:true 강제.
-    // (Issue #11) Node 의 spawn 은 Windows 에서 확장자 없는 path 호출 시 .cmd 자동 추론을 못함.
-    const isWindows = process.platform === 'win32'
-    const proc = spawn(this.claudeBin, args, {
+    // command/shell/windowsVerbatimArguments 는 claudeSpawnCommand 단일 계약에서만 나온다
+    // (ADR-v2-windows-fix-02 §2) — win32 공백 포함 경로 인용 포함.
+    const { command, shell, windowsVerbatimArguments } = claudeSpawnCommand({ bin: this.claudeBin })
+    const proc = spawn(command, args, {
       cwd: opts.cwd,
       env: enrichedClaudeEnv(),
       stdio: ['pipe', 'pipe', 'pipe'],
-      shell: isWindows,
-      // Windows + shell:true 에서 한글 등 unicode 인자가 cmd 의 codepage 변환으로 깨지는 것 방지
-      windowsVerbatimArguments: isWindows
+      shell,
+      windowsVerbatimArguments
     })
 
     const session: ChatSession = {
       proc,
       cwd: opts.cwd,
       buffer: '',
+      // 세션(=프로세스)마다 하나 — 모듈 전역 공유 금지 (동시 실행 중인 다른 세션의 바이트가 섞인다).
+      stdoutDecoder: new StringDecoder('utf8'),
       stderrChunks: [],
       lastTextMsgId: '',
       sessionId: opts.resumeSessionId,
@@ -195,7 +200,7 @@ export class ClaudeChatService {
     this.sessions.set(chatId, session)
 
     proc.stdout.on('data', (data: Buffer) => {
-      session.buffer += data.toString('utf-8')
+      session.buffer += session.stdoutDecoder.write(data)
       let idx: number
       while ((idx = session.buffer.indexOf('\n')) >= 0) {
         const line = session.buffer.substring(0, idx).trim()
@@ -220,6 +225,11 @@ export class ClaudeChatService {
     })
 
     proc.on('close', (code) => {
+      // 불완전한 멀티바이트 시퀀스로 close 시점까지 남아있던 잔여 — 버리되 조용히 버리지 않는다.
+      const decoderTail = session.stdoutDecoder.end()
+      if (decoderTail) {
+        console.warn(`[ClaudeChatService] stdout 디코더 잔여 바이트 폐기 chatId=${chatId} len=${decoderTail.length}`)
+      }
       // 정상 종료(0)가 아닌데 result 이벤트도 못 받았으면 사용자에게 에러 노출.
       // 단, stderr 가 전부 비치명(Warning, OMC 훅 실패 등)이면 false-fatal 방지를 위해 noop.
       if (code !== 0 && !session.hasResultBeenSent) {

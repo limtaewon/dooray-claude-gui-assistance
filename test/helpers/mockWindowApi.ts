@@ -32,7 +32,7 @@ export function createMockWindowApi(): Record<string, unknown> {
       read: vi.fn().mockResolvedValue(''),
       save: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn().mockResolvedValue(undefined),
-      deleteMany: vi.fn().mockResolvedValue({ deleted: 0 }),
+      deleteMany: vi.fn().mockResolvedValue({ deleted: 0, failed: 0 }),
       importFromFiles: vi.fn().mockResolvedValue({ imported: 0, cancelled: false }),
       exportToFolder: vi.fn().mockResolvedValue({ exported: 0, cancelled: false })
     },
@@ -264,7 +264,9 @@ export function createMockWindowApi(): Record<string, unknown> {
     dialog: {
       selectFolder: vi.fn().mockResolvedValue(null)
     },
-    onConfigChanged: vi.fn().mockReturnValue(noopUnsub)
+    onConfigChanged: vi.fn().mockReturnValue(noopUnsub),
+    // v2.0 windows-fix ADR-v2-windows-fix-03 §4: 정적 값 — 함수가 아니라 그대로 덮어써서 테스트한다.
+    system: { platform: 'darwin', osRelease: '23.0.0' }
   }
 }
 
