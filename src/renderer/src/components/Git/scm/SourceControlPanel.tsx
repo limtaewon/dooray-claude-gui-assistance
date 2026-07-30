@@ -243,7 +243,7 @@ function SourceControlPanel({ repoPath, onOpenDiff, onRepoChanged }: SourceContr
           onChange={(e) => setMessage(e.target.value)}
           placeholder={stagedCount > 0 ? `${stagedCount}개 파일 커밋 메시지` : '커밋 메시지'}
           rows={2}
-          className="ds-input resize-none !h-auto py-1.5 text-[calc(11.5px_*_var(--app-font-scale,1))]"
+          className="ds-input resize-none text-[calc(11.5px_*_var(--app-font-scale,1))]"
         />
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-1.5 text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-tertiary cursor-pointer select-none">
