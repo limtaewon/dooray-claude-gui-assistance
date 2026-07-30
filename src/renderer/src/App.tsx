@@ -29,6 +29,7 @@ import { ToastHost, CommandPalette, type CommandGroup, type CommandItem } from '
 import ErrorReportProvider from './components/ErrorReport/ErrorReportProvider'
 import FeedbackProvider from './components/Feedback/FeedbackProvider'
 import { useTheme } from './hooks/useTheme'
+import { useShortcut } from './hooks/useKeybindings'
 
 type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent' | 'harness' | 'workspace'
 
@@ -84,32 +85,29 @@ function App(): JSX.Element {
     dwellStartRef.current = { view: activeView, at: Date.now() }
   }, [activeView])
 
-  // ⌘K 글로벌 단축키 + Shift 2회 (IntelliJ "Search Everywhere" 식) 단축키
+  // v2.0 D — 전역 단축키는 레지스트리 경유. ⚙ 설정 → 단축키 에서 리바인딩된다.
+  useShortcut('global.commandPalette', (e) => {
+    e.preventDefault()
+    setCmdOpen((o) => !o)
+  }, { allowInEditable: true })
+  useShortcut('global.quickTodo', (e) => {
+    e.preventDefault()
+    setQuickTodoOpen(true)
+  }, { allowInEditable: true })
+  useShortcut('global.feedback', (e) => {
+    e.preventDefault()
+    window.dispatchEvent(new CustomEvent('open-feedback-modal'))
+  }, { allowInEditable: true })
+
+  // Shift 2회 (IntelliJ "Search Everywhere" 식) — 조합이 아닌 시퀀스라 레지스트리로 표현하지 않는다
   useEffect(() => {
     const DOUBLE_SHIFT_MS = 400
     let lastShiftAt = 0
     let shiftCorrupted = false // Shift 누른 동안 다른 키 같이 눌렀으면 "쉬프트만 두 번" 패턴 아님
 
     const onKeyDown = (e: KeyboardEvent): void => {
-      const meta = e.metaKey || e.ctrlKey
-      if (meta && e.key.toLowerCase() === 'k') {
-        e.preventDefault()
-        setCmdOpen((o) => !o)
-        return
-      }
-      // ⌘/Ctrl+/ — 어디서든 오늘 할 일 빠른 추가
-      if (meta && !e.shiftKey && (e.key === '/' || e.code === 'Slash')) {
-        e.preventDefault()
-        setQuickTodoOpen(true)
-        return
-      }
-      // ⌘/Ctrl+Shift+B — 어디서든 피드백 모달
-      if (meta && e.shiftKey && e.key.toLowerCase() === 'b') {
-        e.preventDefault()
-        window.dispatchEvent(new CustomEvent('open-feedback-modal'))
-        return
-      }
-      // Shift 외 다른 키가 같이 눌렸으면 더블 Shift 후보 무효화
+      // ⌘K/⌘//⌘⇧B 는 단축키 레지스트리(useShortcut)가 처리한다 — 설정에서 리바인딩 가능.
+      // 이 핸들러는 조합으로 표현할 수 없는 "Shift 두 번" 시퀀스만 남는다.
       if (e.shiftKey && e.key !== 'Shift') {
         shiftCorrupted = true
       }

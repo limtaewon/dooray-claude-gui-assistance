@@ -119,6 +119,21 @@ export function matchShortcut(e: ShortcutKeyState, binding: TerminalShortcutBind
   return isMac ? binding.matchesMac(e) : binding.matchesWin(e)
 }
 
+/**
+ * v2.0 D — 사용자 오버라이드가 있는 액션은 레지스트리 조합을 먼저 본다. 오버라이드가 없으면
+ * 아래 기본 테이블로 폴백한다(레지스트리 기본값과 동일한 조합이라 결과가 같다).
+ */
+export function resolveShortcutWithOverrides(
+  e: ShortcutKeyState & { code?: string },
+  isMac: boolean,
+  matches: (e: ShortcutKeyState & { code?: string }, actionId: string) => boolean
+): TerminalShortcutId | null {
+  for (const binding of TERMINAL_SHORTCUTS) {
+    if (matches(e, `terminal.${binding.id}`)) return binding.id
+  }
+  return resolveShortcut(e, isMac)
+}
+
 /** 테이블을 순회해 일치하는 첫 바인딩의 id 를 반환한다. 없으면 null. */
 export function resolveShortcut(e: ShortcutKeyState, isMac: boolean): TerminalShortcutId | null {
   for (const binding of TERMINAL_SHORTCUTS) {

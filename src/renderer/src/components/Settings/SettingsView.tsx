@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react'
-import { Check, Cpu, Key, Eye, EyeOff, ExternalLink, SlidersHorizontal, LogOut, BarChart2, Moon, Sun, Type, CalendarDays, Loader2, AlertCircle, Zap, X, ChevronUp, ChevronDown, GripVertical, RotateCcw, FolderGit2 } from 'lucide-react'
+import { Check, Cpu, Key, Eye, EyeOff, ExternalLink, SlidersHorizontal, LogOut, BarChart2, Moon, Sun, Type, CalendarDays, Loader2, AlertCircle, Zap, X, ChevronUp, ChevronDown, GripVertical, RotateCcw, FolderGit2, Keyboard } from 'lucide-react'
 import { CUSTOMIZABLE_NAV_ITEMS, DEFAULT_SIDEBAR_PREFS, type SidebarPrefs, type SidebarView } from '../Layout/Sidebar'
 import type { AIModelConfig, AIModelName } from '../../../../shared/types/ai'
 import UsageInsights from './UsageInsights'
 import WorkspaceSettings from './WorkspaceSettings'
+import KeybindingSettings from './KeybindingSettings'
 import { useTheme } from '../../hooks/useTheme'
 import { useFontSettings, FONT_FAMILY_LABELS, type FontFamily } from '../../hooks/useFontSettings'
 import ThemePicker from './ThemePicker'
 import { Modal } from '../common/ds'
 
-type SettingsTab = 'models' | 'dooray' | 'caldav' | 'app' | 'insights' | 'workspace'
+type SettingsTab = 'models' | 'dooray' | 'caldav' | 'app' | 'insights' | 'workspace' | 'keys'
 
 function SettingsView(): JSX.Element {
   const [activeTab, setActiveTab] = useState<SettingsTab>('models')
@@ -30,6 +31,7 @@ function SettingsView(): JSX.Element {
     { id: 'dooray', icon: Key, label: '두레이 연결' },
     { id: 'caldav', icon: CalendarDays, label: '캘린더 연결' },
     { id: 'workspace', icon: FolderGit2, label: '워크스페이스' },
+    { id: 'keys', icon: Keyboard, label: '단축키' },
     { id: 'app', icon: SlidersHorizontal, label: '외관 & 동작' }
   ]
 
@@ -51,6 +53,7 @@ function SettingsView(): JSX.Element {
         {activeTab === 'dooray' && <DoorayTokenSettings />}
         {activeTab === 'caldav' && <CalDAVSettings />}
         {activeTab === 'workspace' && <WorkspaceSettings />}
+        {activeTab === 'keys' && <KeybindingSettings />}
         {activeTab === 'app' && <AppBehaviorSettings />}
       </div>
     </div>

@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { TaskDropService } from './TaskDropService'
-import { WorkspaceStore } from './WorkspaceStore'
+import { WorkspaceStore, type WorkspaceStorage } from './WorkspaceStore'
 
-/** in-memory storage — WorkspaceStore.test.ts 와 동일 패턴 */
-function memoryStorage(): { get: (k: string) => unknown; set: (k: string, v: unknown) => void } {
-  const data = new Map<string, unknown>()
-  return {
-    get: (k) => data.get(k),
-    set: (k, v) => void data.set(k, v)
+/** 디스크 무접촉 in-memory storage — WorkspaceStore.test.ts 와 동일 패턴 */
+class MemoryStorage implements WorkspaceStorage {
+  private map = new Map<string, unknown>()
+  get<T>(key: string, fallback: T): T {
+    return this.map.has(key) ? (this.map.get(key) as T) : fallback
+  }
+  set(key: string, value: unknown): void {
+    this.map.set(key, value)
   }
 }
 
@@ -18,7 +20,7 @@ describe('TaskDropService', () => {
   let store: WorkspaceStore
 
   beforeEach(() => {
-    store = new WorkspaceStore(memoryStorage())
+    store = new WorkspaceStore(new MemoryStorage())
     store.addRepo(REPO_A)
     store.addRepo(REPO_B)
   })

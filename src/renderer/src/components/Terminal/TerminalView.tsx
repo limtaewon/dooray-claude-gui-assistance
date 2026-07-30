@@ -29,13 +29,15 @@ import {
   isValidTree
 } from './splitTree'
 import type { SplitPath } from './splitTree'
-import { resolveShortcut } from './terminalShortcuts'
+import { resolveShortcutWithOverrides } from './terminalShortcuts'
 import type { PasteToken } from './pasteTargetState'
 import { TabPointerSensor, TAB_DRAG_ACTIVATION_DISTANCE_PX } from './tabDragSensor'
 import { moveTab, pickNextActiveTab, pushMru } from './tabOrder'
 import RendererToggle from './RendererToggle'
 import type { TerminalRendererSetting } from './RendererToggle'
 import { resetGlobalWebglFailure } from './webglPolicy'
+import { useKeybindingOverrides } from '../../hooks/useKeybindings'
+import { matchesBinding } from '@shared/keybindings/binding'
 import TaskDrawer, { TASK_DRAG_MIME, type TaskDragPayload } from './TaskDrawer'
 import { buildTaskDropSteps } from './taskDrop'
 import type {
@@ -97,6 +99,10 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [dropHint, setDropHint] = useState<string | null>(null)
   const [dropBusy, setDropBusy] = useState<string | null>(null)
+  // v2.0 D — 단축키 오버라이드. keydown 클로저가 최신 값을 보도록 ref 로 동기화한다.
+  const keybindingOverrides = useKeybindingOverrides()
+  const overridesRef = useRef(keybindingOverrides)
+  useEffect(() => { overridesRef.current = keybindingOverrides }, [keybindingOverrides])
   const restored = useRef(false)
   /** 탭 닫기 시 다음 활성 탭 선택에 쓰는 최근 사용 스택 (세션 수명 동안만 유지, 영속화 안 함). */
   const mruRef = useRef<string[]>([])
@@ -588,7 +594,12 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     const handler = (e: KeyboardEvent): void => {
       if (!active) return
       const isMac = navigator.platform.toUpperCase().includes('MAC')
-      const shortcut = resolveShortcut(e, isMac)
+      // v2.0 D — 설정에서 리바인딩한 조합이 있으면 그것을 우선한다
+      const shortcut = resolveShortcutWithOverrides(e, isMac, (ev, actionId) => {
+        const custom = overridesRef.current[actionId]
+        if (!custom) return false
+        return custom.some((b) => matchesBinding(ev, b, isMac ? 'darwin' : 'other'))
+      })
       if (shortcut) {
         switch (shortcut) {
           case 'newTab': e.preventDefault(); void createTab(); return
