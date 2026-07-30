@@ -10,6 +10,7 @@ import type { HarnessModel, HarnessTriage, DryRunResult } from '../../shared/typ
 import { buildNormalizeSystemPrompt, buildNormalizeUserPrompt, buildEstimateSystemPrompt, buildEstimateUserPrompt } from '../harness/normalizePrompt'
 import { buildEditSystemPrompt, buildEditUserPrompt } from './harnessEditPrompt'
 import type { AIEditProposal } from '../../shared/types/harness-edit'
+import { getClaudeBin as resolveClaudeBinCached } from '../utils/claudeBin'
 
 interface ClaudeCliResult {
   type: string
@@ -88,61 +89,8 @@ const BRIEFING_SYSTEM_PROMPT = `두레이 업무 브리핑을 생성하세요. 3
   "recommendations": ["구체적 행동 제안 1 (도구로 확인한 실제 데이터 인용)", "구체적 행동 제안 2", "..."]
 }`
 
-/**
- * 패키징된 앱에서도 claude CLI 를 찾을 수 있도록 PATH 보강.
- *
- * Why **절대경로** 우선?
- *   사용자 머신에 claude 바이너리가 여러 개 깔려있는 경우 (예: brew + npm-global + .local/bin),
- *   spawn 시 PATH 에서 동적 검색되면 우리가 prepend 한 PATH 의 영향으로 사용자가 의도한 것과
- *   다른(보통 더 오래된) 바이너리가 잡힌다. 그러면 신규 옵션(--include-hook-events 등)이
- *   "unknown option" 으로 실패. 사용자 셸 PATH 에서 정확히 어떤 claude 가 잡히는지를
- *   `which`/`where` 로 확정해 절대경로로 spawn 한다.
- */
-function resolveClaudePath(): string {
-  if (process.env.CLAUDE_CLI_PATH) return process.env.CLAUDE_CLI_PATH
-
-  const isWindows = process.platform === 'win32'
-  const home = homedir()
-
-  // 1) 사용자 셸의 which/where — 사용자가 터미널에서 `claude` 입력 시 실행되는 그 바이너리.
-  //    spawn 시점에서 우리 PATH 보강과 무관하게 항상 같은 바이너리를 쓰게 됨.
-  if (isWindows) {
-    try {
-      const out = execFileSync('where', ['claude'], { timeout: 5000 }).toString().trim().split('\n')[0].trim()
-      if (out && existsSync(out)) return out
-    } catch { /* fall-through */ }
-  } else {
-    try {
-      const shell = process.env.SHELL || '/bin/zsh'
-      const out = execFileSync(shell, ['-l', '-c', 'command -v claude'], { timeout: 5000 }).toString().trim()
-      if (out && existsSync(out)) return out
-    } catch { /* fall-through */ }
-  }
-
-  // 2) 알려진 설치 경로 — 절대경로만 반환 (단순 'claude' 는 안 씀).
-  const candidates = isWindows ? [
-    join(home, '.claude', 'local', 'claude.cmd'),
-    join(home, '.claude', 'bin', 'claude.cmd'),
-    join(home, 'AppData', 'Roaming', 'npm', 'claude.cmd'),
-    join(home, 'AppData', 'Local', 'npm', 'claude.cmd'),
-    join(home, 'AppData', 'Roaming', 'npm', 'claude'),
-  ] : [
-    join(home, '.claude', 'local', 'claude'),
-    join(home, '.claude', 'bin', 'claude'),
-    '/usr/local/bin/claude',
-    '/opt/homebrew/bin/claude',
-    join(home, '.local', 'bin', 'claude'),
-    join(home, '.npm-global', 'bin', 'claude')
-  ]
-  for (const p of candidates) {
-    if (existsSync(p)) return p
-  }
-
-  // 3) 최후 폴백 — PATH 에서 검색되도록 단순 명령어. 이 단계 도달 시 아래 spawn PATH 보강이 의미 가짐.
-  return isWindows ? 'claude.cmd' : 'claude'
-}
-
-const CLAUDE_CLI = resolveClaudePath()
+/** claude 바이너리 경로 해석은 claudeBin 유틸에 위임한다. 평가 시점은 기존과 동일하게 모듈 로드 시 1회 (근거: ADR-v2-utils-04 §5). */
+const CLAUDE_CLI = resolveClaudeBinCached()
 
 export function getClaudeBin(): string { return CLAUDE_CLI }
 
