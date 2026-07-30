@@ -10,10 +10,9 @@
  *     exit 이후 출력만 남긴다 — TUI 가 끝난 시점 이후의 정상 셸 출력만 복원.
  *  2) 끝부분이 미완성 ESC 시퀀스로 잘렸으면 그 부분만 잘라낸다.
  *
- * `TerminalManager.exportSessions()`(레거시, 소비처 살아있는 동안 유지)와
- * `snapshotStore.migrateLegacySessions()`(v2 마이그레이션) 양쪽이 공유한다
- * (ADR-v2-terminal-p2-03 §10 — 원래는 TerminalManager 내부 private 함수였으나
- * 마이그레이션 소비처가 생기며 이 파일로 분리했다).
+ * `snapshotStore.migrateLegacySessions()`(v2 마이그레이션 1회 읽기 경로)가 유일한 소비처다
+ * (ADR-v2-terminal-p2-03 §10 — 원래는 TerminalManager 내부 private 함수였으나 마이그레이션
+ * 전용으로 분리했다. 레거시 export 경로는 M-A-4 에서 정리되어 이 함수만 남았다).
  */
 export function sanitizeForRestore(raw: string): string {
   const altExit = /\x1b\[\?(?:1049|47|1047)l/g

@@ -228,17 +228,21 @@ S-0 공유 계약 (main)
 - [x] `TERMINAL_REQUEST_STATE` 는 **`webContents.send` 전용** — `ipcMain.handle` 등록 금지 (p1 impl-log 제약 승계: `TERMINAL_EXIT` 와 동일 부류)
 - [x] `snapshotStore.saveSnapshot` 이 `TERMINAL_SAVE_STATE` 로 들어온 스냅샷을 coordinator 에도 전달(`onSnapshotArrived`)하도록 배선
 
-### M-A-4. 레거시 경로 제거 — **이번 라운드 미실행 (게이트 미통과)**
+### M-A-4. 레거시 경로 제거 — **완료** (renderer B-5/B-6 라운드가 "legacy 삭제 준비 완료·소비처 0" 확인 후 착수)
 
-> renderer 가 아직 `TERMINAL_RESTORE`/`reorder()` 를 소비 중이다(`TerminalView.tsx` 의 `restoreSaved()`/`reorder()` 호출, B-4/B-5 renderer 파트가 아직 tabOrder/스냅샷 기반으로 이관 전). plan.md 의 "삭제 순서 게이트"에 따라 이번 라운드는 **추가만 하고 삭제는 보류**, 대신 소비처 4곳(`TerminalManager.exportSessions`/`reorder`, `src/preload/index.ts` `restoreSaved`/`reorder`, `src/main/index.ts` 의 두 핸들러, `IPC_CHANNELS.TERMINAL_RESTORE`/`TERMINAL_REORDER`)에 `@deprecated` JSDoc 을 달아 supersede 대상임을 표시했다. renderer 가 이관을 마치면 이 섹션 전체를 그대로 실행한다.
+> renderer B-5(`impl-log.md` `## [renderer] B-5 + B-6` "legacy 삭제 준비 완료" 절)가 `TerminalView.tsx` 의
+> `restoreSaved()`/`reorder()` 호출과 `slice(-5)` 레거시 복원 경로를 완전히 제거하고 `grep` 으로 실호출 0건을
+> 확인했다. 이를 게이트로 이번 라운드에 아래 6곳 + 관련 테스트를 전부 삭제했다.
 
-- [ ] `src/shared/types/ipc.ts` — `TERMINAL_RESTORE`, `TERMINAL_REORDER` 삭제 (`@deprecated` 주석만 추가함)
-- [ ] `src/main/index.ts` — `TERMINAL_RESTORE` 핸들러, `TERMINAL_REORDER` 등록 삭제. **rename 즉시 저장 블록은 이번 라운드에 이미 제거함**(M-A-2 와 함께, `setName` 호출과 반환값은 유지)
-- [ ] `src/main/terminal/TerminalManager.ts` — `exportSessions()`, `reorder()` 삭제(`@deprecated` 주석만 추가함, `sanitizeForRestore()` 는 이미 별도 모듈로 이사 완료). `listSessions()` / `getOutput()` 은 **유지**(전자는 `MentionTerminalSpawner` 소비자 있음)
-- [ ] `src/main/terminal/sessionOrder.ts` + `sessionOrder.test.ts` 삭제
-- [ ] `src/main/terminal/TerminalManager.test.ts` — 삭제된 API 관련 케이스 정리(exit/suppression/output listener 케이스는 **전부 유지**)
-- [ ] `src/preload/index.ts` — `restoreSaved`/`reorder` 제거. **`saveState`/`restoreState`/`onRequestState`/`resolvePath` 는 이번 라운드에 이미 추가함**(`@deprecated` 주석을 `restoreSaved`/`reorder` 에 달아둠). `onRequestState` 는 `TERMINAL_OUTPUT`/`TERMINAL_EXIT` 와 동일한 **단일 리스너 공유 fan-out** 패턴으로 이미 구현
-- [x] `src/main/index.test.ts` — `eventOnly` 에 `TERMINAL_REQUEST_STATE` 추가, `TERMINAL_SAVE_STATE`/`TERMINAL_RESTORE_STATE`/`TERMINAL_RESOLVE_PATH` 가 `handle` 에 있음을 단언. p1 의 `TERMINAL_REORDER` 케이스는 **아직 유효해서 유지**(삭제는 위 항목들과 같은 커밋에서)
+- [x] `src/shared/types/ipc.ts` — `TERMINAL_RESTORE`, `TERMINAL_REORDER` 삭제
+- [x] `src/main/index.ts` — `TERMINAL_RESTORE` 핸들러, `TERMINAL_REORDER` 등록 삭제. rename 즉시 저장 블록은 이전 라운드(M-A-2)에 이미 제거됨(`setName` 호출과 반환값은 유지)
+- [x] `src/main/terminal/TerminalManager.ts` — `exportSessions()`, `reorder()` 삭제 + 미사용 `applySessionOrder`/`sanitizeForRestore` import 제거(`sanitizeForRestore()` 자체는 `snapshotStore.migrateLegacySessions()` 가 계속 사용하므로 파일은 유지). `listSessions()` / `getOutput()` 은 **유지**(전자는 `MentionTerminalSpawner` 소비자 있음, 후자는 `TERMINAL_SAVE_OUTPUT` 소비처 유지)
+- [x] `src/main/terminal/sessionOrder.ts` + `sessionOrder.test.ts` 삭제
+- [x] `src/main/terminal/TerminalManager.test.ts` — `exportSessions`/`reorder` describe 블록 삭제(exit/suppression/output listener 케이스는 **전부 유지**)
+- [x] `src/preload/index.ts` — `restoreSaved`/`reorder` 제거. `saveState`/`restoreState`/`onRequestState`/`resolvePath` 는 그대로 유지
+- [x] `src/main/index.test.ts` — `TERMINAL_REORDER` 전용 테스트 삭제(채널 자체가 사라져 단언 불가). `eventOnly` 의 `TERMINAL_REQUEST_STATE`, `TERMINAL_SAVE_STATE`/`TERMINAL_RESTORE_STATE`/`TERMINAL_RESOLVE_PATH` handle 단언은 유지. 범용 스텁 클래스의 `exportSessions` mock 필드도 함께 제거
+- [x] `test/helpers/mockWindowApi.ts` — M-A-4 완료를 가리키던 잔여 주석 정리(기능적 mock 변경 없음, B-5 라운드에서 이미 `restoreSaved`/`reorder` mock 자체는 제거됨)
+- [x] `grep -rn "restoreSaved\|TERMINAL_RESTORE\b\|TERMINAL_REORDER\|exportSessions\|sanitizeForRestore\|sessionOrder" src/ test/` — 0건(단, `sanitizeForRestore` 자신의 정의/테스트/`snapshotStore.ts` 의 정당한 import 는 남음 — ADR-03 §10 마이그레이션 경로 유지 대상이라 삭제 대상 아님, impl-log 참조)
 
 ### ▣ Gate 3a — renderer 의 B-5 착수 조건
 
@@ -254,51 +258,51 @@ S-0 공유 계약 (main)
 
 ### R5-1. 의존성
 
-- [ ] `npm i @xterm/addon-serialize` — 설치 후 `npm ls @xterm/xterm` 으로 **중복 설치 없음** 확인, peer 가 `@xterm/xterm@5.5` 를 만족하는지 확인. 불만족이면 **addon 버전을 내린다**(xterm 을 올리지 않는다). 설치된 정확한 버전을 impl-log 에 기록
+- [x] `npm i @xterm/addon-serialize` — 설치 후 `npm ls @xterm/xterm` 으로 **중복 설치 없음** 확인, peer 가 `@xterm/xterm@5.5` 를 만족하는지 확인. 불만족이면 **addon 버전을 내린다**(xterm 을 올리지 않는다). 설치된 정확한 버전을 impl-log 에 기록
 
 ### R5-2. serialize + 복원 모듈 (이식)
 
-- [ ] `src/renderer/src/components/Terminal/serializeAbsoluteCursor.ts` 신규 — **Orca `terminal-serialize-absolute-cursor.ts` adapted** (고지 + 표). `serializeWithAbsoluteCursor(terminal, addon, opts)` (함정 #3)
-- [ ] `src/renderer/src/components/Terminal/replay.ts` 신규 — **Orca `replay-guard.ts` / `terminal-snapshot-replay-paint.ts` adapted** (고지 + 표)
-  - [ ] `createReplayGuard()` — `on()`/`off()`/`get active()`. 완료 판정은 **write 콜백 기준** (함정 #2)
-  - [ ] `REPLAY_CLEAR = '\x1b[2J\x1b[3J\x1b[H'`, `POST_REPLAY_MODE_RESET`(커서 스타일 · kitty · 마우스 리포팅 · bracketed paste 리셋 세트)
-  - [ ] **복원 순서 상수 주석 14단계**(ADR-03 §7)를 파일 상단에 그대로 기록
-- [ ] `replay.test.ts` / `serializeAbsoluteCursor.test.ts` — guard 활성 구간의 `onData` 가 PTY 로 안 나감, 절대 CUP 접미가 붙음
+- [x] `src/renderer/src/components/Terminal/serializeAbsoluteCursor.ts` 신규 — **Orca `terminal-serialize-absolute-cursor.ts` adapted** (고지 + 표). `serializeWithAbsoluteCursor(terminal, addon, opts)` (함정 #3)
+- [x] `src/renderer/src/components/Terminal/replay.ts` 신규 — **Orca `replay-guard.ts` / `terminal-snapshot-replay-paint.ts` adapted** (고지 + 표)
+  - [x] `createReplayGuard()` — `on()`/`off()`/`get active()`. 완료 판정은 **write 콜백 기준** (함정 #2)
+  - [x] `REPLAY_CLEAR = '\x1b[2J\x1b[3J\x1b[H'`, `POST_REPLAY_MODE_RESET`(커서 스타일 · kitty · 마우스 리포팅 · bracketed paste 리셋 세트)
+  - [x] **복원 순서 상수 주석 14단계**(ADR-03 §7)를 파일 상단에 그대로 기록
+- [x] `replay.test.ts` / `serializeAbsoluteCursor.test.ts` — guard 활성 구간의 `onData` 가 PTY 로 안 나감, 절대 CUP 접미가 붙음
 
 ### R5-3. TerminalPane 복원 경로
 
-- [ ] `SerializeAddon` 로드 + `TerminalPaneHandle.serialize()` 본체 구현 — 옵션 `{ scrollback: 2000, excludeAltBuffer: true }`, `trimSerializedToBytes(…, 512*1024)` 적용, `{ cwd, cols, rows, serialized }` 반환. 실패 시 `null` + warn(throw 금지)
-- [ ] `restore?: TerminalPaneSnapshot` prop 추가. mount effect 를 **ADR-03 §7 의 14단계 순서**로 재배치:
-  - [ ] 5) unicode provider 활성화 자리를 마련 (B-7 에서 본체 이식 — 그 전까지는 `Unicode11Addon` 활성화가 이 위치로 이동)
-  - [ ] 6) `onOutput` 구독 즉시 시작하되 replay 중 청크는 **큐에 적재**
-  - [ ] 8) `terminal.resize(snap.cols, snap.rows)` — `cols === 0`(legacy 마이그레이션분)이면 스킵
-  - [ ] 9~11) clear → write(snapshot, cb) → `POST_REPLAY_MODE_RESET + '\r\n'`
-  - [ ] 13) `fit()` → PTY resize
-  - [ ] 14) 큐 flush 후 직접 write 로 전환
-- [ ] 기존 `initialOutput` prop 은 **제거**(레거시 복원 경로 소멸). 세 호스트 중 이 prop 을 쓰는 곳은 `TerminalView` 뿐임을 확인하고 함께 정리
-- [ ] `TerminalPane.test.tsx` — mock terminal 호출 순서 배열이 `resize → clear → write → fit → resize(IPC)` 인지 단언
+- [x] `SerializeAddon` 로드 + `TerminalPaneHandle.serialize()` 본체 구현 — 옵션 `{ scrollback: 2000, excludeAltBuffer: true }`, `trimSerializedToBytes(…, 512*1024)` 적용, `{ cwd, cols, rows, serialized }` 반환. 실패 시 `null` + warn(throw 금지) — **편차**: `cwd` 는 handle 이 아니라 `TerminalView.collectSnapshot()` 이 `PaneRuntime.cwd` 와 병합한다(TerminalPane 은 자기 cwd 를 모른다, B-7 의 OSC7 이전까지는 host 가 진실을 쥔다) — impl-log 참조
+- [x] `restore?: TerminalPaneSnapshot` prop 추가. mount effect 를 **ADR-03 §7 의 14단계 순서**로 재배치:
+  - [x] 5) unicode provider 활성화 자리를 마련 (B-7 에서 본체 이식 — 그 전까지는 `Unicode11Addon` 활성화가 이 위치로 이동)
+  - [x] 6) `onOutput` 구독 즉시 시작하되 replay 중 청크는 **큐에 적재**
+  - [x] 8) `terminal.resize(snap.cols, snap.rows)` — `cols === 0`(legacy 마이그레이션분)이면 스킵
+  - [x] 9~11) clear → write(snapshot, cb) → `POST_REPLAY_MODE_RESET + '\r\n'`
+  - [x] 13) `fit()` → PTY resize
+  - [x] 14) 큐 flush 후 직접 write 로 전환
+- [x] 기존 `initialOutput` prop 은 **제거**(레거시 복원 경로 소멸). 세 호스트 중 이 prop 을 쓰는 곳은 `TerminalView` 뿐임을 확인하고 함께 정리
+- [x] `TerminalPane.test.tsx` — mock terminal 호출 순서 배열이 `resize → clear → write → fit → resize(IPC)` 인지 단언
 
 ### R5-4. TerminalView 저장/복원 오케스트레이션
 
-- [ ] 복원: `restorePhase='restoring'` → `window.api.terminal.restoreState()` → `isValidTree` 검증(실패 시 단일 leaf 폴백) → 탭 20 / leaf 40 상한 적용(초과 warn) → leaf 마다 `create()` → 트리·panes 구성 → `restorePhase='ready'`
-- [ ] `slice(-5)`(현 :52) **제거**
-- [ ] 저장: `collectSnapshot()` — 모든 탭 순회하며 `paneRefs.get(leafId)?.serialize()`. `null` 인 pane 은 이전 스냅샷 값을 재사용(있으면), 없으면 빈 문자열
-- [ ] 트리거 4종:
-  - [ ] 구조 변경 1초 debounce (탭 생성/닫기/rename/reorder, split/close pane, 활성 탭 변경)
-  - [ ] 30초 autosave (`setInterval`, unmount 시 clear)
-  - [ ] `beforeunload` → `window.api.terminal.saveState(snap)` fire-and-forget (await 하지 않음)
-  - [ ] `window.api.terminal.onRequestState(() => saveState(collectSnapshot()))` — main 의 before-quit flush 응답
-- [ ] 모든 트리거는 `shouldPersistLayout === false` 면 **즉시 반환** (함정 #10)
-- [ ] `TerminalView.test.tsx` — 복원 중 저장 미발화 / `onRequestState` 수신 시 saveState 1회 / 탭 20 상한 초과 시 warn
+- [x] 복원: `restorePhase='restoring'` → `window.api.terminal.restoreState()` → `isValidTree` 검증(실패 시 단일 leaf 폴백) → 탭 20 / leaf 40 상한 적용(초과 warn) → leaf 마다 `create()` → 트리·panes 구성 → `restorePhase='ready'`
+- [x] `slice(-5)`(현 :52) **제거**
+- [x] 저장: `collectSnapshot()` — 모든 탭 순회하며 `paneRefs.get(leafId)?.serialize()`. `null` 인 pane 은 이전 스냅샷 값을 재사용(있으면), 없으면 빈 문자열
+- [x] 트리거 4종:
+  - [x] 구조 변경 1초 debounce (탭 생성/닫기/rename/reorder, split/close pane, 활성 탭 변경)
+  - [x] 30초 autosave (`setInterval`, unmount 시 clear)
+  - [x] `beforeunload` → `window.api.terminal.saveState(snap)` fire-and-forget (await 하지 않음)
+  - [x] `window.api.terminal.onRequestState(() => saveState(collectSnapshot()))` — main 의 before-quit flush 응답
+- [x] 모든 트리거는 `shouldPersistLayout === false` 면 **즉시 반환** (함정 #10)
+- [x] `TerminalView.test.tsx` — 복원 중 저장 미발화 / `onRequestState` 수신 시 saveState 1회 / 탭 20 상한 초과 시 warn
 
 ### R5-5. 테스트 헬퍼
 
-- [ ] `test/helpers/mockWindowApi.ts` — `restoreSaved`/`reorder` 제거, `saveState: vi.fn().mockResolvedValue({ ok: true, bytes: 0 })` / `restoreState: vi.fn().mockResolvedValue(null)` / `onRequestState: vi.fn().mockReturnValue(noopUnsub)` 추가
+- [x] `test/helpers/mockWindowApi.ts` — `restoreSaved`/`reorder` 제거, `saveState: vi.fn().mockResolvedValue({ ok: true, bytes: 0 })` / `restoreState: vi.fn().mockResolvedValue(null)` / `onRequestState: vi.fn().mockReturnValue(noopUnsub)` 추가
 
 ### ▣ Gate 4 — B-6 착수 조건
 
-- [ ] `npx tsc --noEmit` 양쪽 통과, `npm run test:run` 전체 그린
-- [ ] 수동 QA(ADR-03 §모니터링 5종): vim 복원 / 창 닫고 나중에 ⌘Q / 한글·이모지 / legacy 업그레이드 / store 파일 크기 측정 → impl-log 기록
+- [x] `npx tsc --noEmit` 양쪽 통과, `npm run test:run` 전체 그린
+- [ ] 수동 QA(ADR-03 §모니터링 5종): vim 복원 / 창 닫고 나중에 ⌘Q / 한글·이모지 / legacy 업그레이드 / store 파일 크기 측정 → **미실시(헤드리스 환경) — 통합 단계 수동 QA 목록에 등재, impl-log 참조**
 
 > 커밋: `feat(terminal/renderer): serialize 스냅샷 영속화 v2 — 복원 순서·replay guard·절대 커서 (B-5)`
 
@@ -306,25 +310,25 @@ S-0 공유 계약 (main)
 
 ## B-6. WebGL (renderer-engineer)
 
-- [ ] `npm i @xterm/addon-webgl` — peer 확인 절차는 R5-1 과 동일, 버전 impl-log 기록
-- [ ] `src/renderer/src/components/Terminal/webglPolicy.ts` 신규 — `shouldAttachWebgl({ setting, isVisible, globalFailureLatch, paneLossCount, deferred })` + `setGlobalWebglFailure()` / `resetGlobalWebglFailure()`(테스트·설정 재토글용)
-- [ ] `webglPolicy.test.ts` — 5조건 단독 위반 5케이스 + 전부 통과 + 설정 우선순위
-- [ ] `TerminalPane` 에 attach/dispose 배선:
-  - [ ] `attachWebglIfAllowed()` — 게이트 통과 시 attach, **미통과 시 `disposeWebgl()` 호출**(null 대입만 금지)
-  - [ ] `disposeWebgl()` — `addon.dispose()` → 캔버스별 `WEBGL_lose_context.loseContext()` → `canvas.width = canvas.height = 0` (순서 고정)
-  - [ ] `addon.onContextLoss` → `disposeWebgl()` + `paneLossCount++` + DOM 폴백. **자동 재시도 금지**
-  - [ ] 초기화 throw → `setGlobalWebglFailure()` (앱 수명 동안 유지)
-  - [ ] reveal(`visible` false→true) 과 `document.visibilitychange` visible 에서 `paneLossCount = 0`
-- [ ] `reattachPaneHost`(R4-2)의 빈 훅을 채운다 — `dispose → appendChild → rAF → attach → fit → scrollState 복원`, 구간 동안 `deferred = true`
-- [ ] 설정: `terminalRenderer: 'webgl' | 'dom'` (기본 `'webgl'`) — **기존 `window.api.settings.get/set` 사용, 신규 IPC 0개**
-  - [ ] 탭바 우측 드롭다운(목업 `.rbtn`/`.rmenu`) — 현재 렌더러 상태 dot + 라벨, 폴백 시 `DOM (폴백)`
-  - [ ] `SettingsView.tsx` 에 같은 항목 추가
-- [ ] `src/renderer/src/components/Terminal/TerminalTabs.tsx` **삭제** (참조 0 확인 완료)
+- [x] `npm i @xterm/addon-webgl` — peer 확인 절차는 R5-1 과 동일, 버전 impl-log 기록
+- [x] `src/renderer/src/components/Terminal/webglPolicy.ts` 신규 — `shouldAttachWebgl({ setting, isVisible, globalFailureLatch, paneLossCount, deferred })` + `setGlobalWebglFailure()` / `resetGlobalWebglFailure()`(테스트·설정 재토글용)
+- [x] `webglPolicy.test.ts` — 5조건 단독 위반 5케이스 + 전부 통과 + 설정 우선순위
+- [x] `TerminalPane` 에 attach/dispose 배선:
+  - [x] `attachWebglIfAllowed()` — 게이트 통과 시 attach, **미통과 시 `disposeWebgl()` 호출**(null 대입만 금지)
+  - [x] `disposeWebgl()` — `addon.dispose()` → 캔버스별 `WEBGL_lose_context.loseContext()` → `canvas.width = canvas.height = 0` (순서 고정)
+  - [x] `addon.onContextLoss` → `disposeWebgl()` + `paneLossCount++` + DOM 폴백. **자동 재시도 금지**
+  - [x] 초기화 throw → `setGlobalWebglFailure()` (앱 수명 동안 유지)
+  - [x] reveal(`visible` false→true) 과 `document.visibilitychange` visible 에서 `paneLossCount = 0`
+- [x] `reattachPaneHost`(R4-2)의 빈 훅을 채운다 — `dispose → appendChild → rAF → attach → fit → scrollState 복원`, 구간 동안 `deferred = true`
+- [x] 설정: `terminalRenderer: 'webgl' | 'dom'` (기본 `'webgl'`) — **기존 `window.api.settings.get/set` 사용, 신규 IPC 0개**
+  - [x] 탭바 우측 드롭다운(목업 `.rbtn`/`.rmenu`) — 현재 렌더러 상태 dot + 라벨, 폴백 시 `DOM (폴백)`
+  - [x] `SettingsView.tsx` 에 같은 항목 추가
+- [x] `src/renderer/src/components/Terminal/TerminalTabs.tsx` **삭제** (참조 0 확인 완료)
 
 ### ▣ Gate 5a — B-7 renderer 착수 조건
 
-- [ ] `npx vitest run src/renderer/src/components/Terminal` 그린
-- [ ] 수동: 탭 5개 × 4분할(20 pane) 순회 — 백지 pane 없음 / 설정 토글 즉시 반영 + 재시작 유지 / devtools 콘솔 WebGL 경고 확인
+- [x] `npx vitest run src/renderer/src/components/Terminal` 그린
+- [ ] 수동: 탭 5개 × 4분할(20 pane) 순회 — 백지 pane 없음 / 설정 토글 즉시 반영 + 재시작 유지 / devtools 콘솔 WebGL 경고 확인 — **미실시(헤드리스 환경) — 통합 단계 수동 QA 목록에 등재, impl-log 참조**
 
 > 커밋: `feat(terminal/renderer): WebGL 렌더러 — visible-only lazy attach + 실패 래치 + 설정 토글 (B-6)`
 
@@ -358,46 +362,46 @@ S-0 공유 계약 (main)
 
 ### R7-1. 가드 + addon
 
-- [ ] `links/terminalLinkProviderGuard.ts` — **Orca verbatim** (고지). `installLinkProviderGuard(terminal)` 를 `new Terminal()` **직후, `loadAddon` 전**에 호출
-- [ ] `npm i @xterm/addon-web-links` — peer 확인, URL 전용으로만 로드. 기존 `URL_RE` 자체 provider 제거
-- [ ] `terminalLinkProviderGuard.test.ts` — throw 하는 provider 등록 후 `provideLinks` 호출이 예외를 전파하지 않고 warn 1회
+- [x] `links/terminalLinkProviderGuard.ts` — **Orca adapted**(고지 — 사내 진단 모듈 호출만 `console.warn` 로 대체, 로직 동일). `installLinkProviderGuard(terminal)` 를 `new Terminal()` **직후, `loadAddon` 전**에 호출
+- [x] `npm i @xterm/addon-web-links` — peer 확인(`@xterm/xterm@5.5.0` 단일, 중복 없음), URL 전용으로만 로드. 기존 `URL_RE` 자체 provider 제거
+- [x] `terminalLinkProviderGuard.test.ts` — throw 하는 provider 등록 후 `provideLinks` 호출이 예외를 전파하지 않고 warn 1회
 
 ### R7-2. 경로 인식
 
-- [ ] `links/terminalPathRegex.ts` — **Orca ← VSCode adapted, 이중 고지**. 구분자 필수 패턴 + 상대 경로 + 공백 3-pass(정규식 아닌 코드로 후보 축소, ReDoS 회피) + 무확장자 화이트리스트
-- [ ] `links/bareFileLink.ts` — **Orca ← VSCode adapted, 이중 고지**. bare filename 후보(존재 검증 필수 통과)
-- [ ] `links/lineColumn.ts` — `/^(.*?)(?::(\d+))?(?::(\d+))?$/`, `line<1`/`col<1` 거부, bare root(`/`, `C:/`) 거부
-- [ ] `links/wrappedLinkRanges.ts` — **Orca adapted**. soft wrap(`isWrapped`, 상한 200행/20k자) + **hard wrap**(역스캔 20행 + 조각 판정 술어). 문자열↔셀 매핑은 `line.getCell(x)` **셀 단위 폴백**(`outColumns` 미사용, Orca 노트 §0)
-- [ ] 기존 `TerminalPane.tsx:120-197` 의 `FILE_PATH_RE` / `isWideCodePoint` / `stringIndexToCell` / `provideLinksByRe` **삭제** — 셀 매핑이 대체한다
-- [ ] 각 모듈 테스트 + `src/renderer/src/components/Terminal/__fixtures__/terminal-links/` 에 **사용자 실패 사례 픽스처** 수집(claude TUI hard wrap 출력, 공백 경로, 한글 폴더, 상대 경로)
+- [x] `links/terminalPathRegex.ts` — **Orca ← VSCode adapted, 이중 고지**. 구분자 필수 패턴 + 상대 경로 + 공백 3-pass(정규식 아닌 코드로 후보 축소, ReDoS 회피) + 무확장자 화이트리스트
+- [x] `links/bareFileLink.ts` — **Orca ← VSCode adapted, 이중 고지**. bare filename 후보(존재 검증 필수 통과)
+- [x] `links/lineColumn.ts` — `/^(.*?)(?::(\d+))?(?::(\d+))?$/`, `line<1`/`col<1` 거부, bare root(`/`, `C:/`) 거부. **Orca `explicit-file-link-target.ts` adapted** — cwd 결합 로직은 제거(main 이관)했다고 impl-log 에 명시, 고지 대상으로 추가
+- [x] `links/wrappedLinkRanges.ts` — **Orca adapted**. soft wrap(`isWrapped`, 상한 200행/20k자) + **hard wrap**(역스캔 20행 + 조각 판정 술어). 문자열↔셀 매핑은 `line.getCell(x)` **셀 단위 폴백**(`outColumns` 미사용, Orca 노트 §0)
+- [x] 기존 `TerminalPane.tsx:120-197` 의 `FILE_PATH_RE` / `isWideCodePoint` / `stringIndexToCell` / `provideLinksByRe` **삭제** — 셀 매핑이 대체한다
+- [x] 각 모듈 테스트 + `src/renderer/src/components/Terminal/__fixtures__/terminal-links/` 에 **사용자 실패 사례 픽스처** 수집(claude TUI hard wrap 출력, 공백 경로, 확장자 없는 디렉터리, 상대 경로 4종)
 
 ### R7-3. 존재 검증 + 캐시
 
-- [ ] `links/pathExistsCache.ts` — **Orca verbatim**. LRU 1024, 키 `cwd + '\0' + candidate`, 음수 캐시 포함
-- [ ] `links/resolveLinks.ts` — 후보 배치 → `window.api.terminal.resolvePath(...)` 1회 → 결과를 캐시에 적재 → **fingerprint 재검증**(행 번호 + 텍스트 해시가 그대로일 때만 채택) → `preferLongestNonOverlappingLinks`(길이 내림차순 비중첩)
-- [ ] `pathExistsCache.test.ts`(LRU 축출·음수 캐시·키 충돌) / `resolveLinks.test.ts`(fingerprint 불일치 시 폐기, 중첩 후보 정리)
+- [x] `links/pathExistsCache.ts` — **Orca adapted**(SSH/원격 런타임 키 분기 제거, `cwd + '\0' + candidate` 단일 키). LRU 1024, 음수 캐시 포함
+- [x] `links/resolveLinks.ts` — 후보 배치 → `window.api.terminal.resolvePath(...)` 1회 → 결과를 캐시에 적재 → **fingerprint 재검증**(행 번호 + 텍스트 해시가 그대로일 때만 채택) → `preferLongestNonOverlappingLinks`(길이 내림차순 비중첩, Orca `terminal-link-handlers.ts` 이 함수만 adapted)
+- [x] `pathExistsCache.test.ts`(LRU 축출·음수 캐시·키 충돌) / `resolveLinks.test.ts`(fingerprint 불일치 시 폐기, 중첩 후보 정리)
 
 ### R7-4. cwd 소스
 
-- [ ] `links/parseOsc7.ts` — **Orca verbatim**(Windows 드라이브/UNC 포함)
-- [ ] `TerminalPane` 에서 `parser.registerOscHandler(7, …)` 를 **PTY 연결 전**에 등록 → pane cwd 상태 갱신. `registerOscHandler(133, () => true)`(화면 오염 방지만)
-- [ ] cwd 우선순위 구현: OSC 7 → 세션 spawn cwd → main probe(요청 시 `sessionId` 만 넘기고 main 이 판단)
-- [ ] **rc 주입은 하지 않는다** (Orca 노트 §2)
+- [x] `links/parseOsc7.ts` — **Orca adapted**(원격 런타임 UNC 호스트 옵션 제거, Windows 드라이브 스트립은 유지)
+- [x] `TerminalPane` 에서 `parser.registerOscHandler(7, …)` 를 **PTY 연결 전**에 등록 → pane cwd 상태 갱신(+ `onCwdChange` prop 으로 호스트에 전파). `registerOscHandler(133, () => true)`(화면 오염 방지만)
+- [x] cwd 우선순위 구현: OSC 7 → 세션 spawn cwd → main probe(요청 시 `sessionId` 만 넘기고 main 이 판단)
+- [x] **rc 주입은 하지 않는다** (Orca 노트 §2)
 
 ### R7-5. Cmd+클릭 3버그 + unicode
 
-- [ ] `links/linkClickPriming.ts` — **Orca adapted**. 정지 커서 밑 새 링크 첫 클릭 씹힘
-- [ ] `links/ptyMouseSuppression.ts` — **Orca adapted**. 마우스 aware TUI 이중 열림
-- [ ] link `activate` 진입 시 `terminal.clearSelection()` (드래그 폭주)
-- [ ] `activate` 는 `expandHome` 이 끝난 **resolved 절대 경로**로 `window.api.shell.openPath` 호출. line:col 은 현재 openPath 로 전달 불가하므로 **경로만** 열고, 줄 번호는 링크 툴팁에만 표기(후속 트랙에서 에디터 연동)
-- [ ] `terminalUnicodeProvider.ts` — **Orca verbatim**. `terminal.open()` **직후, 모든 write 전** 활성화(ADR-03 §7 의 5번 자리에 삽입, 함정 #7). 기존 `Unicode11Addon` 위에 얹는다
-- [ ] 테스트: ZWJ 이모지 폭 케이스 + "복원 write 전에 활성화되었는가" 를 호출 순서로 단언
+- [x] `links/linkClickPriming.ts` — **Orca adapted**. 정지 커서 밑 새 링크 첫 클릭 씹힘
+- [x] `links/ptyMouseSuppression.ts` — **Orca adapted, 동작 방식 변경**(impl-log 참조 — 원본이 쓰는 xterm 6.1-beta 패치 옵션 `mouseEventsRequireAlt` 이 stable 5.5 에 없어, 캡처 단계 `stopPropagation()` 으로 대체). 마우스 aware TUI 이중 열림 방지
+- [x] link `activate` 진입 시 `terminal.clearSelection()` (드래그 폭주)
+- [x] `activate` 는 `expandHome` 이 끝난 **resolved 절대 경로**로 `window.api.shell.openPath` 호출. line:col 은 현재 openPath 로 전달 불가하므로 **경로만** 열고, 줄 번호는 링크 툴팁에만 표기(후속 트랙에서 에디터 연동)
+- [x] `terminalUnicodeProvider.ts` — **Orca adapted**(버전 상수/클래스명만 브랜딩 변경). `terminal.open()` **직후, 모든 write 전** 활성화(ADR-03 §7 의 5번 자리에 삽입, 함정 #7). 기존 `Unicode11Addon` 위에 얹는다
+- [x] 테스트: ZWJ 이모지 폭 케이스 + "복원 write 전에 활성화되었는가" 를 호출 순서로 단언
 
 ### ▣ Gate 5 — 마감 착수 조건
 
-- [ ] `npx tsc --noEmit` 양쪽 통과, `npm run test:run` 전체 그린
-- [ ] 수동 QA(ADR-05 §모니터링 8종) 전부 통과
-- [ ] `THIRD-PARTY-NOTICES.md` 표 행 수 == `grep -rl "Portions adapted from" src/` 개수
+- [x] `npx tsc --noEmit` 양쪽 통과, `npm run test:run` 전체 그린(2600 tests, 179 files)
+- [ ] 수동 QA(ADR-05 §모니터링 8종) 전부 통과 — **미실시(헤드리스 환경) — impl-log 수동 QA 목록 참조, 통합 단계에서 실제 Electron 창으로 확인 필요**
+- [x] `THIRD-PARTY-NOTICES.md` 표 행 수(16) vs `grep -rl "Portions adapted from" src/` 개수(15) — **1 차이, impl-log 참조**(p1 부터 있던 `tabDragSensor.ts` 가 다른 문구 관례를 써서 grep 에 안 걸림. 이번 라운드 신규 파일들은 전부 1:1 대응 확인)
 
 > 커밋: `feat(terminal/renderer): 링크 프로바이더 재작성 — wrap 재구성·존재 검증·Cmd+클릭 3버그 (B-7)`
 

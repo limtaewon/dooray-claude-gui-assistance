@@ -9,8 +9,6 @@ import type {
   TerminalResizeOptions,
   TerminalExitPayload
 } from '../../shared/types/terminal'
-import { applySessionOrder } from './sessionOrder'
-import { sanitizeForRestore } from './sanitizeForRestore'
 import { mergePathIntoEnv, claudeExtraPaths } from '../utils/env'
 import { detectWindowsShell, defaultShellProbe } from './windowsShell'
 
@@ -229,26 +227,6 @@ export class TerminalManager {
     return session ? session.pty.pid : null
   }
 
-  /**
-   * @deprecated ADR-v2-terminal-p2-03 이 순서의 진실을 스냅샷의 `tabs` 배열로 단일화하며 supersede 대상으로
-   * 지정했다. 렌더러가 아직 `TERMINAL_REORDER`/`reorder()` 를 소비 중이라 삭제를 보류한다 — 렌더러가
-   * tabOrder 기반으로 이관을 마치면(B-4/B-5) 이 메서드와 `sessionOrder.ts` 를 함께 삭제한다.
-   */
-  /** 렌더러의 탭 순서를 세션 Map 순서에 반영. 유효한 id 가 하나도 없으면 no-op. */
-  reorder(ids: string[]): void {
-    const currentIds = Array.from(this.sessions.keys())
-    if (!ids.some((id) => this.sessions.has(id))) {
-      console.warn('[TerminalManager] reorder — 요청에 유효한 세션 id 가 없음', { ids })
-      return
-    }
-    const newOrder = applySessionOrder(currentIds, ids)
-    const rebuilt = new Map<string, PtySession>()
-    for (const orderedId of newOrder) {
-      rebuilt.set(orderedId, this.sessions.get(orderedId)!)
-    }
-    this.sessions = rebuilt
-  }
-
   listSessions(): TerminalSession[] {
     return Array.from(this.sessions.values()).map((s) => s.meta)
   }
@@ -257,19 +235,6 @@ export class TerminalManager {
   getOutput(id: string): string {
     const session = this.sessions.get(id)
     return session ? session.outputBuffer.join('') : ''
-  }
-
-  /**
-   * @deprecated ADR-v2-terminal-p2-03 이 스크롤백 영속화를 렌더러 serialize 스냅샷으로 옮기며 supersede 대상으로
-   * 지정했다. `TERMINAL_RESTORE`(레거시 읽기 경로)와 rename 직후 즉시 저장이 아직 이 메서드를 참조해
-   * 삭제를 보류한다 — 렌더러가 `TERMINAL_SAVE_STATE`/`TERMINAL_RESTORE_STATE` 로 이관을 마치면 삭제한다.
-   */
-  // 모든 세션의 메타+출력을 저장 가능한 형태로 반환
-  exportSessions(): Array<{ meta: TerminalSession; output: string }> {
-    return Array.from(this.sessions.values()).map((s) => ({
-      meta: s.meta,
-      output: sanitizeForRestore(s.outputBuffer.join(''))
-    }))
   }
 
   // 탭 이름 변경 (UI 표시용 — 출력에는 영향 없음)

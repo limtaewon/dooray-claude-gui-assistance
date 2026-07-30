@@ -143,13 +143,10 @@ export function createMockWindowApi(): Record<string, unknown> {
       kill: vi.fn().mockResolvedValue(undefined),
       list: vi.fn().mockResolvedValue([]),
       getOutput: vi.fn().mockResolvedValue(''),
-      restoreSaved: vi.fn().mockResolvedValue([]),
       rename: vi.fn().mockResolvedValue(true),
       onOutput: vi.fn().mockReturnValue(noopUnsub),
       // v2.0 B-1: 테스트에서 마지막으로 등록된 콜백은 `mock.calls.at(-1)?.[0]` 로 꺼내 직접 발화시킬 수 있음
       onExit: vi.fn().mockReturnValue(noopUnsub),
-      // v2.0 B-8: fire-and-forget — 호출 여부/인자만 검증 대상
-      reorder: vi.fn(),
       // v2.0 M-A: 영속화 v2
       saveState: vi.fn().mockResolvedValue({ ok: true, bytes: 0 }),
       restoreState: vi.fn().mockResolvedValue(null),

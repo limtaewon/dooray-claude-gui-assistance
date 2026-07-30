@@ -4,6 +4,9 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { SearchAddon } from '@xterm/addon-search'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
+import { SerializeAddon } from '@xterm/addon-serialize'
+import { WebglAddon } from '@xterm/addon-webgl'
+import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Image as ImageIcon, ExternalLink } from 'lucide-react'
 import { shouldFollowOutput } from './scrollFollow'
 import useTerminalSearch from './useTerminalSearch'
@@ -12,9 +15,27 @@ import Button from '../common/ds/Button'
 import { resolvePaneActivation } from './paneActivation'
 import { beginPaste, isPasteTargetValid } from './pasteTargetState'
 import type { PasteToken } from './pasteTargetState'
+import { serializeWithAbsoluteCursor } from './serializeAbsoluteCursor'
+import { createReplayGuard, REPLAY_CLEAR, POST_REPLAY_MODE_RESET } from './replay'
+import { shouldAttachWebgl, getGlobalWebglFailure, setGlobalWebglFailure } from './webglPolicy'
+import { activateTerminalUnicodeProvider } from './terminalUnicodeProvider'
+import { installLinkProviderGuard } from './links/terminalLinkProviderGuard'
+import { createFilePathLinkProvider } from './links/filePathLinkProvider'
+import { createLinkTooltip } from './links/linkTooltip'
+import { installTerminalLinkifierClickPriming } from './links/linkClickPriming'
+import { installTerminalLinkPtyMouseSuppression } from './links/ptyMouseSuppression'
+import { isLinkActivationEvent } from './links/linkActivation'
+import { parseOsc7 } from './links/parseOsc7'
+import type { CachedPathResolution } from './links/pathExistsCache'
 import { windowsPtyOptions } from '@shared/utils/windowsPty'
+import { trimSerializedToBytes } from '@shared/utils/textBytes'
 import type { TerminalPaneSnapshot } from '@shared/types/terminal'
 import '@xterm/xterm/css/xterm.css'
+
+/** v2.0 B-5: serialize() 스냅샷의 leaf 당 UTF-8 바이트 캡 (ADR-v2-terminal-p2-03 §9). */
+const PANE_SNAPSHOT_MAX_BYTES = 512 * 1024
+/** v2.0 B-5: SerializeAddon 옵션 — TUI 잔해(alt buffer)는 스냅샷에서 배제한다. */
+const SERIALIZE_OPTIONS = { scrollback: 2000, excludeAltBuffer: true }
 
 interface TerminalPaneProps {
   sessionId: string
@@ -31,7 +52,9 @@ interface TerminalPaneProps {
   onFocusRequest?: () => void
   /** true 인 호스트(SplitLayout, B-4)만 포커스 링/dim 을 그린다 — 레거시 단일 pane 호스트는 표시하지 않는다. */
   showFocusRing?: boolean
-  initialOutput?: string
+  /** v2.0 B-5: 마운트 시 복원할 스냅샷 — 있으면 ADR-03 §7 의 14단계 순서로 replay 한다. 레거시
+   *  `initialOutput` 문자열 복원 경로는 이 prop 으로 완전히 대체됐다(마운트 시 1회만 읽는다). */
+  restore?: TerminalPaneSnapshot
   /** v2.0 B-1: PTY 종료 정보 — 있으면 종료 오버레이를 그리고 입력을 차단한다 (ADR-02). */
   exitInfo?: { exitCode: number; signal: number | null } | null
   /** v2.0 B-1: 종료 오버레이의 "닫기" 버튼. 없으면 버튼을 숨긴다. */
@@ -47,6 +70,13 @@ interface TerminalPaneProps {
   getCurrentPasteTarget?: () => PasteToken | null
   /** v2.0 B-4: 경계 드래그 중에는 true — ResizeObserver 발 fit/PTY resize 를 억제한다(함정 #9). */
   suspendAutoResize?: boolean
+  /** v2.0 B-6: 사용자 설정 렌더러 — 미지정 시 기본값 'webgl' (ADR-v2-terminal-p2-04 §4). */
+  rendererSetting?: 'webgl' | 'dom'
+  /** v2.0 B-6: WebGL 초기화 실패 또는 context loss 로 DOM 렌더러 폴백이 발생하면 1회 호출된다. */
+  onWebglUnavailable?: () => void
+  /** v2.0 B-7: OSC7 로 새 cwd 를 알게 될 때마다 호출된다(링크 cwd 우선순위 1순위) — 호스트가
+   *  `PaneRuntime.cwd` 를 갱신해 스냅샷 저장에도 반영할 수 있게 한다 (ADR-v2-terminal-p2-05 §레이어 4). */
+  onCwdChange?: (cwd: string) => void
 }
 
 /** DOM 리페어런트(reattachPaneHost) 전후로 주고받는 xterm 뷰포트 스크롤 위치. */
@@ -55,8 +85,9 @@ export interface PaneScrollState {
   wasAtBottom: boolean
 }
 
-/** B-3 단계에서는 serialize() 가 null 스텁 — SerializeAddon 은 B-5(ADR-03)에서 붙인다. */
 export interface TerminalPaneHandle {
+  /** v2.0 B-5: SerializeAddon + 절대 커서 접미 + 512KB 캡. cwd 는 호스트가 안다 — 여기서는 채우지
+   *  않는다(TerminalView.collectSnapshot 이 PaneRuntime.cwd 와 병합). 실패 시 null(throw 금지). */
   serialize(): TerminalPaneSnapshot | null
   focus(): void
   /** 컨테이너 크기에 맞춰 refit + PTY resize 1회. */
@@ -65,6 +96,10 @@ export interface TerminalPaneHandle {
   captureScrollState(): PaneScrollState | null
   /** v2.0 B-4: 리페어런트 후 스크롤 위치 복원. */
   restoreScrollState(state: PaneScrollState | null): void
+  /** v2.0 B-6: WebGL 컨텍스트를 명시적으로 반납한다(addon dispose → loseContext → canvas 0×0). */
+  disposeWebgl(): void
+  /** v2.0 B-6: 게이트 통과 시에만 attach, 아니면 dispose — reattachPaneHost/가시성 전환이 호출한다. */
+  attachWebglIfAllowed(): void
 }
 
 function TerminalPaneInner(
@@ -75,14 +110,17 @@ function TerminalPaneInner(
     isFocused,
     onFocusRequest,
     showFocusRing,
-    initialOutput,
+    restore,
     exitInfo,
     onRequestClose,
     tabId,
     leafId,
     paneGeneration,
     getCurrentPasteTarget,
-    suspendAutoResize
+    suspendAutoResize,
+    rendererSetting,
+    onWebglUnavailable,
+    onCwdChange
   }: TerminalPaneProps,
   ref: ForwardedRef<TerminalPaneHandle>
 ): JSX.Element {
@@ -91,6 +129,7 @@ function TerminalPaneInner(
   const terminalRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const searchAddonRef = useRef<SearchAddon | null>(null)
+  const serializeAddonRef = useRef<SerializeAddon | null>(null)
   const search = useTerminalSearch({ sessionId, searchAddonRef, terminalRef })
   // B-3: mount effect(1회 생성) 클로저 밖에서 최신 visible/onFocusRequest 를 참조하기 위한 ref.
   const visibleRef = useRef(visible)
@@ -99,6 +138,26 @@ function TerminalPaneInner(
   useEffect(() => { onFocusRequestRef.current = onFocusRequest }, [onFocusRequest])
   // TerminalPaneHandle.fit() 이 호출할 refit 함수 — mount effect 안에서 fitAddon 이 만들어질 때 배선된다.
   const fitFnRef = useRef<(() => void) | null>(null)
+
+  // v2.0 B-6: WebGL 게이트 평가 함수 — mount effect 안에서 배선되고, visible/rendererSetting 전환
+  // effect 들이 이 ref 를 통해 호출한다(fitFnRef 와 동일 패턴, ADR-04 §1).
+  const evaluateWebglRef = useRef<(() => void) | null>(null)
+  // TerminalPaneHandle.disposeWebgl() 이 호출할 실제 dispose 함수 — reattachPaneHost 리페어런트용.
+  const disposeWebglFnRef = useRef<(() => void) | null>(null)
+  // 같은 가시성 구간에서 겪은 context loss 횟수 — reveal/wake 경계에서만 0 으로 리셋(ADR-04 §3).
+  const paneLossCountRef = useRef(0)
+  // DOM 리페어런트/복원 replay 진행 중 표시 — 이 구간 동안 WebGL 게이트를 보류한다.
+  const deferredRef = useRef(Boolean(restore?.serialized))
+  const rendererSettingRef = useRef<'webgl' | 'dom'>(rendererSetting ?? 'webgl')
+  useEffect(() => { rendererSettingRef.current = rendererSetting ?? 'webgl' }, [rendererSetting])
+  const onWebglUnavailableRef = useRef(onWebglUnavailable)
+  useEffect(() => { onWebglUnavailableRef.current = onWebglUnavailable }, [onWebglUnavailable])
+  useEffect(() => { evaluateWebglRef.current?.() }, [rendererSetting])
+
+  // v2.0 B-7: OSC7 로 알아낸 cwd 를 호스트에 올려보낸다 — mount effect(1회 생성) 클로저가 최신
+  // 콜백을 참조하도록 ref 로 동기화한다(onFocusRequestRef 와 동일 패턴).
+  const onCwdChangeRef = useRef(onCwdChange)
+  useEffect(() => { onCwdChangeRef.current = onCwdChange }, [onCwdChange])
 
   // v2.0 B-4: 경계 드래그 중엔 ResizeObserver 발 fit/PTY resize 를 억제한다 — 드롭 시 1회만
   // 보내야 TUI 가 프레임마다 재그리기하지 않는다(함정 #9, ADR-02 §6).
@@ -151,6 +210,14 @@ function TerminalPaneInner(
       window.api?.system?.osRelease
     )
 
+    // v2.0 B-5 복원 순서 1단계(ADR-v2-terminal-p2-03 §7): 스냅샷 치수가 있으면 처음부터 그 크기로
+    // 연다 — resize 를 기다리지 않아도 8단계의 명시적 resize 와 함께 이중으로 보장된다. cols/rows
+    // 가 0(레거시 마이그레이션분, main 이 모르는 값)이면 옵션 자체를 넣지 않는다.
+    const hasRestoreSnapshot = Boolean(restore?.serialized)
+    const restoreDims = restore && restore.cols > 0 && restore.rows > 0
+      ? { cols: restore.cols, rows: restore.rows }
+      : null
+
     const terminal = new Terminal({
       theme: {
         background: '#111827',
@@ -185,23 +252,35 @@ function TerminalPaneInner(
       allowProposedApi: true,
       // v2.0 B-2: 이 값이 없으면 xterm 이 overview ruler(우측 매치 마커 스트립) 자체를 렌더하지 않는다.
       overviewRulerWidth: 14,
+      ...(restoreDims ? restoreDims : {}),
       ...(windowsPty ? { windowsPty } : {})
     })
 
+    // 2) registerLinkProvider guard monkey-patch — 반드시 loadAddon 보다 먼저다. 순서가 틀리면
+    // web-links 등 addon 내부 provider 는 patch 되지 않은 원본을 잡아간다(ADR-05 §레이어 0, 함정 #5).
+    installLinkProviderGuard(terminal)
+
+    // 3) addon 로드 — fit/search/serialize 는 항상 로드, unicode11 은 환경에 따라 unsupported 일 수 있다.
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)
     const searchAddon = new SearchAddon()
     terminal.loadAddon(searchAddon)
-    // East Asian Wide(한글/중국어/일본어) 셀 폭을 정확히 계산하기 위해 Unicode 11 활성화.
-    // 미적용 시 한글이 1셀로 잘못 잡혀 다음 글자와 겹치거나 sparse 하게 보임.
+    const serializeAddon = new SerializeAddon()
+    terminal.loadAddon(serializeAddon)
+    // East Asian Wide(한글/중국어/일본어) 셀 폭 계산에 필요한 기반 provider — 활성화(activeVersion
+    // 전환)는 4)open() 뒤 5)단계에서 한다(함정 #7, ADR-03 §7). 여기서는 addon 만 불러온다.
     try {
-      const unicode11 = new Unicode11Addon()
-      terminal.loadAddon(unicode11)
-      terminal.unicode.activeVersion = '11'
+      terminal.loadAddon(new Unicode11Addon())
     } catch { /* ok — 환경에 따라 unsupported */ }
+    // 4) DOM attach
     try {
       terminal.open(containerRef.current)
     } catch {}
+    // 5) unicode provider 활성화 — 모든 write 보다 먼저 해야 한다(함정 #7, ADR-03 §7 5단계). Unicode11
+    // 위에 ZWJ 이모지 폭 보정을 얹는다 — terminalUnicodeProvider.ts, B-9.
+    try {
+      activateTerminalUnicodeProvider(terminal)
+    } catch { /* ok — 환경에 따라 unsupported */ }
 
     // B-3: onFocusRequest → 호스트가 focusedLeafId 를 갱신 (pane 은 자기 포커스를 스스로 정하지 않는다).
     // pointerdown 캡처(컨테이너, JSX)뿐 아니라 xterm textarea 자체의 focus 도 알려야
@@ -213,106 +292,165 @@ function TerminalPaneInner(
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
     searchAddonRef.current = searchAddon
+    serializeAddonRef.current = serializeAddon
     // 검색 결과 카운트를 useTerminalSearch 훅으로 전달 — decoration 이 켜져 있을 때만 발화한다.
     const searchResultsDisposable = searchAddon.onDidChangeResults((e) => search.handleResultsChanged(e))
 
-    // 1) 컨테이너 크기에 맞춰 fit, 2) PTY 에 실제 cols/rows 통지, 3) 그 후에 저장된 출력 복원.
-    // Why: open() 직후엔 xterm 이 기본 80x24 grid 로 동작하므로, fit 전에 write() 하면
-    // 모든 셀이 80x24 기준으로 배치된 뒤 fit 이 들어와 줄들이 겹쳐 보이는 깨짐이 발생.
-    // 따라서 write 도 동일한 rAF 안에서 fit 이후로 미룬다.
-    requestAnimationFrame(() => {
-      try { fitAddon.fit() } catch {}
-      // PTY 측 사이즈 동기화 — 저장된 출력이 잘못된 폭으로 wrap 되지 않도록 먼저 맞춘다.
-      try {
-        const dims = fitAddon.proposeDimensions()
-        if (dims && dims.cols > 0 && dims.rows > 0) {
-          window.api.terminal.resize({ id: sessionId, cols: dims.cols, rows: dims.rows })
-        }
-      } catch { /* ok */ }
-      if (initialOutput) {
-        try { terminal.reset() } catch { /* ok */ }
-        terminal.write(initialOutput)
-      }
-    })
+    // v2.0 B-5: replay guard — 7)/12) 단계에서 on/off. 아래 onData 가 이 값을 읽어 replay 중 xterm 의
+    // 자동 쿼리 응답(DA1/CPR 등)이 PTY 로 새는 것을 막는다(함정 #2).
+    const replayGuard = createReplayGuard()
 
-    // #6 터미널 링크 (Warp 스타일) — Cmd/Ctrl + 클릭으로 OS 핸들러 호출.
-    //   1) URL: http(s) → 브라우저
-    //   2) 파일/디렉토리: 절대경로 + 확장자 화이트리스트 또는 trailing slash. shell.openPath 가
-    //      파일은 기본앱, 디렉토리는 파인더/익스플로러로 알아서 열어줌.
-    //   xterm linkProvider 는 여러 개 등록 가능 — URL/File 둘 분리해서 충돌 회피.
-    const URL_RE = /(https?:\/\/[^\s"'`<>()[\]{}]+)/gi
-    // FILE_PATH_RE — 세 가지 alternative (우선순위 순)
-    //   1) '...' 안의 path  → 공백 OK (예: 'Application Support' 같은 macOS 경로). m[1] 캡쳐.
-    //   2) "..." 안의 path  → 동일. m[2] 캡쳐.
-    //   3) 따옴표 없는 path → 확장자 화이트리스트 또는 trailing slash 로만 끝. 공백 분리. m[3] 캡쳐.
-    const FILE_PATH_RE = /'((?:~|\/|\b[A-Za-z]:[\\/])[^'\r\n]+?)'|"((?:~|\/|\b[A-Za-z]:[\\/])[^"\r\n]+?)"|((?:~|\/|\b[A-Za-z]:[\\/])[^\s"'`<>(){}[\]]*?\.(?:tsx?|jsx?|mjs|cjs|py|go|rs|rb|java|kt|c|cc|cpp|h|hpp|cs|swift|php|sh|zsh|bash|sql|md|json|yaml|yml|toml|ini|env|html?|css|scss|sass|less|vue|svelte|astro|xml|pdf|docx?|xlsx?|pptx?|csv|txt|log|zip|tar|gz|tgz|rar|7z|png|jpe?g|gif|webp|bmp|svg|ico|mp[34]|mov|webm|wav|flac))/gi
-    const openWithModifier = (event: MouseEvent, target: string): void => {
-      if (!event.metaKey && !event.ctrlKey) return
-      window.api.shell.openPath(target).catch((err) => console.warn('[term-link] open 실패', err))
+    // v2.0 B-6: WebGL 런타임 — attach/dispose 는 실제 DOM 조작을 담당하고, evaluateWebgl 이 게이트를
+    // 재평가해 둘 중 하나를 호출한다(ADR-04 §1/§2). 초기 평가는 mount fit 완료 이후(finishMount) 다.
+    let webglAddon: WebglAddon | null = null
+    const disposeWebglNow = (): void => {
+      if (!webglAddon) return
+      const addon = webglAddon
+      webglAddon = null
+      try { addon.dispose() } catch { /* ok */ }
+      // Windows/ANGLE 은 addon.dispose() 만으로 드라이버 컨텍스트를 반납하지 않는다(#6874) —
+      // loseContext 를 명시 호출하고 캔버스를 0×0 으로 만들어 예산을 확실히 돌려준다.
+      const canvases = containerRef.current?.querySelectorAll('canvas') ?? []
+      canvases.forEach((canvas) => {
+        try {
+          const gl = (canvas.getContext('webgl2') || canvas.getContext('webgl')) as WebGLRenderingContext | null
+          gl?.getExtension('WEBGL_lose_context')?.loseContext()
+        } catch { /* ok */ }
+        canvas.width = 0
+        canvas.height = 0
+      })
     }
-    // 한글/한자 등 East Asian Wide 는 xterm 셀에서 2 칸 차지. string index 와 cell index 가 어긋나면
-    // link hover/click 영역이 한 칸씩 밀려 사용자가 path 를 못 누름 (#6+ 회귀). 단순 wide-char range 만 처리.
-    const isWideCodePoint = (cp: number): boolean => (
-      (cp >= 0x1100 && cp <= 0x115F) ||
-      (cp >= 0x2E80 && cp <= 0x303E) ||
-      (cp >= 0x3041 && cp <= 0x33FF) ||
-      (cp >= 0x3400 && cp <= 0x4DBF) ||
-      (cp >= 0x4E00 && cp <= 0x9FFF) ||
-      (cp >= 0xA000 && cp <= 0xA4CF) ||
-      (cp >= 0xAC00 && cp <= 0xD7A3) ||
-      (cp >= 0xF900 && cp <= 0xFAFF) ||
-      (cp >= 0xFE30 && cp <= 0xFE4F) ||
-      (cp >= 0xFF00 && cp <= 0xFF60) ||
-      (cp >= 0xFFE0 && cp <= 0xFFE6)
-    )
-    const stringIndexToCell = (line: string, idx: number): number => {
-      let cell = 0
-      for (let i = 0; i < idx && i < line.length; i++) {
-        const cp = line.codePointAt(i) ?? 0
-        cell += isWideCodePoint(cp) ? 2 : 1
-        if (cp > 0xFFFF) i++ // surrogate pair
+    const attachWebglNow = (): void => {
+      if (webglAddon) return
+      try {
+        const addon = new WebglAddon()
+        addon.onContextLoss(() => {
+          console.warn('[TerminalPane] WebGL context loss — DOM 렌더러로 폴백')
+          disposeWebglNow()
+          paneLossCountRef.current += 1
+          onWebglUnavailableRef.current?.()
+        })
+        terminal.loadAddon(addon)
+        webglAddon = addon
+      } catch (e) {
+        // 초기화 자체가 throw — 모듈 전역 래치를 세워 앱 수명 동안 재시도하지 않는다(ADR-04 §3).
+        console.warn('[TerminalPane] WebGL 초기화 실패 — DOM 렌더러로 폴백', e)
+        setGlobalWebglFailure()
+        onWebglUnavailableRef.current?.()
       }
-      return cell
     }
-    const provideLinksByRe = (re: RegExp, lineNum: number, callback: (links: unknown[]) => void): void => {
-      const line = terminal.buffer.active.getLine(lineNum - 1)?.translateToString(true) ?? ''
-      if (!line) return callback([])
-      const out: Array<{
-        range: { start: { x: number; y: number }; end: { x: number; y: number } }
-        text: string
-        activate: (event: MouseEvent, text: string) => void
-      }> = []
-      re.lastIndex = 0
+    const evaluateWebgl = (): void => {
+      const allowed = shouldAttachWebgl({
+        setting: rendererSettingRef.current,
+        isVisible: visibleRef.current,
+        globalFailureLatch: getGlobalWebglFailure(),
+        paneLossCount: paneLossCountRef.current,
+        deferred: deferredRef.current
+      })
+      if (allowed) attachWebglNow()
+      else disposeWebglNow()
+    }
+    evaluateWebglRef.current = evaluateWebgl
+    disposeWebglFnRef.current = disposeWebglNow
+
+    // v2.0 B-7: OSC7(cwd 보고) 을 PTY 연결(onOutput 구독) 전에 등록한다 — replay 가 첫 OSC7 을
+    // 놓치지 않게 하기 위해서다(ADR-05 §레이어 4). 링크 cwd 우선순위 1순위. rc 주입은 하지 않는다
+    // (사용자 셸이 이미 OSC7 을 쏘는 설정이면 그대로 수신만 한다).
+    let paneCwd: string | undefined
+    try {
+      terminal.parser.registerOscHandler(7, (data) => {
+        const cwd = parseOsc7(data)
+        if (cwd) {
+          paneCwd = cwd
+          onCwdChangeRef.current?.(cwd)
+        }
+        return true
+      })
+      // OSC133(프롬프트 마킹) — 활용은 백로그, 여기서는 화면 오염 방지만(미처리 시퀀스가 화면에
+      // 그대로 찍히는 것을 막는다).
+      terminal.parser.registerOscHandler(133, () => true)
+    } catch { /* ok — allowProposedApi 미지원 환경 폴백 */ }
+
+    // v2.0 B-5: replay 중 도착한 라이브 출력은 큐에 적재했다가 replay 종료 후 flush 한다(6/14단계).
+    // PTY 는 이미 살아 있어 셸 프롬프트를 뱉으므로, 그대로 write 하면 복원 내용과 뒤섞인다.
+    let restoring = hasRestoreSnapshot
+    const outputQueue: string[] = []
+
+    // #2 PTY 출력에서 이미지 path 감지. 절대경로 (~/ 또는 / 또는 C:\) + 이미지 확장자.
+    // ANSI escape 시퀀스가 섞여 있을 수 있어 정규식이 그 사이에서 잘 매칭되도록 lookbehind 회피.
+    const IMAGE_PATH_RE = /((?:~|\/|\b[A-Za-z]:[\\/])[^\s"'`<>(){}[\]]*?\.(?:png|jpe?g|gif|webp|bmp|svg))/gi
+    const seenPaths = new Set<string>()
+    const sniffImages = (data: string): void => {
+      IMAGE_PATH_RE.lastIndex = 0
       let m: RegExpExecArray | null
-      while ((m = re.exec(line)) !== null) {
-        // URL provider 는 group 1 만. FILE provider 는 m[1]/m[2]/m[3] 중 정의된 것.
-        // m[1] = single-quoted body, m[2] = double-quoted body, m[3] = unquoted full
-        const isQuoted = m[1] !== undefined || m[2] !== undefined
-        const target = m[1] ?? m[2] ?? m[3] ?? m[0]
-        if (!target) continue
-        // 따옴표 wrap 시 inner range 만 highlight (따옴표는 link 영역에서 제외)
-        const startIdxStr = isQuoted ? m.index + 1 : m.index
-        const endIdxStr = startIdxStr + target.length // exclusive
-        const startCell = stringIndexToCell(line, startIdxStr) + 1
-        const endCell = stringIndexToCell(line, endIdxStr)
-        out.push({
-          range: { start: { x: startCell, y: lineNum }, end: { x: endCell, y: lineNum } },
-          text: target,
-          activate: (event) => openWithModifier(event, target)
+      const newOnes: string[] = []
+      while ((m = IMAGE_PATH_RE.exec(data)) !== null) {
+        const p = m[1]
+        if (seenPaths.has(p)) continue
+        seenPaths.add(p)
+        newOnes.push(p)
+      }
+      if (newOnes.length > 0) {
+        const now = Date.now()
+        setRecentImages((prev) => {
+          const merged = [...newOnes.map((path) => ({ path, seenAt: now })), ...prev]
+          return merged.slice(0, 20)
         })
       }
-      callback(out)
     }
+    // auto-follow: 사용자가 바닥에 있을 때만 새 출력을 따라 내려간다. 위로 올려 읽는 중이면 유지.
+    // wasAtBottom 은 반드시 write() 이전에 스냅샷한다 — write 후엔 baseY 가 늘어 판단이 망가진다.
+    const writeLiveOutput = (data: string): void => {
+      const buf = terminal.buffer.active
+      const wasAtBottom = shouldFollowOutput(buf.viewportY, buf.baseY)
+      terminal.write(data, () => { if (wasAtBottom) terminal.scrollToBottom() })
+      sniffImages(data)
+    }
+
+    // 6) onOutput 구독 시작 — replay 중 도착분은 큐잉.
+    const cleanup = window.api.terminal.onOutput(({ id, data }) => {
+      if (id !== sessionId) return
+      if (restoring) { outputQueue.push(data); return }
+      writeLiveOutput(data)
+    })
+
+    // #6 터미널 링크 — Cmd/Ctrl + 클릭으로 OS 핸들러 호출 (ADR-v2-terminal-p2-05).
+    //   레이어 1) URL — @xterm/addon-web-links 전용(자체 provider 는 URL 패턴을 다루지 않는다).
+    //   레이어 2~5) 파일 경로 — filePathLinkProvider.ts 가 조립(정규식/wrap 재구성/존재 검증/캐시).
+    // 두 provider 모두 위 2)단계에서 patch 된 registerLinkProvider 를 통하므로 동기 throw 로부터
+    // 보호된다(레이어 0). CJK wide-char 셀 폭 보정은 xterm 이 실제로 배치한 셀을 읽는 wrappedLinkRanges
+    // 의 셀 매핑으로 대체됐다 — 기존 isWideCodePoint/stringIndexToCell 하드코딩 표는 삭제.
     try {
-      terminal.registerLinkProvider({
-        provideLinks: (lineNum, cb) => provideLinksByRe(URL_RE, lineNum, cb as (l: unknown[]) => void)
+      const webLinksAddon = new WebLinksAddon((event, uri) => {
+        if (!isLinkActivationEvent(event)) return
+        window.api.shell.openPath(uri).catch((err) => console.warn('[term-link] URL open 실패', err))
       })
-      terminal.registerLinkProvider({
-        provideLinks: (lineNum, cb) => provideLinksByRe(FILE_PATH_RE, lineNum, cb as (l: unknown[]) => void)
+      terminal.loadAddon(webLinksAddon)
+
+      const linkTooltip = createLinkTooltip(terminal.element ?? containerRef.current!)
+      const pathLinkCache = new Map<string, CachedPathResolution>()
+      const filePathLinkProvider = createFilePathLinkProvider(terminal, {
+        sessionId,
+        getCwdHint: () => paneCwd,
+        cache: pathLinkCache,
+        resolvePath: (req) => window.api.terminal.resolvePath(req),
+        openPath: (absolutePath) => {
+          window.api.shell.openPath(absolutePath).catch((err) => console.warn('[term-link] open 실패', err))
+        },
+        tooltip: linkTooltip
       })
+      terminal.registerLinkProvider(filePathLinkProvider)
     } catch (e) {
       console.warn('[TerminalPane] linkProvider 등록 실패:', e)
     }
+
+    // Cmd+클릭 3버그 모듈 — ①정지 커서 밑 새 링크 첫 클릭 씹힘 ②마우스 aware TUI(vim 등) 이중 열림.
+    // ③drag 선택 폭주 방지(clearSelection)는 filePathLinkProvider 의 activate 안에서 처리한다.
+    const linkClickPrimingDisposable = installTerminalLinkifierClickPriming(terminal)
+    const ptyMouseSuppressionDisposable = installTerminalLinkPtyMouseSuppression(
+      terminal,
+      () => terminal.modes.mouseTrackingMode !== 'none'
+    )
 
     // 텍스트 편집기 스타일 키바인딩 (cross-platform).
     // xterm 은 키를 그대로 PTY 로 보내는데, Cmd/Option/Win 같은 modifier 는 별도 매핑이 없으면 무시된다.
@@ -509,42 +647,11 @@ function TerminalPaneInner(
     })
 
     terminal.onData((data) => {
+      // v2.0 B-5: replay 중 xterm 의 자동 쿼리 응답(DA1/CPR 등)이 PTY 로 새는 것을 막는다(함정 #2).
+      if (replayGuard.active) return
       // v2.0 B-1: 입력 차단 경로 ② — 타이핑/붙여넣기로 xterm 이 만든 data 는 여기로 모인다.
       if (exitInfoRef.current) return
       window.api.terminal.input(sessionId, data)
-    })
-
-    // #2 PTY 출력에서 이미지 path 감지. 절대경로 (~/ 또는 / 또는 C:\) + 이미지 확장자.
-    // ANSI escape 시퀀스가 섞여 있을 수 있어 정규식이 그 사이에서 잘 매칭되도록 lookbehind 회피.
-    const IMAGE_PATH_RE = /((?:~|\/|\b[A-Za-z]:[\\/])[^\s"'`<>(){}[\]]*?\.(?:png|jpe?g|gif|webp|bmp|svg))/gi
-    const seenPaths = new Set<string>()
-    const cleanup = window.api.terminal.onOutput(({ id, data }) => {
-      if (id !== sessionId) return
-      // auto-follow: 사용자가 바닥에 있을 때만 새 출력을 따라 내려간다. 위로 올려 읽는 중이면 유지.
-      // wasAtBottom 은 반드시 write() 이전에 스냅샷한다 — write 후엔 baseY 가 늘어 판단이 망가진다.
-      // write() 콜백 안에서 scrollToBottom 을 호출해야 새 출력이 렌더된 뒤 뷰포트가 이동한다.
-      // Why: terminal.write() 는 비동기(내부 큐잉)이므로 write 직후 scrollToBottom 을 호출하면
-      // 렌더링이 완료되기 전에 호출될 수 있다. 콜백 인자를 활용해 렌더 후 실행되게 한다.
-      const buf = terminal.buffer.active
-      const wasAtBottom = shouldFollowOutput(buf.viewportY, buf.baseY)
-      terminal.write(data, () => { if (wasAtBottom) terminal.scrollToBottom() })
-      // path sniff — 같은 path 는 중복 추가 X. 최대 20개 유지 (오래된 것부터 drop).
-      IMAGE_PATH_RE.lastIndex = 0
-      let m: RegExpExecArray | null
-      const newOnes: string[] = []
-      while ((m = IMAGE_PATH_RE.exec(data)) !== null) {
-        const p = m[1]
-        if (seenPaths.has(p)) continue
-        seenPaths.add(p)
-        newOnes.push(p)
-      }
-      if (newOnes.length > 0) {
-        const now = Date.now()
-        setRecentImages((prev) => {
-          const merged = [...newOnes.map((path) => ({ path, seenAt: now })), ...prev]
-          return merged.slice(0, 20)
-        })
-      }
     })
 
     // fit() 전후로 스크롤 위치를 보존한다.
@@ -574,6 +681,46 @@ function TerminalPaneInner(
     // TerminalPaneHandle.fit() 배선 — B-5 가 복원 순서(§7 13단계)에서, B-4 가 리페어런트에서 호출한다.
     fitFnRef.current = () => safeResize(fitAddon)
 
+    // v2.0 B-5: 마운트 fit/복원 완료 처리 — 13)fit→PTY resize, 14)큐 flush. 비복원 마운트에서도
+    // 동일 경로를 태워 fit 타이밍을 하나로 통일한다.
+    const finishMount = (): void => {
+      deferredRef.current = false
+      safeResize(fitAddon)
+      restoring = false
+      if (outputQueue.length > 0) {
+        for (const chunk of outputQueue.splice(0)) writeLiveOutput(chunk)
+      }
+      evaluateWebgl()
+    }
+
+    // 언마운트 이후(테스트 간 격리, 빠른 탭 전환 등) 지연 예약된 rAF 가 stale 클로저로 fit/PTY
+    // resize 를 쏘지 않도록 핸들을 들고 있다가 cleanup 에서 취소한다.
+    let mountRafId: number | null = null
+    if (hasRestoreSnapshot && restore) {
+      // 7) replay guard on — 아래 write 들이 끝날 때까지 onData 를 통한 PTY 송신을 막는다.
+      replayGuard.on()
+      // 8) resize — fit 보다 먼저(함정 #1). cols===0(레거시 마이그레이션분)이면 스킵.
+      if (restore.cols > 0 && restore.rows > 0) {
+        try { terminal.resize(restore.cols, restore.rows) } catch { /* ok */ }
+      }
+      // 9) 클리어
+      terminal.write(REPLAY_CLEAR)
+      // 10) 스냅샷 write — 파싱 완료를 콜백으로 대기
+      terminal.write(restore.serialized, () => {
+        // 11) 모드 리셋 + PROMPT_EOL_MARK(zsh `%`) 방지
+        terminal.write(POST_REPLAY_MODE_RESET + '\r\n', () => {
+          // 12) replay guard off
+          replayGuard.off()
+          mountRafId = requestAnimationFrame(() => { mountRafId = null; finishMount() })
+        })
+      })
+    } else {
+      // 1)~4) 는 이미 위에서 끝났다 — 비복원 마운트는 레이아웃 완료를 한 프레임 기다린 뒤 fit.
+      // Why: open() 직후엔 xterm 이 기본 80x24 grid 로 동작하므로, 컨테이너 레이아웃이
+      // 자리잡기 전에 fit() 하면 잘못된 크기로 계산된다.
+      mountRafId = requestAnimationFrame(() => { mountRafId = null; finishMount() })
+    }
+
     // ResizeObserver 를 디바운스해서 연속된 레이아웃 변경(이미지 사이드바 토글 등)에
     // fit() 이 여러 번 중복 호출되지 않도록 한다.
     // Why: 이미지 사이드바 show/hide 때 padding 변경 → containerRef 크기 변경 → ResizeObserver
@@ -597,38 +744,55 @@ function TerminalPaneInner(
     return () => {
       cleanup()
       searchResultsDisposable.dispose()
+      linkClickPrimingDisposable.dispose()
+      ptyMouseSuppressionDisposable.dispose()
       resizeObserver.disconnect()
       if (resizeTimer !== null) clearTimeout(resizeTimer)
+      if (mountRafId !== null) cancelAnimationFrame(mountRafId)
       paneTextarea?.removeEventListener('focus', handleTextareaFocus)
+      disposeWebglNow()
       terminal.dispose()
     }
   }, [sessionId])
 
-  // v2.0 B-3: fit + PTY resize 는 visible 전환에서만 (ADR-01 §2/§5) — focus() 는 아래 별도 effect.
+  // v2.0 B-6: 가시성 전환마다 WebGL 게이트를 재평가한다 — reveal(→true) 시 이 가시성 구간의
+  // context loss 카운트를 리셋한다(ADR-04 §3, "같은 가시성 구간에서는 재시도하지 않는다"의 경계).
   useEffect(() => {
-    if (visible && fitAddonRef.current) {
-      // hidden → block 전환 후 레이아웃 완료를 기다린 뒤 fit
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const fa = fitAddonRef.current
-          const term = terminalRef.current
-          if (!fa) return
-          try {
-            // reveal 후 fit 해도 bottom 을 유지한다.
-            // Why: visible=true 로 바뀌면서 컨테이너가 나타나고 fitAddon 이 새 크기로
-            // resize() 를 호출하는데, 이때도 viewport 가 top 으로 튈 수 있다.
-            const wasAtBottom = term
-              ? term.buffer.active.viewportY >= term.buffer.active.baseY
-              : true
-            fa.fit()
-            const dims = fa.proposeDimensions()
-            if (dims && dims.cols > 0 && dims.rows > 0) {
-              window.api.terminal.resize({ id: sessionId, cols: dims.cols, rows: dims.rows })
-            }
-            if (wasAtBottom && term) term.scrollToBottom()
-          } catch {}
-        })
+    if (visible) paneLossCountRef.current = 0
+    evaluateWebglRef.current?.()
+  }, [visible])
+
+  // v2.0 B-3: fit + PTY resize 는 visible 전환에서만 (ADR-01 §2/§5) — focus() 는 아래 별도 effect.
+  // v2.0 B-5: rAF 핸들을 취소 가능하게 들고 있는다 — 언마운트/재마운트가 빠르게 이어지는
+  // 테스트·복원 경로에서 stale 클로저가 disposed 된 fitAddon 을 건드리지 않도록 한다.
+  useEffect(() => {
+    if (!visible || !fitAddonRef.current) return
+    let innerRafId: number | null = null
+    const outerRafId = requestAnimationFrame(() => {
+      innerRafId = requestAnimationFrame(() => {
+        innerRafId = null
+        const fa = fitAddonRef.current
+        const term = terminalRef.current
+        if (!fa) return
+        try {
+          // reveal 후 fit 해도 bottom 을 유지한다.
+          // Why: visible=true 로 바뀌면서 컨테이너가 나타나고 fitAddon 이 새 크기로
+          // resize() 를 호출하는데, 이때도 viewport 가 top 으로 튈 수 있다.
+          const wasAtBottom = term
+            ? term.buffer.active.viewportY >= term.buffer.active.baseY
+            : true
+          fa.fit()
+          const dims = fa.proposeDimensions()
+          if (dims && dims.cols > 0 && dims.rows > 0) {
+            window.api.terminal.resize({ id: sessionId, cols: dims.cols, rows: dims.rows })
+          }
+          if (wasAtBottom && term) term.scrollToBottom()
+        } catch {}
       })
+    })
+    return () => {
+      cancelAnimationFrame(outerRafId)
+      if (innerRafId !== null) cancelAnimationFrame(innerRafId)
     }
   }, [visible, sessionId])
 
@@ -637,6 +801,19 @@ function TerminalPaneInner(
   useEffect(() => {
     if (focused) terminalRef.current?.focus()
   }, [focused])
+
+  // v2.0 B-6: 윈도우 wake(document.visibilitychange → visible) 도 reveal 과 같은 리셋 경계다
+  // (ADR-04 §3) — 이 pane 이 지금 보이는 상태일 때만 반응한다.
+  useEffect(() => {
+    const onDocVisibility = (): void => {
+      if (document.visibilityState !== 'visible') return
+      if (!visibleRef.current) return
+      paneLossCountRef.current = 0
+      evaluateWebglRef.current?.()
+    }
+    document.addEventListener('visibilitychange', onDocVisibility)
+    return () => document.removeEventListener('visibilitychange', onDocVisibility)
+  }, [])
 
   // 이미지/파일 → PTY 에 path 입력. drag-drop / clipboard paste 공용 (#2 후속 / 사용자 요청).
   // Claude Code TUI 가 이미지 path 를 알아채면 read 도구로 자동 첨부.
@@ -682,9 +859,24 @@ function TerminalPaneInner(
   }, [focused, sendFileAsPath, capturePasteToken, validatePasteToken])
 
   // forwardRef handle — B-4 는 호스트가 focus()/fit() 을 명령형으로 부를 때, B-5 는 serialize()
-  // 로 스냅샷을 당길 때 쓴다. serialize() 는 B-3 단계에서 addon 미로드라 null 스텁이다.
+  // 로 스냅샷을 당길 때, B-6 은 리페어런트 전후 WebGL dispose/attach 를 명령형으로 부를 때 쓴다.
   useImperativeHandle(ref, () => ({
-    serialize: () => null,
+    serialize: () => {
+      const term = terminalRef.current
+      const addon = serializeAddonRef.current
+      if (!term || !addon) return null
+      try {
+        const raw = serializeWithAbsoluteCursor(term, addon, SERIALIZE_OPTIONS)
+        return {
+          cols: term.cols,
+          rows: term.rows,
+          serialized: trimSerializedToBytes(raw, PANE_SNAPSHOT_MAX_BYTES)
+        }
+      } catch (e) {
+        console.warn('[TerminalPane] serialize 실패', e)
+        return null
+      }
+    },
     focus: () => { terminalRef.current?.focus() },
     fit: () => { fitFnRef.current?.() },
     captureScrollState: () => {
@@ -700,6 +892,14 @@ function TerminalPaneInner(
         if (state.wasAtBottom) term.scrollToBottom()
         else term.scrollToLine(state.viewportY)
       } catch { /* ok */ }
+    },
+    disposeWebgl: () => {
+      deferredRef.current = true
+      disposeWebglFnRef.current?.()
+    },
+    attachWebglIfAllowed: () => {
+      deferredRef.current = false
+      evaluateWebglRef.current?.()
     }
   }), [])
 

@@ -80,7 +80,12 @@ function PaneSlot({
   useEffect(() => {
     const slot = slotRef.current
     if (!slot) return
-    reattachPaneHost(getHost(leafId), slot, getHandle(leafId))
+    const handle = getHandle(leafId)
+    // v2.0 B-6: WebGL dispose/attach 훅 — handle 의 명령형 메서드에 위임한다(ADR-04 §5).
+    reattachPaneHost(getHost(leafId), slot, handle, {
+      disposeWebgl: () => handle?.disposeWebgl(),
+      attachWebgl: () => handle?.attachWebglIfAllowed()
+    })
   })
   return <div ref={slotRef} className="relative flex-1 min-w-0 min-h-0" />
 }

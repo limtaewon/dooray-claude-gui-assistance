@@ -150,10 +150,7 @@ export const IPC_CHANNELS = {
   /** v2.0 B-1: PTY 종료 push (main → renderer). handle 등록 대상 아님 */
   TERMINAL_EXIT: 'terminal:exit',
   TERMINAL_SAVE_OUTPUT: 'terminal:save-output',
-  TERMINAL_RESTORE: 'terminal:restore',
   TERMINAL_RENAME: 'terminal:rename',
-  /** v2.0 B-8: 렌더러 탭 순서를 main 세션 순서에 반영 (fire-and-forget) */
-  TERMINAL_REORDER: 'terminal:reorder',
   /** v2.0 B-5: 렌더러 스냅샷 저장 (invoke). main 이 store 쓰기 + 메모리 캐시 갱신 */
   TERMINAL_SAVE_STATE: 'terminal:save-state',
   /** v2.0 B-5: 스냅샷 복원 (invoke). 최초 1회 legacy terminalSessions 마이그레이션 포함 */

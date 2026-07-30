@@ -6,6 +6,7 @@ import SkillCard from './SkillCard'
 import SkillEditor from './SkillEditor'
 import SkillCreateModal from './SkillCreateModal'
 import type { Skill } from '../../../../shared/types/skills'
+import { sanitizeSkillFilename } from '@shared/utils/filename'
 import { Button, Modal, SegTabs, useToast } from '../common/ds'
 
 import { DEFAULT_WIKIS } from '../../../../shared/wiki-storage-defaults'
@@ -205,8 +206,15 @@ function SkillsManager(): JSX.Element {
         const full = await window.api.dooray.wiki.storageGet(activeWikiId, item.pageId)
         content = full.content
       }
-      await window.api.skills.save({ filename: item.name, content })
-      toast.success(`"${item.name}" 내려받음`)
+      // 위키 제목에 Windows 금지문자가 있으면 저장 전 정제 — 실제 저장명을 UI 가 알아야 거짓말을 안 함
+      // (ADR-v2-windows-fix-05 §1).
+      const filename = sanitizeSkillFilename(item.name)
+      await window.api.skills.save({ filename, content })
+      if (filename !== item.name) {
+        toast.success(`"${item.name}" 내려받음`, `Windows 호환을 위해 파일명이 "${filename}" 으로 저장됐습니다`)
+      } else {
+        toast.success(`"${item.name}" 내려받음`)
+      }
       await loadSkills()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '내려받기 실패')
@@ -341,7 +349,9 @@ function SkillsManager(): JSX.Element {
     if (!ok) return
     try {
       const res = await window.api.skills.deleteMany(Array.from(selected))
-      toast.success(`${res.deleted}개 삭제됨`)
+      if (res.deleted > 0) toast.success(`${res.deleted}개 삭제됨`)
+      // 부분 실패는 조용히 삼키지 않는다 — 삭제 성공과 별개로 실패 건수를 사용자에게 알림.
+      if (res.failed > 0) toast.warn(`${res.failed}개 삭제 실패`, '권한 또는 파일 잠금 문제일 수 있습니다')
       exitSelectMode()
       await loadSkills()
     } catch (err) {
@@ -373,6 +383,7 @@ function SkillsManager(): JSX.Element {
     const targets = wikiItems.filter((it) => selected.has(it.pageId))
     let okCount = 0
     let failCount = 0
+    let renamedCount = 0
     for (const item of targets) {
       try {
         let content = item.content
@@ -380,14 +391,18 @@ function SkillsManager(): JSX.Element {
           const full = await window.api.dooray.wiki.storageGet(activeWikiId, item.pageId)
           content = full.content
         }
-        await window.api.skills.save({ filename: item.name, content })
+        const filename = sanitizeSkillFilename(item.name)
+        if (filename !== item.name) renamedCount++
+        await window.api.skills.save({ filename, content })
         okCount++
       } catch (err) {
         failCount++
         console.error('[Skills] bulk download failed:', item.name, err)
       }
     }
-    if (okCount > 0) toast.success(`${okCount}개 내려받음`)
+    if (okCount > 0) {
+      toast.success(`${okCount}개 내려받음`, renamedCount > 0 ? `${renamedCount}개는 Windows 호환을 위해 파일명이 변경됐습니다` : undefined)
+    }
     if (failCount > 0) toast.error(`${failCount}개 실패`)
     exitSelectMode()
     await loadSkills()

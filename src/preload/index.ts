@@ -436,9 +436,6 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_LIST),
     getOutput: (id: string): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_SAVE_OUTPUT, id),
-    /** @deprecated ADR-v2-terminal-p2-03 supersede 대상 — restoreState() 로 이관하면 삭제. */
-    restoreSaved: (): Promise<Array<{ meta: { id: string; name: string; cwd: string }; output: string }>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_RESTORE),
     rename: (id: string, name: string): Promise<boolean> =>
       ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_RENAME, { id, name }),
     onOutput: (callback: (payload: { id: string; data: string }) => void): (() => void) =>
@@ -446,8 +443,6 @@ const api = {
     /** v2.0 B-1: PTY 종료 통지 구독. suppression·at-most-once 판정은 main 이 수행. */
     onExit: (callback: (payload: TerminalExitPayload) => void): (() => void) =>
       subscribeTerminalExit(callback),
-    /** @deprecated ADR-v2-terminal-p2-03 supersede 대상 — 순서의 진실이 스냅샷 tabs 배열로 단일화되면 삭제. */
-    reorder: (ids: string[]): void => ipcRenderer.send(IPC_CHANNELS.TERMINAL_REORDER, ids),
     /** v2.0 M-A: 렌더러 스냅샷 저장 (invoke). main 이 store 쓰기 + 메모리 캐시 갱신 */
     saveState: (snapshot: TerminalWorkspaceSnapshotV2 | null): Promise<TerminalSaveStateResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_SAVE_STATE, snapshot),

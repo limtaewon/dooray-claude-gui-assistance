@@ -1,5 +1,6 @@
 /**
- * TerminalPane 단위 테스트 — v2.0 B-1 종료 오버레이 · 입력 차단 회귀 게이트 + B-3 isVisible/isFocused 분리.
+ * TerminalPane 단위 테스트 — v2.0 B-1 종료 오버레이 · 입력 차단 회귀 게이트 + B-3 isVisible/isFocused
+ * 분리 + B-5 serialize/복원 순서/replay guard + B-6 WebGL attach/dispose.
  *
  * xterm(@xterm/xterm, @xterm/addon-*)은 canvas/native 렌더러에 의존해 jsdom 에서 신뢰할 수
  * 없다 — TerminalManager.test.ts 의 node-pty mock 과 동일하게 boundary 에서 대체한다.
@@ -18,6 +19,8 @@ import { createRef } from 'react'
 import { fireEvent, waitFor } from '@testing-library/react'
 import { installMockWindowApi, resetMockWindowApi } from '../../../../../test/helpers/mockWindowApi'
 import { renderWithDs } from '../../../../../test/helpers/renderWithDs'
+import { REPLAY_CLEAR, POST_REPLAY_MODE_RESET } from './replay'
+import { resetGlobalWebglFailure } from './webglPolicy'
 
 interface FakeKeyEvent {
   type: string
@@ -34,31 +37,69 @@ interface FakeKeyEvent {
 interface FakeTerminalHandle {
   emitData: (data: string) => void
   emitKey: (event: FakeKeyEvent) => boolean
+  getUnicodeActiveVersion: () => string
 }
 
 // 마지막으로 생성된 Terminal mock 인스턴스 핸들 — TerminalManager.test.ts 의 `lastPty` 패턴과 동일.
 let lastTerminal: FakeTerminalHandle | null = null
 // B-3: windowsPty 옵션이 생성자에 실제로 전달됐는지 검증하기 위한 마지막 생성자 인자 캡처.
 let lastTerminalOptions: Record<string, unknown> | undefined
+// v2.0 B-5: resize/write/fit/PTY-resize 호출 순서를 기록 — 복원 시퀀스(ADR-03 §7) 단언용.
+let callOrder: string[] = []
+// v2.0 B-7: terminal.registerLinkProvider(guard 통과 후) 에 실제로 전달된 provider 들.
+let registeredLinkProviders: Array<{ provideLinks: (line: number, cb: (links: unknown) => void) => void }> = []
+// v2.0 B-7: OSC 핸들러 등록 호출(7/133) 기록 — [ident, handler][].
+let registeredOscHandlers: Array<[number, (data: string) => boolean]> = []
+// v2.0 B-5: true 면 terminal.write() 콜백을 microtask 로 미룬다 — replay guard 활성 구간을
+// 테스트가 관찰할 수 있게 하는 스위치(기본은 기존 동작과 동일한 동기 호출).
+let deferWriteCallback = false
+// v2.0 B-5: serialize() 결과를 테스트별로 조절.
+let fakeSerializeResult = 'FAKE_SERIALIZED'
+let fakeSerializeShouldThrow = false
 
 vi.mock('@xterm/xterm', () => {
   class FakeTerminal {
     buffer = { active: { viewportY: 0, baseY: 0, cursorX: 0, cursorY: 0 } }
-    unicode = { activeVersion: '6' }
+    unicode = { activeVersion: '6', versions: ['6', '11'], register: (): void => {} }
     textarea: undefined = undefined
+    cols = 80
+    rows = 24
+    // v2.0 B-7: element/modes/parser — 링크 provider guard/OSC7/mouse-suppression 배선 대상.
+    element: HTMLDivElement | undefined = undefined
+    modes = { mouseTrackingMode: 'none' as const }
+    parser = {
+      registerOscHandler: (ident: number, handler: (data: string) => boolean): { dispose: () => void } => {
+        registeredOscHandlers.push([ident, handler])
+        return { dispose: () => {} }
+      }
+    }
     private dataHandler: ((data: string) => void) | null = null
     private keyHandler: ((event: FakeKeyEvent) => boolean) | null = null
 
     constructor(options?: Record<string, unknown>) {
       lastTerminalOptions = options
+      if (typeof options?.cols === 'number') this.cols = options.cols as number
+      if (typeof options?.rows === 'number') this.rows = options.rows as number
       lastTerminal = {
         emitData: (data: string) => this.dataHandler?.(data),
-        emitKey: (event: FakeKeyEvent) => (this.keyHandler ? this.keyHandler(event) : true)
+        emitKey: (event: FakeKeyEvent) => (this.keyHandler ? this.keyHandler(event) : true),
+        getUnicodeActiveVersion: () => this.unicode.activeVersion
       }
     }
     loadAddon(): void {}
-    open(): void {}
-    write(_data: string, cb?: () => void): void { cb?.() }
+    open(): void { this.element = document.createElement('div') }
+    resize(cols: number, rows: number): void {
+      this.cols = cols
+      this.rows = rows
+      callOrder.push(`term-resize:${cols}x${rows}`)
+    }
+    write(data: string, cb?: () => void): void {
+      const tag = data === REPLAY_CLEAR ? 'CLEAR' : (data.startsWith(POST_REPLAY_MODE_RESET) ? 'MODE_RESET' : data)
+      callOrder.push(`write:${tag}`)
+      if (!cb) return
+      if (deferWriteCallback) queueMicrotask(cb)
+      else cb()
+    }
     reset(): void {}
     dispose(): void {}
     focus(): void {}
@@ -68,7 +109,11 @@ vi.mock('@xterm/xterm', () => {
     clearSelection(): void {}
     getSelection(): string { return '' }
     scrollToBottom(): void {}
-    registerLinkProvider(): { dispose: () => void } { return { dispose: () => {} } }
+    scrollToLine(): void {}
+    registerLinkProvider(provider: { provideLinks: (line: number, cb: (links: unknown) => void) => void }): { dispose: () => void } {
+      registeredLinkProviders.push(provider)
+      return { dispose: () => {} }
+    }
     onData(cb: (data: string) => void): { dispose: () => void } {
       this.dataHandler = cb
       return { dispose: () => { this.dataHandler = null } }
@@ -82,7 +127,7 @@ vi.mock('@xterm/xterm', () => {
 
 vi.mock('@xterm/addon-fit', () => ({
   FitAddon: class {
-    fit(): void {}
+    fit(): void { callOrder.push('fit') }
     proposeDimensions(): { cols: number; rows: number } { return { cols: 80, rows: 24 } }
   }
 }))
@@ -98,6 +143,34 @@ vi.mock('@xterm/addon-search', () => ({
 
 vi.mock('@xterm/addon-unicode11', () => ({
   Unicode11Addon: class {}
+}))
+
+// v2.0 B-5: 실제 addon-serialize 는 jsdom 에 canvas 가 없어 import 시점에 경고를 뿜는다
+// (Color.ts 의 기본 팔레트 계산) — FakeTerminal 과 동일한 경계 대체 전략.
+vi.mock('@xterm/addon-serialize', () => ({
+  SerializeAddon: class {
+    serialize(): string {
+      if (fakeSerializeShouldThrow) throw new Error('serialize 실패(테스트)')
+      return fakeSerializeResult
+    }
+  }
+}))
+
+// v2.0 B-6: WebglAddon 도 동일 이유로 대체. 생성자 throw/onContextLoss 를 테스트가 제어한다.
+let webglConstructorShouldThrow = false
+let lastWebglOnContextLoss: (() => void) | null = null
+let webglDisposeCalls = 0
+vi.mock('@xterm/addon-webgl', () => ({
+  WebglAddon: class {
+    constructor() {
+      if (webglConstructorShouldThrow) throw new Error('WebGL 초기화 실패(테스트)')
+    }
+    onContextLoss(cb: () => void): { dispose: () => void } {
+      lastWebglOnContextLoss = cb
+      return { dispose: () => {} }
+    }
+    dispose(): void { webglDisposeCalls += 1 }
+  }
 }))
 
 // jsdom 에는 ResizeObserver 가 없다 (mount effect 의 debouncedSafeResize 배선에 필요).
@@ -136,11 +209,22 @@ describe('TerminalPane — v2.0 B-1 종료 오버레이 / 입력 차단', () => 
     globalThis.ResizeObserver = FakeResizeObserver
     lastTerminal = null
     lastTerminalOptions = undefined
+    callOrder = []
+    registeredLinkProviders = []
+    registeredOscHandlers = []
+    deferWriteCallback = false
+    fakeSerializeResult = 'FAKE_SERIALIZED'
+    fakeSerializeShouldThrow = false
+    webglConstructorShouldThrow = false
+    lastWebglOnContextLoss = null
+    webglDisposeCalls = 0
+    resetGlobalWebglFailure()
   })
 
   afterEach(() => {
     resetMockWindowApi()
     vi.clearAllMocks()
+    resetGlobalWebglFailure()
   })
 
   describe('종료 오버레이 렌더링', () => {
@@ -337,10 +421,11 @@ describe('TerminalPane — v2.0 B-1 종료 오버레이 / 입력 차단', () => 
       })
     })
 
-    it('ref.current.serialize() 는 addon 미로드 상태에서도 null 을 반환한다 (throw 없음)', () => {
+    it('ref.current.serialize() 는 throw 없이 스냅샷을 반환한다 (B-5 본체 구현 — 상세 계약은 아래 B-5 섹션)', () => {
       const ref = createRef<TerminalPaneHandle>()
       renderWithDs(<TerminalPane ref={ref} sessionId="s1" isVisible isFocused />)
-      expect(ref.current?.serialize()).toBeNull()
+      expect(() => ref.current?.serialize()).not.toThrow()
+      expect(ref.current?.serialize()).not.toBeNull()
     })
 
     it('ref.current.focus()/fit() 이 예외 없이 동작한다', () => {
@@ -443,6 +528,179 @@ describe('TerminalPane — v2.0 B-1 종료 오버레이 / 입력 차단', () => 
       window.api.system = { platform: 'win32', osRelease: '10.0.19044' }
       renderWithDs(<TerminalPane sessionId="s1" isActive />)
       expect(lastTerminalOptions?.windowsPty).toBeUndefined()
+    })
+  })
+
+  describe('v2.0 B-5 — serialize() · 복원 순서 · replay guard (ADR-v2-terminal-p2-03)', () => {
+    beforeEach(() => {
+      // callOrder 에 IPC PTY resize 도 함께 기록 — 순서 단언에 필요.
+      vi.mocked(window.api.terminal.resize).mockImplementation(() => { callOrder.push('ipc-resize') })
+    })
+
+    it('serialize() 는 addon 결과 + 절대 CUP 접미 + 현재 cols/rows 를 반환한다', () => {
+      fakeSerializeResult = 'HELLO'
+      const ref = createRef<TerminalPaneHandle>()
+      renderWithDs(<TerminalPane ref={ref} sessionId="s1" isVisible isFocused />)
+      expect(ref.current?.serialize()).toEqual({ cols: 80, rows: 24, serialized: 'HELLO\x1b[1;1H' })
+    })
+
+    it('restore 가 없으면 복원 없이 기존처럼 fit → PTY resize 만 실행된다', async () => {
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused />)
+      await waitFor(() => expect(window.api.terminal.resize).toHaveBeenCalled())
+      // v2.0 B-3 부터 존재하던 "reveal 전환" effect 도 visible=true 초기 마운트에서 한 번 더
+      // fit+resize 를 태운다(레거시 동작, 이번 라운드가 만든 회귀 아님) — restore 관련 write/resize
+      // 흔적(term-resize:*, write:*)이 전혀 없다는 것과 첫 페어가 fit→ipc-resize 순서라는 것만 본다.
+      expect(callOrder[0]).toBe('fit')
+      expect(callOrder[1]).toBe('ipc-resize')
+      expect(callOrder.every((c) => c === 'fit' || c === 'ipc-resize')).toBe(true)
+    })
+
+    it('복원 순서가 resize → clear → write(snapshot) → write(mode-reset) → fit → PTY resize 다 (함정 #1)', async () => {
+      const restore = { cols: 100, rows: 30, serialized: 'RESTORED_CONTENT' }
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused restore={restore} />)
+
+      await waitFor(() => expect(callOrder).toContain('ipc-resize'))
+      // 앞의 6개가 복원 시퀀스다 — 이후에 "reveal 전환" effect 가 별도로 붙이는 fit/ipc-resize 는
+      // 이번 라운드가 만든 게 아닌 기존 동작이라 접두사만 확인한다(위 테스트와 동일한 이유).
+      expect(callOrder.slice(0, 6)).toEqual([
+        'term-resize:100x30',
+        'write:CLEAR',
+        'write:RESTORED_CONTENT',
+        'write:MODE_RESET',
+        'fit',
+        'ipc-resize'
+      ])
+    })
+
+    it('cols===0(레거시 마이그레이션분)이면 명시적 resize 를 건너뛰지만 write 는 진행한다', async () => {
+      const restore = { cols: 0, rows: 0, serialized: 'LEGACY_CONTENT' }
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused restore={restore} />)
+      await waitFor(() => expect(window.api.terminal.resize).toHaveBeenCalled())
+      expect(callOrder.some((c) => c.startsWith('term-resize'))).toBe(false)
+      expect(callOrder).toContain('write:LEGACY_CONTENT')
+    })
+
+    it('replay guard 활성 구간의 onData 는 window.api.terminal.input 을 호출하지 않는다 (함정 #2)', async () => {
+      deferWriteCallback = true
+      const restore = { cols: 80, rows: 24, serialized: 'X' }
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused restore={restore} />)
+
+      // write 콜백이 아직 흐르지 않은 시점 — replay guard 는 여전히 켜져 있다.
+      currentTerminal().emitData('\x1b[3;5R') // CPR 자동 응답 흉내
+      expect(window.api.terminal.input).not.toHaveBeenCalled()
+
+      // 콜백 체인(write→write→rAF)이 흘러 replay 가 끝나면 입력이 다시 통과한다.
+      await waitFor(() => expect(window.api.terminal.resize).toHaveBeenCalled())
+      currentTerminal().emitData('ls\n')
+      expect(window.api.terminal.input).toHaveBeenCalledWith('s1', 'ls\n')
+    })
+
+    it('serialize() 가 addon 예외를 던지면 throw 하지 않고 null 을 반환한다', () => {
+      fakeSerializeShouldThrow = true
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const ref = createRef<TerminalPaneHandle>()
+      renderWithDs(<TerminalPane ref={ref} sessionId="s1" isVisible isFocused />)
+      expect(ref.current?.serialize()).toBeNull()
+      expect(warnSpy).toHaveBeenCalled()
+      warnSpy.mockRestore()
+    })
+  })
+
+  describe('v2.0 B-6 — WebGL attach/dispose (ADR-v2-terminal-p2-04)', () => {
+    it('기본값(webgl, visible)이면 mount 후 WebGL 이 attach 된다 — dispose 호출 없음', async () => {
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused />)
+      await waitFor(() => expect(window.api.terminal.resize).toHaveBeenCalled())
+      expect(webglDisposeCalls).toBe(0)
+    })
+
+    it("rendererSetting='dom' 이면 attach 하지 않는다", async () => {
+      const onWebglUnavailable = vi.fn()
+      renderWithDs(
+        <TerminalPane sessionId="s1" isVisible isFocused rendererSetting="dom" onWebglUnavailable={onWebglUnavailable} />
+      )
+      await waitFor(() => expect(window.api.terminal.resize).toHaveBeenCalled())
+      expect(onWebglUnavailable).not.toHaveBeenCalled() // dom 은 "설정"이지 "실패 폴백"이 아니다.
+    })
+
+    it('visible=false 면 attach 하지 않는다 (함정 #4 — hidden pane 미부착)', async () => {
+      renderWithDs(<TerminalPane sessionId="s1" isVisible={false} isFocused={false} />)
+      await waitFor(() => expect(window.api.terminal.resize).toHaveBeenCalled())
+      // hidden 이므로 attach 시도조차 없어야 하고, 혹시 이전에 attach 됐던 경우도 아니므로 dispose 도 0회.
+      expect(webglDisposeCalls).toBe(0)
+    })
+
+    it('WebGL 초기화 자체가 throw 하면 onWebglUnavailable 이 호출되고 전역 래치가 세워진다', async () => {
+      webglConstructorShouldThrow = true
+      const onWebglUnavailable = vi.fn()
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused onWebglUnavailable={onWebglUnavailable} />)
+      await waitFor(() => expect(onWebglUnavailable).toHaveBeenCalledTimes(1))
+    })
+
+    it('context loss 발생 시 dispose 되고 onWebglUnavailable 이 호출된다 — 자동 재시도 없음', async () => {
+      const onWebglUnavailable = vi.fn()
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused onWebglUnavailable={onWebglUnavailable} />)
+      await waitFor(() => expect(window.api.terminal.resize).toHaveBeenCalled())
+      expect(lastWebglOnContextLoss).toBeTypeOf('function')
+
+      const disposeCountBefore = webglDisposeCalls
+      lastWebglOnContextLoss?.()
+
+      expect(webglDisposeCalls).toBe(disposeCountBefore + 1)
+      expect(onWebglUnavailable).toHaveBeenCalledTimes(1)
+    })
+
+    it('가시성 전환(hidden→visible)에서 dispose/attach 가 예외 없이 재평가된다', async () => {
+      const { rerender } = renderWithDs(<TerminalPane sessionId="s1" isVisible={false} isFocused={false} />)
+      await waitFor(() => expect(window.api.terminal.resize).toHaveBeenCalled())
+      rerender(<TerminalPane sessionId="s1" isVisible isFocused />)
+      await waitFor(() => expect(window.api.terminal.resize).toHaveBeenCalledTimes(2))
+    })
+
+    it('ref.current.disposeWebgl()/attachWebglIfAllowed() 는 예외 없이 동작한다 (reattachPaneHost 훅)', async () => {
+      const ref = createRef<TerminalPaneHandle>()
+      renderWithDs(<TerminalPane ref={ref} sessionId="s1" isVisible isFocused />)
+      await waitFor(() => expect(window.api.terminal.resize).toHaveBeenCalled())
+      expect(() => ref.current?.disposeWebgl()).not.toThrow()
+      expect(() => ref.current?.attachWebglIfAllowed()).not.toThrow()
+    })
+  })
+
+  describe('v2.0 B-7/B-9 — 링크 provider guard · unicode 활성화 · OSC7 배선 (ADR-v2-terminal-p2-05)', () => {
+    it('파일 경로 link provider 를 정확히 1개(guard 통과) 등록한다', async () => {
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused />)
+      await waitFor(() => expect(registeredLinkProviders).toHaveLength(1))
+    })
+
+    it('등록된 provider 가 동기 throw 해도(guard) provideLinks 호출이 예외를 전파하지 않는다', async () => {
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused />)
+      await waitFor(() => expect(registeredLinkProviders).toHaveLength(1))
+      // FakeTerminal.buffer.active 는 getLine 이 없어 실제 provideLinks 내부에서 던진다 —
+      // guard 가 이를 삼키고 콜백에 undefined 를 전달해야 한다(렌더러 생존, 함정 #5).
+      const callback = vi.fn()
+      expect(() => registeredLinkProviders[0].provideLinks(1, callback)).not.toThrow()
+      await waitFor(() => expect(callback).toHaveBeenCalledWith(undefined))
+    })
+
+    it('unicode provider 활성화가 마운트 중 실행된다(open() 이후, 함정 #7)', async () => {
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused />)
+      await waitFor(() => expect(window.api.terminal.resize).toHaveBeenCalled())
+      // FakeTerminal 은 _core.unicodeService 가 없어 activateTerminalUnicodeProvider 가 '11'
+      // 폴백 분기를 탄다 — activeVersion 이 초기값('6')에서 '11' 로 바뀐 것이 활성화 호출의 증거.
+      expect(lastTerminal?.getUnicodeActiveVersion()).toBe('11')
+    })
+
+    it('OSC7/OSC133 핸들러가 등록된다(PTY 연결 전, ADR-05 §레이어 4)', async () => {
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused />)
+      await waitFor(() => expect(registeredOscHandlers.map(([ident]) => ident)).toEqual(expect.arrayContaining([7, 133])))
+    })
+
+    it('OSC7 로 cwd 를 알게 되면 onCwdChange 가 호출된다', async () => {
+      const onCwdChange = vi.fn()
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused onCwdChange={onCwdChange} />)
+      await waitFor(() => expect(registeredOscHandlers.length).toBeGreaterThan(0))
+      const osc7 = registeredOscHandlers.find(([ident]) => ident === 7)?.[1]
+      osc7?.('file://host/Users/dev/project')
+      expect(onCwdChange).toHaveBeenCalledWith('/Users/dev/project')
     })
   })
 })

@@ -1,10 +1,11 @@
 /**
  * leaf host div 를 새 슬롯으로 옮기는 안무 — split/close 로 트리 모양이 바뀌면 SplitLayout 의
  * leaf 슬롯 div 자체가 새로 생기므로, 그 안에 들어있던 xterm host 를 옮겨줘야 한다
- * (ADR-v2-terminal-p2-02 §4). 순서 고정: scrollState 캡처 → (B-6) WebGL dispose → appendChild →
- * rAF → (B-6) WebGL attach → fit → scrollState 복원.
+ * (ADR-v2-terminal-p2-02 §4). 순서 고정: scrollState 캡처 → WebGL dispose → appendChild →
+ * rAF → WebGL attach → fit → scrollState 복원.
  *
- * B-4 단계에서는 WebGL 훅이 없다 — B-6(ADR-v2-terminal-p2-04)에서 disposeWebgl/attachWebgl 을 채운다.
+ * WebGL dispose/attach 훅은 SplitLayout 의 PaneSlot 이 `handle.disposeWebgl()`/
+ * `handle.attachWebglIfAllowed()` 로 채운다 (v2.0 B-6, ADR-v2-terminal-p2-04 §5).
  */
 import type { TerminalPaneHandle } from './TerminalPane'
 

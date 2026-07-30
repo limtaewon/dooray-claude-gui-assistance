@@ -6,9 +6,10 @@
  * - 탭 닫기 → window.api.terminal.kill 호출 + 탭 제거
  * - 더블클릭 → 인라인 이름 편집 → Enter → rename 호출
  * - v2.0 B-4: split(⌘D/⌘⇧D) · pane 닫기(⌘W) · 다른 뷰에서는 무반응(active=false)
+ * - v2.0 B-5: restoreState 기반 스냅샷 복원 · 저장 트리거(debounce/onRequestState) · 탭 상한
  *
  * xterm 의존성을 가진 TerminalPane 은 stub 으로 교체 — forwardRef 로 감싸 SplitLayout 의
- * reattachPaneHost(handle.fit() 등 호출)가 예외 없이 동작하게 한다.
+ * reattachPaneHost(handle.fit()/disposeWebgl()/attachWebglIfAllowed() 등 호출)가 예외 없이 동작하게 한다.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { forwardRef, useImperativeHandle } from 'react'
@@ -16,6 +17,7 @@ import { screen, waitFor, act, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { installMockWindowApi, resetMockWindowApi } from '../../../../../test/helpers/mockWindowApi'
 import { renderWithDs } from '../../../../../test/helpers/renderWithDs'
+import type { TerminalWorkspaceSnapshotV2 } from '@shared/types/terminal'
 
 // TerminalPane 은 xterm 의 native 모듈을 끌어와서 jsdom 에서 무거움 → forwardRef stub 으로 교체.
 vi.mock('./TerminalPane', () => ({
@@ -24,12 +26,14 @@ vi.mock('./TerminalPane', () => ({
       sessionId,
       isVisible,
       isFocused,
-      exitInfo
+      exitInfo,
+      restore
     }: {
       sessionId: string
       isVisible?: boolean
       isFocused?: boolean
       exitInfo?: { exitCode: number } | null
+      restore?: { cols: number; rows: number; serialized: string }
     },
     ref: React.ForwardedRef<unknown>
   ) {
@@ -38,7 +42,9 @@ vi.mock('./TerminalPane', () => ({
       focus: () => {},
       fit: () => {},
       captureScrollState: () => null,
-      restoreScrollState: () => {}
+      restoreScrollState: () => {},
+      disposeWebgl: () => {},
+      attachWebglIfAllowed: () => {}
     }), [])
     return (
       <div
@@ -47,6 +53,7 @@ vi.mock('./TerminalPane', () => ({
         data-active={String(Boolean(isFocused))}
         data-exited={String(Boolean(exitInfo))}
         data-exit-code={exitInfo ? String(exitInfo.exitCode) : ''}
+        data-restore-serialized={restore?.serialized ?? ''}
       >
         [pane:{sessionId}]
       </div>
@@ -57,19 +64,35 @@ vi.mock('./TerminalPane', () => ({
 // Import 는 mock 등록 이후.
 import TerminalView from './TerminalView'
 
+/** 최소 유효 스냅샷 하나(탭 1개, leaf 1개)를 만든다 — 상한/복원 테스트 픽스처용. */
+function makeSnapshotWithTabs(count: number): TerminalWorkspaceSnapshotV2 {
+  const tabs = Array.from({ length: count }, (_, i) => {
+    const leafId = `leaf-${i}`
+    return {
+      tabId: `tab-${i}`,
+      name: `restored-${i}`,
+      tree: { type: 'leaf' as const, leafId },
+      focusedLeafId: leafId,
+      panes: { [leafId]: { cwd: `/repo/${i}`, cols: 80, rows: 24, serialized: `snap-${i}` } }
+    }
+  })
+  return { version: 2, savedAt: Date.now(), activeTabId: tabs[0]?.tabId ?? null, tabs }
+}
+
 describe('TerminalView (integration)', () => {
   beforeEach(() => {
     installMockWindowApi()
   })
 
   afterEach(() => {
+    // fake timer 테스트가 도중에 실패해도 이후 테스트의 findByRole/waitFor(실시간 polling)가
+    // 영원히 멈추지 않도록 항상 실타이머로 되돌린다.
+    vi.useRealTimers()
     resetMockWindowApi()
     vi.clearAllMocks()
   })
 
   it('renders empty state when no saved sessions exist', async () => {
-    vi.mocked(window.api.terminal.restoreSaved).mockResolvedValue([])
-
     renderWithDs(<TerminalView />)
 
     expect(await screen.findByText('터미널')).toBeInTheDocument()
@@ -79,7 +102,6 @@ describe('TerminalView (integration)', () => {
   })
 
   it('creates a new tab when 새 터미널 버튼 is clicked', async () => {
-    vi.mocked(window.api.terminal.restoreSaved).mockResolvedValue([])
     const createSpy = vi.mocked(window.api.terminal.create)
     createSpy.mockResolvedValue({
       id: 'sess-1',
@@ -106,7 +128,6 @@ describe('TerminalView (integration)', () => {
   })
 
   it('closes a session through window.api.terminal.kill', async () => {
-    vi.mocked(window.api.terminal.restoreSaved).mockResolvedValue([])
     vi.mocked(window.api.terminal.create).mockResolvedValue({
       id: 'sess-x',
       name: '~',
@@ -133,7 +154,6 @@ describe('TerminalView (integration)', () => {
   })
 
   it('renames a tab via inline edit (Enter commits → terminal.rename)', async () => {
-    vi.mocked(window.api.terminal.restoreSaved).mockResolvedValue([])
     vi.mocked(window.api.terminal.create).mockResolvedValue({
       id: 'sess-r',
       name: '~',
@@ -160,14 +180,12 @@ describe('TerminalView (integration)', () => {
     })
   })
 
-  it('restores saved sessions on mount', async () => {
-    vi.mocked(window.api.terminal.restoreSaved).mockResolvedValue([
-      { meta: { id: 'old', name: 'project-a', cwd: '/repo/a' }, output: 'hello' }
-    ])
+  it('v2.0 B-5: restoreState 스냅샷으로 탭·pane 을 복원하고 각 pane 에 restore 스냅샷을 전달한다', async () => {
+    vi.mocked(window.api.terminal.restoreState).mockResolvedValue(makeSnapshotWithTabs(1))
     vi.mocked(window.api.terminal.create).mockResolvedValue({
       id: 'new-after-restore',
       name: '~',
-      cwd: '/repo/a',
+      cwd: '/repo/0',
       pid: 7,
       createdAt: Date.now()
     } as unknown as Awaited<ReturnType<typeof window.api.terminal.create>>)
@@ -175,14 +193,113 @@ describe('TerminalView (integration)', () => {
     renderWithDs(<TerminalView />)
 
     await waitFor(() => {
-      // 복원 시 create 한 번 + rename(저장됐던 이름 복구) 한 번 이상
-      expect(window.api.terminal.create).toHaveBeenCalled()
-      expect(window.api.terminal.rename).toHaveBeenCalledWith('new-after-restore', 'project-a')
+      expect(window.api.terminal.create).toHaveBeenCalledWith({ cwd: '/repo/0' })
+    })
+    expect(await screen.findByText('restored-0')).toBeInTheDocument()
+    const pane = await screen.findByTestId('term-pane-new-after-restore')
+    expect(pane).toHaveAttribute('data-restore-serialized', 'snap-0')
+    expect(pane).toHaveAttribute('data-active', 'true')
+    // v2 복원은 이름을 스냅샷에서 직접 쓴다 — 레거시처럼 rename IPC 를 다시 왕복하지 않는다.
+    expect(window.api.terminal.rename).not.toHaveBeenCalled()
+  })
+
+  it('v2.0 B-5: 빈 스냅샷(null)이면 빈 상태로 시작하고 복원 관련 create 호출이 없다', async () => {
+    vi.mocked(window.api.terminal.restoreState).mockResolvedValue(null)
+
+    renderWithDs(<TerminalView />)
+
+    expect(await screen.findByText('터미널')).toBeInTheDocument()
+    expect(window.api.terminal.create).not.toHaveBeenCalled()
+  })
+
+  it('v2.0 B-5: 탭 상한(20) 초과 시 최근 20개만 복원하고 warn 을 남긴다', async () => {
+    vi.mocked(window.api.terminal.restoreState).mockResolvedValue(makeSnapshotWithTabs(21))
+    let counter = 0
+    vi.mocked(window.api.terminal.create).mockImplementation(async () => ({
+      id: `restored-sess-${++counter}`,
+      name: '~',
+      cwd: '/tmp',
+      pid: counter,
+      createdAt: Date.now()
+    } as unknown as Awaited<ReturnType<typeof window.api.terminal.create>>))
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    renderWithDs(<TerminalView />)
+
+    await waitFor(() => {
+      expect(window.api.terminal.create).toHaveBeenCalledTimes(20)
+    })
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('20'))
+    // 오래된 탭(restored-0)은 버려지고 최근 탭(restored-20)만 남는다.
+    expect(screen.queryByText('restored-0')).not.toBeInTheDocument()
+    expect(await screen.findByText('restored-20')).toBeInTheDocument()
+    warnSpy.mockRestore()
+  })
+
+  it('v2.0 B-5: 복원 진행 중에는 30초 autosave 가 발화하지 않는다', async () => {
+    vi.useFakeTimers()
+    let resolveRestore: ((v: TerminalWorkspaceSnapshotV2 | null) => void) | null = null
+    vi.mocked(window.api.terminal.restoreState).mockReturnValue(
+      new Promise((resolve) => { resolveRestore = resolve })
+    )
+
+    renderWithDs(<TerminalView />)
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(30000) })
+    expect(window.api.terminal.saveState).not.toHaveBeenCalled()
+
+    // 정리 — pending 프라미스를 해소해 다음 테스트에 영향이 남지 않게 한다.
+    await act(async () => { resolveRestore?.(null) })
+    vi.useRealTimers()
+  })
+
+  it('v2.0 B-5: onRequestState(before-quit flush) 수신 시 saveState 를 1회 호출한다', async () => {
+    vi.mocked(window.api.terminal.restoreState).mockResolvedValue(null)
+    renderWithDs(<TerminalView />)
+    await screen.findByText('터미널')
+    // restorePhase 가 'ready' 로 넘어갈 시간을 준다(마이크로태스크 1틱).
+    await act(async () => { await Promise.resolve() })
+
+    const onRequestState = vi.mocked(window.api.terminal.onRequestState)
+    const flush = onRequestState.mock.calls.at(-1)?.[0] as (() => void) | undefined
+    expect(flush).toBeTypeOf('function')
+
+    act(() => flush?.())
+
+    await waitFor(() => {
+      expect(window.api.terminal.saveState).toHaveBeenCalledTimes(1)
     })
   })
 
+  it('v2.0 B-5: 탭 생성 후 1초가 지나면 debounce 저장이 발화한다', async () => {
+    vi.useFakeTimers()
+    vi.mocked(window.api.terminal.restoreState).mockResolvedValue(null)
+    vi.mocked(window.api.terminal.create).mockResolvedValue({
+      id: 'sess-debounce',
+      name: '~',
+      cwd: '/tmp',
+      pid: 1,
+      createdAt: Date.now()
+    } as unknown as Awaited<ReturnType<typeof window.api.terminal.create>>)
+
+    renderWithDs(<TerminalView />)
+    await act(async () => { await Promise.resolve() }) // restorePhase → 'ready'
+
+    // fake timer 구간에선 findByRole(내부 polling 이 실타이머 기반)을 쓰지 않는다 — 빈 상태 버튼은
+    // restorePhase 와 무관하게 첫 렌더부터 동기로 존재한다.
+    const startBtn = screen.getByRole('button', { name: '새 터미널' })
+    await act(async () => {
+      fireEvent.click(startBtn)
+      await Promise.resolve()
+    })
+
+    expect(window.api.terminal.saveState).not.toHaveBeenCalled()
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+    expect(window.api.terminal.saveState).toHaveBeenCalledTimes(1)
+    vi.useRealTimers()
+  })
+
   it('v2.0 B-1: onExit 으로 받은 종료 정보가 해당 pane/탭 배지에만 반영된다', async () => {
-    vi.mocked(window.api.terminal.restoreSaved).mockResolvedValue([])
     vi.mocked(window.api.terminal.create).mockResolvedValue({
       id: 'sess-exit',
       name: '~',
@@ -210,7 +327,6 @@ describe('TerminalView (integration)', () => {
   })
 
   it('v2.0 B-1: at-most-once — 같은 세션에 두 번째 exit 이 와도 최초 payload 를 덮지 않는다', async () => {
-    vi.mocked(window.api.terminal.restoreSaved).mockResolvedValue([])
     vi.mocked(window.api.terminal.create).mockResolvedValue({
       id: 'sess-exit-2',
       name: '~',
@@ -236,7 +352,6 @@ describe('TerminalView (integration)', () => {
 
   it('v2.0 B-8: 탭을 닫으면 MRU 스택 기준으로 다음 탭이 활성화된다', async () => {
     let counter = 0
-    vi.mocked(window.api.terminal.restoreSaved).mockResolvedValue([])
     vi.mocked(window.api.terminal.create).mockImplementation(async () => ({
       id: `sess-${++counter}`,
       name: '~',
@@ -280,7 +395,6 @@ describe('TerminalView (integration)', () => {
 
     async function createTwoTabsFirstActive(): Promise<void> {
       let counter = 0
-      vi.mocked(window.api.terminal.restoreSaved).mockResolvedValue([])
       vi.mocked(window.api.terminal.create).mockImplementation(async () => ({
         id: `sess-${++counter}`,
         name: '~',

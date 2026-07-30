@@ -814,6 +814,17 @@ function AppBehaviorSettings(): JSX.Element {
         <SidebarPrefsSection />
       </div>
 
+      {/* v2.0 B-6: 터미널 렌더러 — 탭바 우측 드롭다운과 동일 설정(terminalRenderer), 두 곳 어디서나 바꿀 수 있다. */}
+      <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden mt-3">
+        <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30">
+          <span className="text-xs font-medium text-text-primary">터미널 렌더러</span>
+          <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
+            터미널 탭바 우측에서도 바로 전환할 수 있습니다. GPU 문제로 화면이 깨지면 DOM 으로 전환하세요.
+          </p>
+        </div>
+        <TerminalRendererSection />
+      </div>
+
       {/* 알림 */}
       <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden mt-3">
         <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30">
@@ -827,6 +838,47 @@ function AppBehaviorSettings(): JSX.Element {
       <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-3">
         💡 <strong className="text-text-secondary">AI 스킬 관리</strong>는 각 AI 기능 화면 우측의 <span className="text-amber-400 font-medium">스킬</span> 버튼에서 바로 할 수 있습니다.
       </p>
+    </div>
+  )
+}
+
+type TerminalRendererSetting = 'webgl' | 'dom'
+const TERMINAL_RENDERER_OPTIONS: { value: TerminalRendererSetting; label: string; description: string }[] = [
+  { value: 'webgl', label: 'WebGL (기본값)', description: 'GPU 가속 — 긴 로그·TUI 재그리기에 유리' },
+  { value: 'dom', label: 'DOM', description: '호환 모드 — GPU 드라이버 문제 시 폴백' }
+]
+
+/** 터미널 렌더러 설정(webgl|dom) — TerminalView 탭바 드롭다운(RendererToggle)과 같은 settings 키를 공유. */
+function TerminalRendererSection(): JSX.Element {
+  const [value, setValue] = useState<TerminalRendererSetting>('webgl')
+
+  useEffect(() => {
+    window.api.settings.get('terminalRenderer').then((v) => {
+      if (v === 'dom' || v === 'webgl') setValue(v)
+    })
+  }, [])
+
+  const save = async (v: TerminalRendererSetting): Promise<void> => {
+    setValue(v)
+    await window.api.settings.set('terminalRenderer', v)
+  }
+
+  return (
+    <div className="p-2">
+      {TERMINAL_RENDERER_OPTIONS.map((opt) => (
+        <label key={opt.value}
+          className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+            value === opt.value ? 'bg-clauday-blue/10' : 'hover:bg-bg-surface-hover'
+          }`}>
+          <input type="radio" name="terminal-renderer" checked={value === opt.value}
+            onChange={() => save(opt.value)}
+            className="accent-clauday-blue" />
+          <div className="flex-1 min-w-0">
+            <p className={`text-xs ${value === opt.value ? 'text-clauday-blue font-medium' : 'text-text-primary'}`}>{opt.label}</p>
+            <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">{opt.description}</p>
+          </div>
+        </label>
+      ))}
     </div>
   )
 }

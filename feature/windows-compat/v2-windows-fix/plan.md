@@ -306,17 +306,17 @@ status: draft
 
 ### 7-2. `SkillsManager.tsx` 위키 다운로드 2곳
 
-- [ ] `:208` `handleDownloadFromWiki` — `const filename = sanitizeSkillFilename(item.name)` 후 `skills.save({ filename, content })`, 토스트도 정제된 이름으로
-- [ ] `:383` `handleBulkDownloadFromWiki` — 동일
-- [ ] import 는 `@shared/utils/filename`
+- [x] `:208` `handleDownloadFromWiki` — `const filename = sanitizeSkillFilename(item.name)` 후 `skills.save({ filename, content })`, 토스트도 정제된 이름으로
+- [x] `:383` `handleBulkDownloadFromWiki` — 동일
+- [x] import 는 `@shared/utils/filename`
 - [ ] (P2) `:259` 편집기 저장 — 이름을 **바꾸지 말고**, 정제 결과가 다르면 입력 아래 힌트 텍스트로 예고 (ADR-05 결과 §부정 완화)
-- [ ] `SkillsManager.test.tsx`(있으면) 또는 신규 — 위키 항목 이름에 `:`/`/` 가 있을 때 `skills.save` 가 정제된 filename 으로 호출되는지
+- [x] `SkillsManager.test.tsx`(있으면) 또는 신규 — 위키 항목 이름에 `:`/`/` 가 있을 때 `skills.save` 가 정제된 filename 으로 호출되는지
 
 ### 7-3. `MCPForm` Windows 힌트
 
-- [ ] `src/renderer/src/components/MCP/MCPForm.tsx` command 입력(`:166`) 아래에, win32 이고 command 가 래핑 대상이면 "저장 시 `cmd /c` 로 감싸집니다 (Windows 필수)" 힌트 표시
-- [ ] 플랫폼 판정은 `window.api?.system?.platform`. 힌트는 표시 전용 — renderer 는 정규화하지 않는다 (ADR-06 §4)
-- [ ] 디자인 시스템 컴포넌트(`components/common/ds`) 재사용, 새 스타일 만들지 않기
+- [x] `src/renderer/src/components/MCP/MCPForm.tsx` command 입력(`:166`) 아래에, win32 이고 command 가 래핑 대상이면 "저장 시 `cmd /c` 로 감싸집니다 (Windows 필수)" 힌트 표시
+- [x] 플랫폼 판정은 `window.api?.system?.platform`. 힌트는 표시 전용 — renderer 는 정규화하지 않는다 (ADR-06 §4)
+- [x] 디자인 시스템 컴포넌트(`components/common/ds`) 재사용, 새 스타일 만들지 않기
 
 ---
 

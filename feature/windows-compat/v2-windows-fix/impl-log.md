@@ -236,3 +236,10 @@ renderer-engineer 가 §3-4 + §7-1 을 함께 수행했다. §1~§6(A-1 세션,
 - ADR-v2-utils-03 (`../v2-utils/adr-03-env-path-merge.md`) — mergePathIntoEnv/claudeExtraPaths 단일 정의
 - `feature/terminal/v2-terminal-p2/impl-log.md` `## [main-process-engineer] M-A+M-B` — 같은 라운드에
   함께 수행한 terminal-p2 트랙 작업 기록(snapshotStore/quitFlush/pathResolver 상세)
+
+## [renderer] §7 (MCP 힌트 + 스킬 파일명 정제 UI)
+
+- 담당 에이전트가 API 오류로 중단 → 오케스트레이터가 잔여분 마무리 (2026-07-30)
+- 완료: MCPForm win32 힌트(needsWindowsWrapHint — main mcpNormalize 판정과 동일 기준, 표시 전용), SkillsManager 단일/일괄 다운로드 sanitizeSkillFilename 사전 적용 + 정제 시 토스트 안내, deleteMany 부분 실패 토스트, MCPForm.test 5케이스·SkillsManager.test 신규, ClaudeManual·CHANGELOG 반영
+- 오케스트레이터 수정 2건: text-[11px] → calc+var 래핑(fontScale 가드), import 를 @shared 별칭으로 (§7-2 명시 규약)
+- 미실행: §7-2 P2(스킬 편집기 이름 힌트) — 선택 항목, 후속 사이클로

@@ -181,7 +181,6 @@ function makeStubClass(extra: Record<string, unknown> = {}): new (...args: unkno
     listCalendars = vi.fn().mockResolvedValue([])
     getHolidays = vi.fn().mockResolvedValue([])
     checkBusy = vi.fn().mockReturnValue({ busy: false, sinceMs: 0 })
-    exportSessions = vi.fn().mockReturnValue([])
     // v2.0 C-2: WorkspaceService 생성자가 TerminalManager.addExitListener 를 즉시 구독한다.
     addExitListener = vi.fn().mockReturnValue(() => {})
     getProjectWorkflows = vi.fn().mockResolvedValue([])
@@ -368,13 +367,6 @@ describe('main/index.ts IPC 라우터 (channel registration)', () => {
     const onSet = new Set(onCalls)
     expect(onSet.has(IPC_CHANNELS.TERMINAL_INPUT) || onSet.has(IPC_CHANNELS.TERMINAL_RESIZE) || onSet.has(IPC_CHANNELS.ANALYTICS_TRACK))
       .toBe(true)
-  })
-
-  it('TERMINAL_REORDER 는 ipcMain.on 으로 등록되고 ipcMain.handle 에는 없다 (ADR-v2-terminal-p1-05, @deprecated — 렌더러 이관 전까지 유지)', () => {
-    const onSet = new Set(onCalls)
-    const handleSet = new Set(handleCalls)
-    expect(onSet.has(IPC_CHANNELS.TERMINAL_REORDER)).toBe(true)
-    expect(handleSet.has(IPC_CHANNELS.TERMINAL_REORDER)).toBe(false)
   })
 
   it('TERMINAL_SAVE_STATE / TERMINAL_RESTORE_STATE / TERMINAL_RESOLVE_PATH 가 handle 에 등록된다 (v2.0 M-A/M-B)', () => {

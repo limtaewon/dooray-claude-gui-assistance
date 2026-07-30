@@ -917,21 +917,11 @@ function registerIpcHandlers(): void {
   ipcMain.on(IPC_CHANNELS.TERMINAL_RESIZE, (_, opts: TerminalResizeOptions) =>
     terminalManager.resize(opts)
   )
-  // @deprecated ADR-v2-terminal-p2-03 supersede 대상 — 렌더러가 tabOrder(스냅샷 tabs 배열)로 이관하면 삭제.
-  ipcMain.on(IPC_CHANNELS.TERMINAL_REORDER, (_, ids: string[]) =>
-    terminalManager.reorder(ids)
-  )
   ipcMain.handle(IPC_CHANNELS.TERMINAL_KILL, (_, id: string) =>
     terminalManager.kill(id)
   )
   ipcMain.handle(IPC_CHANNELS.TERMINAL_LIST, () => terminalManager.listSessions())
   ipcMain.handle(IPC_CHANNELS.TERMINAL_SAVE_OUTPUT, (_, id: string) => terminalManager.getOutput(id))
-  // @deprecated ADR-v2-terminal-p2-03 supersede 대상. v2 마이그레이션 이후로 이 키는 더 이상 갱신되지 않는다
-  // (30초 autosave·rename 즉시저장·before-quit 이 전부 v2 스냅샷 경로로 이관됨) — 읽기 전용 다운그레이드 안전장치.
-  // 렌더러가 TERMINAL_RESTORE_STATE 로 이관하면 삭제.
-  ipcMain.handle(IPC_CHANNELS.TERMINAL_RESTORE, () => {
-    return store.get('terminalSessions', []) as Array<{ meta: { id: string; name: string; cwd: string }; output: string }>
-  })
   ipcMain.handle(IPC_CHANNELS.TERMINAL_RENAME, (_, { id, name }: { id: string; name: string }) => {
     return terminalManager.setName(id, name)
   })

@@ -25,19 +25,35 @@ import {
   closeLeaf,
   collectLeafIds,
   setRatioAtPath,
-  neighborLeaf
+  neighborLeaf,
+  isValidTree
 } from './splitTree'
 import type { SplitPath } from './splitTree'
 import { resolveShortcut } from './terminalShortcuts'
 import type { PasteToken } from './pasteTargetState'
 import { TabPointerSensor, TAB_DRAG_ACTIVATION_DISTANCE_PX } from './tabDragSensor'
 import { moveTab, pickNextActiveTab, pushMru } from './tabOrder'
+import RendererToggle from './RendererToggle'
+import type { TerminalRendererSetting } from './RendererToggle'
+import { resetGlobalWebglFailure } from './webglPolicy'
 import type {
   TerminalExitPayload,
   TerminalSession,
   SplitDirection,
-  SplitNode
+  SplitNode,
+  TerminalPaneSnapshot,
+  TerminalWorkspaceSnapshotV2
 } from '../../../../shared/types/terminal'
+
+/** v2.0 B-5: 복원 상한 (ADR-v2-terminal-p2-03 §11) — store 부팅 지연 방지. 초과분은 오래된 탭부터 버린다. */
+const MAX_RESTORED_TABS = 20
+const MAX_RESTORED_LEAVES = 40
+/** v2.0 B-5: 구조 변경 저장 debounce (ADR-03 §3-1). */
+const SAVE_DEBOUNCE_MS = 1000
+/** v2.0 B-5: autosave 주기 (ADR-03 §3-2). */
+const AUTOSAVE_INTERVAL_MS = 30000
+/** v2.0 B-6: 렌더러 설정 저장 키 — 기존 settings.get/set 재사용, 신규 IPC 0개 (ADR-04 §4). */
+const RENDERER_SETTING_KEY = 'terminalRenderer'
 
 /** leaf(pane) 1개의 런타임 바인딩 — 트리에는 안 들어가는 휘발값(v2.0 B-4, ADR-v2-terminal-p2-02 §3). */
 interface PaneRuntime {
@@ -47,8 +63,9 @@ interface PaneRuntime {
   exitInfo?: TerminalExitPayload | null
   /** v2.0 B-5 복원 재바인딩에서 증가하는 카운터. B-4 에서는 항상 0(paste 타겟 검증용, ADR-02 §9). */
   generation: number
-  /** 복원된 출력(레거시 경로) — B-5(R5-3)에서 SerializeAddon 기반으로 대체된다. */
-  savedOutput?: string
+  /** v2.0 B-5: 마운트 시 이 pane 이 복원해야 할 스냅샷 — 마운트 후엔 소비되고 갱신되지 않는다
+   *  (마운트 이후의 진실은 handle.serialize() 다). 레거시 `savedOutput` 문자열 경로를 대체했다. */
+  restoreSnapshot?: TerminalPaneSnapshot
 }
 
 /** 탭 1개 — split 트리 + 포커스 leaf + leaf 별 런타임(ADR-v2-terminal-p2-02 §3). */
@@ -80,15 +97,14 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
   /** 드래그 중 삽입 인디케이터 위치 계산용 — 탭 자체는 움직이지 않는다. */
   const [dragState, setDragState] = useState<{ activeId: string; overId: string | null } | null>(null)
 
-  // v2.0 B-4 R4-7: 저장 게이트 자리 확보(ADR-v2-terminal-p2-03, 함정 #10) — B-5 가 복원 시작 시
-  // 'restoring' 으로 바꾸고 완료되면 'ready' 로 되돌린다. 이번 라운드는 항상 'ready' 로 고정되고,
-  // notifyLayoutChanged() 는 게이트만 확인하는 no-op 이다 — B-5 가 여기에 1초 debounce 저장을 연결한다.
-  const [restorePhase] = useState<'idle' | 'restoring' | 'ready'>('ready')
+  // v2.0 B-5: 저장 게이트(ADR-v2-terminal-p2-03, 함정 #10) — 복원이 끝나기 전엔 어떤 저장 트리거도
+  // 발화하지 않는다. 미완성 트리가 자기 스냅샷을 덮어쓰는 사고를 막는다.
+  const [restorePhase, setRestorePhase] = useState<'idle' | 'restoring' | 'ready'>('idle')
   const shouldPersistLayout = restorePhase === 'ready'
-  const notifyLayoutChanged = useCallback(() => {
-    if (!shouldPersistLayout) return
-    // TODO(B-5): 구조 변경 1초 debounce 저장 트리거를 여기에 연결한다.
-  }, [shouldPersistLayout])
+  // 인터벌/beforeunload 클로저는 한 번만 만들어지므로 최신 게이트 값을 ref 로 동기화한다
+  // (onFocusRequestRef 와 동일 패턴).
+  const shouldPersistLayoutRef = useRef(shouldPersistLayout)
+  useEffect(() => { shouldPersistLayoutRef.current = shouldPersistLayout }, [shouldPersistLayout])
 
   // v2.0 B-4: xterm 은 트리 밖에 산다 — leafId 당 host div 하나(never remount), handle 은 forwardRef.
   const paneHostsRef = useRef<Map<string, HTMLDivElement>>(new Map())
@@ -98,6 +114,94 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
   useEffect(() => { tabsRef.current = tabs }, [tabs])
   const activeTabIdRef = useRef<string | null>(activeTabId)
   useEffect(() => { activeTabIdRef.current = activeTabId }, [activeTabId])
+  // v2.0 B-5: pane.serialize() 가 null 을 반환할 때(addon 미준비 등) 재사용할 마지막 성공 스냅샷.
+  const lastPaneSnapshotRef = useRef<Map<string, TerminalPaneSnapshot>>(new Map())
+
+  /** v2.0 B-5: 현재 상태를 스냅샷으로 조립한다 — 모든 트리거(debounce/autosave/beforeunload/
+   *  onRequestState)가 공유하는 단일 진입점. null 인 pane 은 마지막 성공값을 재사용한다(없으면 빈 값). */
+  const collectSnapshot = useCallback((): TerminalWorkspaceSnapshotV2 => {
+    const tabsSnapshot = tabsRef.current.map((tab) => {
+      const panes: Record<string, TerminalPaneSnapshot> = {}
+      for (const leafId of collectLeafIds(tab.tree)) {
+        const pane = tab.panes[leafId]
+        if (!pane) continue
+        const fresh = paneHandlesRef.current.get(leafId)?.serialize() ?? null
+        const snapshot: TerminalPaneSnapshot = fresh
+          ? { cwd: pane.cwd, cols: fresh.cols, rows: fresh.rows, serialized: fresh.serialized }
+          : (lastPaneSnapshotRef.current.get(leafId) ?? { cwd: pane.cwd, cols: 0, rows: 0, serialized: '' })
+        if (fresh) lastPaneSnapshotRef.current.set(leafId, snapshot)
+        panes[leafId] = snapshot
+      }
+      return { tabId: tab.tabId, name: tab.name, tree: tab.tree, focusedLeafId: tab.focusedLeafId, panes }
+    })
+    return { version: 2, savedAt: Date.now(), activeTabId: activeTabIdRef.current, tabs: tabsSnapshot }
+  }, [])
+
+  const persistSnapshot = useCallback(async (): Promise<void> => {
+    try {
+      await window.api.terminal.saveState(collectSnapshot())
+    } catch (e) {
+      console.warn('[terminal] 스냅샷 저장 실패', e)
+    }
+  }, [collectSnapshot])
+
+  // v2.0 B-5: 구조 변경 1초 debounce 저장 (ADR-03 §3-1) — shouldPersistLayout 이 false 면 즉시 반환.
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const notifyLayoutChanged = useCallback(() => {
+    if (!shouldPersistLayoutRef.current) return
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null
+      void persistSnapshot()
+    }, SAVE_DEBOUNCE_MS)
+  }, [persistSnapshot])
+
+  // v2.0 B-5: 30초 autosave (ADR-03 §3-2) — main 의 옛 setInterval 을 이관받았다.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!shouldPersistLayoutRef.current) return
+      void persistSnapshot()
+    }, AUTOSAVE_INTERVAL_MS)
+    return () => clearInterval(interval)
+  }, [persistSnapshot])
+
+  // v2.0 B-5: beforeunload — fire-and-forget(응답을 기다리지 않는다, ADR-03 §3-3).
+  useEffect(() => {
+    const handler = (): void => {
+      if (!shouldPersistLayoutRef.current) return
+      void window.api.terminal.saveState(collectSnapshot())
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [collectSnapshot])
+
+  // v2.0 B-5: before-quit 핸드셰이크 응답 — main 이 TERMINAL_REQUEST_STATE 를 push 하면 즉시 flush.
+  useEffect(() => {
+    const off = window.api.terminal.onRequestState(() => {
+      if (!shouldPersistLayoutRef.current) return
+      void persistSnapshot()
+    })
+    return off
+  }, [persistSnapshot])
+
+  // v2.0 B-6: 사용자 설정 렌더러(webgl|dom) — 기존 settings.get/set 재사용, 신규 IPC 0개(ADR-04 §4).
+  const [rendererSetting, setRendererSetting] = useState<TerminalRendererSetting>('webgl')
+  const [rendererFellBack, setRendererFellBack] = useState(false)
+  useEffect(() => {
+    window.api.settings.get(RENDERER_SETTING_KEY).then((v) => {
+      if (v === 'dom' || v === 'webgl') setRendererSetting(v)
+    })
+  }, [])
+  const handleRendererChange = useCallback((next: TerminalRendererSetting) => {
+    setRendererSetting(next)
+    void window.api.settings.set(RENDERER_SETTING_KEY, next)
+    if (next === 'webgl') {
+      // 명시적 사용자 의사만이 실패 래치를 푸는 유일한 탈출구다(ADR-04 §3).
+      resetGlobalWebglFailure()
+      setRendererFellBack(false)
+    }
+  }, [])
+  const handleWebglUnavailable = useCallback(() => setRendererFellBack(true), [])
 
   const getOrCreateHost = useCallback((leafId: string): HTMLDivElement => {
     let host = paneHostsRef.current.get(leafId)
@@ -127,6 +231,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     paneHostsRef.current.delete(leafId)
     paneHandlesRef.current.delete(leafId)
     paneRefCallbacksRef.current.delete(leafId)
+    lastPaneSnapshotRef.current.delete(leafId)
   }, [])
 
   // v2.0 B-4: paste 타겟 4중 검증(ADR-02 §9)의 "지금 유효한 타겟" — 호스트(TerminalView)가 진실을 쥔다.
@@ -151,37 +256,77 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     if (activeTabIdRef.current !== tabId) activateTab(tabId)
   }, [activateTab])
 
-  // 앱 시작 시 저장된 세션 복원 (최대 5개까지만 — 누적 방지). v2.0 B-5 가 스냅샷 기반으로 대체할 예정 —
-  // 이번 라운드는 레거시 restoreSaved() 경로를 유지하되 tab/leaf 모델로만 감싼다.
+  // v2.0 B-5: 앱 시작 시 저장된 워크스페이스 스냅샷 복원 (ADR-v2-terminal-p2-03 §7/§11).
+  // main 이 legacy terminalSessions 마이그레이션까지 끝낸 뒤 반환하므로 여기선 v2 스키마만 다룬다.
   useEffect(() => {
     if (restored.current) return
     restored.current = true
+    setRestorePhase('restoring')
 
-    window.api.terminal.restoreSaved().then(async (saved) => {
-      if (!saved || saved.length === 0) return
-      const limited = saved.slice(-5)
-      for (const s of limited) {
-        try {
-          const session = await window.api.terminal.create({ cwd: s.meta.cwd || undefined })
-          const restoredName = s.meta.name || '~'
-          if (restoredName) void window.api.terminal.rename(session.id, restoredName)
-          const leafId = crypto.randomUUID()
-          const tabId = crypto.randomUUID()
-          setTabs((prev) => [...prev, {
-            tabId,
-            name: restoredName,
-            tree: { type: 'leaf', leafId },
-            focusedLeafId: leafId,
-            panes: { [leafId]: { sessionId: session.id, cwd: s.meta.cwd, generation: 0, savedOutput: s.output } }
-          }])
-          setActiveTabId((prev) => {
-            if (prev) return prev
-            mruRef.current = pushMru(mruRef.current, tabId)
-            return tabId
-          })
-        } catch { /* ok */ }
+    void (async () => {
+      let snap: TerminalWorkspaceSnapshotV2 | null = null
+      try {
+        snap = await window.api.terminal.restoreState()
+      } catch (e) {
+        console.warn('[terminal] 스냅샷 복원 요청 실패', e)
       }
-    })
+      if (!snap || snap.tabs.length === 0) {
+        setRestorePhase('ready')
+        return
+      }
+      const snapshot = snap
+
+      let tabSnaps = snapshot.tabs
+      if (tabSnaps.length > MAX_RESTORED_TABS) {
+        console.warn(`[terminal] 저장된 탭 ${tabSnaps.length}개 중 최근 ${MAX_RESTORED_TABS}개만 복원합니다`)
+        tabSnaps = tabSnaps.slice(-MAX_RESTORED_TABS)
+      }
+
+      let leafBudget = MAX_RESTORED_LEAVES
+      const nextTabs: TabEntry[] = []
+      for (const tabSnap of tabSnaps) {
+        let tree: SplitNode = isValidTree(tabSnap.tree)
+          ? tabSnap.tree
+          : { type: 'leaf', leafId: crypto.randomUUID() }
+        if (tree !== tabSnap.tree) {
+          console.warn(`[terminal] 탭 "${tabSnap.name}" 의 split 트리가 손상돼 단일 leaf 로 복원합니다`)
+        }
+
+        const leafIds = collectLeafIds(tree)
+        if (leafIds.length > leafBudget) {
+          console.warn(`[terminal] leaf 상한(${MAX_RESTORED_LEAVES}) 초과로 탭 "${tabSnap.name}" 복원을 건너뜁니다`)
+          continue
+        }
+
+        const panes: Record<string, PaneRuntime> = {}
+        let tabFailed = false
+        for (const leafId of leafIds) {
+          const paneSnap = tabSnap.panes[leafId]
+          try {
+            const session = await window.api.terminal.create({ cwd: paneSnap?.cwd })
+            panes[leafId] = { sessionId: session.id, cwd: paneSnap?.cwd, generation: 0, restoreSnapshot: paneSnap }
+          } catch (e) {
+            console.warn('[terminal] 복원 중 세션 생성 실패 — leaf 제외', e)
+            const pruned = closeLeaf(tree, leafId)
+            if (pruned === null) { tabFailed = true; break }
+            tree = pruned
+          }
+        }
+        if (tabFailed || Object.keys(panes).length === 0) continue
+
+        leafBudget -= Object.keys(panes).length
+        const focusedLeafId = panes[tabSnap.focusedLeafId] ? tabSnap.focusedLeafId : Object.keys(panes)[0]
+        nextTabs.push({ tabId: tabSnap.tabId, name: tabSnap.name, tree, focusedLeafId, panes })
+      }
+
+      setTabs(nextTabs)
+      const restoredActiveId = snapshot.activeTabId && nextTabs.some((t) => t.tabId === snapshot.activeTabId)
+        ? snapshot.activeTabId
+        : (nextTabs[0]?.tabId ?? null)
+      setActiveTabId(restoredActiveId)
+      mruRef.current = restoredActiveId ? [restoredActiveId] : []
+      setRestorePhase('ready')
+    })()
   }, [])
 
   // v2.0 B-1: PTY 종료 통지 구독 — sessionId 로 (tabId, leafId) 역매핑, 이미 exitInfo 있으면 덮지 않는다.
@@ -492,13 +637,16 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
             <Plus size={14} />
           </button>
           <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary ml-1 flex-shrink-0">⌘T 새탭 · ⌘D 오른쪽 분할 · ⌘⇧D 아래 분할 · ⌘W 닫기</span>
-          {tabs.length >= 3 && (
-            <button onClick={closeAll}
-              className="ml-auto flex-shrink-0 flex items-center gap-1 px-2 py-0.5 rounded text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-red-400 hover:bg-red-500/10 transition-colors"
-              title={`${tabs.length}개 터미널 모두 닫기`}>
-              <Trash2 size={10} /> 모두 닫기 ({tabs.length})
-            </button>
-          )}
+          <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+            <RendererToggle setting={rendererSetting} fellBack={rendererFellBack} onChange={handleRendererChange} />
+            {tabs.length >= 3 && (
+              <button onClick={closeAll}
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                title={`${tabs.length}개 터미널 모두 닫기`}>
+                <Trash2 size={10} /> 모두 닫기 ({tabs.length})
+              </button>
+            )}
+          </div>
         </div>
       </DndContext>
 
@@ -520,7 +668,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
               isFocused={focused}
               showFocusRing
               onFocusRequest={() => setFocusedLeaf(tab.tabId, leafId)}
-              initialOutput={pane.savedOutput}
+              restore={pane.restoreSnapshot}
               exitInfo={pane.exitInfo}
               onRequestClose={() => closeLeafInTab(tab.tabId, leafId)}
               tabId={tab.tabId}
@@ -528,6 +676,8 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
               paneGeneration={pane.generation}
               getCurrentPasteTarget={getCurrentPasteTarget}
               suspendAutoResize={isDividerDragging}
+              rendererSetting={rendererSetting}
+              onWebglUnavailable={handleWebglUnavailable}
             />,
             getOrCreateHost(leafId)
           )

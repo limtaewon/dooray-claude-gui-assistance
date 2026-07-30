@@ -213,16 +213,7 @@ describe('TerminalManager.onData 처리', () => {
   })
 })
 
-describe('TerminalManager.exportSessions / setName / dispose', () => {
-  it('exportSessions 는 meta + output 반환', () => {
-    const m = new TerminalManager()
-    m.create({})
-    lastPty!.emitData('output text')
-    const exp = m.exportSessions()
-    expect(exp).toHaveLength(1)
-    expect(exp[0].output).toContain('output text')
-  })
-
+describe('TerminalManager.setName / dispose', () => {
   it('setName — 성공 시 true + meta.name 변경', () => {
     const m = new TerminalManager()
     const { id } = m.create({})
@@ -244,23 +235,6 @@ describe('TerminalManager.exportSessions / setName / dispose', () => {
     m.dispose()
     expect(p1.kill).toHaveBeenCalled()
     expect(p2.kill).toHaveBeenCalled()
-  })
-
-  it('exportSessions — alt screen exit 이후만 출력', () => {
-    const m = new TerminalManager()
-    m.create({})
-    // alternate screen enter then exit, then normal output
-    lastPty!.emitData('\x1b[?1049hsome TUI redraw\x1b[?1049lAfter exit')
-    const exp = m.exportSessions()
-    expect(exp[0].output).toBe('After exit')
-  })
-
-  it('exportSessions — 마지막 미완성 ESC 자르기', () => {
-    const m = new TerminalManager()
-    m.create({})
-    lastPty!.emitData('text\x1b[')  // incomplete CSI
-    const exp = m.exportSessions()
-    expect(exp[0].output).toBe('text')
   })
 })
 
@@ -383,32 +357,6 @@ describe('TerminalManager exit 통지 (B-1)', () => {
     p2.emitExit({ exitCode: 2, signal: undefined })
 
     expect(exitCb).toHaveBeenCalledWith({ id: id2, exitCode: 2, signal: null })
-  })
-})
-
-describe('TerminalManager.reorder (B-8)', () => {
-  it('reorder 후 listSessions / exportSessions 순서 일치', () => {
-    const m = new TerminalManager()
-    const a = m.create({})
-    const b = m.create({})
-    const c = m.create({})
-
-    m.reorder([c.id, a.id, b.id])
-
-    expect(m.listSessions().map((s) => s.id)).toEqual([c.id, a.id, b.id])
-    expect(m.exportSessions().map((s) => s.meta.id)).toEqual([c.id, a.id, b.id])
-  })
-
-  it('알 수 없는 id 만 요청하면 no-op + warn', () => {
-    const m = new TerminalManager()
-    const a = m.create({})
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
-    m.reorder(['ghost-1', 'ghost-2'])
-
-    expect(m.listSessions().map((s) => s.id)).toEqual([a.id])
-    expect(warnSpy).toHaveBeenCalled()
-    warnSpy.mockRestore()
   })
 })
 
