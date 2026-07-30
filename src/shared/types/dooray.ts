@@ -51,6 +51,13 @@ export interface DoorayTaskUpdateParams {
   status: string
 }
 
+/** 프로젝트 워크플로우(상태) 1개. `class` 는 `backlog|registered|working|closed` 류의 워크플로우 분류. */
+export interface DoorayWorkflow {
+  id: string
+  name: string
+  class: string
+}
+
 export interface DoorayWikiPage {
   id: string
   projectId?: string

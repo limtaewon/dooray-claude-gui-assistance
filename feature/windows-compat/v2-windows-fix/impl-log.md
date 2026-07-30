@@ -128,3 +128,111 @@ renderer-engineer 가 §3-4 + §7-1 을 함께 수행했다. §1~§6(A-1 세션,
 - ADR-v2-windows-fix-05 (`adr-05-skill-filename-boundary.md`) — 스킬 파일명 경계·삭제 의미론
 - ADR-v2-windows-fix-06 (`adr-06-mcp-stdio-normalize.md`) — MCP stdio 정규화·원자적 쓰기
 - `feature/windows-compat/v2-utils/impl-log.md` §제약 — 승계한 5건 전부 위반하지 않았음(`claudeSpawnCommand` 에 argv 조립 추가 안 함, 역치환 함수 재작성 안 함, `encodeCwd` 에 fs 접근 안 넣음 등)
+
+---
+
+## [main] A-2(§3 터미널 PTY + §4 CLAUDE_START_TASK) + env 병합 4곳(§2-3) — terminal-p2 M-A/M-B 와 통합 라운드
+
+**스코프**: 오케스트레이터 브리핑이 이 트랙의 A-2(§3/§4) + §2-3(env 병합 4곳)을
+`feature/terminal/v2-terminal-p2/` 의 M-A(영속화 main) + M-B(링크 resolve-path) 와 같은 라운드로
+명시 병합했다. `TerminalManager.ts` 는 M-B(getPid) 와 A-2(spawn/env 재작성)가 같은 파일을 만지므로
+여기 한 곳에서 함께 다뤘다 — M-A/M-B 고유분(snapshotStore/quitFlush/pathResolver/ptyCwd)은
+`feature/terminal/v2-terminal-p2/impl-log.md` 의 `## [main-process-engineer] M-A+M-B` 섹션 참조.
+§1/§5/§6(A-1/A-3/MCP)·§6-3(GitService)·§7(renderer)은 이 라운드 스코프 밖(이전/다른 라운드 소유).
+
+### 변경한 파일
+
+- `src/main/terminal/windowsShell.ts` (신규) — `detectWindowsShell({ env, probe })`(ADR-03 §1),
+  `defaultShellProbe`(statSync 기반), pwsh(WindowsApps alias 경로 포함) → powershell → COMSPEC →
+  bare `cmd.exe` 순 후보 배열 + kind 별 args 동봉
+- `src/main/terminal/windowsShell.test.ts` (신규, 5 tests)
+- `src/main/terminal/TerminalManager.ts` (수정) — `enrichedTerminalPath()` 삭제 → `buildPtyEnv()`(모듈
+  함수, `mergePathIntoEnv`/`claudeExtraPaths` 사용 + win32 전용 `PYTHONUTF8`/`TERM_PROGRAM`/
+  `FORCE_HYPERLINK` 세트). `create()` 를 command 지정/win32 기본/darwin·linux 기본 3분기로 재작성,
+  win32 분기는 신설 private `spawnWindowsShell()` 이 `detectWindowsShell` 후보를 순회하며 ConPTY DLL
+  래치(`conptyDllDisabled` 모듈 전역 + `__resetConptyDllLatchForTest()`) 폴백을 수행. `meta.name` 계산을
+  `options.name ?? (options.command ? options.command : 'Terminal')` 로 교체(ADR-04 §3)
+- `src/main/terminal/TerminalManager.test.ts` (수정) — node-pty mock 이 spawn 호출 인자(`file`/`args`/
+  `options`)를 캡처하고 실패 큐(`spawnFailureQueue`)를 주입할 수 있도록 확장, `./windowsShell` 모듈
+  전체를 mock(`detectWindowsShellMock`)해 실제 파일시스템(mac)과 무관하게 win32 후보 체인을 통제.
+  신규 describe 블록 9 tests(darwin 1회 spawn/폴백/ConPTY 재시도/env 분기/전 후보 실패/`options.command`
+  우회/`options.name` 우선) + `getPid` 2 tests = 총 42 tests(기존 33 전부 무수정 통과)
+- `src/main/terminal/startTaskSpawn.ts` (신규) — `buildStartTaskSpawn(params)`(ADR-04 §1) — darwin/linux
+  는 현행 리터럴과 동일, win32 는 `quoteWinShellArg` 로 인용한 `type <promptFile> | <bin> -p --model
+  <model>` verbatim 커맨드라인 조립. `promptFilePath` 없이 win32 호출 시 명시적 에러
+- `src/main/terminal/startTaskSpawn.test.ts` (신규, 9 tests)
+- `src/main/claude/ClaudeChatService.ts` (수정) — `enrichedClaudeEnv()` 본문을
+  `mergePathIntoEnv(process.env, claudeExtraPaths(), { position: 'append' })` 로 교체. 더 이상
+  안 쓰는 `homedir`/`join`/`delimiter` import 제거
+- `src/main/ai/AIService.ts` (수정) — `enrichedEnv()` 의 PATH 조립을 `mergePathIntoEnv(...,
+  { position: 'prepend' })` 로 교체(4곳 중 유일한 prepend 예외, 근거 주석 그 자리에 유지).
+  `DISABLE_OMC`/`ANTHROPIC_API_KEY` 로직은 무변경. 미사용 `delimiter as pathDelimiter` import 제거
+  (`join`/`homedir` 는 다른 곳에서 계속 쓰여 유지)
+- `src/main/index.ts` (수정, 4블록) — ①Terminal 핸들러 블록: `TERMINAL_SAVE_STATE`/
+  `TERMINAL_RESTORE_STATE`/`TERMINAL_RESOLVE_PATH` 핸들러 + rename 즉시저장 제거(terminal-p2 M-A 몫,
+  같은 파일이라 같이 기록) ②라이프사이클 블록: 30초 interval 삭제, before-quit → quitFlush 위임
+  ③`CLAUDE_START_TASK` 핸들러: `buildStartTaskSpawn()` 결과로 스폰 + win32 임시 프롬프트 파일
+  쓰기/정리(exit 리스너 + 5분 타이머), `require('os').homedir()` 제거 → 상단 `import { homedir } from
+  'os'` ④CLI Info `richEnv` 계산을 `mergePathIntoEnv`/`claudeExtraPaths` 로 교체(env 병합 4곳 중 1곳)
+- `src/shared/types/terminal.ts` (수정) — `TerminalCreateOptions.args?: string[] | string`(win32
+  verbatim 전용 주석), `.name?: string` 추가 (`TerminalSaveStateResult` 등 M-A 분은 terminal-p2 impl-log 참조)
+- `feature/windows-compat/v2-windows-fix/plan.md` (수정) — §2-3/§3-1/§3-2/§3-3/§4-1/§4-2/§4-3 체크박스 갱신 + §8 후속 검증 노트 추가
+
+### 결정 사항 (해야 할 것)
+
+- **`detectWindowsShell` 의 pwsh 후보에 `%LOCALAPPDATA%\Microsoft\WindowsApps\pwsh.exe` 를 추가**했다
+  (ADR-03 본문의 후보 목록에는 명시가 없었지만, 컨텍스트 섹션이 설명하는 "함정 #11" 실제 시나리오가
+  정확히 이 경로다 — Store 설치 pwsh 의 0바이트 alias 스텁). `powershell.exe`(inbox) 쪽은 WindowsApps
+  경유가 흔하지 않아(System32 기본 탑재) 추가하지 않았다.
+- **`spawnWindowsShell` 의 `conptyDllDisabled` 래치는 모듈 전역**(클래스 인스턴스가 아님) — ADR-03 §2
+  가 "모듈 전역 래치" 라고 명시했고, 실제 DLL 로드 성패는 프로세스 전체에 걸친 사실이라 인스턴스 단위로
+  들고 있을 이유가 없다. 테스트 격리를 위해 `__resetConptyDllLatchForTest()` 를 export.
+- **`buildPtyEnv(isWindows)` 를 `TerminalManager.ts` 모듈 함수로 유지**(클래스 메서드로 옮기지 않음) —
+  `create()` 호출마다 순수하게 env 객체 하나를 조립하는 로직이라 인스턴스 상태에 의존하지 않는다.
+- **win32 CLAUDE_START_TASK 임시파일 삭제를 `terminalManager.addExitListener` 로 구현**하며, exit
+  콜백과 5분 안전망 타이머 양쪽에서 동일한 `cleanup()` 클로저(`cleaned` 플래그로 중복 삭제 방지)를
+  호출하도록 했다 — 어느 쪽이 먼저 발화하든 파일 삭제는 정확히 1회.
+- **`TerminalCreateOptions.args`(string|string[]) 를 `TerminalManager.create()` 가 그대로
+  `pty.spawn()` 에 전달**한다(문자열 분해 없음) — node-pty 자체가 win32 에서 `string` 이면 verbatim
+  커맨드라인으로 취급하는 것에 위임.
+
+### 제약 (하지 말 것) — 실제로 지킨 것
+
+- **`AIService.runClaudeStream` 의 argv 조립(Windows `--append-system-prompt` → stdin combine 포함)
+  에 손대지 않았다.** `git diff` 로 해당 블록 변경 0줄 확인.
+- **mac 경로를 "일관성" 이유로 바꾸지 않았다** — `TerminalManager.create()` 의 darwin/linux 분기
+  (`$SHELL -l`, `LANG`/`LC_ALL`/`LC_CTYPE`), `buildStartTaskSpawn` 의 darwin 반환값 모두 리터럴
+  회귀 테스트로 기존과 동일함을 고정했다.
+- **`claudeSpawnCommand()` 에 argv 조립을 추가하지 않았다.**
+- **셸 rc 주입을 하지 않았다** — `detectWindowsShell` 의 PowerShell args 는 `-Command` 로 세션 한정
+  적용, 프로필 파일을 건드리지 않는다.
+- **IPC 채널을 새로 만들지 않았다** — `TERMINAL_SAVE_STATE`/`TERMINAL_RESTORE_STATE`/
+  `TERMINAL_RESOLVE_PATH` 는 이전(S-0) 라운드에서 이미 shared/types 에 있었다.
+- **`GitService.ts` 를 손대지 않았다** — §6-3 은 여전히 다른 트랙 소유.
+- **`src/renderer/**` 를 손대지 않았다** — §7(renderer) 은 이 라운드 스코프 밖.
+
+### 플랫폼 분기 감사 (이번 라운드가 만지거나 새로 둔 `process.platform` 지점)
+
+| 파일 | 지점 | darwin 테스트 | win32 테스트 | 비고 |
+|---|---|---|---|---|
+| `windowsShell.ts` | `detectWindowsShell` 후보 체인 | — (win32 전용 함수) | `windowsShell.test.ts` 5케이스 | `probe` 주입으로 mac CI 에서 win32 검증 |
+| `TerminalManager.ts` | `create()` 3분기(command 지정/win32/darwin·linux) | 기존 33 tests + darwin 1회 spawn 신규 | 신규 5 tests(폴백/ConPTY 재시도/env/전 후보 실패/command 우회) | `./windowsShell` mock 으로 실제 fs 무관 |
+| `startTaskSpawn.ts` | `buildStartTaskSpawn` platform 분기 | darwin/linux 리터럴 회귀 2케이스 | win32 커맨드라인 전문 6케이스 | 순수 함수, fs 미접근 |
+| `ptyCwd.ts`(terminal-p2 M-B, 같은 라운드) | `probePtyCwd` platform 분기 | darwin(lsof) | win32(null) + linux(readlink) | terminal-p2 impl-log 에도 기록 |
+| `ClaudeChatService.ts`/`AIService.ts` `enrichedEnv`류 | 인라인 `isWindows` 분기 자체가 사라짐(`mergePathIntoEnv` 내부로 이관) | 기존 테스트 무수정 통과 | 〃 | 호출부에는 더 이상 `process.platform` 분기가 없음 |
+
+### 미실행 (후속 라운드/다른 트랙 인계)
+
+- §6-3 GitService `samePath` 교체 — 다른 트랙 소유, 미착수.
+- §7(renderer) — 스킬 파일명 미리 정제(`SkillsManager.tsx`)/MCP 힌트(`MCPForm.tsx`) — renderer 파일이라 미착수.
+- §3-3 `asarUnpack` 정적 확인은 파일시스템 레벨로 완료했지만, 실제 Windows 패키징 산출물에서 conpty.dll
+  이 로드되는지는 Windows 실기가 필요 — qa-report.md 인계.
+- Windows VM 스모크 전체(plan.md §11) — 미실행, 산출물로만 존재.
+
+### 참조
+
+- ADR-v2-windows-fix-03 (`adr-03-windows-pty-spawn.md`) — detectWindowsShell/ConPTY DLL 래치/windowsPty 게이트
+- ADR-v2-windows-fix-04 (`adr-04-start-task-prompt-pipe.md`) — buildStartTaskSpawn/TerminalCreateOptions 확장
+- ADR-v2-utils-03 (`../v2-utils/adr-03-env-path-merge.md`) — mergePathIntoEnv/claudeExtraPaths 단일 정의
+- `feature/terminal/v2-terminal-p2/impl-log.md` `## [main-process-engineer] M-A+M-B` — 같은 라운드에
+  함께 수행한 terminal-p2 트랙 작업 기록(snapshotStore/quitFlush/pathResolver 상세)

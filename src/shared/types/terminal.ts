@@ -9,7 +9,10 @@ export interface TerminalSession {
 export interface TerminalCreateOptions {
   cwd?: string
   command?: string
-  args?: string[]
+  /** node-pty 에 그대로 전달된다. 문자열 형태는 win32 verbatim 커맨드라인 전용 — 다른 곳에서 쓰지 않는다 (ADR-v2-windows-fix-04 §2). */
+  args?: string[] | string
+  /** 탭 표시 이름 — 지정하지 않으면 `command`(또는 'Terminal')를 그대로 쓴다. 스폰 커맨드와 표시 이름을 분리하고 싶을 때 사용(ADR-v2-windows-fix-04 §3). */
+  name?: string
 }
 
 export interface TerminalResizeOptions {
@@ -74,6 +77,13 @@ export interface TerminalWorkspaceSnapshotV2 {
   savedAt: number
   activeTabId: string | null
   tabs: TerminalTabSnapshot[]
+}
+
+/** TERMINAL_SAVE_STATE 응답. skipped 는 shouldPersistSnapshot 게이트가 빈 스냅샷 덮어쓰기를 막았을 때만 true. */
+export interface TerminalSaveStateResult {
+  ok: boolean
+  bytes: number
+  skipped?: boolean
 }
 
 // v2.0 B-7: 링크 경로 존재 검증 배치 (M-B, TERMINAL_RESOLVE_PATH).

@@ -327,7 +327,7 @@ function App(): JSX.Element {
               )}
             </div>
             <div className={`absolute inset-0 ${vis('terminal')}`}>
-              <TerminalView />
+              <TerminalView active={activeView === 'terminal'} />
             </div>
             <div className={`absolute inset-0 ${vis('agent')}`}>
               <MentionAgentView />

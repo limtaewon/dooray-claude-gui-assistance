@@ -182,6 +182,9 @@ function makeStubClass(extra: Record<string, unknown> = {}): new (...args: unkno
     getHolidays = vi.fn().mockResolvedValue([])
     checkBusy = vi.fn().mockReturnValue({ busy: false, sinceMs: 0 })
     exportSessions = vi.fn().mockReturnValue([])
+    // v2.0 C-2: WorkspaceService 생성자가 TerminalManager.addExitListener 를 즉시 구독한다.
+    addExitListener = vi.fn().mockReturnValue(() => {})
+    getProjectWorkflows = vi.fn().mockResolvedValue([])
   } as unknown as new (...args: unknown[]) => unknown
 }
 
@@ -322,7 +325,8 @@ describe('main/index.ts IPC 라우터 (channel registration)', () => {
       IPC_CHANNELS.BOT_GET_STATUS,
       IPC_CHANNELS.GIT_IS_REPO,
       IPC_CHANNELS.ANALYTICS_SUMMARY,
-      IPC_CHANNELS.DIALOG_SELECT_FOLDER
+      IPC_CHANNELS.DIALOG_SELECT_FOLDER,
+      IPC_CHANNELS.WORKSPACE_START_TASK
     ]
     const handleSet = new Set(handleCalls)
     const missing = critical.filter((c) => !handleSet.has(c))
@@ -334,6 +338,8 @@ describe('main/index.ts IPC 라우터 (channel registration)', () => {
     const eventOnly = [
       IPC_CHANNELS.TERMINAL_OUTPUT,
       IPC_CHANNELS.TERMINAL_EXIT,
+      // v2.0 M-A: main → renderer flush 요청 push 전용 (ADR-v2-terminal-p2-03 §2)
+      IPC_CHANNELS.TERMINAL_REQUEST_STATE,
       IPC_CHANNELS.DOORAY_TASKS_PARTIAL,
       IPC_CHANNELS.MENTION_RECEIVED,
       IPC_CHANNELS.MENTION_TERMINAL_OPENED,
@@ -344,11 +350,17 @@ describe('main/index.ts IPC 라우터 (channel registration)', () => {
       IPC_CHANNELS.WATCHER_NEW_MESSAGES,
       IPC_CHANNELS.WATCHER_NOTIFICATION_CLICK,
       IPC_CHANNELS.CONFIG_CHANGED,
-      IPC_CHANNELS.CLAUDE_CHAT_EVENT
+      IPC_CHANNELS.CLAUDE_CHAT_EVENT,
+      IPC_CHANNELS.WORKSPACE_RUN_UPDATED
     ]
     const handleSet = new Set(handleCalls)
     const wronglyHandled = eventOnly.filter((c) => handleSet.has(c))
     expect(wronglyHandled).toEqual([])
+  })
+
+  it('WORKSPACE_RUN_UPDATED 는 push 전용 — ipcMain.handle 에 등록되지 않는다 (ADR-v2-workspace-p1-06 (f))', () => {
+    const handleSet = new Set(handleCalls)
+    expect(handleSet.has(IPC_CHANNELS.WORKSPACE_RUN_UPDATED)).toBe(false)
   })
 
   it('terminal input/resize channels use ipcMain.on (fire-and-forget) not handle', () => {
@@ -358,10 +370,17 @@ describe('main/index.ts IPC 라우터 (channel registration)', () => {
       .toBe(true)
   })
 
-  it('TERMINAL_REORDER 는 ipcMain.on 으로 등록되고 ipcMain.handle 에는 없다 (ADR-v2-terminal-p1-05)', () => {
+  it('TERMINAL_REORDER 는 ipcMain.on 으로 등록되고 ipcMain.handle 에는 없다 (ADR-v2-terminal-p1-05, @deprecated — 렌더러 이관 전까지 유지)', () => {
     const onSet = new Set(onCalls)
     const handleSet = new Set(handleCalls)
     expect(onSet.has(IPC_CHANNELS.TERMINAL_REORDER)).toBe(true)
     expect(handleSet.has(IPC_CHANNELS.TERMINAL_REORDER)).toBe(false)
+  })
+
+  it('TERMINAL_SAVE_STATE / TERMINAL_RESTORE_STATE / TERMINAL_RESOLVE_PATH 가 handle 에 등록된다 (v2.0 M-A/M-B)', () => {
+    const handleSet = new Set(handleCalls)
+    expect(handleSet.has(IPC_CHANNELS.TERMINAL_SAVE_STATE)).toBe(true)
+    expect(handleSet.has(IPC_CHANNELS.TERMINAL_RESTORE_STATE)).toBe(true)
+    expect(handleSet.has(IPC_CHANNELS.TERMINAL_RESOLVE_PATH)).toBe(true)
   })
 })

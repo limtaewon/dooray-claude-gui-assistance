@@ -137,3 +137,34 @@ export interface WorkspaceRunUpdatedPayload {
   runId: string
   reason: 'created' | 'status' | 'session' | 'removed'
 }
+
+/** `workspace:repos:add` 요청. `id` 는 경로 기반으로 결정적으로 계산되므로 입력에서 받지 않는다. */
+export interface AddRepoParams {
+  path: string
+  name?: string
+  defaultBaseBranch?: string
+  branchPrefix?: string
+}
+
+export interface ResumeRunResult {
+  workspace: TaskWorkspace
+  run: AgentRun
+  warnings: string[]
+}
+
+export interface AdoptRunResult {
+  workspace: TaskWorkspace
+  run: AgentRun
+}
+
+export interface CleanupRunResult {
+  workspace: TaskWorkspace
+  warnings: string[]
+}
+
+export interface ReconcileResult {
+  /** terminalSessionId 가 있던 run 중 이번 reconcile 로 detach(null 화)된 개수 */
+  detached: number
+  /** 워크트리가 사라져 discarded 로 정리된 run 개수 */
+  discarded: number
+}

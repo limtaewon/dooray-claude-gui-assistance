@@ -1,6 +1,6 @@
 import { execFileSync, spawn } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { join, delimiter as pathDelimiter } from 'path'
+import { join } from 'path'
 import { homedir } from 'os'
 import { StringDecoder } from 'string_decoder'
 import { BrowserWindow } from 'electron'
@@ -12,6 +12,7 @@ import { buildNormalizeSystemPrompt, buildNormalizeUserPrompt, buildEstimateSyst
 import { buildEditSystemPrompt, buildEditUserPrompt } from './harnessEditPrompt'
 import type { AIEditProposal } from '../../shared/types/harness-edit'
 import { getClaudeBin as resolveClaudeBinCached, claudeSpawnCommand } from '../utils/claudeBin'
+import { mergePathIntoEnv, claudeExtraPaths } from '../utils/env'
 
 interface ClaudeCliResult {
   type: string
@@ -243,25 +244,12 @@ export function setUserAnthropicApiKey(key: string | null): void {
 
 /** 패키징 앱에서도 동작하도록 PATH 보강 + OMC/플러그인 훅 비활성화 (속도 최적화) */
 function enrichedEnv(): Record<string, string> {
-  const home = homedir()
-  const isWindows = process.platform === 'win32'
-  const extraPaths = isWindows ? [
-    join(home, '.claude', 'local'),
-    join(home, '.claude', 'bin'),
-    join(home, 'AppData', 'Roaming', 'npm'),
-    join(home, 'AppData', 'Local', 'npm'),
-  ] : [
-    join(home, '.claude', 'local'),
-    join(home, '.claude', 'bin'),
-    '/usr/local/bin',
-    '/opt/homebrew/bin',
-    join(home, '.local', 'bin'),
-    join(home, '.npm-global', 'bin')
-  ]
-  const currentPath = process.env.PATH || (isWindows ? '' : '/usr/bin:/bin')
+  // AIService 는 resolveClaudeBin() 이 준 절대경로로 spawn 하므로 PATH 검색이 바이너리 선택에
+  // 관여하지 않는다 — 다른 3곳(append)과 달리 prepend 여도 "구버전 claude 를 잡는" 회귀가 없다
+  // (ADR-v2-utils-03 §컨텍스트, 4곳 중 유일한 prepend 예외).
+  const merged = mergePathIntoEnv(process.env, claudeExtraPaths(), { position: 'prepend' })
   const env: Record<string, string> = {
-    ...(process.env as Record<string, string>),
-    PATH: [...extraPaths, currentPath].join(pathDelimiter),
+    ...(merged as Record<string, string>),
     // OMC ultrawork 세션 복원 훅 비활성화 (매번 75k 토큰 로드 방지)
     DISABLE_OMC: '1'
   }

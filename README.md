@@ -403,4 +403,6 @@ gh release upload v<버전> release/*.dmg
 
 이슈 / PR 환영합니다. 앱 안의 **커뮤니티** 탭에서도 사내 사용자 모임 진행 중이에요.
 
+서드파티 이식 코드의 라이선스 고지는 [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) 를 참조하세요.
+
 버그 발견하면 — AI 호출 실패는 토스트의 🐞 **오류 리포트** 버튼이 진단 정보 자동 수집해서 한 번에 제보해 줍니다.

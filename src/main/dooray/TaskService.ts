@@ -1,7 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '../../shared/types/ipc'
 import { DoorayClient } from './DoorayClient'
-import type { DoorayTask, DoorayTaskDetail, DoorayTaskComment, DoorayTaskUpdateParams, DoorayProject } from '../../shared/types/dooray'
+import type { DoorayTask, DoorayTaskDetail, DoorayTaskComment, DoorayTaskUpdateParams, DoorayProject, DoorayWorkflow } from '../../shared/types/dooray'
 
 interface DoorayListResponse<T> {
   header: { resultCode: number; isSuccessful: boolean }
@@ -434,6 +434,12 @@ export class TaskService {
     )
     for (const r of results) { if (r.status === 'fulfilled') allTasks.push(...r.value) }
     return allTasks
+  }
+
+  /** 프로젝트 워크플로우(상태) 목록. `loadWorkflows` 캐시를 Map → 배열로 변환해 반환(Map 은 IPC 직렬화 불가). 실패해도 `[]`. */
+  async getProjectWorkflows(projectId: string): Promise<DoorayWorkflow[]> {
+    const map = await this.loadWorkflows(projectId)
+    return Array.from(map.entries()).map(([id, v]) => ({ id, name: v.name, class: v.class }))
   }
 
   async getTaskDetail(projectId: string, taskId: string): Promise<DoorayTaskDetail> {

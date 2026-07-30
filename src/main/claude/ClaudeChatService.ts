@@ -2,45 +2,19 @@ import { spawn, type ChildProcess } from 'child_process'
 import { StringDecoder } from 'string_decoder'
 import { decodeProcessText, isBenignStderr } from '../utils/procText'
 import { BrowserWindow } from 'electron'
-import { homedir } from 'os'
-import { join, delimiter as pathDelimiter } from 'path'
 import { IPC_CHANNELS } from '../../shared/types/ipc'
 import type { ClaudeChatEvent, ClaudeChatSendRequest } from '../../shared/types/claude-chat'
 import { claudeSpawnCommand } from '../utils/claudeBin'
+import { mergePathIntoEnv, claudeExtraPaths } from '../utils/env'
 
 /**
  * Electron 패키징 앱은 GUI 에서 실행되어 PATH 가 부족하다 (.zshrc/.bashrc 미실행).
- * claude CLI 내부 hook 과 MCP 서버는 node 를 호출하므로 PATH 에 nvm/homebrew 경로를 보강.
- *
- * Why extraPaths 를 **append** (뒤에 붙이기)?
- *   여러 머신에서 claude / node 가 다양한 위치에 설치되어 있어, prepend 하면 우리 추가
- *   경로의 구버전이 사용자 PATH 의 신버전을 가리는 문제가 발생. 사용자 PATH 가 우선이고
- *   부족할 때만 우리 fallback 이 메우게 한다.
+ * claude CLI 내부 hook 과 MCP 서버는 node 를 호출하므로 PATH 에 nvm/homebrew 경로를 보강한다.
+ * append(사용자 PATH 우선) — 우리 fallback 구버전이 사용자의 신버전을 가리지 않게 한다
+ * (ADR-v2-utils-03, 4곳 복제본을 단일 정의로 통일).
  */
 function enrichedClaudeEnv(): NodeJS.ProcessEnv {
-  const home = homedir()
-  const isWindows = process.platform === 'win32'
-  const extraPaths = isWindows
-    ? [
-        join(home, '.claude', 'local'),
-        join(home, '.claude', 'bin'),
-        join(home, 'AppData', 'Roaming', 'npm'),
-        join(home, 'AppData', 'Local', 'npm'),
-      ]
-    : [
-        join(home, '.claude', 'local'),
-        join(home, '.claude', 'bin'),
-        '/usr/local/bin',
-        '/opt/homebrew/bin',
-        '/opt/homebrew/sbin',
-        join(home, '.local', 'bin'),
-        join(home, '.npm-global', 'bin'),
-      ]
-  const currentPath = process.env.PATH || (isWindows ? '' : '/usr/bin:/bin')
-  return {
-    ...process.env,
-    PATH: [currentPath, ...extraPaths].join(pathDelimiter),
-  }
+  return mergePathIntoEnv(process.env, claudeExtraPaths(), { position: 'append' })
 }
 
 interface ChatSession {

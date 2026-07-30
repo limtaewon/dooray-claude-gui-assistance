@@ -89,7 +89,8 @@ export function createMockWindowApi(): Record<string, unknown> {
       calendar: {
         list: vi.fn().mockResolvedValue([]),
         events: vi.fn().mockResolvedValue([])
-      }
+      },
+      projectWorkflows: vi.fn().mockResolvedValue([])
     },
     caldav: {
       testConnect: vi.fn().mockResolvedValue({ ok: false }),
@@ -149,6 +150,12 @@ export function createMockWindowApi(): Record<string, unknown> {
       onExit: vi.fn().mockReturnValue(noopUnsub),
       // v2.0 B-8: fire-and-forget — 호출 여부/인자만 검증 대상
       reorder: vi.fn(),
+      // v2.0 M-A: 영속화 v2
+      saveState: vi.fn().mockResolvedValue({ ok: true, bytes: 0 }),
+      restoreState: vi.fn().mockResolvedValue(null),
+      onRequestState: vi.fn().mockReturnValue(noopUnsub),
+      // v2.0 M-B: 링크 존재 검증
+      resolvePath: vi.fn().mockResolvedValue([]),
       onMentionOpened: vi.fn().mockReturnValue(noopUnsub),
       onMentionFocus: vi.fn().mockReturnValue(noopUnsub)
     },
@@ -220,7 +227,32 @@ export function createMockWindowApi(): Record<string, unknown> {
       diff: vi.fn().mockResolvedValue({ files: [] }),
       compareBranches: vi.fn().mockResolvedValue({ files: [] }),
       compareFile: vi.fn().mockResolvedValue(null),
-      prune: vi.fn().mockResolvedValue(undefined)
+      prune: vi.fn().mockResolvedValue(undefined),
+      deleteBranch: vi.fn().mockResolvedValue(undefined)
+    },
+    // v2.0 C-2: 워크스페이스(태스크 ↔ 워크트리 ↔ 에이전트 run). renderer 뷰는 C-3 이후에 붙는다.
+    workspace: {
+      repos: {
+        list: vi.fn().mockResolvedValue([]),
+        add: vi.fn().mockResolvedValue(null),
+        update: vi.fn().mockResolvedValue(null),
+        remove: vi.fn().mockResolvedValue(undefined)
+      },
+      settings: {
+        get: vi.fn().mockResolvedValue(null),
+        set: vi.fn().mockResolvedValue(null)
+      },
+      setProjectRepo: vi.fn().mockResolvedValue(undefined),
+      list: vi.fn().mockResolvedValue([]),
+      get: vi.fn().mockResolvedValue(null),
+      startTask: vi.fn().mockResolvedValue(null),
+      run: {
+        resume: vi.fn().mockResolvedValue(null),
+        adopt: vi.fn().mockResolvedValue(null),
+        cleanup: vi.fn().mockResolvedValue(null)
+      },
+      reconcile: vi.fn().mockResolvedValue({ detached: 0, discarded: 0 }),
+      onRunUpdated: vi.fn().mockReturnValue(noopUnsub)
     },
     analytics: {
       track: vi.fn(),

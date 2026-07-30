@@ -379,7 +379,27 @@ export const IPC_CHANNELS = {
    *   - model: 재정규화 후 최신 HarnessModel
    * 제약: backupDir 은 <userData>/harness-backups/ 하위여야 한다 (경로 주입 방어).
    */
-  HARNESS_RESTORE_BACKUP: 'harness:edit:restore'
+  HARNESS_RESTORE_BACKUP: 'harness:edit:restore',
+
+  // Workspace (v2.0 C-2) — 두레이 태스크 ↔ 워크트리 ↔ 에이전트 run. 타입: src/shared/types/workspace.ts
+  WORKSPACE_REPOS_LIST: 'workspace:repos:list',
+  WORKSPACE_REPOS_ADD: 'workspace:repos:add',
+  WORKSPACE_REPOS_UPDATE: 'workspace:repos:update',
+  WORKSPACE_REPOS_REMOVE: 'workspace:repos:remove',
+  WORKSPACE_SETTINGS_GET: 'workspace:settings:get',
+  WORKSPACE_SETTINGS_SET: 'workspace:settings:set',
+  WORKSPACE_PROJECT_REPO_SET: 'workspace:project-repo:set',
+  WORKSPACE_LIST: 'workspace:list',
+  WORKSPACE_GET: 'workspace:get',
+  WORKSPACE_START_TASK: 'workspace:start-task',
+  WORKSPACE_RUN_RESUME: 'workspace:run:resume',
+  WORKSPACE_RUN_ADOPT: 'workspace:run:adopt',
+  WORKSPACE_RUN_CLEANUP: 'workspace:run:cleanup',
+  WORKSPACE_RECONCILE: 'workspace:reconcile',
+  /** main → renderer push 전용. ipcMain.handle 등록 금지. */
+  WORKSPACE_RUN_UPDATED: 'workspace:run:updated',
+  DOORAY_PROJECT_WORKFLOWS: 'dooray:project:workflows',
+  GIT_DELETE_BRANCH: 'git:delete-branch'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]

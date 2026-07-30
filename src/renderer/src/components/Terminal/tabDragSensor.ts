@@ -1,3 +1,12 @@
+/*
+ * TabPointerSensor 는 dnd-kit 의 PointerSensor(https://github.com/clauderic/dnd-kit) 클래스를
+ * 상속하는 파생물입니다.
+ * Copyright (c) 2021 Claudéric Demers — MIT License
+ * See THIRD-PARTY-NOTICES.md
+ *
+ * 변경: activationConstraint(distance) 를 12px 상수로 고정해 탭 더블클릭 rename 과 구분.
+ * (v2.0 B-4 ADR-06 소급 등재 — p1 도입분)
+ */
 import { PointerSensor } from '@dnd-kit/core'
 
 /** 탭 드래그 활성화까지 필요한 최소 이동 거리(px) — TabPointerSensor 의 activationConstraint 와 동일 값 유지. */

@@ -1,5 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell, dialog, Menu } from 'electron'
 import { join } from 'path'
+import { homedir } from 'os'
+import { randomUUID } from 'crypto'
 import { is } from '@electron-toolkit/utils'
 import { McpConfigManager } from './config/McpConfigManager'
 import { SkillsManager } from './config/SkillsManager'
@@ -61,6 +63,12 @@ import { AIService, setUserAnthropicApiKey, getClaudeBin } from './ai/AIService'
 import { claudeSpawnCommand } from './utils/claudeBin'
 import { formatProjectLabel } from './utils/claudeProjects'
 import { expandHome } from './utils/paths'
+import { mergePathIntoEnv, claudeExtraPaths } from './utils/env'
+import { SnapshotStore } from './terminal/snapshotStore'
+import { createQuitFlushCoordinator } from './terminal/quitFlush'
+import { resolveCandidates } from './terminal/pathResolver'
+import { probePtyCwd } from './terminal/ptyCwd'
+import { buildStartTaskSpawn } from './terminal/startTaskSpawn'
 import { ClaudeChatService } from './claude/ClaudeChatService'
 import { ClaudeSessionService } from './claude/ClaudeSessionService'
 import { AttachmentService } from './claude/AttachmentService'
@@ -69,13 +77,32 @@ import { TerminalManager } from './terminal/TerminalManager'
 import { SkillStore } from './skills/SkillStore'
 import { GitService } from './git/GitService'
 import { AnalyticsService } from './analytics/AnalyticsService'
+// v2.0 C-2 — 워크스페이스(태스크 ↔ 워크트리 ↔ claude 세션) 도메인
+import { WorkspaceStore } from './workspace/WorkspaceStore'
+import { WorkspaceService } from './workspace/WorkspaceService'
+import { AgentRunSpawner } from './workspace/AgentRunSpawner'
+import { WorkspaceHookHandler, WORKSPACE_HOOK_KIND } from './workspace/WorkspaceHookHandler'
+import { preApproveTrust, writeHookSettings } from './claude/claudeDirSetup'
 import { IPC_CHANNELS } from '../shared/types/ipc'
 import type { McpServerConfig } from '../shared/types/mcp'
 import type { SkillSaveRequest } from '../shared/types/skills'
 import type { UsageQueryParams } from '../shared/types/usage'
 import type { DoorayTaskUpdateParams, DoorayWikiUpdateParams, DoorayCalendarQueryParams, DoorayTask } from '../shared/types/dooray'
-import type { TerminalCreateOptions, TerminalResizeOptions } from '../shared/types/terminal'
+import type {
+  TerminalCreateOptions,
+  TerminalResizeOptions,
+  TerminalWorkspaceSnapshotV2,
+  TerminalResolvePathRequest
+} from '../shared/types/terminal'
 import type { GitWorktreeCreateParams, GitWorktreeRemoveParams } from '../shared/types/git'
+import type {
+  StartTaskParams,
+  ResumeRunParams,
+  CleanupRunParams,
+  AddRepoParams,
+  RepoRegistryEntry,
+  WorkspaceSettings
+} from '../shared/types/workspace'
 
 // Managers
 const mcpConfigManager = new McpConfigManager()
@@ -178,6 +205,21 @@ const claudeSessions = new ClaudeSessionService()
 const claudeAttachments = new AttachmentService()
 const store = new Store({ name: 'clauday-data' })
 const terminalManager = new TerminalManager()
+// v2.0 M-A: 터미널 워크스페이스 스냅샷 저장소 — electron-store 를 SnapshotStorage 로 주입 (ADR-v2-terminal-p2-03).
+const snapshotStore = new SnapshotStore({
+  get: <T,>(key: string, defaultValue: T): T => store.get(key, defaultValue) as T,
+  set: (key: string, value: unknown): void => store.set(key, value)
+})
+// before-quit 700ms 핸드셰이크 — 렌더러에 flush 요청 후 응답/타임아웃 중 먼저 오는 쪽으로 종료를 재개한다.
+const quitFlush = createQuitFlushCoordinator({
+  hasLiveWindow: () => BrowserWindow.getAllWindows().length > 0,
+  requestFlush: () => {
+    const win = BrowserWindow.getAllWindows()[0]
+    if (win && !win.isDestroyed()) win.webContents.send(IPC_CHANNELS.TERMINAL_REQUEST_STATE)
+  },
+  persist: () => snapshotStore.saveSnapshot(snapshotStore.getCachedSnapshot(), 'cache'),
+  quit: () => app.quit()
+})
 const agentWorkspace = new AgentWorkspaceManager()
 const channelSessionStore = new ChannelSessionStore()
 const mentionTerminalSpawner = new MentionTerminalSpawner(terminalManager, channelSessionStore)
@@ -196,6 +238,29 @@ hookRouter.setHandler(MENTION_HOOK_KIND, (ev, route) => mentionHookHandler.handl
 const skillStore = new SkillStore()
 const gitService = new GitService()
 const analyticsService = new AnalyticsService()
+
+// v2.0 C-2 — 워크스페이스(태스크 ↔ 브랜치 ↔ 워크트리 ↔ claude 세션 run). gitRepoPath 는 Git 뷰(BranchWorkspace)가
+// 계속 쓰는 clauday-data 스토어의 기존 키 — 레지스트리가 비어 있으면 첫 저장소로 자동 승격된다(ADR-v2-workspace-p1-03).
+const workspaceStore = new WorkspaceStore(new Store({ name: 'clauday-workspaces' }), {
+  legacyGitRepoPath: store.get('gitRepoPath', '') as string
+})
+const agentRunSpawner = new AgentRunSpawner(terminalManager)
+const workspaceService = new WorkspaceService({
+  store: workspaceStore,
+  git: gitService,
+  tasks: taskService,
+  spawner: agentRunSpawner,
+  terminals: terminalManager,
+  // hook 서버 port/secret 은 부팅 후 비동기로 정해지므로 값이 아닌 thunk (ADR-v2-workspace-p1-05 (d))
+  getHookConfig: () => (hookServer.getPort() ? { port: hookServer.getPort(), secret: hookServer.getSecret() } : null),
+  getWorkspaceRoot: () => agentWorkspace.getRoot(),
+  getAgentRoot: () => agentWorkspace.getAgentRoot(),
+  claudeDir: { preApproveTrust, writeHookSettings }
+})
+const workspaceHookHandler = new WorkspaceHookHandler({ workspaceService })
+// 멘션이 1순위 — C-0 의 보존 약속(ADR-v2-workspace-p0-01). 워크트리는 agentRoot 밖이므로 충돌 없음.
+hookRouter.addResolver((cwd) => workspaceHookHandler.resolve(cwd))
+hookRouter.setHandler(WORKSPACE_HOOK_KIND, (ev, route) => workspaceHookHandler.handle(ev, route))
 
 // Harness Studio (v1.7) — HarnessService 인스턴스화는 app.getPath('userData') 가 필요하므로
 // createWindow() 내부 또는 app.whenReady() 이후에 생성한다. 여기서는 지연 초기화용 레퍼런스만 선언.
@@ -276,6 +341,14 @@ function createWindow(): BrowserWindow {
     agentWorkspace.setHookConfig({ port, secret })
     hookServer.setHandler((ev) => hookRouter.dispatch(ev))
   }).catch((err) => console.error('[HookServer] start 실패:', err))
+  // v2.0 C-2 — run 변경을 렌더러로 push. electron 의존(webContents.send)은 index.ts 에만 둔다.
+  workspaceService.addChangeListener((payload) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(IPC_CHANNELS.WORKSPACE_RUN_UPDATED, payload)
+    }
+  })
+  // 부팅 시 휘발 상태 정리(terminalSessionId 초기화 + 외부 삭제 워크트리 감지)
+  void workspaceService.reconcile().catch((err) => console.error('[Workspace] reconcile 실패:', err))
   mentionDispatcher.onMention(async (ctx) => {
     try {
       const orgId = extractOrgId(ctx)
@@ -844,6 +917,7 @@ function registerIpcHandlers(): void {
   ipcMain.on(IPC_CHANNELS.TERMINAL_RESIZE, (_, opts: TerminalResizeOptions) =>
     terminalManager.resize(opts)
   )
+  // @deprecated ADR-v2-terminal-p2-03 supersede 대상 — 렌더러가 tabOrder(스냅샷 tabs 배열)로 이관하면 삭제.
   ipcMain.on(IPC_CHANNELS.TERMINAL_REORDER, (_, ids: string[]) =>
     terminalManager.reorder(ids)
   )
@@ -852,25 +926,40 @@ function registerIpcHandlers(): void {
   )
   ipcMain.handle(IPC_CHANNELS.TERMINAL_LIST, () => terminalManager.listSessions())
   ipcMain.handle(IPC_CHANNELS.TERMINAL_SAVE_OUTPUT, (_, id: string) => terminalManager.getOutput(id))
+  // @deprecated ADR-v2-terminal-p2-03 supersede 대상. v2 마이그레이션 이후로 이 키는 더 이상 갱신되지 않는다
+  // (30초 autosave·rename 즉시저장·before-quit 이 전부 v2 스냅샷 경로로 이관됨) — 읽기 전용 다운그레이드 안전장치.
+  // 렌더러가 TERMINAL_RESTORE_STATE 로 이관하면 삭제.
   ipcMain.handle(IPC_CHANNELS.TERMINAL_RESTORE, () => {
     return store.get('terminalSessions', []) as Array<{ meta: { id: string; name: string; cwd: string }; output: string }>
   })
   ipcMain.handle(IPC_CHANNELS.TERMINAL_RENAME, (_, { id, name }: { id: string; name: string }) => {
-    const ok = terminalManager.setName(id, name)
-    // 즉시 자동 저장 한 번 더 (다음 30초 폴링 전에 종료돼도 이름 보존되게)
-    if (ok) {
-      try {
-        const sessions = terminalManager.exportSessions()
-        if (sessions.length > 0) store.set('terminalSessions', sessions)
-      } catch { /* ok */ }
+    return terminalManager.setName(id, name)
+  })
+  // v2.0 M-A: 스냅샷 저장 — store 쓰기 + 메모리 캐시 갱신. 대기 중인 before-quit 핸드셰이크가 있으면 즉시 종료를 재개시킨다.
+  ipcMain.handle(IPC_CHANNELS.TERMINAL_SAVE_STATE, (_, snapshot: TerminalWorkspaceSnapshotV2 | null) => {
+    const result = snapshotStore.saveSnapshot(snapshot, 'renderer')
+    quitFlush.onSnapshotArrived()
+    return result
+  })
+  // v2.0 M-A: 스냅샷 복원 — v2 가 없고 legacy terminalSessions 가 있으면 최초 1회 마이그레이션.
+  ipcMain.handle(IPC_CHANNELS.TERMINAL_RESTORE_STATE, () => snapshotStore.loadSnapshot())
+  // v2.0 M-B: 링크 후보 배치 존재 검증 — cwdHint 없으면 pid cwd probe(POSIX 한정) → 그래도 없으면 세션 spawn cwd.
+  ipcMain.handle(IPC_CHANNELS.TERMINAL_RESOLVE_PATH, async (_, req: TerminalResolvePathRequest) => {
+    let cwd = req.cwdHint
+    if (!cwd && req.sessionId) {
+      const pid = terminalManager.getPid(req.sessionId)
+      if (pid) cwd = (await probePtyCwd(pid)) ?? undefined
     }
-    return ok
+    if (!cwd && req.sessionId) {
+      cwd = terminalManager.listSessions().find((s) => s.id === req.sessionId)?.cwd
+    }
+    return resolveCandidates({ cwd: cwd || homedir(), candidates: req.candidates })
   })
 
   // Claude Code Task Bridge - 태스크 컨텍스트로 Claude Code 세션 시작
   ipcMain.handle(
     IPC_CHANNELS.CLAUDE_START_TASK,
-    (_, { subject, body, projectCode }: { subject: string; body?: string; projectCode?: string }) => {
+    async (_, { subject, body, projectCode }: { subject: string; body?: string; projectCode?: string }) => {
       const prompt = [
         `두레이 태스크를 시작합니다.`,
         `프로젝트: ${projectCode || '알 수 없음'}`,
@@ -879,11 +968,51 @@ function registerIpcHandlers(): void {
         `\n이 태스크를 분석하고 필요한 작업을 진행해주세요.`
       ].filter(Boolean).join('\n')
 
-      const session = terminalManager.create({
-        command: 'claude',
-        args: ['-p', prompt, '--model', 'sonnet'],
-        cwd: require('os').homedir()
+      const platform = process.platform
+      let promptFilePath: string | undefined
+      if (platform === 'win32') {
+        promptFilePath = join(app.getPath('temp'), `clauday-start-task-${randomUUID()}.txt`)
+        // BOM 없는 UTF-8 — chcp 65001 상태의 `type` 이 BOM 을 그대로 흘려 프롬프트 첫 글자를 오염시킨다.
+        await editFs.writeFile(promptFilePath, prompt, 'utf8')
+      }
+
+      const spawnSpec = buildStartTaskSpawn({
+        prompt,
+        platform,
+        claudeBin: getClaudeBin(),
+        comspec: process.env.COMSPEC,
+        promptFilePath
       })
+
+      const session = terminalManager.create({
+        command: spawnSpec.command,
+        args: spawnSpec.args,
+        name: spawnSpec.displayName,
+        cwd: homedir()
+      })
+
+      // win32 임시 프롬프트 파일 정리 — 세션 종료 시 삭제 + 5분 안전망 타이머 (프롬프트 본문은 로그에 남기지 않는다).
+      if (spawnSpec.promptFile) {
+        const filePath = spawnSpec.promptFile
+        let cleaned = false
+        const cleanup = (): void => {
+          if (cleaned) return
+          cleaned = true
+          editFs.unlink(filePath).catch((error) => {
+            console.warn('[CLAUDE_START_TASK] 임시 프롬프트 파일 삭제 실패', { filePath, error })
+          })
+        }
+        const off = terminalManager.addExitListener((payload) => {
+          if (payload.id !== session.id) return
+          cleanup()
+          off()
+        })
+        setTimeout(() => {
+          cleanup()
+          off()
+        }, 5 * 60 * 1000).unref()
+      }
+
       return session
     }
   )
@@ -900,6 +1029,11 @@ function registerIpcHandlers(): void {
     IPC_CHANNELS.DOORAY_TASK_COMMENTS,
     (_, { projectId, taskId }: { projectId: string; taskId: string }) =>
       taskService.getTaskComments(projectId, taskId)
+  )
+
+  // 프로젝트 워크플로우(상태) 목록 — v2.0 C-2 startTask 의 두레이 상태 전환에 사용
+  ipcMain.handle(IPC_CHANNELS.DOORAY_PROJECT_WORKFLOWS, (_, projectId: string) =>
+    taskService.getProjectWorkflows(projectId)
   )
 
   // Claude Code Chat (interactive transcript)
@@ -1393,16 +1527,8 @@ ${data}`,
   // Claude CLI Info (한국어 번역 포함)
   ipcMain.handle(IPC_CHANNELS.CLAUDE_CLI_INFO, async () => {
     const { execFile } = require('child_process')
-    const { homedir } = require('os')
-    const { join } = require('path')
-    const home = homedir()
-    const { delimiter: pathDelim } = require('path')
-    const isWin = process.platform === 'win32'
-    const extraPaths = isWin
-      ? [join(home, '.claude', 'local'), join(home, '.claude', 'bin'), join(home, 'AppData', 'Roaming', 'npm'), join(home, 'AppData', 'Local', 'npm')]
-      : [join(home, '.claude', 'local'), join(home, '.claude', 'bin'), '/usr/local/bin', '/opt/homebrew/bin', join(home, '.local', 'bin')]
-    // 사용자 PATH 우선 — extraPaths 는 fallback (구버전 claude 가 우리 prepend 로 잡히는 문제 방지)
-    const richEnv = { ...process.env, PATH: [process.env.PATH || '', ...extraPaths].join(pathDelim), DISABLE_OMC: '1' }
+    // PATH 보강은 mergePathIntoEnv/claudeExtraPaths 단일 정의를 쓴다 (append — ADR-v2-utils-03, 4곳 목록 드리프트 해소).
+    const richEnv = { ...mergePathIntoEnv(process.env, claudeExtraPaths(), { position: 'append' }), DISABLE_OMC: '1' }
     const { decodeProcessText } = require('./utils/procText') as typeof import('./utils/procText')
     // command/shell 은 claudeSpawnCommand 단일 계약에서만 나온다 (ADR-v2-windows-fix-02 §2).
     // 이전엔 문자열 'claude' 를 shell 미경유로 넘겨 PATHEXT 해석이 안 돼 Windows 에서 ENOENT 였다.
@@ -1494,6 +1620,44 @@ ${data}`,
   gitHandle(IPC_CHANNELS.GIT_PRUNE, (repoPath) =>
     gitService.pruneWorktrees(repoPath as string)
   )
+  gitHandle(IPC_CHANNELS.GIT_DELETE_BRANCH, (args) => {
+    const { repoPath, branch, opts } = args as { repoPath: string; branch: string; opts?: { force?: boolean } }
+    return gitService.deleteBranch(repoPath, branch, opts)
+  })
+
+  // Workspace (v2.0 C-2) — 두레이 태스크 ↔ 워크트리 ↔ 에이전트 run (에러 시 메시지 정규화)
+  const workspaceHandle = <T,>(channel: string, handler: (...args: unknown[]) => Promise<T> | T): void => {
+    ipcMain.handle(channel, async (_, ...args: unknown[]) => {
+      try {
+        return await handler(...args)
+      } catch (err) {
+        throw new Error(err instanceof Error ? err.message : String(err))
+      }
+    })
+  }
+
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_REPOS_LIST, () => workspaceService.listRepos())
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_REPOS_ADD, (params) => workspaceService.addRepo(params as AddRepoParams))
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_REPOS_UPDATE, (args) => {
+    const { id, patch } = args as { id: string; patch: Partial<RepoRegistryEntry> }
+    return workspaceService.updateRepo(id, patch)
+  })
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_REPOS_REMOVE, (id) => workspaceService.removeRepo(id as string))
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_SETTINGS_GET, () => workspaceService.getSettings())
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_SETTINGS_SET, (patch) =>
+    workspaceService.setSettings(patch as Partial<WorkspaceSettings>)
+  )
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_PROJECT_REPO_SET, (args) => {
+    const { projectId, repoId } = args as { projectId: string; repoId: string }
+    return workspaceService.setProjectRepo(projectId, repoId)
+  })
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_LIST, () => workspaceService.listWorkspaces())
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_GET, (key) => workspaceService.getWorkspace(key as string))
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_START_TASK, (params) => workspaceService.startTask(params as StartTaskParams))
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_RUN_RESUME, (params) => workspaceService.resumeRun(params as ResumeRunParams))
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_RUN_ADOPT, (runId) => workspaceService.adoptRun(runId as string))
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_RUN_CLEANUP, (params) => workspaceService.cleanupRun(params as CleanupRunParams))
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_RECONCILE, () => workspaceService.reconcile())
 
   // Analytics (로컬 전용 사용 분석)
   ipcMain.on(IPC_CHANNELS.ANALYTICS_TRACK, (_, event: { type: string; params?: Record<string, unknown> }) => {
@@ -1872,13 +2036,8 @@ app.whenReady().then(() => {
   // 토큰 미설정 / 네트워크 실패는 알아서 다음 주기 재시도.
   aiRecommendNotifier.start().catch((e) => console.warn('[main] aiRecommendNotifier 시작 실패:', e))
 
-  // 터미널 세션 30초마다 자동 저장
-  setInterval(() => {
-    try {
-      const sessions = terminalManager.exportSessions()
-      if (sessions.length > 0) store.set('terminalSessions', sessions)
-    } catch {}
-  }, 30000)
+  // v2.0 M-A: 터미널 스냅샷 자동 저장 타이머는 렌더러로 이관됐다(스크롤백은 렌더러에만 있으므로 —
+  // ADR-v2-terminal-p2-03 §3). main 은 더 이상 30초 interval 을 돌리지 않는다.
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -1887,16 +2046,14 @@ app.whenReady().then(() => {
   })
 })
 
-// 터미널 세션 저장 (앱 종료 전)
-app.on('before-quit', () => {
-  try {
-    const sessions = terminalManager.exportSessions()
-    store.set('terminalSessions', sessions)
-  } catch {}
-})
+// v2.0 M-A: before-quit 700ms 핸드셰이크로 교체 — 렌더러에 flush 요청 후 응답/타임아웃 중 먼저 오는 쪽으로
+// quitFlush.persist() 가 캐시를 저장한다. 창이 없으면(darwin 에서 창 닫고 나중에 ⌘Q) 대기 없이 즉시 캐시 경로.
+app.on('before-quit', (event) => quitFlush.onBeforeQuit(event))
 
 app.on('window-all-closed', () => {
   configWatcher.stop()
+  // 저장은 스냅샷 경로라 dispose 와 결합되지 않는다(ADR-v2-terminal-p2-03 §6) — 창 없는 PTY 는 재연결
+  // 대상이 없으므로 그대로 죽이고, 스크롤백은 그 직전 beforeunload 스냅샷으로 보존된다.
   terminalManager.dispose()
   claudeChat.dispose()
   void botService.stop()

@@ -128,72 +128,72 @@ S-0 공유 계약 (main)
 
 ### R4-0. 서드파티 고지 선행 (ADR-06 — 이식 파일보다 먼저)
 
-- [ ] `THIRD-PARTY-NOTICES.md` **신설** — 서문 / 프로젝트별 저작권 줄(Orca·Lovecast Inc. / Microsoft VSCode / dnd-kit / xterm.js) / **MIT 전문 1회** / 이식 파일 표(헤더: `로컬 경로 | 원본 프로젝트 | 원본 경로 | verbatim·adapted`)
-- [ ] `README.md` 하단에 `THIRD-PARTY-NOTICES.md` 링크 1줄
-- [ ] p1 의 `tabDragSensor.ts`(dnd-kit `PointerSensor` 상속) 행을 표에 소급 등재
-- [ ] 이후 이식 파일을 만들 때마다 **① 파일 상단 고지 블록(4요소: 원 프로젝트/원본 경로+버전/저작권+MIT/변경 1줄) → ② 표에 행 추가** 를 같은 커밋에서 수행
+- [x] `THIRD-PARTY-NOTICES.md` **신설** — 서문 / 프로젝트별 저작권 줄(Orca·Lovecast Inc. / Microsoft VSCode / dnd-kit / xterm.js) / **MIT 전문 1회** / 이식 파일 표(헤더: `로컬 경로 | 원본 프로젝트 | 원본 경로 | verbatim·adapted`)
+- [x] `README.md` 하단에 `THIRD-PARTY-NOTICES.md` 링크 1줄
+- [x] p1 의 `tabDragSensor.ts`(dnd-kit `PointerSensor` 상속) 행을 표에 소급 등재
+- [x] 이후 이식 파일을 만들 때마다 **① 파일 상단 고지 블록(4요소: 원 프로젝트/원본 경로+버전/저작권+MIT/변경 1줄) → ② 표에 행 추가** 를 같은 커밋에서 수행
 
 ### R4-1. splitTree 순수 함수
 
-- [ ] `src/renderer/src/components/Terminal/splitTree.ts` 신규 (ADR-02 §2) — `splitLeaf` / `closeLeaf`(형제 승격, 마지막이면 null) / `findLeafPath` / `collectLeafIds` / `setRatioAtPath`(경로가 분기 아니면 원본 반환) / `quantizeRatio`(0.5±0.005 → undefined, 그 외 3자리) / `getEqualizeWeight` + `equalizeRatios` / `neighborLeaf(tree, from, 'left'|'right'|'up'|'down')` / `isValidTree`(unknown type · 중복 leafId · ratio 범위 · 깊이>8)
-- [ ] `splitTree.test.ts` 신규 — 위 함수별 경계 + `neighborLeaf` 4방향 + 손상 트리 5종 + **불변성**(입력 트리를 변형하지 않음)
+- [x] `src/renderer/src/components/Terminal/splitTree.ts` 신규 (ADR-02 §2) — `splitLeaf` / `closeLeaf`(형제 승격, 마지막이면 null) / `findLeafPath` / `collectLeafIds` / `setRatioAtPath`(경로가 분기 아니면 원본 반환) / `quantizeRatio`(0.5±0.005 → undefined, 그 외 3자리) / `getEqualizeWeight` + `equalizeRatios` / `neighborLeaf(tree, from, 'left'|'right'|'up'|'down')` / `isValidTree`(unknown type · 중복 leafId · ratio 범위 · 깊이>8)
+- [x] `splitTree.test.ts` 신규 — 위 함수별 경계 + `neighborLeaf` 4방향 + 손상 트리 5종 + **불변성**(입력 트리를 변형하지 않음)
 
 ### R4-2. SplitLayout + 리페어런트 규약
 
-- [ ] `src/renderer/src/components/Terminal/SplitLayout.tsx` 신규 — 재귀 render-prop. `direction: 'row'|'column'` → flex, `flex-basis: calc(ratio * 100%)`, 최소 `Math.min(MIN_PANE_PX(120), total/2)`
-- [ ] 파일 상단에 **5줄 주석** — "leaf 슬롯은 의도적으로 빈 div 다. xterm 은 트리 밖 Map + portal(ADR-02 §4). 여기서 `<TerminalPane>` 을 직접 렌더하면 재조정으로 스크롤백이 날아간다"
-- [ ] `TerminalView` 에 `paneHostsRef: Map<leafId, HTMLDivElement>` + `getOrCreateHost(leafId)` — host div 는 leafId 당 **한 번만** 생성
-- [ ] `TerminalView` 가 `collectLeafIds(tree).map(id => createPortal(<TerminalPane ref={…} … />, getOrCreateHost(id)))`
-- [ ] leaf 슬롯 effect: `slot.appendChild(host)` + cleanup 없음(host 는 다음 슬롯이 가져간다)
-- [ ] `reattachPaneHost(leafId)` 유틸 — `scrollState 캡처 → (B-6 이후) disposeWebgl → appendChild → rAF → (B-6 이후) attach → fit → scrollState 복원`. B-4 단계에서는 WebGL 호출부를 빈 훅으로 두고 B-6 에서 채운다
+- [x] `src/renderer/src/components/Terminal/SplitLayout.tsx` 신규 — 재귀 render-prop. `direction: 'row'|'column'` → flex, `flex-basis: calc(ratio * 100%)`, 최소 `Math.min(MIN_PANE_PX(120), total/2)`
+- [x] 파일 상단에 **5줄 주석** — "leaf 슬롯은 의도적으로 빈 div 다. xterm 은 트리 밖 Map + portal(ADR-02 §4). 여기서 `<TerminalPane>` 을 직접 렌더하면 재조정으로 스크롤백이 날아간다"
+- [x] `TerminalView` 에 `paneHostsRef: Map<leafId, HTMLDivElement>` + `getOrCreateHost(leafId)` — host div 는 leafId 당 **한 번만** 생성
+- [x] `TerminalView` 가 `collectLeafIds(tree).map(id => createPortal(<TerminalPane ref={…} … />, getOrCreateHost(id)))`
+- [x] leaf 슬롯 effect: `slot.appendChild(host)` + cleanup 없음(host 는 다음 슬롯이 가져간다)
+- [x] `reattachPaneHost(leafId)` 유틸 — `scrollState 캡처 → (B-6 이후) disposeWebgl → appendChild → rAF → (B-6 이후) attach → fit → scrollState 복원`. B-4 단계에서는 WebGL 호출부를 빈 훅으로 두고 B-6 에서 채운다
 
 ### R4-3. pane divider (이식)
 
-- [ ] `src/renderer/src/components/Terminal/paneDividerDrag.ts` 신규 — **Orca `pane-divider-drag.ts` adapted** (고지 블록 + 표 행)
-  - [ ] 투명 히트박스 8px + `::after` 1px 시각선(교차 지점은 음수 inset 으로 연결)
-  - [ ] `setPointerCapture` + window `pointermove`/`pointerup` 이중화
-  - [ ] rAF 코얼레싱
-  - [ ] **드래그 중 DOM `flex-basis` 만 조작 — React state·PTY resize 금지** (함정 #9)
-  - [ ] 드롭 시 1회: `setRatioAtPath` → `fit` → PTY resize
-  - [ ] 더블클릭 → 0.5 / 적응형 최소폭
-- [ ] `paneDividerDrag.test.ts` — 순수 계산부(`clampRatio`, `ratioFromPointer`, 적응형 min)만 단위 테스트. 실제 pointer 이벤트는 수동 QA
+- [x] `src/renderer/src/components/Terminal/paneDividerDrag.ts` 신규 — **Orca `pane-divider-drag.ts` adapted** (고지 블록 + 표 행). 단 이번 세션은 Orca 소스에 직접 접근하지 못해 `docs/dev/orca-absorption-notes.md` §5 서술 스펙(투명 히트박스/rAF/resize 홀드/적응형 min)을 재구현했다 — impl-log "알려진 편차" 참조
+  - [x] 투명 히트박스 8px + 중앙 1px 시각선(SplitLayout.tsx 의 divider — 교차 지점 음수 inset 연결은 생략, impl-log 참조)
+  - [x] `setPointerCapture` + window `pointermove`/`pointerup` 이중화
+  - [x] rAF 코얼레싱
+  - [x] **드래그 중 DOM `flex-basis` 만 조작 — React state·PTY resize 금지** (함정 #9, `suspendAutoResize` 게이트로 ResizeObserver 발 resize 도 억제)
+  - [x] 드롭 시 1회: `setRatioAtPath` → `fit` → PTY resize
+  - [x] 더블클릭 → 0.5 / 적응형 최소폭
+- [x] `paneDividerDrag.test.ts` — 순수 계산부(`clampRatio`, `ratioFromPointer`, 적응형 min)만 단위 테스트. 실제 pointer 이벤트는 수동 QA
 
 ### R4-4. TerminalView 상태 재편
 
-- [ ] `TabEntry { tabId, name, tree, focusedLeafId, panes: Record<leafId, PaneRuntime> }` 로 전환. `PaneRuntime { sessionId, cwd?, exitInfo?, savedSnapshot?, generation }`
-- [ ] 기존 `SessionWithOutput[]` 소비처(탭바 렌더 · MRU · exit 구독 · rename · closeSession · ⌘1~9)를 전부 새 모양으로 이관. **탭 DnD(p1) 는 `tabId` 기준으로 유지**
-- [ ] exit 구독: payload 의 `id`(sessionId) → 역매핑으로 `(tabId, leafId)` 찾아 `exitInfo` 세팅. 이미 있으면 덮지 않음(p1 규약 유지)
-- [ ] `splitFocusedPane(direction)` — `window.api.terminal.create({ cwd: 현재 pane cwd })` → `splitLeaf(tree, focusedLeafId, direction, newLeafId)` → `focusedLeafId = newLeafId`
-- [ ] `closeFocusedPane()` — `kill(sessionId)` → `closeLeaf` → null 이면 탭 닫기. 닫힌 뒤 포커스는 형제의 첫 leaf
-- [ ] 탭 라벨에 pane 수 배지(2 이상일 때, 목업 `.panecnt`)
-- [ ] 활성 pane 의 OSC 타이틀만 탭 제목으로 전파(비활성 pane 의 타이틀 변경은 무시 — 깜빡임 방지)
+- [x] `TabEntry { tabId, name, tree, focusedLeafId, panes: Record<leafId, PaneRuntime> }` 로 전환. `PaneRuntime { sessionId, cwd?, exitInfo?, generation, savedOutput? }` — `savedSnapshot`(B-5 구조화 스냅샷)은 아직 없어 레거시 `initialOutput` 경로를 그대로 옮긴 `savedOutput` 필드로 대체(impl-log 참조)
+- [x] 기존 `SessionWithOutput[]` 소비처(탭바 렌더 · MRU · exit 구독 · rename · closeSession · ⌘1~9)를 전부 새 모양으로 이관. **탭 DnD(p1) 는 `tabId` 기준으로 유지**
+- [x] exit 구독: payload 의 `id`(sessionId) → 역매핑으로 `(tabId, leafId)` 찾아 `exitInfo` 세팅. 이미 있으면 덮지 않음(p1 규약 유지)
+- [x] `splitFocusedPane(direction)` — `window.api.terminal.create({ cwd: 현재 pane cwd })` → `splitLeaf(tree, focusedLeafId, direction, newLeafId)` → `focusedLeafId = newLeafId`
+- [x] `closeLeafInTab(tabId, leafId)`(plan 원문의 `closeFocusedPane` — 호출부가 활성 탭/focusedLeafId 를 구해 넘긴다) — `kill(sessionId)` → `closeLeaf` → null 이면 탭 닫기. 닫힌 뒤 포커스는 형제의 첫 leaf
+- [x] 탭 라벨에 pane 수 배지(2 이상일 때, 목업 `.panecnt` → `⫿N`)
+- [ ] 활성 pane 의 OSC 타이틀만 탭 제목으로 전파 — **B-4 스코프에서 의도적으로 보류**. PRD B-4 수락 기준 체크리스트엔 없고 OSC 처리 전반(7/133)이 B-7 소관이라 그때 함께 배선하는 편이 일관적이다(impl-log 참조)
 
 ### R4-5. 단축키 + 뷰 활성 가드
 
-- [ ] `src/renderer/src/components/Terminal/terminalShortcuts.ts` 신규 — `{ id, mac, win, action }` 테이블 상수 (D-1 이 그대로 흡수 가능한 모양). `matchShortcut(e, binding)` 순수 함수 + 테스트
-- [ ] `TerminalView` 의 기존 `keydown` 핸들러(:144-159)를 테이블 순회로 교체. **`active === false` 면 즉시 반환**
-- [ ] `src/renderer/src/App.tsx:330` → `<TerminalView active={activeView === 'terminal'} />` (**1줄**)
-- [ ] 바인딩: ⌘D/Ctrl+Alt+D(우분할) · ⌘⇧D/Ctrl+Shift+D(아래분할) · ⌥⌘화살표/Alt+Ctrl+화살표(포커스 이동) · ⌘W/Ctrl+W(pane→탭) · ⌘T/Ctrl+T(새 탭) · ⌘1~9(탭 전환)
-- [ ] ⌘D 는 `preventDefault` + `return false` 로 PTY 로 새지 않게. **Windows/Linux 에서 Ctrl+D 는 EOF 로 그대로 통과** (ADR-02 §8)
+- [x] `src/renderer/src/components/Terminal/terminalShortcuts.ts` 신규 — `{ id, mac, win, action }` 테이블 상수 (D-1 이 그대로 흡수 가능한 모양). `matchShortcut(e, binding)` 순수 함수 + 테스트
+- [x] `TerminalView` 의 기존 `keydown` 핸들러(:144-159)를 테이블 순회로 교체. **`active === false` 면 즉시 반환**
+- [x] `src/renderer/src/App.tsx:330` → `<TerminalView active={activeView === 'terminal'} />` (**1줄**)
+- [x] 바인딩: ⌘D/Ctrl+Alt+D(우분할) · ⌘⇧D/Ctrl+Shift+D(아래분할) · ⌥⌘화살표/Alt+Ctrl+화살표(포커스 이동) · ⌘W/Ctrl+W(pane→탭) · ⌘T/Ctrl+T(새 탭) · ⌘1~9(탭 전환, 테이블 밖 별도 처리)
+- [x] ⌘D 는 `preventDefault` + `return false` 로 PTY 로 새지 않게. **Windows/Linux 에서 Ctrl+D 는 EOF 로 그대로 통과** (ADR-02 §8)
 
 ### R4-6. paste 타겟 4중 재검증 (이식)
 
-- [ ] `src/renderer/src/components/Terminal/pasteTargetState.ts` 신규 — **Orca `terminal-paste-target-state.ts` adapted** (고지 + 표)
-  - [ ] `beginPaste(): PasteToken{ tabId, leafId, sessionId, generation }` / `isPasteTargetValid(token, current): boolean`
-- [ ] `TerminalPane` 의 클립보드 read 경로 3곳(⌘V / Ctrl+Shift+V / document paste)에서 await 전 토큰 발급 → await 후 검증 → 불일치면 폐기 + `console.warn('[terminal-paste] 타겟 변경으로 폐기', { … })`
-- [ ] `pasteTargetState.test.ts` — 4필드 각각 불일치 시 false, 전부 일치 시 true
+- [x] `src/renderer/src/components/Terminal/pasteTargetState.ts` 신규 — **Orca `terminal-paste-target-state.ts` adapted** (고지 + 표)
+  - [x] `beginPaste(): PasteToken{ tabId, leafId, sessionId, generation }` / `isPasteTargetValid(token, current): boolean`
+- [x] `TerminalPane` 의 클립보드 read 경로 3곳(⌘V / Ctrl+Shift+V / document paste)에서 await 전 토큰 발급 → await 후 검증 → 불일치면 폐기 + `console.warn('[terminal-paste] 타겟 변경으로 폐기', { … })`
+- [x] `pasteTargetState.test.ts` — 4필드 각각 불일치 시 false, 전부 일치 시 true
 
 ### R4-7. 저장 게이트 자리 확보
 
-- [ ] `TerminalView` 에 `restorePhase: 'idle' | 'restoring' | 'ready'` 상태 + `shouldPersistLayout = restorePhase === 'ready'` 도입. B-4 단계에서는 항상 `'ready'` 로 두고, B-5 가 `'restoring'` 을 채운다 (함정 #10)
+- [x] `TerminalView` 에 `restorePhase: 'idle' | 'restoring' | 'ready'` 상태 + `shouldPersistLayout = restorePhase === 'ready'` 도입. B-4 단계에서는 항상 `'ready'` 로 두고, B-5 가 `'restoring'` 을 채운다 (함정 #10). 구조 변경 지점마다 `notifyLayoutChanged()` 게이트 훅을 심어 B-5 가 debounce 저장만 채우면 되게 함
 
 ### ▣ Gate 2 — B-5 renderer 착수 조건
 
-- [ ] `npx tsc --noEmit -p tsconfig.web.json` 통과
-- [ ] `npx vitest run src/renderer/src/components/Terminal` 그린 (기존 TerminalView 케이스 전부 유지)
-- [ ] **회귀 테스트 통과**: 3분할 → 가운데 leaf 닫기 → 남은 두 pane 의 host div 가 동일 노드 참조
-- [ ] 수동: 4분할 생성 / 경계 드래그(vim 열어둔 pane 에서 드래그 중 재그리기 0회, 드롭 시 1회) / ⌥⌘화살표 이동 / ⌘W 순차 닫기 / 다른 뷰에서 ⌘W·⌘T 무반응
-- [ ] `THIRD-PARTY-NOTICES.md` 표 행 수 == 이식 파일 수
+- [x] `npx tsc --noEmit -p tsconfig.web.json` 통과
+- [x] `npx vitest run src/renderer/src/components/Terminal` 그린 (기존 TerminalView 케이스 전부 유지)
+- [x] **회귀 테스트 통과**: 3분할 → 가운데 leaf 닫기 → 남은 두 pane 의 host div 가 동일 노드 참조
+- [ ] 수동: 4분할 생성 / 경계 드래그(vim 열어둔 pane 에서 드래그 중 재그리기 0회, 드롭 시 1회) / ⌥⌘화살표 이동 / ⌘W 순차 닫기 / 다른 뷰에서 ⌘W·⌘T 무반응 — **미실시(헤드리스 환경) — 통합 단계 수동 QA 목록에 등재**
+- [x] `THIRD-PARTY-NOTICES.md` 표 행 수 == 이식 파일 수 (3 == 3, `grep -rl "Portions adapted from Orca\|dnd-kit 의 PointerSensor" src/` 로 확인)
 
 > 커밋: `feat(terminal/renderer): split pane — 이진 트리 + SplitLayout + divider drag (B-4)`
 > 커밋: `docs: THIRD-PARTY-NOTICES.md 신설 (Orca/VSCode/dnd-kit MIT 고지)` — 이식 파일 커밋과 **같은 PR·같은 시점**
@@ -204,45 +204,47 @@ S-0 공유 계약 (main)
 
 ### M-A-1. 스냅샷 저장소 모듈
 
-- [ ] `src/main/terminal/snapshotStore.ts` 신규 — storage 주입(`{ get, set }`)으로 테스트 가능하게 (WikiStorageService 선례)
-  - [ ] `shouldPersistSnapshot(incoming, existing, source: 'renderer' | 'cache'): boolean` (ADR-03 §5) — `'cache'` + 빈 incoming + 비어있지 않은 existing → false + `console.warn`
-  - [ ] `migrateLegacySessions(legacy): TerminalWorkspaceSnapshotV2` (ADR-03 §10) — 세션 1개 = 탭 1개(단일 leaf, 새 UUID), `cols/rows = 0`
-  - [ ] `sanitizeForRestore()` 를 `TerminalManager` 에서 **이 파일로 이사**(마이그레이션 전용). 기존 테스트도 함께 이동
-  - [ ] `capWorkspaceBytes(snapshot, { perLeafBytes: 512*1024, totalBytes: 8*1024*1024 })` — leaf trim → 그래도 초과면 활성 탭 제외 오래된 탭부터 드롭 + warn
-  - [ ] `loadSnapshot()` / `saveSnapshot(incoming, source)` — legacy 마이그레이션은 `loadSnapshot` 최초 1회
-- [ ] `src/shared/utils/textBytes.ts` 신규 — `utf8ByteLength(s)`, `trimSerializedToBytes(text, maxBytes)`(**secant 보간 최대 4 probe** + 개행 되감기)
-- [ ] `snapshotStore.test.ts` / `textBytes.test.ts` — ADR-03 §모니터링 목록대로
+- [x] `src/main/terminal/snapshotStore.ts` 신규 — storage 주입(`{ get, set }`)으로 테스트 가능하게 (WikiStorageService 선례)
+  - [x] `shouldPersistSnapshot(incoming, existing, source: 'renderer' | 'cache'): boolean` (ADR-03 §5) — `'cache'` + 빈 incoming + 비어있지 않은 existing → false + `console.warn`
+  - [x] `migrateLegacySessions(legacy): TerminalWorkspaceSnapshotV2` (ADR-03 §10) — 세션 1개 = 탭 1개(단일 leaf, 새 UUID), `cols/rows = 0`
+  - [x] `sanitizeForRestore()` 를 `TerminalManager` 에서 **이 파일로 이사**(마이그레이션 전용). 기존 테스트도 함께 이동 — **편차**: M-A-4 가 게이트로 보류돼 `exportSessions()`(레거시, 아직 생존)가 계속 이 함수를 필요로 해서, `snapshotStore.ts` 안이 아니라 별도 `src/main/terminal/sanitizeForRestore.ts` 로 이사하고 `TerminalManager.ts`/`snapshotStore.ts` 양쪽이 그 한 곳을 import 하게 했다. 기존 테스트(`TerminalManager.test.ts` 안 2건)는 유지하고 `sanitizeForRestore.test.ts` 를 신규로 추가 — impl-log 참조
+  - [x] `capWorkspaceBytes(snapshot, { perLeafBytes: 512*1024, totalBytes: 8*1024*1024 })` — leaf trim → 그래도 초과면 활성 탭 제외 오래된 탭부터 드롭 + warn
+  - [x] `loadSnapshot()` / `saveSnapshot(incoming, source)` — legacy 마이그레이션은 `loadSnapshot` 최초 1회
+- [x] `src/shared/utils/textBytes.ts` 신규 — `utf8ByteLength(s)`, `trimSerializedToBytes(text, maxBytes)`(**secant 보간 최대 4 probe** + 개행 되감기)
+- [x] `snapshotStore.test.ts` / `textBytes.test.ts` — ADR-03 §모니터링 목록대로
 
 ### M-A-2. before-quit 핸드셰이크 (index.ts 라이프사이클 블록)
 
-- [ ] 순수 로직은 `src/main/terminal/quitFlush.ts` 로 분리 — `createQuitFlushCoordinator({ requestFlush, persist, timeoutMs: 700, now })` 가 `{ onBeforeQuit(event), onSnapshotArrived(snapshot), get done() }` 을 노출. **index.ts 에는 배선만**
-- [ ] `src/main/index.ts` `before-quit`(:1892-1898) 교체 — `exportSessions` 저장 제거, coordinator 위임. `preventDefault` 는 **정확히 1회**(`quitFlushDone`), 창 없으면 즉시 캐시 경로, 타임아웃 700ms, 응답 도착 시 `clearTimeout`
-- [ ] `src/main/index.ts` 30초 `setInterval`(:1877-1883) **삭제** (렌더러로 이관)
-- [ ] `src/main/index.ts` `window-all-closed`(:1900-1908) — `terminalManager.dispose()` **유지**. 주석 1줄로 "저장은 스냅샷 경로라 dispose 와 결합되지 않는다(ADR-03 §6)" 명시
-- [ ] `quitFlush.test.ts` — fake timer 4케이스(응답 없음/응답 도착/2회차 before-quit/창 없음)
+- [x] 순수 로직은 `src/main/terminal/quitFlush.ts` 로 분리 — `createQuitFlushCoordinator({ requestFlush, persist, timeoutMs: 700, now })` 가 `{ onBeforeQuit(event), onSnapshotArrived(snapshot), get done() }` 을 노출. **index.ts 에는 배선만** — **편차**: `onSnapshotArrived()` 는 인자 없이 설계했다(스냅샷 자체는 `TERMINAL_SAVE_STATE` 핸들러가 이미 `snapshotStore.saveSnapshot()` 으로 저장을 끝낸 뒤 호출하는 "응답 도착" 신호일 뿐이라 값이 필요 없었음). impl-log 참조
+- [x] `src/main/index.ts` `before-quit` 교체 — `exportSessions` 저장 제거, coordinator 위임. `preventDefault` 는 **정확히 1회**(coordinator 내부 `done` 플래그), 창 없으면 즉시 캐시 경로, 타임아웃 700ms, 응답 도착 시 `clearTimeout`
+- [x] `src/main/index.ts` 30초 `setInterval` **삭제** (렌더러로 이관)
+- [x] `src/main/index.ts` `window-all-closed` — `terminalManager.dispose()` **유지**. 주석 1줄로 "저장은 스냅샷 경로라 dispose 와 결합되지 않는다(ADR-03 §6)" 명시
+- [x] `quitFlush.test.ts` — fake timer 4케이스(응답 없음/응답 도착/2회차 before-quit/창 없음) + 보강 2건(평상시 saveState 는 quit 에 영향 없음, timeoutMs 커스텀)
 
-### M-A-3. IPC 핸들러 3종 (index.ts Terminal 블록 :843-874 안)
+### M-A-3. IPC 핸들러 3종 (index.ts Terminal 블록 안)
 
-- [ ] `ipcMain.handle(TERMINAL_SAVE_STATE, (_, snap) => snapshotStore.saveSnapshot(snap, 'renderer'))` — 메모리 캐시도 갱신, `{ ok, bytes, skipped? }` 반환
-- [ ] `ipcMain.handle(TERMINAL_RESTORE_STATE, () => snapshotStore.loadSnapshot())`
-- [ ] `TERMINAL_REQUEST_STATE` 는 **`webContents.send` 전용** — `ipcMain.handle` 등록 금지 (p1 impl-log 제약 승계: `TERMINAL_EXIT` 와 동일 부류)
-- [ ] `snapshotStore.saveSnapshot` 이 `TERMINAL_SAVE_STATE` 로 들어온 스냅샷을 coordinator 에도 전달(`onSnapshotArrived`)하도록 배선
+- [x] `ipcMain.handle(TERMINAL_SAVE_STATE, (_, snap) => snapshotStore.saveSnapshot(snap, 'renderer'))` — 메모리 캐시도 갱신, `{ ok, bytes, skipped? }` 반환
+- [x] `ipcMain.handle(TERMINAL_RESTORE_STATE, () => snapshotStore.loadSnapshot())`
+- [x] `TERMINAL_REQUEST_STATE` 는 **`webContents.send` 전용** — `ipcMain.handle` 등록 금지 (p1 impl-log 제약 승계: `TERMINAL_EXIT` 와 동일 부류)
+- [x] `snapshotStore.saveSnapshot` 이 `TERMINAL_SAVE_STATE` 로 들어온 스냅샷을 coordinator 에도 전달(`onSnapshotArrived`)하도록 배선
 
-### M-A-4. 레거시 경로 제거
+### M-A-4. 레거시 경로 제거 — **이번 라운드 미실행 (게이트 미통과)**
 
-- [ ] `src/shared/types/ipc.ts` — `TERMINAL_RESTORE`, `TERMINAL_REORDER` 삭제
-- [ ] `src/main/index.ts` — `TERMINAL_RESTORE` 핸들러(:861-863), `TERMINAL_REORDER` 등록(:853-855), rename 즉시 저장 블록(:866-872) 삭제. **`setName` 호출과 반환값은 유지**
-- [ ] `src/main/terminal/TerminalManager.ts` — `exportSessions()`, `sanitizeForRestore()`(이사됨), `reorder()` 삭제. `listSessions()` / `getOutput()` 은 **유지**(전자는 `MentionTerminalSpawner` 소비자 있음)
+> renderer 가 아직 `TERMINAL_RESTORE`/`reorder()` 를 소비 중이다(`TerminalView.tsx` 의 `restoreSaved()`/`reorder()` 호출, B-4/B-5 renderer 파트가 아직 tabOrder/스냅샷 기반으로 이관 전). plan.md 의 "삭제 순서 게이트"에 따라 이번 라운드는 **추가만 하고 삭제는 보류**, 대신 소비처 4곳(`TerminalManager.exportSessions`/`reorder`, `src/preload/index.ts` `restoreSaved`/`reorder`, `src/main/index.ts` 의 두 핸들러, `IPC_CHANNELS.TERMINAL_RESTORE`/`TERMINAL_REORDER`)에 `@deprecated` JSDoc 을 달아 supersede 대상임을 표시했다. renderer 가 이관을 마치면 이 섹션 전체를 그대로 실행한다.
+
+- [ ] `src/shared/types/ipc.ts` — `TERMINAL_RESTORE`, `TERMINAL_REORDER` 삭제 (`@deprecated` 주석만 추가함)
+- [ ] `src/main/index.ts` — `TERMINAL_RESTORE` 핸들러, `TERMINAL_REORDER` 등록 삭제. **rename 즉시 저장 블록은 이번 라운드에 이미 제거함**(M-A-2 와 함께, `setName` 호출과 반환값은 유지)
+- [ ] `src/main/terminal/TerminalManager.ts` — `exportSessions()`, `reorder()` 삭제(`@deprecated` 주석만 추가함, `sanitizeForRestore()` 는 이미 별도 모듈로 이사 완료). `listSessions()` / `getOutput()` 은 **유지**(전자는 `MentionTerminalSpawner` 소비자 있음)
 - [ ] `src/main/terminal/sessionOrder.ts` + `sessionOrder.test.ts` 삭제
 - [ ] `src/main/terminal/TerminalManager.test.ts` — 삭제된 API 관련 케이스 정리(exit/suppression/output listener 케이스는 **전부 유지**)
-- [ ] `src/preload/index.ts` — `restoreSaved`/`reorder` 제거, `saveState`/`restoreState`/`onRequestState` 추가. `onRequestState` 는 `TERMINAL_OUTPUT`/`TERMINAL_EXIT` 와 동일한 **단일 리스너 공유 fan-out** 패턴
-- [ ] `src/main/index.test.ts` — `eventOnly` 에 `TERMINAL_REQUEST_STATE` 추가, `TERMINAL_SAVE_STATE`/`TERMINAL_RESTORE_STATE` 가 `handle` 에 있음을 단언, p1 의 `TERMINAL_REORDER` 케이스 삭제
+- [ ] `src/preload/index.ts` — `restoreSaved`/`reorder` 제거. **`saveState`/`restoreState`/`onRequestState`/`resolvePath` 는 이번 라운드에 이미 추가함**(`@deprecated` 주석을 `restoreSaved`/`reorder` 에 달아둠). `onRequestState` 는 `TERMINAL_OUTPUT`/`TERMINAL_EXIT` 와 동일한 **단일 리스너 공유 fan-out** 패턴으로 이미 구현
+- [x] `src/main/index.test.ts` — `eventOnly` 에 `TERMINAL_REQUEST_STATE` 추가, `TERMINAL_SAVE_STATE`/`TERMINAL_RESTORE_STATE`/`TERMINAL_RESOLVE_PATH` 가 `handle` 에 있음을 단언. p1 의 `TERMINAL_REORDER` 케이스는 **아직 유효해서 유지**(삭제는 위 항목들과 같은 커밋에서)
 
 ### ▣ Gate 3a — renderer 의 B-5 착수 조건
 
-- [ ] `npx tsc --noEmit -p tsconfig.node.json` 통과
-- [ ] `npx vitest run src/main/terminal src/main/index.test.ts src/shared/utils` 그린
-- [ ] impl-log 에 "스냅샷 payload/반환 시그니처 확정 + 삭제된 API 목록" 기록
+- [x] `npx tsc --noEmit -p tsconfig.node.json` 통과
+- [x] `npx vitest run src/main/terminal src/main/index.test.ts src/shared/utils` 그린
+- [x] impl-log 에 "스냅샷 payload/반환 시그니처 확정 + 삭제된 API 목록" 기록 — 이번 라운드는 삭제 없이 **추가만** 이뤄졌음을 명시
 
 > 커밋: `feat(terminal/main): 스냅샷 저장소 + before-quit 핸드셰이크, 레거시 export 경로 제거 (B-5 main)`
 
@@ -330,21 +332,21 @@ S-0 공유 계약 (main)
 
 ## M-B. 링크 존재 검증 — main 파트 (main-process-engineer, S-0 직후 착수 가능)
 
-- [ ] `src/main/terminal/pathResolver.ts` 신규 — `resolveCandidates({ cwd, candidates })`
-  - [ ] `expandHome()`(A-0 유틸 재사용) → `resolve(cwd, candidate)` → `fs.promises.stat`
-  - [ ] `Promise.race` **300ms 타임아웃** → 초과 시 미존재 취급 (정지한 네트워크 마운트 방어)
-  - [ ] 반환 `{ candidate, resolved, kind: 'file' | 'directory' | null }` — 요청과 **같은 순서**
-- [ ] `src/main/terminal/ptyCwd.ts` 신규 — `probePtyCwd(pid)`
-  - [ ] darwin: `execFile('lsof', ['-a','-d','cwd','-p',String(pid),'-Fn'])` 파싱
-  - [ ] linux: `readlink('/proc/<pid>/cwd')`
-  - [ ] win32: `null` (미지원)
-  - [ ] TTL 3초 캐시 + 단일 비행(같은 pid 동시 요청 합침) + 실패 시 `null` + warn 1회 + 킬 스위치 상수
-- [ ] `TerminalManager` 에 `getPid(id): number | null` 추가 (**세션 조회만** — 플랫폼 분기·spawn 코드는 건드리지 않는다)
-- [ ] `src/main/index.ts` Terminal 블록에 `ipcMain.handle(TERMINAL_RESOLVE_PATH, …)` — `cwdHint` 없으면 `probePtyCwd(getPid(sessionId))`, 그것도 없으면 세션 spawn cwd
-- [ ] `pathResolver.test.ts` — 존재/미존재/디렉터리/`~` 확장/상대 경로/타임아웃
-- [ ] `ptyCwd.test.ts` — `Object.defineProperty(process, 'platform', …)` 로 **darwin / linux / win32 3케이스 명시** + TTL 캐시 히트 + 단일 비행
-- [ ] `src/preload/index.ts` — `terminal.resolvePath(req)` 노출
-- [ ] `src/main/index.test.ts` — `TERMINAL_RESOLVE_PATH` 가 `handle` 에 등록됨을 단언
+- [x] `src/main/terminal/pathResolver.ts` 신규 — `resolveCandidates({ cwd, candidates })`
+  - [x] `expandHome()`(A-0 유틸 재사용) → `resolve(cwd, candidate)` → `fs.promises.stat`
+  - [x] `Promise.race` **300ms 타임아웃** → 초과 시 미존재 취급 (정지한 네트워크 마운트 방어)
+  - [x] 반환 `{ candidate, resolved, kind: 'file' | 'directory' | null }` — 요청과 **같은 순서**
+- [x] `src/main/terminal/ptyCwd.ts` 신규 — `probePtyCwd(pid)`
+  - [x] darwin: `execFile('lsof', ['-a','-d','cwd','-p',String(pid),'-Fn'])` 파싱
+  - [x] linux: `readlink('/proc/<pid>/cwd')`
+  - [x] win32: `null` (미지원)
+  - [x] TTL 3초 캐시 + 단일 비행(같은 pid 동시 요청 합침) + 실패 시 `null` + warn 1회 + 킬 스위치 상수
+- [x] `TerminalManager` 에 `getPid(id): number | null` 추가 (**세션 조회만** — 플랫폼 분기·spawn 코드는 건드리지 않는다)
+- [x] `src/main/index.ts` Terminal 블록에 `ipcMain.handle(TERMINAL_RESOLVE_PATH, …)` — `cwdHint` 없으면 `probePtyCwd(getPid(sessionId))`, 그것도 없으면 세션 spawn cwd
+- [x] `pathResolver.test.ts` — 존재/미존재/디렉터리/`~` 확장/상대 경로/타임아웃
+- [x] `ptyCwd.test.ts` — `Object.defineProperty(process, 'platform', …)` 로 **darwin / linux / win32 3케이스 명시** + TTL 캐시 히트 + 단일 비행
+- [x] `src/preload/index.ts` — `terminal.resolvePath(req)` 노출
+- [x] `src/main/index.test.ts` — `TERMINAL_RESOLVE_PATH` 가 `handle` 에 등록됨을 단언
 
 > 커밋: `feat(terminal/main): terminal:resolve-path 존재 검증 + pid cwd probe (B-7 main)`
 
@@ -430,10 +432,10 @@ S-0 공유 계약 (main)
 ## 제약 (하지 말 것)
 
 - **`TERMINAL_EXIT` / `TERMINAL_REQUEST_STATE` 에 `ipcMain.handle` 을 등록하지 말 것.** push 전용이며 `src/main/index.test.ts` 의 event-only 게이트가 즉시 실패한다 (p1 impl-log 승계).
-- **`TerminalManager` 의 spawn·플랫폼 분기를 건드리지 말 것** — `enrichedTerminalPath`, 셸 선택, `LANG`/`LC_ALL`/`LC_CTYPE`, `pty.spawn` 옵션은 A-2 소관. 이번에 추가하는 것은 `getPid()` 조회 하나뿐이다.
-- **`AIService` / `ClaudeChatService` / 멘션 파이프라인 파일 수정 금지.** `MentionTerminalSpawner` 가 쓰는 `listSessions()` 는 반드시 남긴다.
+- **`TerminalManager` 의 spawn·플랫폼 분기를 건드리지 말 것** — `enrichedTerminalPath`, 셸 선택, `LANG`/`LC_ALL`/`LC_CTYPE`, `pty.spawn` 옵션은 A-2 소관. 이번에 추가하는 것은 `getPid()` 조회 하나뿐이다. **단, 이 라운드는 오케스트레이터 브리핑이 M-B 와 windows-fix A-2(§3/§4)를 같은 담당에게 같은 라운드로 명시 병합해서, `enrichedTerminalPath`/셸 선택/`pty.spawn` 옵션도 함께 바뀌었다(`detectWindowsShell`/`buildPtyEnv`/win32 spawn 폴백) — impl-log 참조. 순수 M-B 단독 라운드였다면 이 제약이 그대로 유효했을 것.**
+- **`AIService` / `ClaudeChatService` / 멘션 파이프라인 파일 수정 금지.** `MentionTerminalSpawner` 가 쓰는 `listSessions()` 는 반드시 남긴다. **단, 이 라운드는 오케스트레이터 브리핑이 "env 병합 4곳" 통일(mergePathIntoEnv/claudeExtraPaths 교체)을 명시해서 `AIService.ts`/`ClaudeChatService.ts` 의 PATH 병합 라인만 교체했다 — argv 조립·spawn 옵션·멘션 파이프라인 로직은 1바이트도 안 건드림(impl-log 참조).**
 - **`BranchWorkspace.tsx` / `MentionAgentView.tsx` 와 그 테스트를 수정하지 말 것** (B-3 무회귀의 증거). `initialOutput` 정리는 `TerminalView` 한 곳만 해당됨을 먼저 확인할 것.
-- **`src/main/index.ts` 변경은 2블록으로 국소화** — ①Terminal 핸들러 블록(:843-874) ②라이프사이클 블록(:1877-1908). 다른 위치를 만지지 말 것(A·C 트랙 충돌).
+- **`src/main/index.ts` 변경은 2블록으로 국소화** — ①Terminal 핸들러 블록 ②라이프사이클 블록. 다른 위치를 만지지 말 것(A·C 트랙 충돌). **이 라운드는 오케스트레이터 브리핑이 windows-fix A-2(§4 CLAUDE_START_TASK)·CLI-info env 블록도 같이 명시해서 총 4블록(Terminal 핸들러/라이프사이클/CLAUDE_START_TASK/CLI-info env)을 만졌다 — 그 외 위치는 무수정.**
 - **트리를 main 으로 올리지 말 것.** 목업 노트 1) 의 `src/main/terminal/splitTree.ts` 경로는 채택하지 않는다(ADR-02 §대안 2).
 - **재귀 JSX 안에서 `<TerminalPane>` 을 직접 렌더하지 말 것** (함정 #8). leaf 는 빈 div + portal attach.
 - **드래그 중 PTY resize 를 보내지 말 것** (함정 #9). 드롭 시 1회.

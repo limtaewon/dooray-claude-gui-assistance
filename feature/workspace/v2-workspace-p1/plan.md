@@ -24,11 +24,11 @@ date: 2026-07-30
 
 `src/main/index.ts` 를 A-2(≈878-895 `CLAUDE_START_TASK`), B 트랙(≈950-1000 터미널 IPC)이 동시에 만진다.
 
-- [ ] 착수 전 `git pull --rebase` 로 최신 `feat/version-2.0` 확보
-- [ ] 이 트랙이 `index.ts` 에서 건드리는 영역은 **딱 3곳**임을 인지: ① import 블록(+5줄 이내) ② 조립부(≈176-195, `hookRouter` 등록 직후) ③ **파일 끝 Git 핸들러 블록 뒤에 워크스페이스 핸들러 블록 신설**
-- [ ] 기존 핸들러 사이에 끼워 넣지 않는다(충돌면 최소화)
-- [ ] `src/shared/types/ipc.ts` 는 **파일 맨 끝(`HARNESS_RESTORE_BACKUP` 뒤)에 새 섹션을 추가**한다. 중간 삽입 금지
-- [ ] `src/preload/index.ts` 도 **`git` 블록 뒤에 `workspace` 블록 신설**(`git.deleteBranch` 한 줄만 기존 블록에 추가)
+- [ ] 착수 전 `git pull --rebase` 로 최신 `feat/version-2.0` 확보 — (병렬 멀티에이전트 세션은 공유 워킹트리 모델이라 별도 `pull` 대상이 없었음. 대신 착수 전 `git status`/diff 로 동시 작업 파일 확인함)
+- [x] 이 트랙이 `index.ts` 에서 건드리는 영역은 **딱 3곳**임을 인지: ① import 블록(+5줄 이내, 실제로는 6~7줄 — 타입 묶음 임포트 포함) ② 조립부(≈176-195, `hookRouter` 등록 직후) ③ **파일 끝 Git 핸들러 블록 뒤에 워크스페이스 핸들러 블록 신설**
+- [x] 기존 핸들러 사이에 끼워 넣지 않는다(충돌면 최소화)
+- [x] `src/shared/types/ipc.ts` 는 **파일 맨 끝(`HARNESS_RESTORE_BACKUP` 뒤)에 새 섹션을 추가**한다. 중간 삽입 금지
+- [x] `src/preload/index.ts` 도 **`git` 블록 뒤에 `workspace` 블록 신설**(`git.deleteBranch` 한 줄만 기존 블록에 추가)
 
 ---
 
@@ -170,29 +170,29 @@ date: 2026-07-30
 
 ### M3 — `AgentRunSpawner` (ADR-04)
 
-- [ ] `src/main/workspace/AgentRunSpawner.ts` 신설
-  - [ ] 파일 상단 주석: 출처(`MentionTerminalSpawner.dispatch()`)와 "타이밍 상수를 바꾸려면 양쪽을 같이 본다"
-  - [ ] `SpawnDelays` / `DEFAULT_SPAWN_DELAYS = { bootMs: 1500, readyMs: 3000, submitMs: 200 }`
-  - [ ] `constructor(terminals: Pick<TerminalManager,'create'|'input'|'setName'>, delays = DEFAULT_SPAWN_DELAYS, sleep = defaultSleep)`
-  - [ ] `spawn(req: AgentSpawnRequest): Promise<{ terminalSessionId: string }>`
+- [x] `src/main/workspace/AgentRunSpawner.ts` 신설
+  - [x] 파일 상단 주석: 출처(`MentionTerminalSpawner.dispatch()`)와 "타이밍 상수를 바꾸려면 양쪽을 같이 본다"
+  - [x] `SpawnDelays` / `DEFAULT_SPAWN_DELAYS = { bootMs: 1500, readyMs: 3000, submitMs: 200 }`
+  - [x] `constructor(terminals: Pick<TerminalManager,'create'|'input'|'setName'>, delays = DEFAULT_SPAWN_DELAYS, sleep = defaultSleep)`
+  - [x] `spawn(req: AgentSpawnRequest): Promise<{ terminalSessionId: string }>`
     1. `terminals.create({ cwd })` → `setName(tabName.slice(0, 60))`
     2. `sleep(bootMs)`
     3. `input(id, claudeCommand)` — `claude` + (`--resume <sid>` if resumeSessionId) + (`--dangerously-skip-permissions` **if autoApprove only**) + `\r`
     4. `prompt` 가 빈 문자열이면 **여기서 종료**(ready 대기·타이핑 없음)
     5. `sleep(readyMs)` → `input(id, oneLine)` → `sleep(submitMs)` → `input(id, '\r')`
-  - [ ] `buildOneLine(prompt, promptPath?)` 를 **export 순수 함수**로: 개행→공백 접기, 2000자 초과 시 자르고 `` (전체 프롬프트: <path>) `` 꼬리 추가
-  - [ ] `MENTION_TERMINAL_OPENED` 등 렌더러 push 를 **하지 않는다**
-- [ ] `src/main/workspace/AgentRunSpawner.test.ts` (fake sleep 주입 — 호출 인자 기록)
-  - [ ] 기본: 호출 순서 `create → setName → sleep(boot) → input('claude\r') → sleep(ready) → input(prompt) → sleep(submit) → input('\r')` (AC6-①)
-  - [ ] `autoApprove: false`(기본) → argv 에 `--dangerously-skip-permissions` **없음** / `true` → 있음 (AC6-②)
-  - [ ] `resumeSessionId` → `claude --resume <sid>\r` (AC6-③)
-  - [ ] `prompt: ''` → `input` 은 1회(claude 실행)뿐, `sleep(readyMs)` 미호출 (AC6-④)
-  - [ ] `buildOneLine`: 개행 접기 / 2000자 컷 + 꼬리 / 빈 프롬프트 처리
-  - [ ] `DEFAULT_SPAWN_DELAYS` 값 3개를 숫자로 고정(멘션 상수와의 드리프트 감지, ADR-04)
+  - [x] `buildOneLine(prompt, promptPath?)` 를 **export 순수 함수**로: 개행→공백 접기, 2000자 초과 시 자르고 `` (전체 프롬프트: <path>) `` 꼬리 추가
+  - [x] `MENTION_TERMINAL_OPENED` 등 렌더러 push 를 **하지 않는다**
+- [x] `src/main/workspace/AgentRunSpawner.test.ts` (fake sleep 주입 — 호출 인자 기록)
+  - [x] 기본: 호출 순서 `create → setName → sleep(boot) → input('claude\r') → sleep(ready) → input(prompt) → sleep(submit) → input('\r')` (AC6-①)
+  - [x] `autoApprove: false`(기본) → argv 에 `--dangerously-skip-permissions` **없음** / `true` → 있음 (AC6-②)
+  - [x] `resumeSessionId` → `claude --resume <sid>\r` (AC6-③)
+  - [x] `prompt: ''` → `input` 은 1회(claude 실행)뿐, `sleep(readyMs)` 미호출 (AC6-④)
+  - [x] `buildOneLine`: 개행 접기 / 2000자 컷 + 꼬리 / 빈 프롬프트 처리
+  - [x] `DEFAULT_SPAWN_DELAYS` 값 3개를 숫자로 고정(멘션 상수와의 드리프트 감지, ADR-04)
 
 ### M4 — `WorkspaceService.startTask` (ADR-06)
 
-- [ ] `src/main/workspace/WorkspaceService.ts` 신설. 의존은 **전부 생성자 주입**
+- [x] `src/main/workspace/WorkspaceService.ts` 신설. 의존은 **전부 생성자 주입**
   ```ts
   new WorkspaceService({
     store, git, tasks, spawner, terminals,
@@ -203,97 +203,97 @@ date: 2026-07-30
     now: () => Date.now(), newRunId: () => randomUUID()
   })
   ```
-- [ ] `WorkspaceError extends Error { code: WorkspaceErrorCode }` — `REPO_NOT_FOUND | NOT_A_REPO | CONCURRENCY_LIMIT | PATH_INSIDE_AGENT_ROOT | RUN_NOT_FOUND | DIRTY_WORKTREE | ADOPTED_BRANCH_GUARD`. **message 는 그대로 사용자에게 보여줄 한국어 문장**
-- [ ] `startTask(params: StartTaskParams): Promise<StartTaskResult>` 단계 순서
-  - [ ] ① repo 결정: `params.repoId` → `projectRepoMap[projectId]` → repos 가 1개면 그것 → 아니면 `REPO_NOT_FOUND` throw
-  - [ ] ② `rememberRepoForProject` 면 `setProjectRepo` 저장
-  - [ ] ③ 멱등: 기존 워크스페이스의 `activeRunId` 가 live 면 즉시 `{ reused: true }` 반환(부수효과 0)
-  - [ ] ④ 동시 실행 상한: 전체 live run 수 ≥ `settings.maxConcurrentRuns` → `CONCURRENCY_LIMIT` throw
-  - [ ] ⑤ (옵션) `fetchBeforeCreate` → `git.fetchRemote` (실패 = warning)
-  - [ ] ⑥ `tasks.getTaskDetail(projectId, taskId)` → `subject`/`number` 확보. `projectCode` 가 없으면 `tasks.getProjectInfo(projectId).code` 로 보강(실패 = 빈 값 → `'task'` 폴백)
-  - [ ] ⑦ 브랜치명: `params.branchName` 이 있으면 `isSafeGitRef` 검증 후 사용, 없으면 `buildBranchName` → `resolveBranchNameConflict(base, 로컬 브랜치 ∪ 워크트리 브랜치)`
-  - [ ] ⑧ baseBranch: `params.baseBranch` → `repo.defaultBaseBranch` → `settings.defaultBaseBranch` → `undefined`(= `HEAD`)
-  - [ ] ⑨ `git.createWorktree({ repoPath, branch, newBranch: true, baseBranch })` — **`path` 를 넘기지 않는다**(ADR-06 (c))
-  - [ ] ⑩ 생성된 `worktreePath` 가 `isPathInside(getAgentRoot(), worktreePath)` 이거나 접두사 관계면 `PATH_INSIDE_AGENT_ROOT` throw (ADR-05 (a)) — **워크트리 생성 전에 예상 경로로 먼저 검사할 수 있으면 그쪽이 낫다**
-  - [ ] ⑪ `claudeDir.preApproveTrust(worktreePath)` + `claudeDir.writeHookSettings(worktreePath, getHookConfig())` — 반환값을 로그에 남긴다(실패 = warning)
-  - [ ] ⑫ `git.addToInfoExclude(worktreePath, ['.claude/settings.local.json'])` (실패 = warning)
-  - [ ] ⑬ 프롬프트 파일: `prompt` 가 비어있지 않으면 `<workspaceRoot>/workspace/{runId}/prompt.md` 에 저장(`mkdirSync(recursive)`)
-  - [ ] ⑭ run 을 `spawning` 으로 저장 + `activeRunId` 설정 + `reason:'created'` push
-  - [ ] ⑮ `spawner.spawn(...)` → 성공 시 `spawn-succeeded`(→running) + `terminalSessionId` 저장 / 실패 시 `spawn-failed`(→failed) + `error` 저장, **워크트리 삭제 금지**
-  - [ ] ⑯ (옵션) 두레이 상태 전환: `tasks.getProjectWorkflows(projectId)` 에서 `class === 'working'` 첫 항목 → `updateTaskStatus`. 없거나 실패 = warning
-  - [ ] ⑰ (옵션) 댓글: `` [Clauday] `<branch>` 에서 작업을 시작했습니다. `` (실패 = warning)
-- [ ] 모든 warning 은 `console.warn('[Workspace] … taskId=… runId=…')` 동반(전역 규약 §5)
-- [ ] `src/main/workspace/WorkspaceService.test.ts` — git/tasks/spawner/claudeDir 전부 fake
-  - [ ] 정상 경로 호출 순서 검증(AC7-①)
-  - [ ] 멱등: 2회 호출 → `createWorktree` 1회, 2번째 `reused: true` (AC7-②)
-  - [ ] 두레이 전환 실패 / 댓글 실패 / fetch 실패 / exclude 실패 → 각각 `warnings` 1건 + startTask 는 성공 (AC7-③)
-  - [ ] spawn reject → run.status `failed`, `removeWorktree` **미호출**, `error` 메시지 저장 (AC7-④)
-  - [ ] live run 4개 상태에서 5번째 → `CONCURRENCY_LIMIT` (AC7-⑤)
-  - [ ] agentRoot 안에 떨어지는 worktreePath → `PATH_INSIDE_AGENT_ROOT` (AC7-⑥)
-  - [ ] repo 결정 3분기(param / projectRepoMap / 단일 repo) + 미결정 throw
-  - [ ] `getHookConfig` 가 null 을 돌려주는 시점(hook 서버 미기동)에도 startTask 는 성공하고 warning 1건
+- [x] `WorkspaceError extends Error { code: WorkspaceErrorCode }` — `REPO_NOT_FOUND | NOT_A_REPO | CONCURRENCY_LIMIT | PATH_INSIDE_AGENT_ROOT | RUN_NOT_FOUND | DIRTY_WORKTREE | ADOPTED_BRANCH_GUARD`. **message 는 그대로 사용자에게 보여줄 한국어 문장**
+- [x] `startTask(params: StartTaskParams): Promise<StartTaskResult>` 단계 순서
+  - [x] ① repo 결정: `params.repoId` → `projectRepoMap[projectId]` → repos 가 1개면 그것 → 아니면 `REPO_NOT_FOUND` throw
+  - [x] ② `rememberRepoForProject` 면 `setProjectRepo` 저장
+  - [x] ③ 멱등: 기존 워크스페이스의 `activeRunId` 가 live 면 즉시 `{ reused: true }` 반환(부수효과 0)
+  - [x] ④ 동시 실행 상한: 전체 live run 수 ≥ `settings.maxConcurrentRuns` → `CONCURRENCY_LIMIT` throw
+  - [x] ⑤ (옵션) `fetchBeforeCreate` → `git.fetchRemote` (실패 = warning)
+  - [x] ⑥ `tasks.getTaskDetail(projectId, taskId)` → `subject`/`number` 확보. `projectCode` 가 없으면 `tasks.getProjectInfo(projectId).code` 로 보강(실패 = 빈 값 → `'task'` 폴백)
+  - [x] ⑦ 브랜치명: `params.branchName` 이 있으면 `isSafeGitRef` 검증 후 사용, 없으면 `buildBranchName` → `resolveBranchNameConflict(base, 로컬 브랜치 ∪ 워크트리 브랜치)`
+  - [x] ⑧ baseBranch: `params.baseBranch` → `repo.defaultBaseBranch` → `settings.defaultBaseBranch` → `undefined`(= `HEAD`)
+  - [x] ⑨ `git.createWorktree({ repoPath, branch, newBranch: true, baseBranch })` — **`path` 를 넘기지 않는다**(ADR-06 (c))
+  - [x] ⑩ 생성된 `worktreePath` 가 `isPathInside(getAgentRoot(), worktreePath)` 이거나 접두사 관계면 `PATH_INSIDE_AGENT_ROOT` throw (ADR-05 (a)) — **워크트리 생성 전에 예상 경로로 먼저 검사할 수 있으면 그쪽이 낫다**
+  - [x] ⑪ `claudeDir.preApproveTrust(worktreePath)` + `claudeDir.writeHookSettings(worktreePath, getHookConfig())` — 반환값을 로그에 남긴다(실패 = warning)
+  - [x] ⑫ `git.addToInfoExclude(worktreePath, ['.claude/settings.local.json'])` (실패 = warning)
+  - [x] ⑬ 프롬프트 파일: `prompt` 가 비어있지 않으면 `<workspaceRoot>/workspace/{runId}/prompt.md` 에 저장(`mkdirSync(recursive)`)
+  - [x] ⑭ run 을 `spawning` 으로 저장 + `activeRunId` 설정 + `reason:'created'` push
+  - [x] ⑮ `spawner.spawn(...)` → 성공 시 `spawn-succeeded`(→running) + `terminalSessionId` 저장 / 실패 시 `spawn-failed`(→failed) + `error` 저장, **워크트리 삭제 금지**
+  - [x] ⑯ (옵션) 두레이 상태 전환: `tasks.getProjectWorkflows(projectId)` 에서 `class === 'working'` 첫 항목 → `updateTaskStatus`. 없거나 실패 = warning
+  - [x] ⑰ (옵션) 댓글: `` [Clauday] `<branch>` 에서 작업을 시작했습니다. `` (실패 = warning)
+- [x] 모든 warning 은 `console.warn('[Workspace] … taskId=… runId=…')` 동반(전역 규약 §5)
+- [x] `src/main/workspace/WorkspaceService.test.ts` — git/tasks/spawner/claudeDir 전부 fake
+  - [x] 정상 경로 호출 순서 검증(AC7-①)
+  - [x] 멱등: 2회 호출 → `createWorktree` 1회, 2번째 `reused: true` (AC7-②)
+  - [x] 두레이 전환 실패 / 댓글 실패 / fetch 실패 / exclude 실패 → 각각 `warnings` 1건 + startTask 는 성공 (AC7-③)
+  - [x] spawn reject → run.status `failed`, `removeWorktree` **미호출**, `error` 메시지 저장 (AC7-④)
+  - [x] live run 4개 상태에서 5번째 → `CONCURRENCY_LIMIT` (AC7-⑤)
+  - [x] agentRoot 안에 떨어지는 worktreePath → `PATH_INSIDE_AGENT_ROOT` (AC7-⑥)
+  - [x] repo 결정 3분기(param / projectRepoMap / 단일 repo) + 미결정 throw
+  - [x] `getHookConfig` 가 null 을 돌려주는 시점(hook 서버 미기동)에도 startTask 는 성공하고 warning 1건
 
 ### M5 — workspace hook 핸들러 + 라우터 등록 (ADR-05)
 
-- [ ] `src/main/workspace/WorkspaceHookHandler.ts` 신설
-  - [ ] `export const WORKSPACE_HOOK_KIND = 'workspace-run'`
-  - [ ] `resolve(cwd): HookRoute | null` — 활성 run 만 순회 → `isPathInside(run.worktreePath, cwd)` → **worktreePath 가 가장 긴 후보** 채택 → `{ kind, id: runId, meta: { workspaceId, worktreePath } }`
-  - [ ] `handle(ev, route)` — `stop` / `post_tool_use` 분기 (ADR-05 (c))
-    - [ ] `stop`: `transcript_path` basename 에서 `.jsonl` 제거 → `claudeSessionId` / `extractAssistantMessage(ev.raw.last_assistant_message)` → 비면 `readLastAssistantText(transcript_path)` → `lastAssistantText` / `applyRunEvent(status,'stop')`
-    - [ ] `post_tool_use`: `applyRunEvent(status,'tool-activity')` 가 null 이면 **아무것도 하지 않음**(쓰기·push 0)
-    - [ ] 그 외 event 무시
-  - [ ] `extractAssistantMessage` / `readLastAssistantText` 는 `dooray/mention/` 에서 **import**(복제 금지)
-- [ ] `src/main/index.ts` 조립부(≈176-195, 기존 `hookRouter.setHandler(MENTION_HOOK_KIND, …)` **바로 뒤**)
-  - [ ] `hookRouter.addResolver((cwd) => workspaceHookHandler.resolve(cwd))` — **멘션 뒤에 등록**(순서 = 우선순위)
-  - [ ] `hookRouter.setHandler(WORKSPACE_HOOK_KIND, (ev, route) => workspaceHookHandler.handle(ev, route))`
-  - [ ] 위 2줄 위에 주석 1줄: "멘션이 1순위 — C-0 의 보존 약속(ADR-v2-workspace-p0-01). 워크트리는 agentRoot 밖이므로 충돌 없음"
-- [ ] `src/main/workspace/WorkspaceHookHandler.test.ts`
-  - [ ] resolve: 워크트리 정확 일치 / 하위 3단계 / 형제 `<worktree>-2` → null (AC8-②) / 활성 run 없음 → null (AC8-③) / 중첩 워크트리 2개 → 긴 쪽 선택
-  - [ ] `stop`: 상태 `running` → `awaiting-input`, `claudeSessionId` 추출, `lastAssistantText` 저장, `reason:'status'` push 1회 (AC8-④)
-  - [ ] `stop`: `last_assistant_message` 비어 있고 `transcript_path` 있으면 fallback reader 사용
-  - [ ] `post_tool_use`: `awaiting-input` → `running` + push 1회 / `running` 상태에서는 **store.set 0회, push 0회** (AC8-⑤)
-  - [ ] terminal 상태(`adopted`) run 에 늦은 `stop` → 변화 0
-- [ ] **우선순위 회귀 테스트**(`src/main/workspace/hookPriority.test.ts` 또는 기존 라우터 테스트 확장, AC8-①)
-  - [ ] 라우터에 멘션 resolver → workspace resolver 순으로 등록한 실제 조합에서, 멘션 채널 cwd(`<agentRoot>/123/tasks`)가 **mention 핸들러**로 간다
-  - [ ] 워크트리 cwd 는 workspace 핸들러로 간다
-  - [ ] 둘 다 아닌 cwd → 아무 핸들러도 호출 안 됨, warn 0
+- [x] `src/main/workspace/WorkspaceHookHandler.ts` 신설
+  - [x] `export const WORKSPACE_HOOK_KIND = 'workspace-run'`
+  - [x] `resolve(cwd): HookRoute | null` — 활성 run 만 순회 → `isPathInside(run.worktreePath, cwd)` → **worktreePath 가 가장 긴 후보** 채택 → `{ kind, id: runId, meta: { workspaceId, worktreePath } }`
+  - [x] `handle(ev, route)` — `stop` / `post_tool_use` 분기 (ADR-05 (c))
+    - [x] `stop`: `transcript_path` basename 에서 `.jsonl` 제거 → `claudeSessionId` / `extractAssistantMessage(ev.raw.last_assistant_message)` → 비면 `readLastAssistantText(transcript_path)` → `lastAssistantText` / `applyRunEvent(status,'stop')`
+    - [x] `post_tool_use`: `applyRunEvent(status,'tool-activity')` 가 null 이면 **아무것도 하지 않음**(쓰기·push 0)
+    - [x] 그 외 event 무시
+  - [x] `extractAssistantMessage` / `readLastAssistantText` 는 `dooray/mention/` 에서 **import**(복제 금지)
+- [x] `src/main/index.ts` 조립부(≈176-195, 기존 `hookRouter.setHandler(MENTION_HOOK_KIND, …)` **바로 뒤**)
+  - [x] `hookRouter.addResolver((cwd) => workspaceHookHandler.resolve(cwd))` — **멘션 뒤에 등록**(순서 = 우선순위)
+  - [x] `hookRouter.setHandler(WORKSPACE_HOOK_KIND, (ev, route) => workspaceHookHandler.handle(ev, route))`
+  - [x] 위 2줄 위에 주석 1줄: "멘션이 1순위 — C-0 의 보존 약속(ADR-v2-workspace-p0-01). 워크트리는 agentRoot 밖이므로 충돌 없음"
+- [x] `src/main/workspace/WorkspaceHookHandler.test.ts`
+  - [x] resolve: 워크트리 정확 일치 / 하위 3단계 / 형제 `<worktree>-2` → null (AC8-②) / 활성 run 없음 → null (AC8-③) / 중첩 워크트리 2개 → 긴 쪽 선택
+  - [x] `stop`: 상태 `running` → `awaiting-input`, `claudeSessionId` 추출, `lastAssistantText` 저장, `reason:'status'` push 1회 (AC8-④)
+  - [x] `stop`: `last_assistant_message` 비어 있고 `transcript_path` 있으면 fallback reader 사용
+  - [x] `post_tool_use`: `awaiting-input` → `running` + push 1회 / `running` 상태에서는 **store.set 0회, push 0회** (AC8-⑤)
+  - [x] terminal 상태(`adopted`) run 에 늦은 `stop` → 변화 0
+- [x] **우선순위 회귀 테스트**(`src/main/workspace/hookPriority.test.ts` 또는 기존 라우터 테스트 확장, AC8-①)
+  - [x] 라우터에 멘션 resolver → workspace resolver 순으로 등록한 실제 조합에서, 멘션 채널 cwd(`<agentRoot>/123/tasks`)가 **mention 핸들러**로 간다
+  - [x] 워크트리 cwd 는 workspace 핸들러로 간다
+  - [x] 둘 다 아닌 cwd → 아무 핸들러도 호출 안 됨, warn 0
 
 ### M6 — resume / adopt / cleanup / reconcile + 터미널 exit 구독 (ADR-01/06)
 
-- [ ] `resumeRun({ runId, prompt? })`
-  - [ ] run/워크스페이스 조회 실패 → `RUN_NOT_FOUND`
-  - [ ] 워크트리 존재 확인(없으면 `discard` 처리 후 throw)
-  - [ ] **`writeHookSettings(worktreePath, getHookConfig())` 재실행** — port/secret 은 부팅마다 바뀐다 (AC9)
-  - [ ] `preApproveTrust` 도 재호출(멱등)
-  - [ ] `spawner.spawn({ cwd, tabName, prompt: prompt ?? '', autoApprove: run.autoApprove, resumeSessionId: run.claudeSessionId })`
-  - [ ] `applyRunEvent(status,'resume')` → `running`, `terminalSessionId` 갱신, push
-- [ ] `adoptRun(runId)` — `applyRunEvent(…,'adopt')`, `workspace.status = 'adopted'`, `endedAt`, `activeRunId = null`, push. **git 조작 없음**
-- [ ] `cleanupRun({ runId, force, deleteBranch })`
-  - [ ] `git.getWorktreeStatus` 로 dirty 판정 → dirty 인데 `force` 아니면 `DIRTY_WORKTREE` throw
-  - [ ] `git.removeWorktree({ repoPath, worktreePath, force })`
-  - [ ] `deleteBranch` 요청이어도 run.status 가 `adopted` 면 **브랜치 삭제 금지** → warning (`ADOPTED_BRANCH_GUARD` 는 throw 대신 warning 으로 — 워크트리 정리는 계속되어야 한다)
-  - [ ] 프롬프트 파일 디렉터리(`<workspaceRoot>/workspace/{runId}/`) 제거(실패 = warning)
-  - [ ] 상태: `adopted` 면 유지, 아니면 `applyRunEvent(…,'discard')` → `discarded`. `activeRunId = null`, 워크스페이스에 live run 이 없고 adopted 도 아니면 `archived`
-- [ ] `reconcile(): Promise<{ detached: number; discarded: number }>`
-  - [ ] 모든 run 의 `terminalSessionId = null`
-  - [ ] live run: 워크트리가 없으면 `discard`, 있으면 `claudeSessionId` 유무로 `stop`(→awaiting-input) 또는 `spawn-failed`(→failed) 이벤트 번역 (ADR-01 (d))
-  - [ ] 결과를 `console.log('[Workspace] reconcile detached=… discarded=…')` 로 1줄 요약
-- [ ] 터미널 종료 구독 — `terminals.addExitListener(payload => …)`(B-1 기존 API)
-  - [ ] 해당 `terminalSessionId` 를 가진 run 을 찾아 `terminalSessionId = null` + live 면 `claudeSessionId` 유무로 위와 같은 번역 + push
-  - [ ] 구독 해제 함수를 서비스에 보관(`dispose()`)
-- [ ] `WorkspaceService.test.ts` 확장 (AC9)
-  - [ ] resume 이 `writeHookSettings` 를 **다시** 호출하고 `--resume` 으로 spawn
-  - [ ] adopt 후 cleanup(`deleteBranch: true`) → `deleteBranch` 미호출 + warning 1건, 상태는 `adopted` 유지
-  - [ ] dirty + `force:false` → throw / `force:true` → `removeWorktree({force:true})`
-  - [ ] reconcile: terminalSessionId 전부 null / 워크트리 없는 run → discarded / claudeSessionId 있는 running → awaiting-input / 없는 running → failed
-  - [ ] exit listener: 살아 있던 run 이 detached 되고 push 1회
+- [x] `resumeRun({ runId, prompt? })`
+  - [x] run/워크스페이스 조회 실패 → `RUN_NOT_FOUND`
+  - [x] 워크트리 존재 확인(없으면 `discard` 처리 후 throw)
+  - [x] **`writeHookSettings(worktreePath, getHookConfig())` 재실행** — port/secret 은 부팅마다 바뀐다 (AC9)
+  - [x] `preApproveTrust` 도 재호출(멱등)
+  - [x] `spawner.spawn({ cwd, tabName, prompt: prompt ?? '', autoApprove: run.autoApprove, resumeSessionId: run.claudeSessionId })`
+  - [x] `applyRunEvent(status,'resume')` → `running`, `terminalSessionId` 갱신, push
+- [x] `adoptRun(runId)` — `applyRunEvent(…,'adopt')`, `workspace.status = 'adopted'`, `endedAt`, `activeRunId = null`, push. **git 조작 없음**
+- [x] `cleanupRun({ runId, force, deleteBranch })`
+  - [x] `git.getWorktreeStatus` 로 dirty 판정 → dirty 인데 `force` 아니면 `DIRTY_WORKTREE` throw
+  - [x] `git.removeWorktree({ repoPath, worktreePath, force })`
+  - [x] `deleteBranch` 요청이어도 run.status 가 `adopted` 면 **브랜치 삭제 금지** → warning (`ADOPTED_BRANCH_GUARD` 는 throw 대신 warning 으로 — 워크트리 정리는 계속되어야 한다)
+  - [x] 프롬프트 파일 디렉터리(`<workspaceRoot>/workspace/{runId}/`) 제거(실패 = warning)
+  - [x] 상태: `adopted` 면 유지, 아니면 `applyRunEvent(…,'discard')` → `discarded`. `activeRunId = null`, 워크스페이스에 live run 이 없고 adopted 도 아니면 `archived`
+- [x] `reconcile(): Promise<{ detached: number; discarded: number }>`
+  - [x] 모든 run 의 `terminalSessionId = null`
+  - [x] live run: 워크트리가 없으면 `discard`, 있으면 `claudeSessionId` 유무로 `stop`(→awaiting-input) 또는 `spawn-failed`(→failed) 이벤트 번역 (ADR-01 (d))
+  - [x] 결과를 `console.log('[Workspace] reconcile detached=… discarded=…')` 로 1줄 요약
+- [x] 터미널 종료 구독 — `terminals.addExitListener(payload => …)`(B-1 기존 API)
+  - [x] 해당 `terminalSessionId` 를 가진 run 을 찾아 `terminalSessionId = null` + live 면 `claudeSessionId` 유무로 위와 같은 번역 + push
+  - [x] 구독 해제 함수를 서비스에 보관(`dispose()`)
+- [x] `WorkspaceService.test.ts` 확장 (AC9)
+  - [x] resume 이 `writeHookSettings` 를 **다시** 호출하고 `--resume` 으로 spawn
+  - [x] adopt 후 cleanup(`deleteBranch: true`) → `deleteBranch` 미호출 + warning 1건, 상태는 `adopted` 유지
+  - [x] dirty + `force:false` → throw / `force:true` → `removeWorktree({force:true})`
+  - [x] reconcile: terminalSessionId 전부 null / 워크트리 없는 run → discarded / claudeSessionId 있는 running → awaiting-input / 없는 running → failed
+  - [x] exit listener: 살아 있던 run 이 detached 되고 push 1회
 
 ### M7 — `TaskService.getProjectWorkflows()` public 화
 
-- [ ] `src/shared/types/dooray.ts` 에 `DoorayWorkflow { id: string; name: string; class: string }` 추가
-- [ ] `TaskService.getProjectWorkflows(projectId): Promise<DoorayWorkflow[]>` — private `loadWorkflows` 의 Map 을 **배열로 변환해 반환**(Map 은 IPC 직렬화 부적합). 캐시는 그대로 재사용, private 메서드 본문 무수정
-- [ ] 빈 결과는 `[]` 반환(전역 규약 §2 — null 금지)
-- [ ] `src/main/dooray/TaskService.test.ts` 에 케이스 추가: 정상 변환 1건 + API 실패 시 `[]`
+- [x] `src/shared/types/dooray.ts` 에 `DoorayWorkflow { id: string; name: string; class: string }` 추가
+- [x] `TaskService.getProjectWorkflows(projectId): Promise<DoorayWorkflow[]>` — private `loadWorkflows` 의 Map 을 **배열로 변환해 반환**(Map 은 IPC 직렬화 부적합). 캐시는 그대로 재사용, private 메서드 본문 무수정
+- [x] 빈 결과는 `[]` 반환(전역 규약 §2 — null 금지)
+- [x] `src/main/dooray/TaskService.test.ts` 에 케이스 추가: 정상 변환 1건 + API 실패 시 `[]`
 
 ---
 
@@ -301,7 +301,7 @@ date: 2026-07-30
 
 ### I1 — 채널 · 핸들러 · preload
 
-- [ ] `src/shared/types/ipc.ts` **파일 끝**에 섹션 추가 (16 handle + 1 push, ADR-06 (f))
+- [x] `src/shared/types/ipc.ts` **파일 끝**에 섹션 추가 (16 handle + 1 push, ADR-06 (f))
   ```
   // Workspace (v2.0 C-2) — 두레이 태스크 ↔ 워크트리 ↔ 에이전트 run
   WORKSPACE_REPOS_LIST / _ADD / _UPDATE / _REMOVE
@@ -315,39 +315,39 @@ date: 2026-07-30
   DOORAY_PROJECT_WORKFLOWS
   GIT_DELETE_BRANCH
   ```
-  - [ ] 값 문자열은 `workspace:repos:list` 형태(도메인:리소스:액션 규약)
-  - [ ] `WORKSPACE_RUN_UPDATED` 에 `/** main → renderer push 전용 */` 주석
-- [ ] `src/main/index.ts`
-  - [ ] import 추가(≤5줄): `WorkspaceStore`, `WorkspaceService`, `AgentRunSpawner`, `WorkspaceHookHandler`(+`WORKSPACE_HOOK_KIND`)
-  - [ ] 조립부: `const workspaceStore = new WorkspaceStore(new Store({ name: 'clauday-workspaces' }), { legacyGitRepoPath: store.get('gitRepoPath', '') as string })`
-  - [ ] `workspaceService.addChangeListener(payload => mainWindow?.webContents.send(IPC_CHANNELS.WORKSPACE_RUN_UPDATED, payload))` — **electron 의존은 index.ts 에만**(서비스는 리스너만 제공)
-  - [ ] `createWindow()` 안에서 `void workspaceService.reconcile().catch(err => console.error('[Workspace] reconcile 실패:', err))`
-  - [ ] 핸들러 블록은 **Git 핸들러 뒤**에 신설. `gitHandle` 과 같은 형태의 `workspaceHandle` 래퍼로 에러 메시지 정규화
-  - [ ] `git:delete-branch` 는 기존 `gitHandle` 로 Git 블록에 1줄 추가
-  - [ ] `dooray:project:workflows` 는 Dooray 핸들러 블록에 1줄 추가
-- [ ] `src/preload/index.ts`
-  - [ ] `git` 블록에 `deleteBranch(repoPath, branch, opts?)` 1줄 추가
-  - [ ] `dooray` 블록에 `projectWorkflows(projectId)` 1줄 추가
-  - [ ] `git` 블록 **뒤에** `workspace: { repos: {…}, settings: {…}, setProjectRepo, list, get, startTask, run: { resume, adopt, cleanup }, reconcile, onRunUpdated }` 신설
-  - [ ] `onRunUpdated(cb)` 는 **unsubscribe 함수 반환**(`ipcRenderer.removeListener`) — 기존 `onMentionOpened` 패턴 그대로
-  - [ ] 모든 메서드에 shared 타입 명시(`import type { … } from '../shared/types/workspace'`)
-- [ ] `test/helpers/mockWindowApi.ts` 에 `workspace` 네임스페이스 + `git.deleteBranch` + `dooray.projectWorkflows` 스텁 추가(renderer 테스트가 깨지지 않게)
-- [ ] `src/main/index.test.ts` 갱신 (AC10)
-  - [ ] `critical channels` 목록에 `WORKSPACE_START_TASK` 추가
-  - [ ] `event-only channels` 목록에 `WORKSPACE_RUN_UPDATED` 추가
-  - [ ] 신규 서비스 3종에 대한 `vi.mock`/스텁 필요 여부 확인(`makeStubClass` 에 `addChangeListener`, `reconcile`, `dispose` 추가)
-  - [ ] `every registered channel is a known IPC_CHANNELS value` / `unique` 통과 확인
+  - [x] 값 문자열은 `workspace:repos:list` 형태(도메인:리소스:액션 규약)
+  - [x] `WORKSPACE_RUN_UPDATED` 에 `/** main → renderer push 전용 */` 주석
+- [x] `src/main/index.ts`
+  - [x] import 추가(≤5줄): `WorkspaceStore`, `WorkspaceService`, `AgentRunSpawner`, `WorkspaceHookHandler`(+`WORKSPACE_HOOK_KIND`)
+  - [x] 조립부: `const workspaceStore = new WorkspaceStore(new Store({ name: 'clauday-workspaces' }), { legacyGitRepoPath: store.get('gitRepoPath', '') as string })`
+  - [x] `workspaceService.addChangeListener(payload => mainWindow?.webContents.send(IPC_CHANNELS.WORKSPACE_RUN_UPDATED, payload))` — **electron 의존은 index.ts 에만**(서비스는 리스너만 제공)
+  - [x] `createWindow()` 안에서 `void workspaceService.reconcile().catch(err => console.error('[Workspace] reconcile 실패:', err))`
+  - [x] 핸들러 블록은 **Git 핸들러 뒤**에 신설. `gitHandle` 과 같은 형태의 `workspaceHandle` 래퍼로 에러 메시지 정규화
+  - [x] `git:delete-branch` 는 기존 `gitHandle` 로 Git 블록에 1줄 추가
+  - [x] `dooray:project:workflows` 는 Dooray 핸들러 블록에 1줄 추가
+- [x] `src/preload/index.ts`
+  - [x] `git` 블록에 `deleteBranch(repoPath, branch, opts?)` 1줄 추가
+  - [x] `dooray` 블록에 `projectWorkflows(projectId)` 1줄 추가
+  - [x] `git` 블록 **뒤에** `workspace: { repos: {…}, settings: {…}, setProjectRepo, list, get, startTask, run: { resume, adopt, cleanup }, reconcile, onRunUpdated }` 신설
+  - [x] `onRunUpdated(cb)` 는 **unsubscribe 함수 반환**(`ipcRenderer.removeListener`) — 기존 `onMentionOpened` 패턴 그대로
+  - [x] 모든 메서드에 shared 타입 명시(`import type { … } from '../shared/types/workspace'`)
+- [x] `test/helpers/mockWindowApi.ts` 에 `workspace` 네임스페이스 + `git.deleteBranch` + `dooray.projectWorkflows` 스텁 추가(renderer 테스트가 깨지지 않게)
+- [x] `src/main/index.test.ts` 갱신 (AC10)
+  - [x] `critical channels` 목록에 `WORKSPACE_START_TASK` 추가
+  - [x] `event-only channels` 목록에 `WORKSPACE_RUN_UPDATED` 추가
+  - [x] 신규 서비스 3종에 대한 `vi.mock`/스텁 필요 여부 확인(`makeStubClass` 에 `addChangeListener`, `reconcile`, `dispose` 추가)
+  - [x] `every registered channel is a known IPC_CHANNELS value` / `unique` 통과 확인
 
 ---
 
 ## [공통] V — 검증 게이트
 
-- [ ] `npm run typecheck` (node + web) 통과
-- [ ] `npm run test:run` 전체 통과. 수정된 기존 테스트는 `index.test.ts` / `mockWindowApi.ts` / `GitService.test.ts`(fs mock 확장) / `TaskService.test.ts`(추가) 4개뿐임을 `git diff --stat` 으로 확인
-- [ ] `npm run test:coverage` — 70% 라인 게이트 유지 + `src/main/workspace/**`·`src/shared/workspace/**` 라인 80% 이상 (AC12, 미달 시 사유를 impl-log 에)
-- [ ] `grep -rn "fanout\|fanOut\|judgeRuns" src/shared src/main | wc -l` → 0 (AC2)
-- [ ] `git diff --stat -- src/renderer/src/components` → 변경 0 (AC15)
-- [ ] `git diff -- src/main/dooray/mention/` → **조립부 외 변경 0**(멘션 파일 자체는 무수정. `index.ts` 의 resolver 등록 2줄만)
+- [x] `npm run typecheck` (node + web) 통과 — 작업 중간에는 병렬 진행 중인 다른 트랙(terminal WIP)의 무관한 에러가 잠시 보였으나(내 스코프 파일 기인 0건, impl-log 에 기록), **최종 확인 시점(`npm run typecheck` 직접 실행)에는 node+web 모두 에러 0 으로 완전히 그린**.
+- [x] `npm run test:run` 전체 통과(160 files / 2448 tests). 수정된 기존 테스트는 `index.test.ts` / `mockWindowApi.ts` / `GitService.test.ts`(C-1, fs mock 확장) / `TaskService.test.ts`(추가) 4개뿐임을 `git diff --stat` 으로 확인
+- [x] `npm run test:coverage` — 70% 라인 게이트 유지(전체 82.13%) + `src/main/workspace/**` 94.99% · `src/shared/workspace/**` 100% (AC12 충족)
+- [x] `grep -rn "fanout\|fanOut\|judgeRuns" src/shared src/main | wc -l` → 0 (AC2)
+- [x] `git diff --stat -- src/renderer/src/components` → 내 변경 0 (AC15). (참고: 세션 내 병렬 terminal 트랙이 `src/renderer/src/components/Terminal/**` 를 별도로 수정 중이나 이 트랙의 diff 는 아님)
+- [x] `git diff -- src/main/dooray/mention/` → 변경 0(조립부만 `index.ts` 에서 수정, 멘션 파일 자체 무수정)
 - [ ] **수동 QA A (AC13)** — 실 저장소 + 실 태스크 1건
   - [ ] `npm run dev` → 임시 스크립트/콘솔에서 `window.api.workspace.startTask({...})` 호출(뷰가 없으므로 devtools 콘솔 사용)
   - [ ] `git -C <repo> worktree list` 에 새 워크트리, `git branch` 에 새 브랜치

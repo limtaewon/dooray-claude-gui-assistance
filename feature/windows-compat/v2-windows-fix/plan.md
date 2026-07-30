@@ -105,14 +105,14 @@ status: draft
 
 ### 2-3. PATH 보강 4곳 → `mergePathIntoEnv` + `claudeExtraPaths`
 
-> **[main/A-1/A-3/MCP] 미실행** — 오케스트레이터 브리핑이 "env 병합 4곳" 을 다른 라운드·트랙 소유로 명시 금지했다. `ClaudeChatService.enrichedClaudeEnv`/`AIService.enrichedEnv`/`index.ts richEnv`/`TerminalManager.enrichedTerminalPath` 4곳 전부 **미착수** — 후속 라운드 몫.
+> **[main/M-A+M-B+A-2 통합 라운드] 완료** — 후속 오케스트레이터 브리핑이 "env 병합 4곳" 을 이 라운드(터미널 v2-terminal-p2 M-A/M-B 와 병합)로 명시했다. `ClaudeChatService.enrichedClaudeEnv`/`AIService.enrichedEnv`/`index.ts richEnv`/`TerminalManager.enrichedTerminalPath` 4곳 전부 교체 완료.
 
-- [ ] `ClaudeChatService.ts:18-42` `enrichedClaudeEnv` 본문 교체 (append 기본값). 함수 상단의 append 근거 주석은 **유지**
-- [ ] `AIService.ts:242-270` `enrichedEnv` — `{ position: 'prepend' }` **명시** + "절대경로 spawn 이라 PATH 가 바이너리 선택에 관여하지 않음" 근거 주석 (ADR-02 §4). `DISABLE_OMC`/`ANTHROPIC_API_KEY` 는 그대로
-- [ ] 반환 타입 `Record<string,string>` 과 `NodeJS.ProcessEnv` 의 차이 처리 (undefined 값 제거 또는 시그니처 조정 — 캐스트로 뭉개지 말 것)
-- [ ] `index.ts:1406-1410` CLI Info `richEnv` 교체 (append) + `DISABLE_OMC` 유지
-- [ ] `TerminalManager.ts:58-84` `enrichedTerminalPath` 는 §3-2 에서 함께 처리
-- [ ] 교체 후 `grep -rn "AppData', 'Roaming', 'npm'" src/main` 이 `env.ts`/`claudeBin.ts` 외에 안 나오는지 확인 (목록 복제 소멸)
+- [x] `ClaudeChatService.ts` `enrichedClaudeEnv` 본문 교체 (append 기본값). 함수 상단의 append 근거 주석은 **유지**
+- [x] `AIService.ts` `enrichedEnv` — `{ position: 'prepend' }` **명시** + "절대경로 spawn 이라 PATH 가 바이너리 선택에 관여하지 않음" 근거 주석 (ADR-02 §4). `DISABLE_OMC`/`ANTHROPIC_API_KEY` 는 그대로
+- [x] 반환 타입 `Record<string,string>` 과 `NodeJS.ProcessEnv` 의 차이 처리 (undefined 값 제거 또는 시그니처 조정 — 캐스트로 뭉개지 말 것) — `mergePathIntoEnv` 결과를 `Record<string,string>` 으로 캐스트하는 지점 1곳(AIService)만 필요, 기존 캐스트 패턴 그대로 재사용
+- [x] `index.ts` CLI Info `richEnv` 교체 (append) + `DISABLE_OMC` 유지
+- [x] `TerminalManager.ts` `enrichedTerminalPath` 는 §3-2 에서 함께 처리 (`buildPtyEnv` 로 대체)
+- [x] 교체 후 `grep -rn "AppData', 'Roaming', 'npm'" src/main` 이 `env.ts`/`claudeBin.ts` 외에 안 나오는지 확인 (목록 복제 소멸) — 확인 완료, impl-log 참조
 
 ### 2-4. stdout `StringDecoder` 2곳
 
@@ -134,41 +134,41 @@ status: draft
 
 ### 3-1. `detectWindowsShell` 신설 — `src/main/terminal/windowsShell.ts`
 
-- [ ] `WindowsShellKind` / `ShellProbe` / `WindowsShellCandidate` 타입 (ADR-03 §1)
-- [ ] `detectWindowsShell({ env, probe })` — pwsh → powershell → COMSPEC → bare `cmd.exe` 순 후보 배열
-- [ ] 후보 경로: `%ProgramFiles%\PowerShell\7\pwsh.exe`, `%ProgramW6432%`/`%ProgramFiles(x86)%` 변형, `%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe`, `%COMSPEC%`, `%SystemRoot%\System32\cmd.exe`
-- [ ] **절대경로 후보는 `probe(p)?.isFile && size > 0` 통과 필수** (WindowsApps 0바이트 alias 배제). 마지막 bare `cmd.exe` 는 probe 없이 항상 포함
-- [ ] args 를 후보에 동봉 — PowerShell 계열 `-NoLogo -NoExit -Command '[Console]::OutputEncoding=...'`, cmd 계열 `/K chcp 65001>nul`
-- [ ] `defaultShellProbe` (실제 `statSync` 기반) 를 같은 모듈에서 export — TerminalManager 가 주입
+- [x] `WindowsShellKind` / `ShellProbe` / `WindowsShellCandidate` 타입 (ADR-03 §1)
+- [x] `detectWindowsShell({ env, probe })` — pwsh → powershell → COMSPEC → bare `cmd.exe` 순 후보 배열
+- [x] 후보 경로: `%ProgramFiles%\PowerShell\7\pwsh.exe`, `%ProgramW6432%`/`%ProgramFiles(x86)%` 변형(+ `%LOCALAPPDATA%\Microsoft\WindowsApps\pwsh.exe` — 함정 #11 실측 시나리오), `%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe`, `%COMSPEC%`, `%SystemRoot%\System32\cmd.exe`
+- [x] **절대경로 후보는 `probe(p)?.isFile && size > 0` 통과 필수** (WindowsApps 0바이트 alias 배제). 마지막 bare `cmd.exe` 는 probe 없이 항상 포함
+- [x] args 를 후보에 동봉 — PowerShell 계열 `-NoLogo -NoExit -Command '[Console]::OutputEncoding=...'`, cmd 계열 `/K chcp 65001>nul`
+- [x] `defaultShellProbe` (실제 `statSync` 기반) 를 같은 모듈에서 export — TerminalManager 가 주입
 
 테스트 `src/main/terminal/windowsShell.test.ts`:
-- [ ] pwsh 실존 → 1순위
-- [ ] `WindowsApps\pwsh.exe` 만 존재하고 size 0 → **후보에서 제외**되고 powershell 로 내려감
-- [ ] pwsh/powershell 부재 → COMSPEC → 그것도 없으면 bare `cmd.exe`
-- [ ] 후보마다 args 가 kind 에 맞는지 (cmd 후보에 `-NoLogo` 가 붙지 않는지 명시 단언)
-- [ ] probe 가 예외를 던져도 (권한 오류) 다음 후보로 넘어가는지
+- [x] pwsh 실존 → 1순위
+- [x] `WindowsApps\pwsh.exe` 만 존재하고 size 0 → **후보에서 제외**되고 powershell 로 내려감
+- [x] pwsh/powershell 부재 → COMSPEC → 그것도 없으면 bare `cmd.exe`
+- [x] 후보마다 args 가 kind 에 맞는지 (cmd 후보에 `-NoLogo` 가 붙지 않는지 명시 단언)
+- [x] probe 가 예외를 던져도 (권한 오류) 다음 후보로 넘어가는지
 
 ### 3-2. `TerminalManager.create` 교체 — `src/main/terminal/TerminalManager.ts`
 
-- [ ] `enrichedTerminalPath()`(`:58-84`) 삭제 → env 조립부에서 `mergePathIntoEnv(baseEnv, claudeExtraPaths())`
-- [ ] win32 env 세트 추가: `PYTHONUTF8=1`, `TERM_PROGRAM='Clauday'`, `FORCE_HYPERLINK='1'` (ADR-03 §3). **darwin/linux 의 LANG/LC_ALL/LC_CTYPE 3종은 한 글자도 바꾸지 않는다**
-- [ ] `options.command` 미지정 + win32 → `detectWindowsShell` 후보 체인. 지정 시 현행대로 그 커맨드 사용
-- [ ] 폴백 루프 + ConPTY DLL 래치 (ADR-03 §2): 후보당 최대 2회, `looksLikeConptyDllError` 판정 시 모듈 전역 래치, 실패마다 `warn` (후보 경로 + 오류), 전부 실패 시 마지막 오류 throw
-- [ ] win32 spawn 옵션에 `useConptyDll: !conptyDllDisabled`
-- [ ] 스폰 성패와 무관하게 **darwin 경로의 spawn 인자/옵션은 현행과 동일** (`-l` 로그인 셸 포함)
-- [ ] 스폰 로직을 `create()` 밖 private 메서드로 빼서 테스트 가능하게 (node-pty 는 vi.mock)
+- [x] `enrichedTerminalPath()` 삭제 → env 조립부(`buildPtyEnv`)에서 `mergePathIntoEnv(baseEnv, claudeExtraPaths())`
+- [x] win32 env 세트 추가: `PYTHONUTF8=1`, `TERM_PROGRAM='Clauday'`, `FORCE_HYPERLINK='1'` (ADR-03 §3). **darwin/linux 의 LANG/LC_ALL/LC_CTYPE 3종은 한 글자도 바꾸지 않는다**
+- [x] `options.command` 미지정 + win32 → `detectWindowsShell` 후보 체인. 지정 시 현행대로 그 커맨드 사용
+- [x] 폴백 루프 + ConPTY DLL 래치 (ADR-03 §2): 후보당 최대 2회, `looksLikeConptyDllError` 판정 시 모듈 전역 래치, 실패마다 `warn` (후보 경로 + 오류), 전부 실패 시 마지막 오류 throw
+- [x] win32 spawn 옵션에 `useConptyDll: !conptyDllDisabled`
+- [x] 스폰 성패와 무관하게 **darwin 경로의 spawn 인자/옵션은 현행과 동일** (`-l` 로그인 셸 포함)
+- [x] 스폰 로직을 `create()` 밖 private 메서드(`spawnWindowsShell`)로 빼서 테스트 가능하게 (node-pty 는 vi.mock)
 
 테스트 (`src/main/terminal/TerminalManager.test.ts` 에 append — 기존 파일 있음):
-- [ ] darwin: `pty.spawn` 이 `$SHELL -l` 로 1회만 호출되고 env 에 `LANG` 이 있으며 `PYTHONUTF8` 이 **없는지**
-- [ ] win32: 1순위 후보 spawn 실패 → 2순위로 폴백하고 args 가 후보의 것으로 바뀌는지
-- [ ] win32: 첫 시도 ConPTY DLL 오류 → 같은 후보 `useConptyDll:false` 재시도 → 성공. 이후 호출은 재시도 없이 바로 false
-- [ ] win32 env 에 `PYTHONUTF8`/`TERM_PROGRAM`/`FORCE_HYPERLINK` 존재, `LANG` **부재**
-- [ ] 전 후보 실패 시 throw + 실패 횟수만큼 warn
+- [x] darwin: `pty.spawn` 이 `$SHELL -l` 로 1회만 호출되고 env 에 `LANG` 이 있으며 `PYTHONUTF8` 이 **없는지**
+- [x] win32: 1순위 후보 spawn 실패 → 2순위로 폴백하고 args 가 후보의 것으로 바뀌는지
+- [x] win32: 첫 시도 ConPTY DLL 오류 → 같은 후보 `useConptyDll:false` 재시도 → 성공. 이후 호출은 재시도 없이 바로 false
+- [x] win32 env 에 `PYTHONUTF8`/`TERM_PROGRAM`/`FORCE_HYPERLINK` 존재, `LANG` **부재** — 이 개발 머신 자체에 `LANG` 이 이미 설정돼 있어 테스트 안에서 `process.env.LANG` 을 save/delete/restore 해 순수하게 검증(impl-log 참조)
+- [x] 전 후보 실패 시 throw + 실패 횟수만큼 warn
 
 ### 3-3. Windows 빌드 사전 확인 (실기 전 체크)
 
-- [ ] `node_modules/node-pty/package.json` 의 버전이 `useConptyDll` 을 지원하는지 재확인 (현재 1.1.0 — typings `:104` 에 존재)
-- [ ] `package.json` 의 `asarUnpack`/`files` 가 node-pty 의 ConPTY DLL 경로(`build/Release/conpty*`)를 포함하는지 확인. 빠졌으면 **PRD R2** 대로 폴백에 의존하되 impl-log 에 기록
+- [x] `node_modules/node-pty/package.json` 의 버전이 `useConptyDll` 을 지원하는지 재확인 (1.1.0 — typings 에 `useConptyDll` 존재 확인)
+- [x] `package.json` 의 `asarUnpack`/`files` 가 node-pty 의 ConPTY DLL 경로를 포함하는지 확인 — `asarUnpack: ["node_modules/node-pty/**/*", ...]` 로 node-pty 패키지 전체가 통째로 unpack 대상이라 `prebuilds/win32-{x64,arm64}/conpty/conpty.dll`, `third_party/conpty/.../conpty.dll` 모두 포함됨을 파일시스템에서 직접 확인. 실행 시 실제 로드 성공 여부는 Windows 실기 필요(qa-report 인계)
 
 ### 3-4. `windowsPtyOptions` + preload 노출 [main, renderer 선행]
 
@@ -194,35 +194,35 @@ status: draft
 
 ### 4-1. `buildStartTaskSpawn` 신설 — `src/main/terminal/startTaskSpawn.ts`
 
-- [ ] `StartTaskSpawn` 타입 + `buildStartTaskSpawn(params)` (ADR-04 §1)
-- [ ] darwin/linux 분기: `{ command: 'claude', args: ['-p', prompt, '--model', model], displayName: 'claude' }` — **현행과 동일**
-- [ ] win32 분기: `command = comspec(cmd 계열 아니면 'cmd.exe')`, `args` 는 verbatim 문자열
+- [x] `StartTaskSpawn` 타입 + `buildStartTaskSpawn(params)` (ADR-04 §1)
+- [x] darwin/linux 분기: `{ command: 'claude', args: ['-p', prompt, '--model', model], displayName: 'claude' }` — **현행과 동일**
+- [x] win32 분기: `command = comspec(cmd 계열 아니면 'cmd.exe')`, `args` 는 verbatim 문자열
       `/d /s /c "chcp 65001>nul && type "<promptFile>" | "<bin>" -p --model <model>"`
-- [ ] 인용은 `quoteWinShellArg` 사용 (멱등). 프롬프트 본문은 커맨드라인에 **절대 넣지 않는다**
-- [ ] `promptFile` 미지정인데 win32 면 명확한 에러 (조용히 mac 경로로 떨어지지 않게)
+- [x] 인용은 `quoteWinShellArg` 사용 (멱등). 프롬프트 본문은 커맨드라인에 **절대 넣지 않는다**
+- [x] `promptFile` 미지정인데 win32 면 명확한 에러 (조용히 mac 경로로 떨어지지 않게)
 
 ### 4-2. shared 타입 확장 — `src/shared/types/terminal.ts`
 
-- [ ] `TerminalCreateOptions.args?: string[] | string` (문자열은 **win32 verbatim 전용**임을 주석에 명시, ADR-04 §2)
-- [ ] `TerminalCreateOptions.name?: string` 추가 (ADR-04 §3)
-- [ ] `TerminalManager.create` — `meta.name = options.name ?? (options.command ? options.command : 'Terminal')`. args 는 node-pty 에 **그대로** 전달 (문자열 분해 금지)
+- [x] `TerminalCreateOptions.args?: string[] | string` (문자열은 **win32 verbatim 전용**임을 주석에 명시, ADR-04 §2)
+- [x] `TerminalCreateOptions.name?: string` 추가 (ADR-04 §3)
+- [x] `TerminalManager.create` — `meta.name = options.name ?? (options.command ? options.command : 'Terminal')`. args 는 node-pty 에 **그대로** 전달 (문자열 분해 금지)
 
-### 4-3. `index.ts` CLAUDE_START_TASK 핸들러(`:877-895`)
+### 4-3. `index.ts` CLAUDE_START_TASK 핸들러
 
-- [ ] 프롬프트 조립부는 그대로 유지 (문구 변경 없음)
-- [ ] win32 면 `app.getPath('temp')` 아래 `clauday-start-task-<uuid>.txt` 에 **BOM 없는 UTF-8** 로 프롬프트 기록
-- [ ] `buildStartTaskSpawn` 결과로 `terminalManager.create({ command, args, name: displayName, cwd: homedir() })`
-- [ ] 임시파일 정리: `terminalManager.addExitListener` 로 해당 세션 exit 시 삭제 + 5분 타이머 안전망. 삭제 실패는 `warn`
-- [ ] 프롬프트 본문을 로그에 남기지 않는지 확인
-- [ ] `require('os').homedir()` 인라인 제거 → 상단 import 사용
+- [x] 프롬프트 조립부는 그대로 유지 (문구 변경 없음)
+- [x] win32 면 `app.getPath('temp')` 아래 `clauday-start-task-<uuid>.txt` 에 **BOM 없는 UTF-8** 로 프롬프트 기록
+- [x] `buildStartTaskSpawn` 결과로 `terminalManager.create({ command, args, name: displayName, cwd: homedir() })`
+- [x] 임시파일 정리: `terminalManager.addExitListener` 로 해당 세션 exit 시 삭제 + 5분 타이머 안전망. 삭제 실패는 `warn`
+- [x] 프롬프트 본문을 로그에 남기지 않는지 확인
+- [x] `require('os').homedir()` 인라인 제거 → 상단 import 사용
 
 테스트 `src/main/terminal/startTaskSpawn.test.ts`:
-- [ ] darwin 반환값이 현행 리터럴과 **정확히** 일치 (회귀 잠금)
-- [ ] win32 커맨드라인 문자열 전문 단언 — `chcp 65001`, `type "…"`, 파이프, 인용된 bin, `-p`(값 없음), `--model sonnet` 순서
-- [ ] 공백 포함 bin 경로(`C:\Program Files\...`)가 인용되는지
-- [ ] 공백 포함 promptFile 경로가 인용되는지
-- [ ] 개행 포함 프롬프트가 커맨드라인에 **등장하지 않는지** (문자열에 `\n` 없음 단언)
-- [ ] COMSPEC 이 cmd 계열이 아닌 값일 때 `cmd.exe` 로 폴백
+- [x] darwin 반환값이 현행 리터럴과 **정확히** 일치 (회귀 잠금)
+- [x] win32 커맨드라인 문자열 전문 단언 — `chcp 65001`, `type "…"`, 파이프, 인용된 bin, `-p`(값 없음), `--model sonnet` 순서
+- [x] 공백 포함 bin 경로(`C:\Program Files\...`)가 인용되는지
+- [x] 공백 포함 promptFile 경로가 인용되는지
+- [x] 개행 포함 프롬프트가 커맨드라인에 **등장하지 않는지** (문자열에 `\n` 없음 단언)
+- [x] COMSPEC 이 cmd 계열이 아닌 값일 때 `cmd.exe` 로 폴백
 
 ---
 
@@ -331,6 +331,13 @@ status: draft
 - [ ] **플랫폼 분기 이중 검증 감사**: 이번 라운드가 만지거나 남긴 `process.platform` 지점은 impl-log 표로 정리(완료). `src/main`/`src/shared` 전체 감사는 터미널(§3/§4) 모듈이 아직 없어 트랙 전체 완결 후 재실행 필요
 - [ ] **죽은 코드 소멸 확인**: `claudeSpawnCommand`/`sanitizeSkillFilename`/`writeFileAtomic`/`expandHome`/`findProjectDir`/`readSessionCwd` 는 이번 라운드로 소비처 확보(impl-log 표). `mergePathIntoEnv`/`claudeExtraPaths`(PATH 병합, 다른 트랙)·`samePath`(GitService 소비 아직, 다른 트랙)는 미완
 - [ ] mac 수동 스모크 — **미실행** (에이전트가 GUI 조작 불가, Definition of Done 상 사용자 수동 QA 항목으로 남김)
+
+> **[M-A+M-B+A-2 통합 라운드, 후속]** 위 §8 은 이전(A-1/A-3/MCP) 라운드 기준이다. 이번 라운드가 §2-3(PATH 병합 4곳)·§3(A-2 터미널 PTY)·§4(A-2 CLAUDE_START_TASK)를 완료하며 추가로 검증한 내용:
+> - [x] `npx vitest run` 전체 통과 (160 files / 2454 tests, 실패 0 — 이번 라운드 신규/수정분 포함)
+> - [x] `npx tsc --noEmit -p tsconfig.node.json` / `-p tsconfig.web.json` 둘 다 통과
+> - [x] **플랫폼 분기 이중 검증 감사** 갱신 — `windowsShell.ts`/`TerminalManager.ts`(스폰 분기)/`startTaskSpawn.ts`/`ptyCwd.ts` 4개 신규 지점 모두 darwin/win32(+ptyCwd 는 linux) 테스트 페어 확보. 표는 이번 라운드 impl-log 참조
+> - [x] **죽은 코드 소멸 확인** — `mergePathIntoEnv`/`claudeExtraPaths` 가 이번 라운드로 4곳(TerminalManager/ClaudeChatService/AIService/index.ts CLI-info) 소비처 확보, 더 이상 미사용 아님. `samePath`(GitService) 는 여전히 미완 — 다른 트랙
+> - [ ] Windows 실기 스모크 — **미실행** (에이전트가 Windows VM 접근 불가). plan.md §11 체크리스트가 산출물로 존재, qa-report.md 작성은 integrator 몫
 
 ---
 

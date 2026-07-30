@@ -273,6 +273,27 @@ describe('TaskService.listCommunityPosts', () => {
   })
 })
 
+describe('TaskService.getProjectWorkflows', () => {
+  it('정상 변환 — Map 캐시를 배열로 반환', async () => {
+    client.request.mockResolvedValue({
+      result: [
+        { id: 'wf-1', name: '등록', class: 'registered' },
+        { id: 'wf-2', name: '진행중', class: 'working' }
+      ]
+    })
+    const workflows = await svc.getProjectWorkflows('p1')
+    expect(workflows).toEqual([
+      { id: 'wf-1', name: '등록', class: 'registered' },
+      { id: 'wf-2', name: '진행중', class: 'working' }
+    ])
+  })
+
+  it('API 실패 시 빈 배열', async () => {
+    client.request.mockRejectedValue(new Error('fail'))
+    expect(await svc.getProjectWorkflows('p1')).toEqual([])
+  })
+})
+
 describe('TaskService.getMyMemberIdPublic', () => {
   it('me 응답에서 id 추출 후 캐시', async () => {
     client.request.mockResolvedValue(ME)

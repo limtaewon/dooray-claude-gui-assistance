@@ -10,6 +10,8 @@ import useTerminalSearch from './useTerminalSearch'
 import TerminalSearchBar from './TerminalSearchBar'
 import Button from '../common/ds/Button'
 import { resolvePaneActivation } from './paneActivation'
+import { beginPaste, isPasteTargetValid } from './pasteTargetState'
+import type { PasteToken } from './pasteTargetState'
 import { windowsPtyOptions } from '@shared/utils/windowsPty'
 import type { TerminalPaneSnapshot } from '@shared/types/terminal'
 import '@xterm/xterm/css/xterm.css'
@@ -34,6 +36,23 @@ interface TerminalPaneProps {
   exitInfo?: { exitCode: number; signal: number | null } | null
   /** v2.0 B-1: 종료 오버레이의 "닫기" 버튼. 없으면 버튼을 숨긴다. */
   onRequestClose?: () => void
+  /** v2.0 B-4: 이 pane 이 속한 탭 id — paste 타겟 4중 검증(tabId+leafId+sessionId+generation)에 쓰인다.
+   *  SplitLayout 호스트만 넘긴다 — 레거시 3호스트는 생략하며, 이 경우 paste 검증은 통과로 취급한다. */
+  tabId?: string
+  /** v2.0 B-4: 이 pane 자신의 leafId. tabId 와 함께 넘겨야 paste 검증이 활성화된다. */
+  leafId?: string
+  /** v2.0 B-4: 세션 재바인딩 카운터 — B-4 에서는 항상 0, B-5 복원 재바인딩에서 증가한다. */
+  paneGeneration?: number
+  /** v2.0 B-4: "지금" 유효한 paste 타겟(호스트의 활성 탭+포커스 leaf)을 반환한다 — 호스트가 진실을 쥔다. */
+  getCurrentPasteTarget?: () => PasteToken | null
+  /** v2.0 B-4: 경계 드래그 중에는 true — ResizeObserver 발 fit/PTY resize 를 억제한다(함정 #9). */
+  suspendAutoResize?: boolean
+}
+
+/** DOM 리페어런트(reattachPaneHost) 전후로 주고받는 xterm 뷰포트 스크롤 위치. */
+export interface PaneScrollState {
+  viewportY: number
+  wasAtBottom: boolean
 }
 
 /** B-3 단계에서는 serialize() 가 null 스텁 — SerializeAddon 은 B-5(ADR-03)에서 붙인다. */
@@ -42,6 +61,10 @@ export interface TerminalPaneHandle {
   focus(): void
   /** 컨테이너 크기에 맞춰 refit + PTY resize 1회. */
   fit(): void
+  /** v2.0 B-4: DOM 리페어런트 직전 스크롤 위치 캡처 — 버퍼 API 기반이라 reparent 자체엔 영향받지 않는다. */
+  captureScrollState(): PaneScrollState | null
+  /** v2.0 B-4: 리페어런트 후 스크롤 위치 복원. */
+  restoreScrollState(state: PaneScrollState | null): void
 }
 
 function TerminalPaneInner(
@@ -54,7 +77,12 @@ function TerminalPaneInner(
     showFocusRing,
     initialOutput,
     exitInfo,
-    onRequestClose
+    onRequestClose,
+    tabId,
+    leafId,
+    paneGeneration,
+    getCurrentPasteTarget,
+    suspendAutoResize
   }: TerminalPaneProps,
   ref: ForwardedRef<TerminalPaneHandle>
 ): JSX.Element {
@@ -71,6 +99,33 @@ function TerminalPaneInner(
   useEffect(() => { onFocusRequestRef.current = onFocusRequest }, [onFocusRequest])
   // TerminalPaneHandle.fit() 이 호출할 refit 함수 — mount effect 안에서 fitAddon 이 만들어질 때 배선된다.
   const fitFnRef = useRef<(() => void) | null>(null)
+
+  // v2.0 B-4: 경계 드래그 중엔 ResizeObserver 발 fit/PTY resize 를 억제한다 — 드롭 시 1회만
+  // 보내야 TUI 가 프레임마다 재그리기하지 않는다(함정 #9, ADR-02 §6).
+  const suspendAutoResizeRef = useRef(suspendAutoResize)
+  useEffect(() => { suspendAutoResizeRef.current = suspendAutoResize }, [suspendAutoResize])
+
+  // v2.0 B-4: paste 타겟 4중 재검증(ADR-02 §9) — tabId/leafId 가 없는 레거시 호스트에서는
+  // 토큰이 null 이 되어 검증을 건너뛴다(현행 동작 그대로).
+  const getCurrentPasteTargetRef = useRef(getCurrentPasteTarget)
+  useEffect(() => { getCurrentPasteTargetRef.current = getCurrentPasteTarget }, [getCurrentPasteTarget])
+  const capturePasteToken = useCallback((): PasteToken | null => {
+    if (tabId === undefined || leafId === undefined) return null
+    return beginPaste({ tabId, leafId, sessionId, generation: paneGeneration ?? 0 })
+  }, [tabId, leafId, sessionId, paneGeneration])
+  const validatePasteToken = useCallback((token: PasteToken | null): boolean => {
+    if (!token) return true // 레거시 호스트 — 게이팅하지 않는다.
+    const current = getCurrentPasteTargetRef.current?.() ?? null
+    const ok = isPasteTargetValid(token, current)
+    if (!ok) console.warn('[terminal-paste] 타겟 변경으로 폐기', { token, current })
+    return ok
+  }, [])
+  // mount effect(키 핸들러)는 한 번만 만들어지는 클로저다 — capturePasteToken/validatePasteToken 이
+  // 최신 상태를 유지하도록 ref 로 감싼다 (onFocusRequestRef 와 동일 패턴).
+  const capturePasteTokenRef = useRef(capturePasteToken)
+  useEffect(() => { capturePasteTokenRef.current = capturePasteToken }, [capturePasteToken])
+  const validatePasteTokenRef = useRef(validatePasteToken)
+  useEffect(() => { validatePasteTokenRef.current = validatePasteToken }, [validatePasteToken])
 
   // mount effect(onData/attachCustomKeyEventHandler) 클로저는 한 번만 만들어지므로 prop 을 직접
   // 읽으면 stale 해진다 — ref 로 최신 값을 동기화해서 입력 차단 판정에 쓴다 (ADR-02 §결정 4).
@@ -331,7 +386,9 @@ function TerminalPaneInner(
             case 'v':
             case 'V': {
               // 클립보드 → PTY 로 paste. 이미지면 디스크 저장 후 path 입력, 텍스트면 기존 동작.
+              // v2.0 B-4: await 전 토큰 발급 → await 후 검증 — 도중에 포커스/탭이 바뀌면 폐기(ADR-02 §9).
               e.preventDefault()
+              const pasteToken = capturePasteTokenRef.current()
               ;(async () => {
                 try {
                   if (navigator.clipboard.read) {
@@ -342,16 +399,19 @@ function TerminalPaneInner(
                         const blob = await it.getType(imgType)
                         const ext = imgType.split('/')[1] || 'png'
                         const file = new File([blob], `clipboard-${Date.now()}.${ext}`, { type: imgType })
+                        if (!validatePasteTokenRef.current(pasteToken)) return
                         await sendFileAsPath(file)
                         return
                       }
                     }
                   }
                   const text = await navigator.clipboard.readText()
-                  if (text) send(text)
+                  if (text && validatePasteTokenRef.current(pasteToken)) send(text)
                 } catch {
                   // read() 거부 시 텍스트만 fallback
-                  navigator.clipboard.readText().then((t) => { if (t) send(t) }).catch(() => { /* ok */ })
+                  navigator.clipboard.readText()
+                    .then((t) => { if (t && validatePasteTokenRef.current(pasteToken)) send(t) })
+                    .catch(() => { /* ok */ })
                 }
               })()
               return false
@@ -388,9 +448,10 @@ function TerminalPaneInner(
           if (sel) navigator.clipboard.writeText(sel).catch(() => { /* ok */ })
           return false
         }
-        // Ctrl+Shift+V — 클립보드 → PTY paste (텍스트/이미지).
+        // Ctrl+Shift+V — 클립보드 → PTY paste (텍스트/이미지). v2.0 B-4: paste 타겟 4중 재검증.
         if (ctrl && shift && !alt && (k === 'v' || k === 'V')) {
           e.preventDefault()
+          const pasteToken = capturePasteTokenRef.current()
           ;(async () => {
             try {
               if (navigator.clipboard.read) {
@@ -401,15 +462,18 @@ function TerminalPaneInner(
                     const blob = await it.getType(imgType)
                     const ext = imgType.split('/')[1] || 'png'
                     const file = new File([blob], `clipboard-${Date.now()}.${ext}`, { type: imgType })
+                    if (!validatePasteTokenRef.current(pasteToken)) return
                     await sendFileAsPath(file)
                     return
                   }
                 }
               }
               const text = await navigator.clipboard.readText()
-              if (text) send(text)
+              if (text && validatePasteTokenRef.current(pasteToken)) send(text)
             } catch {
-              navigator.clipboard.readText().then((t) => { if (t) send(t) }).catch(() => { /* ok */ })
+              navigator.clipboard.readText()
+                .then((t) => { if (t && validatePasteTokenRef.current(pasteToken)) send(t) })
+                .catch(() => { /* ok */ })
             }
           })()
           return false
@@ -524,6 +588,8 @@ function TerminalPaneInner(
     const resizeObserver = new ResizeObserver(() => {
       // v2.0 B-3: 숨김 컨테이너의 0×0 fit 이 PTY 를 1×1 로 만드는 사고 방지 (ADR-01 §5).
       if (!visibleRef.current) return
+      // v2.0 B-4: 경계 드래그 중엔 억제 — 드롭 시 SplitLayout 이 명시적으로 fit() 을 1회 호출한다.
+      if (suspendAutoResizeRef.current) return
       debouncedSafeResize()
     })
     resizeObserver.observe(containerRef.current)
@@ -597,6 +663,8 @@ function TerminalPaneInner(
   // (ADR-01 §2). split 이 들어와도 이 게이트 덕분에 이미지 붙여넣기 1회가 N개 PTY 로 새지 않는다.
   useEffect(() => {
     if (!focused) return
+    // v2.0 B-4: document 리스너 등록 시점에 토큰을 발급 — await 이후 검증한다(ADR-02 §9).
+    const pasteToken = capturePasteToken()
     const onPaste = (ev: Event): void => {
       const e = ev as ClipboardEvent
       const items = e.clipboardData?.items
@@ -606,19 +674,33 @@ function TerminalPaneInner(
       e.preventDefault()
       void Promise.all(imageItems.map(async (it) => {
         const f = it.getAsFile()
-        if (f) await sendFileAsPath(f)
+        if (f && validatePasteToken(pasteToken)) await sendFileAsPath(f)
       }))
     }
     document.addEventListener('paste', onPaste)
     return () => document.removeEventListener('paste', onPaste)
-  }, [focused, sendFileAsPath])
+  }, [focused, sendFileAsPath, capturePasteToken, validatePasteToken])
 
   // forwardRef handle — B-4 는 호스트가 focus()/fit() 을 명령형으로 부를 때, B-5 는 serialize()
   // 로 스냅샷을 당길 때 쓴다. serialize() 는 B-3 단계에서 addon 미로드라 null 스텁이다.
   useImperativeHandle(ref, () => ({
     serialize: () => null,
     focus: () => { terminalRef.current?.focus() },
-    fit: () => { fitFnRef.current?.() }
+    fit: () => { fitFnRef.current?.() },
+    captureScrollState: () => {
+      const term = terminalRef.current
+      if (!term) return null
+      const buf = term.buffer.active
+      return { viewportY: buf.viewportY, wasAtBottom: buf.viewportY >= buf.baseY }
+    },
+    restoreScrollState: (state) => {
+      const term = terminalRef.current
+      if (!term || !state) return
+      try {
+        if (state.wasAtBottom) term.scrollToBottom()
+        else term.scrollToLine(state.viewportY)
+      } catch { /* ok */ }
+    }
   }), [])
 
   return (

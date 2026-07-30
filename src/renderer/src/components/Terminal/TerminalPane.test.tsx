@@ -101,7 +101,10 @@ vi.mock('@xterm/addon-unicode11', () => ({
 }))
 
 // jsdom 에는 ResizeObserver 가 없다 (mount effect 의 debouncedSafeResize 배선에 필요).
+// v2.0 B-4: suspendAutoResize 게이트 테스트를 위해 마지막 콜백을 캡처해 수동으로 발화시킨다.
+let lastResizeObserverCallback: (() => void) | null = null
 class FakeResizeObserver {
+  constructor(cb: () => void) { lastResizeObserverCallback = cb }
   observe(): void {}
   disconnect(): void {}
 }
@@ -345,6 +348,82 @@ describe('TerminalPane — v2.0 B-1 종료 오버레이 / 입력 차단', () => 
       renderWithDs(<TerminalPane ref={ref} sessionId="s1" isVisible isFocused />)
       expect(() => ref.current?.focus()).not.toThrow()
       expect(() => ref.current?.fit()).not.toThrow()
+    })
+  })
+
+  describe('v2.0 B-4 — paste 타겟 4중 검증 / DOM 리페어런트 (ADR-v2-terminal-p2-02 §9/§4)', () => {
+    function makePathedFile(path: string): File {
+      const file = new File(['x'], 'shot.png', { type: 'image/png' })
+      Object.defineProperty(file, 'path', { value: path })
+      return file
+    }
+    function dispatchImagePaste(): void {
+      const dataTransfer = {
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => makePathedFile('/tmp/shot.png') }]
+      }
+      const pasteEvent = new Event('paste', { bubbles: true }) as unknown as ClipboardEvent
+      Object.defineProperty(pasteEvent, 'clipboardData', { value: dataTransfer })
+      document.dispatchEvent(pasteEvent)
+    }
+
+    it('현재 유효 타겟과 4필드가 일치하면 paste 가 정상 전달된다', async () => {
+      const getCurrentPasteTarget = vi.fn().mockReturnValue({ tabId: 't1', leafId: 'l1', sessionId: 's1', generation: 0 })
+      renderWithDs(
+        <TerminalPane sessionId="s1" isVisible isFocused tabId="t1" leafId="l1" paneGeneration={0}
+          getCurrentPasteTarget={getCurrentPasteTarget} />
+      )
+      dispatchImagePaste()
+      await waitFor(() => {
+        expect(window.api.terminal.input).toHaveBeenCalledWith('s1', '/tmp/shot.png ')
+      })
+    })
+
+    it('클립보드 read 도중 타겟이 바뀌면 폐기되고 console.warn 이 찍힌다', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      // 검증 시점에 다른 leafId 를 반환 — 포커스가 다른 pane 으로 옮겨간 상황을 흉내낸다.
+      const getCurrentPasteTarget = vi.fn().mockReturnValue({ tabId: 't1', leafId: 'other-leaf', sessionId: 's1', generation: 0 })
+      renderWithDs(
+        <TerminalPane sessionId="s1" isVisible isFocused tabId="t1" leafId="l1" paneGeneration={0}
+          getCurrentPasteTarget={getCurrentPasteTarget} />
+      )
+      dispatchImagePaste()
+      await waitFor(() => {
+        expect(warnSpy).toHaveBeenCalledWith('[terminal-paste] 타겟 변경으로 폐기', expect.anything())
+      })
+      expect(window.api.terminal.input).not.toHaveBeenCalled()
+      warnSpy.mockRestore()
+    })
+
+    it('tabId/leafId 가 없는 레거시 호스트는 getCurrentPasteTarget 이 있어도 게이팅되지 않는다', async () => {
+      const getCurrentPasteTarget = vi.fn().mockReturnValue(null)
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused getCurrentPasteTarget={getCurrentPasteTarget} />)
+      dispatchImagePaste()
+      await waitFor(() => {
+        expect(window.api.terminal.input).toHaveBeenCalledWith('s1', '/tmp/shot.png ')
+      })
+    })
+
+    it('captureScrollState/restoreScrollState 는 예외 없이 왕복한다', () => {
+      const ref = createRef<TerminalPaneHandle>()
+      renderWithDs(<TerminalPane ref={ref} sessionId="s1" isVisible isFocused />)
+      const state = ref.current?.captureScrollState() ?? null
+      expect(state).toEqual({ viewportY: 0, wasAtBottom: true })
+      expect(() => ref.current?.restoreScrollState(state)).not.toThrow()
+      expect(() => ref.current?.restoreScrollState(null)).not.toThrow()
+    })
+
+    it('suspendAutoResize 인 동안엔 ResizeObserver 발 PTY resize 가 억제된다 — 해제되면 재개된다', async () => {
+      const { rerender } = renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused suspendAutoResize />)
+      await waitFor(() => expect(window.api.terminal.resize).toHaveBeenCalled()) // 마운트 rAF 1회는 게이트 무관
+      vi.mocked(window.api.terminal.resize).mockClear()
+
+      lastResizeObserverCallback?.()
+      await new Promise((r) => setTimeout(r, 60))
+      expect(window.api.terminal.resize).not.toHaveBeenCalled()
+
+      rerender(<TerminalPane sessionId="s1" isVisible isFocused suspendAutoResize={false} />)
+      lastResizeObserverCallback?.()
+      await waitFor(() => expect(window.api.terminal.resize).toHaveBeenCalled())
     })
   })
 

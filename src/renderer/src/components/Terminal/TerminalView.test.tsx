@@ -5,35 +5,53 @@
  * - 새 탭 추가 → window.api.terminal.create 호출 + 탭 추가
  * - 탭 닫기 → window.api.terminal.kill 호출 + 탭 제거
  * - 더블클릭 → 인라인 이름 편집 → Enter → rename 호출
+ * - v2.0 B-4: split(⌘D/⌘⇧D) · pane 닫기(⌘W) · 다른 뷰에서는 무반응(active=false)
  *
- * xterm 의존성을 가진 TerminalPane 은 stub 으로 교체.
+ * xterm 의존성을 가진 TerminalPane 은 stub 으로 교체 — forwardRef 로 감싸 SplitLayout 의
+ * reattachPaneHost(handle.fit() 등 호출)가 예외 없이 동작하게 한다.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { screen, waitFor, act } from '@testing-library/react'
+import { forwardRef, useImperativeHandle } from 'react'
+import { screen, waitFor, act, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { installMockWindowApi, resetMockWindowApi } from '../../../../../test/helpers/mockWindowApi'
 import { renderWithDs } from '../../../../../test/helpers/renderWithDs'
 
-// TerminalPane 은 xterm 의 native 모듈을 끌어와서 jsdom 에서 무거움 → 단순 stub.
+// TerminalPane 은 xterm 의 native 모듈을 끌어와서 jsdom 에서 무거움 → forwardRef stub 으로 교체.
 vi.mock('./TerminalPane', () => ({
-  default: ({
-    sessionId,
-    isActive,
-    exitInfo
-  }: {
-    sessionId: string
-    isActive: boolean
-    exitInfo?: { exitCode: number } | null
-  }): JSX.Element => (
-    <div
-      data-testid={`term-pane-${sessionId}`}
-      data-active={String(isActive)}
-      data-exited={String(Boolean(exitInfo))}
-      data-exit-code={exitInfo ? String(exitInfo.exitCode) : ''}
-    >
-      [pane:{sessionId}]
-    </div>
-  )
+  default: forwardRef(function StubTerminalPane(
+    {
+      sessionId,
+      isVisible,
+      isFocused,
+      exitInfo
+    }: {
+      sessionId: string
+      isVisible?: boolean
+      isFocused?: boolean
+      exitInfo?: { exitCode: number } | null
+    },
+    ref: React.ForwardedRef<unknown>
+  ) {
+    useImperativeHandle(ref, () => ({
+      serialize: () => null,
+      focus: () => {},
+      fit: () => {},
+      captureScrollState: () => null,
+      restoreScrollState: () => {}
+    }), [])
+    return (
+      <div
+        data-testid={`term-pane-${sessionId}`}
+        data-visible={String(Boolean(isVisible))}
+        data-active={String(Boolean(isFocused))}
+        data-exited={String(Boolean(exitInfo))}
+        data-exit-code={exitInfo ? String(exitInfo.exitCode) : ''}
+      >
+        [pane:{sessionId}]
+      </div>
+    )
+  })
 }))
 
 // Import 는 mock 등록 이후.
@@ -79,9 +97,11 @@ describe('TerminalView (integration)', () => {
     await waitFor(() => {
       expect(createSpy).toHaveBeenCalledTimes(1)
     })
-    // 새 탭 영역에 stub 패널이 마운트
+    // 새 탭 영역에 stub 패널이 마운트되고 유일한 탭이므로 visible+focused 둘 다 true
     await waitFor(() => {
-      expect(screen.getByTestId('term-pane-sess-1')).toBeInTheDocument()
+      const pane = screen.getByTestId('term-pane-sess-1')
+      expect(pane).toHaveAttribute('data-visible', 'true')
+      expect(pane).toHaveAttribute('data-active', 'true')
     })
   })
 
@@ -130,7 +150,7 @@ describe('TerminalView (integration)', () => {
     const editBtn = await screen.findByRole('button', { name: '이름 변경' })
     await userEvent.click(editBtn)
 
-    // session 의 초기 name 은 '~' (빈 상태 버튼 클릭 → cwd 없음 → base='~')
+    // 탭의 초기 name 은 '~' (빈 상태 버튼 클릭 → cwd 없음 → base='~')
     const input = await screen.findByDisplayValue('~')
     await userEvent.clear(input)
     await userEvent.type(input, 'my-tab{Enter}')
@@ -248,6 +268,110 @@ describe('TerminalView (integration)', () => {
     })
     await waitFor(() => {
       expect(screen.getByTestId('term-pane-sess-3')).toHaveAttribute('data-active', 'true')
+    })
+  })
+
+  describe('v2.0 B-4 — split pane', () => {
+    // jsdom 의 navigator.platform 은 빈 문자열 — terminalShortcuts 의 mac/win 분기가 결정론적으로
+    // 동작하도록 명시 고정한다(CLAUDE.md 플랫폼 분기 테스트 가이드).
+    beforeEach(() => {
+      Object.defineProperty(window.navigator, 'platform', { value: 'MacIntel', configurable: true })
+    })
+
+    async function createTwoTabsFirstActive(): Promise<void> {
+      let counter = 0
+      vi.mocked(window.api.terminal.restoreSaved).mockResolvedValue([])
+      vi.mocked(window.api.terminal.create).mockImplementation(async () => ({
+        id: `sess-${++counter}`,
+        name: '~',
+        cwd: '/tmp',
+        pid: counter,
+        createdAt: Date.now()
+      } as unknown as Awaited<ReturnType<typeof window.api.terminal.create>>))
+    }
+
+    it('⌘D 로 오른쪽 분할 — 새 PTY 가 생성되고 pane 수 배지가 뜬다', async () => {
+      await createTwoTabsFirstActive()
+      renderWithDs(<TerminalView active />)
+      await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+      await screen.findByTestId('term-pane-sess-1')
+
+      const createSpy = vi.mocked(window.api.terminal.create)
+      createSpy.mockClear()
+
+      fireEvent.keyDown(window, { key: 'd', metaKey: true })
+
+      await waitFor(() => {
+        expect(createSpy).toHaveBeenCalledTimes(1)
+      })
+      await screen.findByTestId('term-pane-sess-2')
+      expect(await screen.findByTitle('분할된 pane 2개')).toBeInTheDocument()
+
+      // 분할 직후 새 pane 이 focus 를 받는다 — sess-1 은 visible 이지만 focused 는 아니다.
+      await waitFor(() => {
+        expect(screen.getByTestId('term-pane-sess-1')).toHaveAttribute('data-active', 'false')
+        expect(screen.getByTestId('term-pane-sess-2')).toHaveAttribute('data-active', 'true')
+      })
+      expect(screen.getByTestId('term-pane-sess-1')).toHaveAttribute('data-visible', 'true')
+    })
+
+    it('⌘W 로 분할된 pane 을 하나 닫으면 탭은 유지되고 나머지 pane 이 남는다', async () => {
+      await createTwoTabsFirstActive()
+      renderWithDs(<TerminalView active />)
+      await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+      await screen.findByTestId('term-pane-sess-1')
+      fireEvent.keyDown(window, { key: 'd', metaKey: true })
+      await screen.findByTestId('term-pane-sess-2')
+
+      const killSpy = vi.mocked(window.api.terminal.kill)
+      fireEvent.keyDown(window, { key: 'w', metaKey: true })
+
+      await waitFor(() => {
+        expect(killSpy).toHaveBeenCalledWith('sess-2')
+      })
+      // 탭 자체는 살아있다(sess-1 은 남음), pane 배지는 사라진다.
+      await screen.findByTestId('term-pane-sess-1')
+      expect(screen.queryByTestId('term-pane-sess-2')).not.toBeInTheDocument()
+      expect(screen.queryByTitle(/분할된 pane/)).not.toBeInTheDocument()
+    })
+
+    it('마지막 pane 에서 ⌘W 를 누르면 탭 자체가 닫힌다', async () => {
+      await createTwoTabsFirstActive()
+      renderWithDs(<TerminalView active />)
+      await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+      await screen.findByTestId('term-pane-sess-1')
+
+      const killSpy = vi.mocked(window.api.terminal.kill)
+      fireEvent.keyDown(window, { key: 'w', metaKey: true })
+
+      await waitFor(() => {
+        expect(killSpy).toHaveBeenCalledWith('sess-1')
+      })
+      await waitFor(() => {
+        expect(screen.queryByTestId('term-pane-sess-1')).not.toBeInTheDocument()
+      })
+    })
+
+    it('active=false 면 ⌘D/⌘W/⌘T 가 아무 것도 하지 않는다(다른 뷰에서 PTY 가 죽지 않음)', async () => {
+      await createTwoTabsFirstActive()
+      const { rerender } = renderWithDs(<TerminalView active />)
+      await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+      await screen.findByTestId('term-pane-sess-1')
+
+      rerender(<TerminalView active={false} />)
+
+      const createSpy = vi.mocked(window.api.terminal.create)
+      const killSpy = vi.mocked(window.api.terminal.kill)
+      createSpy.mockClear()
+
+      fireEvent.keyDown(window, { key: 'd', metaKey: true })
+      fireEvent.keyDown(window, { key: 't', metaKey: true })
+      fireEvent.keyDown(window, { key: 'w', metaKey: true })
+
+      await new Promise((r) => setTimeout(r, 0))
+      expect(createSpy).not.toHaveBeenCalled()
+      expect(killSpy).not.toHaveBeenCalled()
+      expect(screen.getByTestId('term-pane-sess-1')).toBeInTheDocument()
     })
   })
 })
