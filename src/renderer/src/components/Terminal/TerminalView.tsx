@@ -96,7 +96,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
   const [isDividerDragging, setIsDividerDragging] = useState(false)
   /** v2.0 C-3.5 — 두레이 태스크 드로어 */
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(true)
   const [dropHint, setDropHint] = useState<string | null>(null)
   const [dropBusy, setDropBusy] = useState<string | null>(null)
   // v2.0 D — 단축키 오버라이드. keydown 클로저가 최신 값을 보도록 ref 로 동기화한다.
@@ -491,6 +491,21 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     return () => window.removeEventListener('adopt-terminal', handler)
   }, [adoptSession])
 
+  // 업무 패널 열림 상태 영속화 — 기본은 열림(두레이 업무가 이 화면의 출발점이라서)
+  useEffect(() => {
+    void window.api.settings
+      .get('terminalTaskDrawerOpen')
+      .then((v) => { if (v === false) setDrawerOpen(false) })
+      .catch(() => undefined)
+  }, [])
+  const toggleDrawer = useCallback(() => {
+    setDrawerOpen((v) => {
+      const next = !v
+      void window.api.settings.set('terminalTaskDrawerOpen', next)
+      return next
+    })
+  }, [])
+
   /** v2.0 B-4: split 은 항상 새 PTY — 현재 focused pane 의 cwd 를 상속한다(ADR-02 §7). */
   const splitFocusedPane = useCallback(async (direction: SplitDirection) => {
     const tabId = activeTabIdRef.current
@@ -635,7 +650,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       if (shortcut) {
         switch (shortcut) {
           case 'newTab': e.preventDefault(); void createTab(); return
-          case 'toggleTaskDrawer': e.preventDefault(); setDrawerOpen((v) => !v); return
+          case 'toggleTaskDrawer': e.preventDefault(); toggleDrawer(); return
           case 'closePane': {
             e.preventDefault()
             const tabId = activeTabIdRef.current
@@ -765,14 +780,16 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
             title="새 터미널 (⌘T)">
             <Plus size={14} />
           </button>
-          <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary ml-1 flex-shrink-0">⌘T 새탭 · ⌘D 오른쪽 분할 · ⌘⇧D 아래 분할 · ⌘W 닫기</span>
           <div className="ml-auto flex items-center gap-2 flex-shrink-0">
-            <button onClick={() => setDrawerOpen((v) => !v)}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[calc(10px_*_var(--app-font-scale,1))] transition-colors ${
-                drawerOpen ? 'text-clauday-blue bg-clauday-blue/10' : 'text-text-tertiary hover:text-text-primary hover:bg-bg-surface-hover'
+            <button onClick={toggleDrawer}
+              aria-pressed={drawerOpen}
+              className={`flex items-center gap-1.5 h-7 px-2.5 rounded-[7px] text-[calc(11.5px_*_var(--app-font-scale,1))] font-medium border transition-colors ${
+                drawerOpen
+                  ? 'text-text-primary bg-bg-surface-hover border-bg-border-light'
+                  : 'text-text-secondary border-bg-border hover:text-text-primary hover:bg-bg-surface-hover'
               }`}
-              title="두레이 태스크 드로어 (⌘⇧T)">
-              <ClipboardList size={11} /> 태스크
+              title="두레이 업무 패널 (⌘⇧T)">
+              <ClipboardList size={13} /> 업무
             </button>
             <RendererToggle setting={rendererSetting} fellBack={rendererFellBack} onChange={handleRendererChange} />
             {tabs.length >= 3 && (
@@ -870,7 +887,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
         )}
       </div>
     </div>
-    {drawerOpen && <TaskDrawer onClose={() => setDrawerOpen(false)} />}
+    {drawerOpen && <TaskDrawer onClose={toggleDrawer} />}
     </div>
   )
 }

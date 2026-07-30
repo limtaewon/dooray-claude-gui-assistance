@@ -220,12 +220,13 @@ function TerminalPaneInner(
 
     const terminal = new Terminal({
       theme: {
-        background: '#111827',
-        foreground: '#F9FAFB',
-        cursor: '#F9FAFB',
-        cursorAccent: '#111827',
-        selectionBackground: '#3B82F644',
-        black: '#111827',
+        // v2.0: 앱 캔버스(--bg-base #0C0C0E)와 같은 톤 — 터미널만 남색으로 뜨지 않게
+        background: '#0C0C0E',
+        foreground: '#F1F1F3',
+        cursor: '#F1F1F3',
+        cursorAccent: '#0C0C0E',
+        selectionBackground: '#FFFFFF26',
+        black: '#0C0C0E',
         red: '#EF4444',
         green: '#22C55E',
         yellow: '#FB923C',

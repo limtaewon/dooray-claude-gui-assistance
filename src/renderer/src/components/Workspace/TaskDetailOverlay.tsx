@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ArrowRight, Copy, ExternalLink, GitBranch, Send, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -105,8 +106,10 @@ function TaskDetailOverlay({
 
   const ref = task.projectCode ? `${task.projectCode}/${task.number ?? ''}` : String(task.number ?? '')
 
-  return (
-    <div className="absolute inset-0 z-40 flex" role="dialog" aria-modal="true" aria-label={task.subject}>
+  // 앱 루트 밖(body)으로 포털 — 터미널 flex 컨테이너 안에서는 absolute 기준이 어긋나
+  // 드로어와 쌓임 순서가 뒤집힌다 (DS Modal 과 동일 전략).
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex" role="dialog" aria-modal="true" aria-label={task.subject}>
       <button
         type="button"
         aria-label="닫기"
@@ -221,7 +224,8 @@ function TaskDetailOverlay({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
