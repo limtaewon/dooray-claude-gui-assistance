@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clauday v2.0 — 통합 워크스페이스 뷰 목업</title>
+<style>
+  :root{
+    --bg:#0e1014; --panel:#161a22; --panel2:#1c212b; --border:#272d3a; --border2:#333b4a;
+    --tx:#e7ebf2; --tx2:#9aa4b6; --tx3:#6b7484;
+    --orange:#ff7a1a; --blue:#4a9eff;
+    --ok:#34d399; --warn:#fbbf24; --bad:#f87171;
+    --radius:10px;
+    font-synthesis:none;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--tx);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    font-size:13px; line-height:1.5; overflow:hidden;
+  }
+  /* ===== App shell ===== */
+  .app{display:flex; flex-direction:column; height:100vh}
+  .titlebar{height:38px; background:#0b0d11; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:10px; padding:0 14px; flex:none; -webkit-user-select:none}
+  .lights{display:flex; gap:7px}
+  .lights i{width:11px;height:11px;border-radius:50%}
+  .lights i:nth-child(1){background:#ff5f57}.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}
+  .title{font-weight:600; font-size:12.5px; letter-spacing:.2px}
+  .title b{background:linear-gradient(90deg,var(--orange),var(--blue));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .titlebar .spacer{flex:1}
+  .cmdk{font-size:11px; color:var(--tx3); border:1px solid var(--border2); padding:3px 8px; border-radius:6px}
+  .body{display:flex; flex:1; min-height:0}
+  /* sidebar */
+  .sidebar{width:56px; background:#0b0d11; border-right:1px solid var(--border); flex:none;
+    display:flex; flex-direction:column; align-items:center; padding-top:10px; gap:5px}
+  .nav{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    color:var(--tx3); cursor:pointer; font-size:17px; position:relative}
+  .nav:hover{background:#181c24;color:var(--tx2)}
+  .nav.active{background:linear-gradient(135deg,rgba(255,122,26,.22),rgba(74,158,255,.22));color:var(--tx)}
+  .nav.active::before{content:"";position:absolute;left:-10px;top:8px;bottom:8px;width:3px;border-radius:3px;background:linear-gradient(var(--orange),var(--blue))}
+  /* main */
+  .main{flex:1; display:flex; flex-direction:column; min-width:0}
+  .topbar{padding:11px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; flex:none}
+  .topbar .vt{font-size:14px;font-weight:700}
+  .topbar .vsub{color:var(--tx3);font-size:11.5px}
+  .topbar .spacer{flex:1}
+  .btn{font-size:12px;padding:7px 13px;border-radius:8px;border:1px solid var(--border2);background:var(--panel2);
+    color:var(--tx);cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
+  .btn:hover{border-color:var(--blue)}
+  .btn.primary{background:linear-gradient(135deg,var(--orange),var(--blue));border:none;color:#fff;font-weight:700}
+  .btn.primary:hover{filter:brightness(1.1)}
+  .btn.ghost{background:transparent}
+  .btn.on{border-color:var(--blue);color:var(--blue)}
+  .cols{display:flex;flex:1;min-height:0}
+
+  /* ===== 좌측: 태스크 목록 ===== */
+  .tasks{width:300px;flex:none;border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0;background:rgba(11,13,17,.4)}
+  .tasks-top{padding:12px 12px 10px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:8px;flex:none}
+  .pin{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--tx);
+    background:var(--panel2);border:1px solid var(--border2);border-radius:8px;padding:5px 10px;cursor:pointer;width:fit-content}
+  .pin .caret{color:var(--tx3);font-size:10px}
+  .search{display:flex;align-items:center;gap:7px;background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:6px 10px}
+  .search input{flex:1;background:transparent;border:none;outline:none;color:var(--tx);font-size:12px;font-family:inherit}
+  .search input::placeholder{color:var(--tx3)}
+  .search .ic{color:var(--tx3);font-size:12px}
+  .wfchips{display:flex;gap:5px}
+  .wfchip{font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid var(--border2);color:var(--tx2);cursor:pointer;background:transparent}
+  .wfchip:hover{color:var(--tx)}
+  .wfchip.active{background:linear-gradient(135deg,rgba(255,122,26,.22),rgba(74,158,255,.22));color:var(--tx);border-color:var(--border2)}
+  .tasklist{flex:1;overflow:auto;padding:8px}
+  .taskrow{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:10px 11px;margin-bottom:7px;cursor:pointer;
+    transition:border-color .1s, background .1s}
+  .taskrow:hover{border-color:var(--border2)}
+  .taskrow.sel{border-color:var(--blue);background:linear-gradient(135deg,rgba(255,122,26,.07),rgba(74,158,255,.09))}
+  .taskrow .tno{font-size:10.5px;color:var(--tx3);font-weight:700;font-family:"JetBrains Mono",ui-monospace,Menlo,monospace}
+  .taskrow .tt{font-size:12.5px;font-weight:600;margin:2px 0 6px;line-height:1.35}
+  .trow-meta{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+  .tag{font-size:9.5px;font-weight:700;padding:1px 7px;border-radius:20px}
+  .tag.ios{background:rgba(74,158,255,.16);color:var(--blue)}
+  .tag.android{background:rgba(52,211,153,.16);color:var(--ok)}
+  .tag.kmp{background:rgba(192,132,252,.18);color:#c084fc}
+  .due{font-size:10px;color:var(--tx3);margin-left:auto}
+  .due.soon{color:var(--warn)}
+  .wsline{display:flex;align-items:center;gap:6px;margin-top:7px;padding-top:7px;border-top:1px dashed var(--border)}
+  .branch{font-size:10px;font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;color:#9ff0cf;
+    background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);padding:1px 7px;border-radius:6px}
+  .rdots{display:flex;gap:5px;margin-left:auto;align-items:center}
+  .rdot{width:8px;height:8px;border-radius:50%;flex:none}
+  .rdot.run{background:var(--blue);box-shadow:0 0 0 0 rgba(74,158,255,.5);animation:pulse 1.6s infinite}
+  .rdot.wait{background:var(--orange)}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(74,158,255,.5)}70%{box-shadow:0 0 0 6px rgba(74,158,255,0)}100%{box-shadow:0 0 0 0 rgba(74,158,255,0)}}
+  .tasks-foot{flex:none;border-top:1px solid var(--border);padding:9px 14px;font-size:11px;color:var(--tx2);display:flex;align-items:center;gap:6px}
+  .tasks-foot .rdot{width:7px;height:7px}
+
+  /* ===== 중앙 ===== */
+  .center{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
+  .pane{display:none;flex:1;min-height:0;flex-direction:column}
+  .pane.active{display:flex}
+
+  /* --- 상태 A: 태스크 상세 --- */
+  .detail{flex:1;overflow:auto;padding:22px 26px}
+  .dhead{display:flex;align-items:flex-start;gap:16px;margin-bottom:4px}
+  .dhead .dtitle{flex:1;min-width:0}
+  .dhead .tno{font-size:11px;color:var(--tx3);font-weight:700;font-family:"JetBrains Mono",ui-monospace,Menlo,monospace}
+  .dhead h1{font-size:19px;margin:3px 0 0;font-weight:800;line-height:1.3}
+  .dactions{display:flex;gap:8px;flex:none;padding-top:4px;align-items:flex-start}
+  .btn.start{font-size:13px;padding:9px 18px}
+  /* 원클릭 즉시 시작 — split button */
+  .splitwrap{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  .splitrow{position:relative}
+  .splitbtn{display:inline-flex;align-items:stretch;border-radius:9px;overflow:hidden;
+    background:linear-gradient(135deg,var(--orange),var(--blue));box-shadow:0 4px 14px rgba(74,158,255,.22)}
+  .splitbtn button{border:none;background:transparent;color:#fff;cursor:pointer;font-family:inherit;font-weight:700}
+  .splitbtn .mainseg{font-size:13px;padding:9px 16px;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+  .splitbtn .caretseg{padding:0 12px;border-left:1px solid rgba(255,255,255,.35);font-size:11px}
+  .splitbtn .mainseg:hover,.splitbtn .caretseg:hover{background:rgba(255,255,255,.13)}
+  .splitbtn.busy .mainseg{cursor:default}
+  .spinner{width:12px;height:12px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;flex:none}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .startcap{font-size:10px;color:var(--tx3);text-align:right;line-height:1.7}
+  .startcap code{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:9.5px;color:var(--tx2);background:var(--panel2);padding:0 5px;border-radius:4px}
+  .startmenu{display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--panel2);border:1px solid var(--border2);
+    border-radius:10px;padding:5px;z-index:40;box-shadow:0 10px 28px rgba(0,0,0,.55);min-width:250px}
+  .startmenu.open{display:block}
+  .startmenu button{display:flex;width:100%;text-align:left;border:none;background:transparent;color:var(--tx);
+    font-size:12px;padding:8px 11px;border-radius:7px;cursor:pointer;font-family:inherit;align-items:center;gap:9px}
+  .startmenu button:hover{background:var(--panel)}
+  .startmenu button small{color:var(--tx3);margin-left:auto;font-size:10px}
+  .startmenu .mcap{font-size:9.5px;color:var(--tx3);padding:7px 11px 4px;border-top:1px solid var(--border);margin-top:4px}
+  /* 토스트 */
+  .toast{position:fixed;right:18px;bottom:18px;background:var(--panel2);border:1px solid var(--border2);border-left:3px solid var(--ok);
+    border-radius:10px;padding:11px 15px;font-size:12px;font-weight:600;color:var(--tx);box-shadow:0 12px 32px rgba(0,0,0,.55);z-index:100;
+    opacity:0;transform:translateY(10px);transition:opacity .25s ease,transform .25s ease;pointer-events:none;max-width:440px}
+  .toast.show{opacity:1;transform:translateY(0)}
+  .dmeta{display:flex;align-items:center;gap:10px;margin:14px 0 18px;flex-wrap:wrap}
+  .avatar{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--orange),var(--blue));
+    display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex:none}
+  .dmeta .who{font-size:12px;color:var(--tx2)}
+  .dmeta .sep{color:var(--tx3);font-size:10px}
+  .dbody{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;max-width:760px}
+  .dbody p{margin:0 0 12px;color:var(--tx);font-size:13px}
+  .dbody p:last-child{margin-bottom:0}
+  .checklist{list-style:none;margin:4px 0 12px;padding:0;display:flex;flex-direction:column;gap:6px}
+  .checklist li{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--tx2)}
+  .cb{width:15px;height:15px;border-radius:4px;border:1.5px solid var(--border2);flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:10px}
+  .cb.done{background:rgba(52,211,153,.18);border-color:var(--ok);color:var(--ok)}
+  .comments{max-width:760px;margin-top:18px}
+  .comments h3{font-size:12px;color:var(--tx2);font-weight:700;margin:0 0 10px}
+  .comment{display:flex;gap:10px;margin-bottom:12px}
+  .comment .avatar{width:26px;height:26px}
+  .comment .avatar.g2{background:linear-gradient(135deg,#34d399,#4a9eff)}
+  .comment .cbody{flex:1;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:9px 13px}
+  .comment .cwho{font-size:11.5px;font-weight:700}
+  .comment .cwho small{color:var(--tx3);font-weight:500;margin-left:7px}
+  .comment .ctext{font-size:12.5px;color:var(--tx2);margin-top:3px}
+
+  /* --- 상태 B: 워크스페이스 (태스크당 브랜치 1개, 여러 태스크 동시 병렬) --- */
+  .wsp{flex:1;min-height:0;display:flex;flex-direction:column;padding:14px 18px 12px}
+  .strip{display:flex;align-items:center;gap:9px;flex:none;font-size:11px;color:var(--tx2);
+    background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:7px 12px;margin-bottom:10px;flex-wrap:wrap}
+  .strip code{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:10.5px;color:#cdd6e6;background:var(--panel2);padding:1px 6px;border-radius:5px}
+  .strip .sep{color:var(--tx3)}
+  .sbadge{font-size:10px;font-weight:800;padding:1px 8px;border-radius:20px}
+  .sbadge.run{background:rgba(74,158,255,.16);color:var(--blue)}
+  .sbadge.wait{background:rgba(255,122,26,.16);color:var(--orange)}
+  .strip .elapsed{margin-left:auto;color:var(--tx3);font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:10.5px}
+  .term{flex:1;min-height:0;overflow:auto;background:#0a0c10;border:1px solid var(--border);border-radius:12px;
+    padding:14px 16px;font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:11.5px;line-height:1.75;color:#c6cfde;white-space:pre-wrap}
+  .term .wl{color:var(--orange);font-weight:700}
+  .term .dim{color:var(--tx3)}
+  .term .usr{color:var(--tx)}
+  .term .tool{color:var(--blue)}
+  .term .res{color:var(--tx3)}
+  .term .okt{color:var(--ok)}
+  .term .warnt{color:var(--warn)}
+  .cursor{display:inline-block;width:8px;height:14px;background:#c6cfde;vertical-align:-2px;animation:blink 1.1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  .wfwrap{position:relative;display:inline-flex}
+  .wfstate{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--tx2);cursor:pointer;
+    background:var(--panel2);border:1px solid var(--border2);border-radius:20px;padding:4px 12px;font-family:inherit}
+  .wfstate b{color:var(--ok)}
+  .wfstate .caret{color:var(--tx3);font-size:9px}
+  .wfmenu{display:none;position:absolute;top:calc(100% + 6px);left:0;background:var(--panel2);border:1px solid var(--border2);
+    border-radius:9px;padding:5px;z-index:30;box-shadow:0 8px 24px rgba(0,0,0,.5);min-width:130px}
+  .wfmenu.open{display:block}
+  .wfmenu button{display:flex;width:100%;text-align:left;border:none;background:transparent;color:var(--tx2);
+    font-size:12px;padding:6px 10px;border-radius:6px;cursor:pointer;font-family:inherit;align-items:center;gap:8px}
+  .wfmenu button:hover{background:var(--panel);color:var(--tx)}
+  .wfmenu .dot2{width:7px;height:7px;border-radius:50%;flex:none}
+  .actionbar{display:flex;align-items:stretch;gap:8px;flex:none;margin-top:10px}
+  .abtns{display:flex;gap:7px;flex-wrap:wrap;align-content:flex-start}
+  .diffadd{color:var(--ok);font-weight:700;font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:11px}
+  .diffdel{color:var(--bad);font-weight:700;font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:11px}
+  .btn.adopt{border-color:rgba(52,211,153,.5);color:#9ff0cf}
+  .btn.adopt:hover{border-color:var(--ok)}
+  .btn.trash{color:var(--tx3)}
+  .btn.trash:hover{border-color:var(--bad);color:var(--bad)}
+  .preview{margin-left:auto;max-width:320px;background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--orange);
+    border-radius:9px;padding:8px 12px}
+  .preview .pk{font-size:9.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--tx3);font-weight:700;margin-bottom:2px}
+  .preview .pv{font-size:11.5px;color:var(--tx2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+  /* ===== 우측: 업무 상세 / 변경사항 슬라이드 패널 ===== */
+  .compare{width:0;flex:none;border-left:1px solid transparent;overflow:hidden;transition:width .22s ease,border-color .22s ease;background:rgba(11,13,17,.4)}
+  .compare.open{width:340px;border-left-color:var(--border)}
+  .compare-in{width:340px;height:100%;display:flex;flex-direction:column;padding:16px}
+  .phead{display:flex;align-items:center;gap:8px;flex:none;margin-bottom:13px}
+  .seg{flex:1;display:inline-flex;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px}
+  .segbtn{flex:1;border:none;background:transparent;color:var(--tx2);padding:6px 0;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit}
+  .segbtn:hover{color:var(--tx)}
+  .segbtn.active{background:linear-gradient(135deg,rgba(255,122,26,.25),rgba(74,158,255,.25));color:var(--tx)}
+  .compare-in .x{background:transparent;border:none;color:var(--tx3);cursor:pointer;font-size:15px;font-family:inherit;flex:none}
+  .compare-in .x:hover{color:var(--tx)}
+  .ptab{display:none}
+  .ptab.active{display:flex;flex-direction:column;flex:1;min-height:0;overflow:auto}
+  .csub{color:var(--tx3);font-size:11px;margin:0 0 12px}
+  /* 업무 상세 탭 */
+  .pd-tno{font-size:10.5px;color:var(--tx3);font-weight:700;font-family:"JetBrains Mono",ui-monospace,Menlo,monospace}
+  .pd-title{font-size:15px;font-weight:800;line-height:1.35;margin:3px 0 10px}
+  .pd-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+  .pd-meta .who{font-size:11.5px;color:var(--tx2)}
+  .pd-body{flex:none;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+  .pd-body p{margin:0 0 10px;font-size:12px;color:var(--tx2);line-height:1.6}
+  .pd-body p:last-child{margin-bottom:0}
+  .pd-body .checklist{margin:2px 0 10px}
+  .pd-body .checklist li{font-size:11.5px}
+  .pd-comments{margin-top:14px}
+  .pd-comments h4{font-size:11.5px;color:var(--tx2);font-weight:700;margin:0 0 9px}
+  .pd-comments .cbody{padding:8px 11px}
+  .pd-comments .ctext{font-size:11.5px}
+  .pd-open{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;font-weight:700;color:var(--blue);
+    text-decoration:none;border:1px solid var(--border2);border-radius:9px;padding:9px;margin-top:14px;flex:none}
+  .pd-open:hover{border-color:var(--blue)}
+  /* 변경사항 탭 */
+  .diffsum{display:flex;align-items:baseline;gap:8px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 13px;margin-bottom:10px;flex:none}
+  .diffsum .big{font-size:16px}
+  .diffsum .fcount{margin-left:auto;font-size:11px;color:var(--tx2)}
+  .flist{display:flex;flex-direction:column;gap:4px}
+  .frow{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:7px 10px}
+  .fico{font-size:9px;font-weight:800;width:16px;height:16px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+  .fico.m{background:rgba(251,191,36,.16);color:var(--warn)}
+  .fico.a{background:rgba(52,211,153,.16);color:var(--ok)}
+  .fpath{flex:1;min-width:0;font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:10px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fnum{display:flex;gap:6px;flex:none}
+  .fnum .diffadd,.fnum .diffdel{font-size:10px}
+  .difffn{font-size:10px;color:var(--tx3);text-align:center;margin-top:12px}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- titlebar -->
+  <div class="titlebar">
+    <div class="lights"><i></i><i></i><i></i></div>
+    <div class="title"><b>Clauday</b> · 통합 워크스페이스</div>
+    <div class="spacer"></div>
+    <div class="cmdk">⌘K 빠른 이동</div>
+  </div>
+
+  <div class="body">
+    <!-- sidebar -->
+    <div class="sidebar">
+      <div class="nav" title="두레이">📋</div>
+      <div class="nav active" title="워크스페이스">🗂</div>
+      <div class="nav" title="터미널">⌨️</div>
+      <div class="nav" title="세션">💬</div>
+      <div class="nav" title="Git">🌿</div>
+      <div class="nav" title="MCP">🧩</div>
+      <div class="nav" title="스킬">⚡</div>
+      <div class="nav" title="설정" style="margin-top:auto;margin-bottom:10px">⚙️</div>
+    </div>
+
+    <div class="main">
+      <!-- topbar -->
+      <div class="topbar">
+        <div>
+          <div class="vt">워크스페이스</div>
+          <div class="vsub">태스크마다 격리된 워크트리에서 Claude Code 를 병렬로 굴립니다</div>
+        </div>
+        <div class="spacer"></div>
+        <button class="btn on" id="cmpBtn" onclick="toggleCompare()">📄 업무 상세</button>
+      </div>
+
+      <div class="cols">
+        <!-- ===== 좌측: 내 두레이 태스크 ===== -->
+        <div class="tasks">
+          <div class="tasks-top">
+            <button class="pin">📌 dooray-D-TF <span class="caret">▾</span></button>
+            <div class="search"><span class="ic">🔍</span><input type="text" placeholder="태스크 검색…"></div>
+            <div class="wfchips">
+              <button class="wfchip active" onclick="pickWf(this)">전체</button>
+              <button class="wfchip" onclick="pickWf(this)">진행중</button>
+              <button class="wfchip" onclick="pickWf(this)">등록됨</button>
+            </div>
+          </div>
+
+          <div class="tasklist">
+            <!-- 워크스페이스 있는 태스크 -->
+            <div class="taskrow sel" data-pane="ws2619" onclick="selectTask(this)">
+              <div class="tno">#2619</div>
+              <div class="tt">[iOS] 메일 목록 디자인 개선</div>
+              <div class="trow-meta">
+                <span class="tag ios">iOS</span>
+                <span class="due soon">마감 8/7 (금)</span>
+              </div>
+              <div class="wsline">
+                <span class="branch">feature/D-TF-2619</span>
+                <span class="rdots" title="작업 중"><i class="rdot run"></i></span>
+              </div>
+            </div>
+
+            <div class="taskrow" data-pane="dt2657" onclick="selectTask(this)">
+              <div class="tno">#2657</div>
+              <div class="tt">[Android/iOS] 푸시 알림 설정 화면</div>
+              <div class="trow-meta">
+                <span class="tag android">Android</span>
+                <span class="tag ios">iOS</span>
+                <span class="due">마감 8/12 (수)</span>
+              </div>
+            </div>
+
+            <div class="taskrow" data-pane="ws2596" onclick="selectTask(this)">
+              <div class="tno">#2596</div>
+              <div class="tt">[KMP] load-level 캐시 개선</div>
+              <div class="trow-meta">
+                <span class="tag kmp">KMP</span>
+                <span class="due">마감 8/21 (금)</span>
+              </div>
+              <div class="wsline">
+                <span class="branch">feature/D-TF-2596</span>
+                <span class="rdots" title="응답 대기"><i class="rdot wait"></i></span>
+              </div>
+            </div>
+
+            <div class="taskrow" data-pane="dt2603" onclick="selectTask(this)">
+              <div class="tno">#2603</div>
+              <div class="tt">[iOS] 다크모드 색상 토큰 정리</div>
+              <div class="trow-meta">
+                <span class="tag ios">iOS</span>
+                <span class="due">마감 8/28 (금)</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="tasks-foot">
+            <i class="rdot run"></i> 작업 중 1 <span style="color:var(--tx3)">·</span>
+            <i class="rdot wait"></i> 응답 대기 1
+          </div>
+        </div>
+
+        <!-- ===== 중앙 ===== -->
+        <div class="center">
+
+          <!-- 상태 B: 워크스페이스 있음 (#2619) -->
+          <div class="pane active" id="ws2619">
+            <div class="wsp">
+              <!-- 단일 run 헤더 -->
+              <div class="strip">
+                <span class="branch">feature/D-TF-2619</span>
+                <span class="sbadge run">작업 중</span>
+                <span class="sep">·</span> base <code>origin/develop</code>
+                <span class="sep">·</span> <code>~/Clauday-Workspaces/dooray-D-TF/2619</code>
+                <span class="elapsed">경과 12:34</span>
+              </div>
+
+                <div class="term"><span class="wl">✻ Welcome to Claude Code!</span>
+
+<span class="dim">  /help 도움말 · cwd: ~/Clauday-Workspaces/dooray-D-TF/2619</span>
+
+<span class="dim">&gt;</span> <span class="usr">메일 목록 셀에 구분선을 추가하고 여백을 디자인 가이드에 맞게 조정해줘</span>
+
+<span class="tool">⏺</span> 메일 목록 관련 파일을 먼저 확인하겠습니다.
+
+<span class="tool">⏺ Read</span>(DoorayMail/MailList/MailListCell.swift)
+<span class="res">  ⎿ 84줄 읽음</span>
+
+<span class="tool">⏺ Edit</span>(DoorayMail/MailList/MailListCell.swift)
+<span class="res">  ⎿ separator 레이어 추가, contentInsets 16 → 20 조정</span>
+
+<span class="tool">⏺ Bash</span>(xcodebuild -scheme DoorayMail build)
+<span class="res">  ⎿ <span class="okt">Build Succeeded</span></span>
+
+<span class="tool">⏺</span> 메일 목록 셀 구분선 추가와 여백 조정을 완료했습니다. 시뮬레이터에서
+  확인해보시고, 셀 높이도 함께 조정이 필요하면 말씀해주세요.
+
+<span class="cursor"></span></div>
+
+                <div class="actionbar">
+                  <div class="abtns">
+                    <button class="btn">변경사항 <span class="diffadd">+84</span> <span class="diffdel">−12</span></button>
+                    <button class="btn">✏️ 추가 지시</button>
+                    <button class="btn">🔌 재연결</button>
+                    <button class="btn adopt">✓ 채택</button>
+                    <button class="btn trash">🗑 휴지통 정리</button>
+                  </div>
+                  <div class="preview">
+                    <div class="pk">마지막 응답</div>
+                    <div class="pv">메일 목록 셀 구분선 추가와 여백 조정을 완료했습니다. 시뮬레이터에서 확인해보시고…</div>
+                  </div>
+                </div>
+            </div>
+          </div>
+
+          <!-- 상태 B 변형: #2596 워크스페이스 (응답 대기) -->
+          <div class="pane" id="ws2596">
+            <div class="wsp">
+              <div class="strip">
+                <span class="branch">feature/D-TF-2596</span>
+                <span class="sbadge wait">응답 대기</span>
+                <span class="sep">·</span> base <code>origin/develop</code>
+                <span class="sep">·</span> <code>~/Clauday-Workspaces/dooray-D-TF/2596</code>
+                <span class="elapsed">경과 27:08</span>
+              </div>
+
+                <div class="term"><span class="wl">✻ Welcome to Claude Code!</span>
+
+<span class="dim">  /help 도움말 · cwd: ~/Clauday-Workspaces/dooray-D-TF/2596</span>
+
+<span class="dim">&gt;</span> <span class="usr">load-level 캐시의 디스크 TTL 정책을 정리하고 무효화 트리거를 일원화해줘</span>
+
+<span class="tool">⏺ Read</span>(shared/cache/LoadLevelCache.kt)
+<span class="res">  ⎿ 212줄 읽음</span>
+
+<span class="tool">⏺ Edit</span>(shared/cache/CacheInvalidation.kt)
+<span class="res">  ⎿ 무효화 트리거를 CacheInvalidationBus 로 일원화</span>
+
+<span class="tool">⏺</span> 디스크 캐시 TTL 정책은 두 가지 안이 가능합니다.
+
+  1. 전 load-level 고정 15분 — 구현 단순, 검증 쉬움
+  2. load-level 별 차등 (5분 / 15분 / 60분) — 히트율 유리
+
+<span class="warnt">  어느 쪽으로 진행할까요? 선택해주시면 이어서 반영하겠습니다.</span>
+
+<span class="cursor"></span></div>
+
+                <div class="actionbar">
+                  <div class="abtns">
+                    <button class="btn">변경사항 <span class="diffadd">+57</span> <span class="diffdel">−23</span></button>
+                    <button class="btn">✏️ 추가 지시</button>
+                    <button class="btn">🔌 재연결</button>
+                    <button class="btn adopt">✓ 채택</button>
+                    <button class="btn trash">🗑 휴지통 정리</button>
+                  </div>
+                  <div class="preview">
+                    <div class="pk">마지막 응답 · 입력 대기</div>
+                    <div class="pv">디스크 캐시 TTL 정책을 두 가지 안(고정 15분 / load-level 차등) 중 선택해주세요…</div>
+                  </div>
+                </div>
+            </div>
+          </div>
+
+          <!-- 상태 A: 워크스페이스 없음 (#2657) -->
+          <div class="pane" id="dt2657">
+            <div class="detail">
+              <div class="dhead">
+                <div class="dtitle">
+                  <div class="tno">dooray-D-TF · #2657</div>
+                  <h1>[Android/iOS] 푸시 알림 설정 화면</h1>
+                </div>
+                <div class="dactions">
+                  <div class="splitwrap">
+                    <div class="splitrow">
+                      <div class="splitbtn" id="startBtn">
+                        <button class="mainseg" id="startMain" onclick="startWork()">▶ 작업 시작</button>
+                        <button class="caretseg" onclick="toggleStartMenu(event)" title="시작 옵션">▾</button>
+                      </div>
+                      <div class="startmenu" id="startMenu">
+                        <button>⚙ 설정 후 시작… <small>⌥클릭</small></button>
+                        <button>⌨ 프롬프트 없이 터미널만 열기</button>
+                        <div class="mcap">설정 모달은 start-work-modal 목업 참고</div>
+                      </div>
+                    </div>
+                    <div class="startcap">
+                      <code>ios-dooray</code> · <code>origin/develop</code> · <code>feature/D-TF-2657</code> · 에이전트 1 — 클릭 즉시 시작<br>
+                      설정 변경은 ▾
+                    </div>
+                  </div>
+                  <button class="btn ghost">Dooray에서 열기 ↗</button>
+                </div>
+              </div>
+              <div class="dmeta">
+                <span class="avatar">임</span><span class="who">임태원</span>
+                <span class="sep">·</span>
+                <span class="tag android">Android</span>
+                <span class="tag ios">iOS</span>
+                <span class="sep">·</span>
+                <span class="who">마감 8/12 (수)</span>
+                <span class="sep">·</span>
+                <span class="who">등록됨</span>
+              </div>
+
+              <div class="dbody">
+                <p>메신저/메일/프로젝트 알림을 사용자가 카테고리별로 제어할 수 있는 푸시 알림 설정 화면을 신규로 구현합니다. Android와 iOS 공통 스펙이며, 설정 모델은 KMP 공유 모듈에 두고 각 플랫폼은 UI만 구현합니다.</p>
+                <p>기존에는 전체 on/off 단일 토글만 제공되어 "메일 알림만 끄고 싶다"는 VOC가 반복적으로 들어왔습니다. 이번 개편으로 카테고리 단위 제어와 방해금지 시간대를 함께 제공합니다.</p>
+                <ul class="checklist">
+                  <li><span class="cb done">✓</span> 알림 카테고리 목록/스펙 확정 (메신저·메일·프로젝트·캘린더)</li>
+                  <li><span class="cb"></span> 카테고리별 on/off 토글 UI</li>
+                  <li><span class="cb"></span> 방해금지 시간대 설정 (요일 + 시간 범위)</li>
+                  <li><span class="cb"></span> 설정값 서버 동기화 API 연동</li>
+                </ul>
+                <p>디자인 시안은 Figma <em>Push-Settings-v2</em> 페이지 기준. 접근성(VoiceOver/TalkBack) 라벨 필수.</p>
+              </div>
+
+              <div class="comments">
+                <h3>댓글 2</h3>
+                <div class="comment">
+                  <span class="avatar g2">김</span>
+                  <div class="cbody">
+                    <div class="cwho">김도현 <small>어제 17:42</small></div>
+                    <div class="ctext">서버 동기화 API는 settings-v2 엔드포인트로 이미 배포돼 있어요. 스웨거 문서 링크 태스크에 첨부했습니다.</div>
+                  </div>
+                </div>
+                <div class="comment">
+                  <span class="avatar">박</span>
+                  <div class="cbody">
+                    <div class="cwho">박서연 <small>오늘 09:15</small></div>
+                    <div class="ctext">방해금지 시간대는 1차 스코프에서 요일 단위까지만 가고, 공휴일 예외는 후속 태스크로 뺐으면 합니다.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 상태 A 변형: #2603 -->
+          <div class="pane" id="dt2603">
+            <div class="detail">
+              <div class="dhead">
+                <div class="dtitle">
+                  <div class="tno">dooray-D-TF · #2603</div>
+                  <h1>[iOS] 다크모드 색상 토큰 정리</h1>
+                </div>
+                <div class="dactions">
+                  <button class="btn primary start">▶ 작업 시작</button>
+                  <button class="btn ghost">Dooray에서 열기 ↗</button>
+                </div>
+              </div>
+              <div class="dmeta">
+                <span class="avatar">임</span><span class="who">임태원</span>
+                <span class="sep">·</span>
+                <span class="tag ios">iOS</span>
+                <span class="sep">·</span>
+                <span class="who">마감 8/28 (금)</span>
+                <span class="sep">·</span>
+                <span class="who">등록됨</span>
+              </div>
+              <div class="dbody">
+                <p>하드코딩된 다크모드 색상을 시맨틱 토큰(Semantic Color)으로 치환합니다. 메일 목록/상세 화면부터 우선 적용하고, 토큰 네이밍은 디자인 시스템 v3 기준을 따릅니다.</p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ===== 우측: 업무 상세 / 변경사항 슬라이드 패널 (기본 열림) ===== -->
+        <div class="compare open" id="cmpPanel">
+          <div class="compare-in">
+            <div class="phead">
+              <div class="seg">
+                <button class="segbtn active" data-ptab="ptDetail" onclick="pickPanelTab(this)">업무 상세</button>
+                <button class="segbtn" data-ptab="ptDiff" onclick="pickPanelTab(this)">변경사항</button>
+              </div>
+              <button class="x" onclick="toggleCompare()" title="닫기">✕</button>
+            </div>
+
+            <!-- 탭 1: 업무 상세 (터미널과 나란히 보는 태스크 본문) -->
+            <div class="ptab active" id="ptDetail">
+              <div class="pd-tno">dooray-D-TF · #2619</div>
+              <div class="pd-title">[iOS] 메일 목록 디자인 개선</div>
+              <div class="pd-meta">
+                <div class="wfwrap">
+                  <button class="wfstate" onclick="toggleWfMenu(event)"><b id="wfLabel">진행중</b> <span class="caret">▾</span></button>
+                  <div class="wfmenu" id="wfMenu">
+                    <button onclick="pickState('등록됨','var(--tx2)')"><i class="dot2" style="background:var(--tx3)"></i> 등록됨</button>
+                    <button onclick="pickState('진행중','var(--ok)')"><i class="dot2" style="background:var(--ok)"></i> 진행중</button>
+                    <button onclick="pickState('완료','var(--blue)')"><i class="dot2" style="background:var(--blue)"></i> 완료</button>
+                  </div>
+                </div>
+                <span class="avatar" style="width:20px;height:20px;font-size:10px">임</span>
+                <span class="who">임태원</span>
+                <span class="tag ios">iOS</span>
+                <span class="due soon">마감 8/7 (금)</span>
+              </div>
+
+              <div class="pd-body">
+                <p>메일 목록에서 항목 간 경계가 흐릿해 스캔이 어렵다는 VOC 가 반복 접수되었습니다. 디자인 가이드 v3 기준으로 셀 구분선과 좌우 여백을 재정비합니다.</p>
+                <p>아이패드 분할 뷰에서도 동일 규격이 유지되어야 하며, 다크모드에서 구분선 대비값(최소 1.3:1)을 확인합니다.</p>
+                <ul class="checklist">
+                  <li><span class="cb done">✓</span> 셀 구분선 추가 (가이드 v3 스펙)</li>
+                  <li><span class="cb done">✓</span> 좌우 여백 16pt → 20pt 조정</li>
+                  <li><span class="cb"></span> 셀 높이 / 타이포 검수</li>
+                  <li><span class="cb"></span> 다크모드 대비값 확인</li>
+                </ul>
+                <p>시안은 Figma <em>MailList-Redesign</em> 페이지 기준입니다.</p>
+              </div>
+
+              <div class="pd-comments">
+                <h4>댓글 2</h4>
+                <div class="comment">
+                  <span class="avatar g2" style="width:22px;height:22px;font-size:10px">박</span>
+                  <div class="cbody">
+                    <div class="cwho">박서연 <small>어제 14:20</small></div>
+                    <div class="ctext">여백은 시안 기준 20pt 로 확정입니다. 16pt 안은 폐기해주세요.</div>
+                  </div>
+                </div>
+                <div class="comment">
+                  <span class="avatar" style="width:22px;height:22px;font-size:10px">김</span>
+                  <div class="cbody">
+                    <div class="cwho">김도현 <small>오늘 10:02</small></div>
+                    <div class="ctext">아이패드 멀티컬럼에서 구분선이 컬럼 경계와 겹치지 않는지도 확인 부탁드려요.</div>
+                  </div>
+                </div>
+              </div>
+
+              <a class="pd-open" href="#" onclick="return false">Dooray에서 열기 ↗</a>
+            </div>
+
+            <!-- 탭 2: 변경사항 (현재 워크트리 diff 요약) -->
+            <div class="ptab" id="ptDiff">
+              <div class="csub">feature/D-TF-2619 · origin/develop 대비</div>
+
+              <div class="diffsum">
+                <span class="diffadd big">+84</span> <span class="diffdel big">−12</span>
+                <span class="fcount">파일 6개 변경</span>
+              </div>
+
+              <div class="flist">
+                <div class="frow"><span class="fico m">M</span><span class="fpath">DoorayMail/MailList/MailListCell.swift</span><span class="fnum"><span class="diffadd">+42</span><span class="diffdel">−8</span></span></div>
+                <div class="frow"><span class="fico m">M</span><span class="fpath">DoorayMail/MailList/MailListViewController.swift</span><span class="fnum"><span class="diffadd">+18</span><span class="diffdel">−2</span></span></div>
+                <div class="frow"><span class="fico m">M</span><span class="fpath">DoorayMail/MailList/MailListLayout.swift</span><span class="fnum"><span class="diffadd">+9</span><span class="diffdel">−1</span></span></div>
+                <div class="frow"><span class="fico m">M</span><span class="fpath">DesignSystem/Tokens/Spacing.swift</span><span class="fnum"><span class="diffadd">+6</span><span class="diffdel">−0</span></span></div>
+                <div class="frow"><span class="fico m">M</span><span class="fpath">DoorayMail/Resources/MailAssets.xcassets</span><span class="fnum"><span class="diffadd">+5</span><span class="diffdel">−1</span></span></div>
+                <div class="frow"><span class="fico a">A</span><span class="fpath">DoorayMailTests/MailListCellTests.swift</span><span class="fnum"><span class="diffadd">+4</span><span class="diffdel">−0</span></span></div>
+              </div>
+
+              <div class="difffn">파일 클릭 시 Monaco diff 뷰어로 열립니다 (목업에서는 생략)</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 우하단 토스트 -->
+<div class="toast" id="toast"></div>
+
+<script>
+  // 좌측 태스크 선택 → 중앙 상태 A/B 전환
+  function selectTask(row){
+    document.querySelectorAll('.taskrow').forEach(function(r){ r.classList.remove('sel'); });
+    row.classList.add('sel');
+    var pane = row.getAttribute('data-pane');
+    document.querySelectorAll('.center > .pane').forEach(function(p){
+      p.classList.toggle('active', p.id === pane);
+    });
+  }
+
+  // 우측 패널 열기/닫기 (기본 열림)
+  function toggleCompare(){
+    var open = document.getElementById('cmpPanel').classList.toggle('open');
+    document.getElementById('cmpBtn').classList.toggle('on', open);
+  }
+
+  // 우측 패널 내부 탭 전환 (업무 상세 | 변경사항)
+  function pickPanelTab(btn){
+    document.querySelectorAll('.segbtn').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    var tab = btn.getAttribute('data-ptab');
+    document.querySelectorAll('.ptab').forEach(function(p){
+      p.classList.toggle('active', p.id === tab);
+    });
+  }
+
+  // 워크플로우 필터 칩
+  function pickWf(chip){
+    document.querySelectorAll('.wfchip').forEach(function(c){ c.classList.remove('active'); });
+    chip.classList.add('active');
+  }
+
+  // 두레이 상태 드롭다운
+  function toggleWfMenu(e){
+    e.stopPropagation();
+    document.getElementById('wfMenu').classList.toggle('open');
+  }
+  function pickState(label, color){
+    var el = document.getElementById('wfLabel');
+    el.textContent = label;
+    el.style.color = color;
+    document.getElementById('wfMenu').classList.remove('open');
+  }
+  document.addEventListener('click', function(){
+    document.getElementById('wfMenu').classList.remove('open');
+    document.getElementById('startMenu').classList.remove('open');
+  });
+
+  // 시작 옵션 드롭다운 (▾ 세그먼트)
+  function toggleStartMenu(e){
+    e.stopPropagation();
+    document.getElementById('startMenu').classList.toggle('open');
+  }
+
+  // 원클릭 즉시 시작 데모: 워크트리 생성 → claude 시작 → 상태 B 전환 + 토스트
+  function startWork(){
+    var btn = document.getElementById('startBtn');
+    var main = document.getElementById('startMain');
+    if(btn.classList.contains('busy')) return;
+    btn.classList.add('busy');
+    main.innerHTML = '<span class="spinner"></span> 워크트리 생성 중…';
+    setTimeout(function(){
+      main.innerHTML = '<span class="spinner"></span> claude 시작 중…';
+      setTimeout(function(){
+        // 데모: 기존 2619 워크스페이스 패널을 재사용해 상태 B 로 전환
+        selectTask(document.querySelector('.taskrow[data-pane="ws2619"]'));
+        btn.classList.remove('busy');
+        main.innerHTML = '▶ 작업 시작';
+        showToast('▶ feature/D-TF-2657 작업 시작됨 · 두레이 상태: 진행중');
+      }, 800);
+    }, 800);
+  }
+
+  function showToast(msg){
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._hide);
+    t._hide = setTimeout(function(){ t.classList.remove('show'); }, 3000);
+  }
+</script>
+
+<!--
+  ═══ 실제 구현 시 컴포넌트 매핑 (v2.0) ═══
+  · 이 뷰 전체        → src/renderer/src/components/Workspace/WorkspaceView.tsx (App.tsx activeView='workspace')
+  · 뷰 정체성         → 여러 태스크(브랜치)를 동시에 병렬 작업. 태스크당 워크스페이스(워크트리+세션)는 1개 — fan-out 없음
+  · 좌측 태스크 카드   → TaskRow (기존 Dooray 뷰의 태스크 목록 셀 재사용 + 브랜치 배지/상태 dot 확장)
+  · 상태 A (상세)     → TaskDetailPanel (기존 두레이 태스크 상세 재사용, [작업 시작] 버튼만 추가)
+  · 작업 시작 버튼     → StartWorkButton (split: 기본=마지막 설정으로 즉시 시작, ▾=옵션 메뉴. 설정 모달은 start-work-modal 목업)
+  · 상태 B (작업)     → WorkspacePanel (신규 — 단일 run 헤더 / 터미널 / 액션바)
+  · 터미널 영역       → TerminalPane (기존 xterm + TerminalManager 세션 attach 재사용)
+  · 우측 슬라이드 패널 → TaskContextPanel (세그먼트 탭: 업무 상세 = TaskDetailPanel 축약 재사용 | 변경사항 = DiffPanel 재사용)
+                        워크스페이스 작업 중 태스크 본문을 나란히 보는 것이 기본 상태 (기본 열림 + 업무 상세 탭)
+  · 워크스페이스 상태(작업 중/응답 대기)는 HookServer stop hook + pty idle 감지로 판정
+-->
+</body>
+</html>

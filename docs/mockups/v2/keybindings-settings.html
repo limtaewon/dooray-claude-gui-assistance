@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clauday v2.0 — 설정 · 단축키 목업</title>
+<style>
+  :root{
+    --bg:#0e1014; --panel:#161a22; --panel2:#1c212b; --border:#272d3a; --border2:#333b4a;
+    --tx:#e7ebf2; --tx2:#9aa4b6; --tx3:#6b7484;
+    --orange:#ff7a1a; --blue:#4a9eff;
+    --ok:#34d399; --warn:#fbbf24; --bad:#f87171;
+    --radius:10px;
+    font-synthesis:none;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--tx);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    font-size:13px; line-height:1.5; overflow:hidden;
+  }
+  code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+  /* ===== App shell (harness-studio-mockup 패턴 준수) ===== */
+  .app{display:flex; flex-direction:column; height:100vh}
+  .titlebar{height:38px; background:#0b0d11; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:10px; padding:0 14px; flex:none; -webkit-user-select:none}
+  .lights{display:flex; gap:7px}
+  .lights i{width:11px;height:11px;border-radius:50%}
+  .lights i:nth-child(1){background:#ff5f57}.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}
+  .title{font-weight:600; font-size:12.5px; letter-spacing:.2px}
+  .title b{background:linear-gradient(90deg,var(--orange),var(--blue));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .titlebar .spacer{flex:1}
+  .cmdkhint{font-size:11px; color:var(--tx3); border:1px solid var(--border2); padding:3px 8px; border-radius:6px}
+  .body{display:flex; flex:1; min-height:0}
+  /* sidebar 56px 아이콘 네비 */
+  .sidebar{width:56px; background:#0b0d11; border-right:1px solid var(--border); flex:none;
+    display:flex; flex-direction:column; align-items:center; padding-top:10px; gap:5px}
+  .nav{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    color:var(--tx3); cursor:pointer; font-size:17px; position:relative}
+  .nav:hover{background:#181c24;color:var(--tx2)}
+  .nav.active{background:linear-gradient(135deg,rgba(255,122,26,.22),rgba(74,158,255,.22));color:var(--tx)}
+  .nav.active::before{content:"";position:absolute;left:-10px;top:8px;bottom:8px;width:3px;border-radius:3px;background:linear-gradient(var(--orange),var(--blue))}
+  .main{flex:1; display:flex; flex-direction:column; min-width:0}
+
+  /* ===== 설정 레이아웃 ===== */
+  .settings{display:flex; flex:1; min-height:0}
+  .setnav{width:210px; flex:none; border-right:1px solid var(--border); padding:16px 10px; background:rgba(11,13,17,.4)}
+  .setnav h1{font-size:14px; margin:2px 8px 12px; font-weight:800}
+  .setnav .si{display:flex; align-items:center; gap:9px; padding:8px 12px; border-radius:9px;
+    color:var(--tx2); cursor:pointer; font-size:12.5px; position:relative}
+  .setnav .si:hover{background:#181c24; color:var(--tx)}
+  .setnav .si.active{background:linear-gradient(135deg,rgba(255,122,26,.18),rgba(74,158,255,.18)); color:var(--tx); font-weight:600}
+  .setnav .si.active::before{content:""; position:absolute; left:-10px; top:7px; bottom:7px; width:3px; border-radius:3px;
+    background:linear-gradient(var(--orange),var(--blue))}
+  .setnav .si .ic{width:16px; text-align:center; font-size:14px}
+  .setcontent{flex:1; min-width:0; overflow:auto; padding:22px 28px 40px}
+  .pagehead{margin-bottom:14px}
+  .pagehead h2{margin:0; font-size:17px; font-weight:800}
+  .pagehead p{margin:5px 0 0; color:var(--tx2); font-size:12px}
+
+  /* ===== 툴바 ===== */
+  .toolrow{display:flex; gap:10px; align-items:center; margin-bottom:16px; max-width:860px}
+  .toolrow input{flex:1; background:var(--bg); border:1px solid var(--border2); border-radius:9px;
+    color:var(--tx); padding:9px 12px; font-size:12.5px; outline:none}
+  .toolrow input:focus{border-color:var(--blue); box-shadow:0 0 0 3px rgba(74,158,255,.12)}
+  .btn{font-size:12px; padding:7px 13px; border-radius:8px; border:1px solid var(--border2); background:var(--panel2);
+    color:var(--tx); cursor:pointer; display:inline-flex; align-items:center; gap:6px; white-space:nowrap}
+  .btn:hover{border-color:var(--blue)}
+  .btn.ghost{background:transparent; color:var(--tx2)}
+  .btn.ghost:hover{color:var(--tx)}
+  .btn.sm{font-size:11px; padding:3px 9px; border-radius:7px}
+  .seg{display:inline-flex; background:var(--panel); border:1px solid var(--border); border-radius:9px; padding:3px; gap:2px; flex:none}
+  .seg button{border:none; background:transparent; color:var(--tx2); padding:5px 13px; border-radius:7px;
+    cursor:pointer; font-size:12px; font-weight:600}
+  .seg button.active{background:linear-gradient(135deg,rgba(255,122,26,.25),rgba(74,158,255,.25)); color:var(--tx)}
+
+  /* ===== ds-card 그룹 ===== */
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px 16px; margin-bottom:14px; max-width:860px}
+  .card h3{margin:0 0 2px; font-size:13.5px; display:flex; align-items:center; gap:8px}
+  .card .gcap{color:var(--tx3); font-size:11px; margin:0 0 8px}
+  .card .gcap.warn{color:#d9b25a}
+
+  /* ===== 단축키 행 ===== */
+  .krow{display:flex; align-items:center; gap:9px; padding:7px 10px; border-radius:9px; margin:0 -6px}
+  .krow:hover{background:var(--panel2)}
+  .krow .aname{flex:1; display:flex; align-items:center; gap:8px; min-width:0; font-size:12.5px}
+  .krow.locked{opacity:.45}
+  .krow.locked .kbd{cursor:default}
+  .krow.flash{animation:flashrow 1.6s ease}
+  @keyframes flashrow{0%,60%{background:rgba(74,158,255,.18)}100%{background:transparent}}
+
+  .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:11.5px; padding:3px 10px;
+    border-radius:7px; background:var(--bg); border:1px solid var(--border2); color:#cdd6e6;
+    cursor:pointer; min-width:44px; text-align:center; flex:none}
+  button.kbd{line-height:1.5}
+  .kbd:hover{border-color:var(--blue)}
+  .kbd.static{cursor:default; color:var(--tx2)}
+  .kbd.static:hover{border-color:var(--border2)}
+  .kbd.capturing{border-color:var(--blue); color:var(--blue); background:rgba(74,158,255,.08);
+    animation:capblink 1.1s infinite; min-width:0; font-family:inherit; font-size:11px}
+  @keyframes capblink{0%,100%{box-shadow:0 0 0 0 rgba(74,158,255,.35)}50%{box-shadow:0 0 0 4px rgba(74,158,255,0)}}
+  .kbd.pending{border-color:var(--warn); color:var(--warn)}
+  .ksep{color:var(--tx3); font-size:11px}
+
+  .chgdot{width:7px; height:7px; border-radius:50%; background:var(--blue); flex:none}
+  .undo{border:1px solid var(--border2); background:var(--panel2); color:var(--tx2); font-size:12px;
+    width:24px; height:24px; border-radius:7px; cursor:pointer; flex:none; line-height:1}
+  .undo:hover{border-color:var(--blue); color:var(--tx)}
+
+  .newchip{font-size:9px; font-weight:800; letter-spacing:.5px; padding:1px 6px; border-radius:8px;
+    background:rgba(52,211,153,.16); color:var(--ok); flex:none}
+  .lock{color:var(--tx3); font-size:11px; flex:none}
+
+  /* 충돌 배지 + 툴팁 */
+  .warnbadge{font-size:9.5px; font-weight:700; padding:1px 7px; border-radius:8px; flex:none;
+    background:rgba(251,191,36,.14); color:var(--warn); border:1px solid rgba(251,191,36,.35);
+    position:relative; cursor:help; white-space:nowrap}
+  .warnbadge:hover::after{content:attr(data-tip); position:absolute; bottom:calc(100% + 8px); left:0;
+    width:max-content; max-width:300px; white-space:normal; background:#0b0d11; border:1px solid var(--border2);
+    color:var(--tx); font-weight:500; font-size:11px; line-height:1.5; padding:7px 10px; border-radius:8px;
+    box-shadow:0 8px 24px rgba(0,0,0,.5); z-index:60}
+
+  /* 인라인 충돌 경고 */
+  .inlinewarn{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:2px -6px 6px;
+    padding:8px 12px; border-radius:9px; font-size:11.5px;
+    background:rgba(251,191,36,.08); border:1px solid rgba(251,191,36,.35); color:#f4d489}
+  .inlinewarn code{background:var(--bg); border:1px solid var(--border2); padding:1px 6px; border-radius:5px; color:var(--warn); font-size:11px}
+
+  /* Shift 두 번 특수 행: 토글 + 임계값 스텝퍼 */
+  .switch{width:34px; height:20px; border-radius:20px; background:var(--border2); position:relative;
+    cursor:pointer; transition:background .15s; flex:none}
+  .switch::after{content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%;
+    background:var(--tx2); transition:left .15s, background .15s}
+  .switch.on{background:linear-gradient(135deg,var(--orange),#ff924a)}
+  .switch.on::after{left:16px; background:#fff}
+  .stepper{display:inline-flex; align-items:center; border:1px solid var(--border2); border-radius:8px; overflow:hidden; flex:none}
+  .stepper button{width:26px; height:24px; border:none; background:var(--panel2); color:var(--tx); cursor:pointer; font-size:13px; line-height:1}
+  .stepper button:hover{background:#242b38}
+  .stepper button:disabled{color:var(--tx3); cursor:default; background:var(--panel2)}
+  .stepper .val{width:58px; text-align:center; font-weight:700; font-size:11.5px}
+  .krow .miniLabel{font-size:10.5px; color:var(--tx3); flex:none}
+  .krow.off .stepper{opacity:.4; pointer-events:none}
+
+  .noresult{max-width:860px; text-align:center; color:var(--tx3); padding:46px 20px; font-size:12.5px;
+    border:1px dashed var(--border2); border-radius:14px}
+  .footnote{max-width:860px; color:var(--tx3); font-size:11px; margin-top:6px}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- titlebar -->
+  <div class="titlebar">
+    <div class="lights"><i></i><i></i><i></i></div>
+    <div class="title"><b>Clauday</b> · 설정 <span style="font-weight:400;color:var(--tx3)">— 단축키</span></div>
+    <div class="spacer"></div>
+    <div class="cmdkhint">⌘K</div>
+  </div>
+  <div class="body">
+    <!-- sidebar: 56px 아이콘 네비 -->
+    <div class="sidebar">
+      <div class="nav" title="두레이">🏠</div>
+      <div class="nav" title="터미널">▢</div>
+      <div class="nav" title="세션">💬</div>
+      <div class="nav" title="MCP">🧩</div>
+      <div class="nav" title="스킬">⚡</div>
+      <div class="nav" title="Harness Studio">🧭</div>
+      <div class="nav" title="사용량">📊</div>
+      <div class="nav active" title="설정">⚙</div>
+    </div>
+    <!-- main -->
+    <div class="main">
+      <div class="settings">
+        <!-- 설정 카테고리 -->
+        <div class="setnav">
+          <h1>설정</h1>
+          <div class="si"><span class="ic">🎛</span>일반</div>
+          <div class="si"><span class="ic">🔗</span>두레이 연동</div>
+          <div class="si"><span class="ic">🗂</span>워크스페이스</div>
+          <div class="si"><span class="ic">▣</span>터미널</div>
+          <div class="si"><span class="ic">🤖</span>AI 모델</div>
+          <div class="si active"><span class="ic">⌨</span>단축키</div>
+        </div>
+
+        <!-- 콘텐츠 -->
+        <div class="setcontent">
+          <div class="pagehead">
+            <h2>단축키</h2>
+            <p>키 칩을 클릭한 뒤 새 조합을 누르면 리바인딩됩니다. 충돌은 즉시 감지됩니다.</p>
+          </div>
+
+          <div class="toolrow">
+            <input type="text" id="search" placeholder="액션 또는 키로 검색" spellcheck="false" autocomplete="off">
+            <button class="btn ghost" id="resetAll">기본값 전체 복원</button>
+            <div class="seg" id="platformSeg">
+              <button class="active" data-platform="mac">macOS</button>
+              <button data-platform="win">Windows</button>
+            </div>
+          </div>
+
+          <!-- 그룹 1 — 전역 -->
+          <div class="card kgroup">
+            <h3>전역</h3>
+            <p class="gcap">앱 어디서나 동작합니다.</p>
+
+            <div class="krow">
+              <div class="aname">커맨드 팔레트 열기
+                <span class="warnbadge" data-tip="C1 · 터미널 '화면 지우기'와 충돌 — 터미널 포커스 시 이중 발화 중 (수정 예정)">⚠️ 충돌</span>
+              </div>
+              <span class="chgdot" hidden></span>
+              <button class="kbd" data-id="cmdk" data-name="커맨드 팔레트 열기" data-combo="⌘K" data-default="⌘K">⌘K</button>
+              <button class="undo" title="기본값 복원" hidden>↺</button>
+            </div>
+
+            <div class="krow special" id="dblShiftRow">
+              <div class="aname">커맨드 팔레트 열기 (보조)</div>
+              <span class="kbd static" title="Shift 두 번 빠르게">Shift ×2</span>
+              <div class="switch on" id="dblShiftToggle" role="switch" aria-checked="true" title="Shift 두 번 감지 켜기/끄기"></div>
+              <span class="miniLabel">임계값</span>
+              <div class="stepper">
+                <button id="thMinus" aria-label="임계값 감소">−</button>
+                <span class="val" id="thVal">400ms</span>
+                <button id="thPlus" aria-label="임계값 증가">＋</button>
+              </div>
+            </div>
+
+            <div class="krow">
+              <div class="aname">오늘 할 일 빠른 추가</div>
+              <span class="chgdot" hidden></span>
+              <button class="kbd" data-id="quickadd" data-name="오늘 할 일 빠른 추가" data-combo="⌘/" data-default="⌘/">⌘/</button>
+              <button class="undo" title="기본값 복원" hidden>↺</button>
+            </div>
+
+            <div class="krow">
+              <div class="aname">최근 뷰 전환</div>
+              <span class="chgdot" hidden></span>
+              <button class="kbd" data-id="recentview" data-name="최근 뷰 전환" data-combo="⌘E" data-default="⌘E">⌘E</button>
+              <button class="undo" title="기본값 복원" hidden>↺</button>
+            </div>
+
+            <div class="krow">
+              <div class="aname">피드백 보내기</div>
+              <span class="chgdot" hidden></span>
+              <button class="kbd" data-id="feedback" data-name="피드백 보내기" data-combo="⌘⇧B" data-default="⌘⇧B">⌘⇧B</button>
+              <button class="undo" title="기본값 복원" hidden>↺</button>
+            </div>
+          </div>
+
+          <!-- 그룹 2 — 터미널 (뷰) -->
+          <div class="card kgroup">
+            <h3>터미널 (뷰)</h3>
+            <p class="gcap">터미널 뷰가 활성일 때 동작합니다.</p>
+
+            <div class="krow">
+              <div class="aname">새 터미널 탭
+                <span class="warnbadge" data-tip="C2 · 세션 뷰 '새 세션'과 충돌 — 마지막에 등록된 핸들러만 동작 (수정 예정)">⚠️ 충돌</span>
+              </div>
+              <span class="chgdot" hidden></span>
+              <button class="kbd" data-id="newtab" data-name="새 터미널 탭" data-combo="⌘T" data-default="⌘T">⌘T</button>
+              <button class="undo" title="기본값 복원" hidden>↺</button>
+            </div>
+
+            <div class="krow">
+              <div class="aname">탭/pane 닫기
+                <span class="warnbadge" data-tip="C3 · Electron 창 닫기(role: close)와 충돌 — pane 대신 창이 닫힐 수 있음 (수정 예정)">⚠️ 충돌</span>
+              </div>
+              <span class="chgdot" hidden></span>
+              <button class="kbd" data-id="closetab" data-name="탭/pane 닫기" data-combo="⌘W" data-default="⌘W">⌘W</button>
+              <button class="undo" title="기본값 복원" hidden>↺</button>
+            </div>
+
+            <div class="krow">
+              <div class="aname">탭 1~9 전환
+                <span class="warnbadge" data-tip="C4 · 세션 목록 '세션 1~9 전환'과 충돌 — 포커스된 뷰에 따라 다르게 동작 (수정 예정)">⚠️ 충돌</span>
+              </div>
+              <span class="chgdot" hidden></span>
+              <button class="kbd" data-id="tabswitch" data-name="탭 1~9 전환" data-combo="⌘1-9" data-default="⌘1-9">⌘1-9</button>
+              <button class="undo" title="기본값 복원" hidden>↺</button>
+            </div>
+
+            <div class="krow">
+              <div class="aname">우측으로 분할<span class="newchip">NEW</span></div>
+              <span class="chgdot" hidden></span>
+              <button class="kbd" data-id="splitright" data-name="우측으로 분할" data-combo="⌘D" data-default="⌘D">⌘D</button>
+              <button class="undo" title="기본값 복원" hidden>↺</button>
+            </div>
+
+            <div class="krow">
+              <div class="aname">아래로 분할<span class="newchip">NEW</span></div>
+              <span class="chgdot" hidden></span>
+              <button class="kbd" data-id="splitdown" data-name="아래로 분할" data-combo="⌘⇧D" data-default="⌘⇧D">⌘⇧D</button>
+              <button class="undo" title="기본값 복원" hidden>↺</button>
+            </div>
+
+            <div class="krow">
+              <div class="aname">pane 포커스 이동<span class="newchip">NEW</span></div>
+              <span class="chgdot" hidden></span>
+              <button class="kbd" data-id="panefocus" data-name="pane 포커스 이동" data-combo="⌥⌘←→↑↓" data-default="⌥⌘←→↑↓">⌥⌘←→↑↓</button>
+              <button class="undo" title="기본값 복원" hidden>↺</button>
+            </div>
+
+            <div class="krow">
+              <div class="aname">태스크 드로어 토글<span class="newchip">NEW</span></div>
+              <span class="chgdot" hidden></span>
+              <button class="kbd" data-id="taskdrawer" data-name="태스크 드로어 토글" data-combo="⌘⇧T" data-default="⌘⇧T">⌘⇧T</button>
+              <button class="undo" title="기본값 복원" hidden>↺</button>
+            </div>
+
+            <div class="krow">
+              <div class="aname">터미널 내 검색</div>
+              <span class="chgdot" hidden></span>
+              <button class="kbd" data-id="termsearch" data-name="터미널 내 검색" data-combo="⌘F" data-default="⌘F">⌘F</button>
+              <button class="undo" title="기본값 복원" hidden>↺</button>
+            </div>
+          </div>
+
+          <!-- 그룹 3 — 터미널 (입력/편집) -->
+          <div class="card kgroup">
+            <h3>터미널 (입력/편집)</h3>
+            <p class="gcap warn">셸 제어문자와 연동 — 신중히 변경</p>
+
+            <div class="krow">
+              <div class="aname">화면 지우기
+                <span class="warnbadge" data-tip="C1 · 전역 '커맨드 팔레트 열기'와 충돌 — 터미널 포커스 시 이중 발화 중 (수정 예정)">⚠️ 충돌</span>
+              </div>
+              <span class="chgdot" hidden></span>
+              <button class="kbd" data-id="clearscreen" data-name="화면 지우기" data-combo="⌘K" data-default="⌘K">⌘K</button>
+              <button class="undo" title="기본값 복원" hidden>↺</button>
+            </div>
+
+            <div class="krow">
+              <div class="aname">줄 처음/끝으로 이동</div>
+              <span class="chgdot" hidden></span>
+              <button class="kbd" data-id="linestart" data-name="줄 처음으로 이동" data-combo="⌘←" data-default="⌘←">⌘←</button>
+              <span class="ksep">/</span>
+              <button class="kbd" data-id="lineend" data-name="줄 끝으로 이동" data-combo="⌘→" data-default="⌘→">⌘→</button>
+              <button class="undo" title="기본값 복원" hidden>↺</button>
+            </div>
+
+            <div class="krow">
+              <div class="aname">단어 단위 이동</div>
+              <span class="chgdot" hidden></span>
+              <button class="kbd" data-id="wordleft" data-name="단어 왼쪽 이동" data-combo="⌥←" data-default="⌥←">⌥←</button>
+              <span class="ksep">/</span>
+              <button class="kbd" data-id="wordright" data-name="단어 오른쪽 이동" data-combo="⌥→" data-default="⌥→">⌥→</button>
+              <button class="undo" title="기본값 복원" hidden>↺</button>
+            </div>
+
+            <div class="krow">
+              <div class="aname">줄/단어 삭제</div>
+              <span class="chgdot" hidden></span>
+              <button class="kbd" data-id="delline" data-name="줄 삭제" data-combo="⌘⌫" data-default="⌘⌫">⌘⌫</button>
+              <span class="ksep">/</span>
+              <button class="kbd" data-id="delword" data-name="단어 삭제" data-combo="⌥⌫" data-default="⌥⌫">⌥⌫</button>
+              <button class="undo" title="기본값 복원" hidden>↺</button>
+            </div>
+
+            <div class="krow">
+              <div class="aname">현재 입력줄 선택</div>
+              <span class="chgdot" hidden></span>
+              <button class="kbd" data-id="selectline" data-name="현재 입력줄 선택" data-combo="⌘A" data-default="⌘A">⌘A</button>
+              <button class="undo" title="기본값 복원" hidden>↺</button>
+            </div>
+
+            <div class="krow">
+              <div class="aname">전체 선택</div>
+              <span class="chgdot" hidden></span>
+              <button class="kbd" data-id="selectall" data-name="전체 선택" data-combo="⌘⇧A" data-default="⌘⇧A">⌘⇧A</button>
+              <button class="undo" title="기본값 복원" hidden>↺</button>
+            </div>
+
+            <div class="krow">
+              <div class="aname">복사/붙여넣기</div>
+              <span class="chgdot" hidden></span>
+              <button class="kbd" data-id="copy" data-name="복사" data-combo="⌘C" data-default="⌘C">⌘C</button>
+              <span class="ksep">/</span>
+              <button class="kbd" data-id="paste" data-name="붙여넣기" data-combo="⌘V" data-default="⌘V">⌘V</button>
+              <button class="undo" title="기본값 복원" hidden>↺</button>
+            </div>
+
+            <div class="krow">
+              <div class="aname">멀티라인 개행</div>
+              <span class="chgdot" hidden></span>
+              <button class="kbd" data-id="newline" data-name="멀티라인 개행" data-combo="⇧Enter" data-default="⇧Enter">⇧Enter</button>
+              <button class="undo" title="기본값 복원" hidden>↺</button>
+            </div>
+          </div>
+
+          <!-- 그룹 4 — 잠금(편집 불가) -->
+          <div class="card kgroup">
+            <h3>잠금 <span class="lock">🔒</span></h3>
+            <p class="gcap">시스템 메뉴 항목은 변경할 수 없습니다</p>
+
+            <div class="krow locked">
+              <div class="aname"><span class="lock">🔒</span>실행 취소/재실행</div>
+              <span class="kbd" data-locked="1" data-name="실행 취소" data-combo="⌘Z">⌘Z</span>
+              <span class="ksep">/</span>
+              <span class="kbd" data-locked="1" data-name="재실행" data-combo="⌘⇧Z">⌘⇧Z</span>
+            </div>
+
+            <div class="krow locked">
+              <div class="aname"><span class="lock">🔒</span>새로고침</div>
+              <span class="kbd" data-locked="1" data-name="새로고침" data-combo="⌘⇧R">⌘⇧R</span>
+            </div>
+          </div>
+
+          <div class="noresult" id="noresult" hidden>검색 결과가 없습니다. 다른 액션명이나 키로 검색해 보세요.</div>
+
+          <div class="footnote">변경 사항은 즉시 저장됩니다 · 커맨드 팔레트와 매뉴얼의 키 표기도 함께 갱신됩니다</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ===== 플랫폼 표기 =====
+  let platform = 'mac'; // 'mac' | 'win'
+
+  // mac 심볼 표기('⌘⇧D')를 파싱: 선행 수정자 + 나머지 키
+  function parseCombo(mac) {
+    let i = 0; const mods = [];
+    while (i < mac.length && '⌘⇧⌥⌃'.includes(mac[i])) { mods.push(mac[i]); i++; }
+    return { mods, rest: mac.slice(i) };
+  }
+
+  // 저장은 mac 심볼 canonical, 표시는 플랫폼별 변환
+  function displayCombo(mac) {
+    if (platform === 'mac') return mac;
+    const { mods, rest } = parseCombo(mac);
+    const parts = [];
+    if (mods.includes('⌘') || mods.includes('⌃')) parts.push('Ctrl');
+    if (mods.includes('⌥')) parts.push('Alt');
+    if (mods.includes('⇧')) parts.push('Shift');
+    parts.push(rest === '⌫' ? 'Backspace' : rest);
+    return parts.join('+');
+  }
+
+  function normalizeCombo(mac) { // 수정자 순서 무시 비교용
+    const { mods, rest } = parseCombo(mac);
+    return mods.sort().join('') + rest;
+  }
+
+  function refreshAllChips() {
+    document.querySelectorAll('.kbd[data-combo]').forEach(ch => {
+      if (ch.classList.contains('capturing') || ch.classList.contains('pending')) return;
+      ch.textContent = displayCombo(ch.dataset.combo);
+    });
+  }
+
+  document.querySelectorAll('#platformSeg button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#platformSeg button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      platform = b.dataset.platform;
+      refreshAllChips();
+      applyFilter();
+    });
+  });
+
+  // ===== 행 상태 (변경 dot + 복원 버튼) =====
+  function updateRowState(row) {
+    const chips = [...row.querySelectorAll('.kbd[data-default]')];
+    const changed = chips.some(c => c.dataset.combo !== c.dataset.default);
+    const dot = row.querySelector('.chgdot');
+    const undo = row.querySelector('.undo');
+    if (dot) dot.hidden = !changed;
+    if (undo) undo.hidden = !changed;
+  }
+
+  document.querySelectorAll('.krow .undo').forEach(u => {
+    u.addEventListener('click', () => {
+      const row = u.closest('.krow');
+      row.querySelectorAll('.kbd[data-default]').forEach(c => { c.dataset.combo = c.dataset.default; });
+      refreshAllChips();
+      updateRowState(row);
+    });
+  });
+
+  // ===== 키 캡처 리바인딩 =====
+  let capture = null; // { chip, pending?: string }
+
+  function clearInlineWarn() {
+    document.querySelectorAll('.inlinewarn').forEach(w => w.remove());
+  }
+
+  function endCapture() {
+    if (!capture) return;
+    capture.chip.classList.remove('capturing', 'pending');
+    capture = null;
+    clearInlineWarn();
+    refreshAllChips();
+  }
+
+  function startCapture(chip) {
+    if (capture) endCapture();
+    capture = { chip };
+    clearInlineWarn();
+    chip.classList.add('capturing');
+    chip.textContent = '새 키 조합을 누르세요… (Esc 취소)';
+  }
+
+  document.querySelectorAll('.kbd[data-default]').forEach(chip => {
+    chip.addEventListener('click', e => {
+      e.stopPropagation();
+      if (capture && capture.chip === chip) return;
+      startCapture(chip);
+    });
+  });
+
+  // keydown → mac 심볼 조합 문자열
+  function eventToMacCombo(e) {
+    let s = '';
+    if (e.metaKey) s += '⌘';
+    if (e.shiftKey) s += '⇧';
+    if (e.altKey) s += '⌥';
+    if (e.ctrlKey) s += '⌃';
+    let k;
+    if (e.code && e.code.startsWith('Key')) k = e.code.slice(3);          // 문자 (⌥ 조합 특수문자 방지)
+    else if (e.code && e.code.startsWith('Digit')) k = e.code.slice(5);   // 숫자
+    else {
+      const map = { ArrowLeft:'←', ArrowRight:'→', ArrowUp:'↑', ArrowDown:'↓', Backspace:'⌫', ' ':'Space' };
+      k = map[e.key] || (e.key.length === 1 ? e.key.toUpperCase() : e.key);
+    }
+    return s + k;
+  }
+
+  // 다른 액션과의 충돌 검색 (잠금 항목 포함)
+  function findConflict(combo, exceptChip) {
+    const n = normalizeCombo(combo);
+    for (const c of document.querySelectorAll('.kbd[data-combo]')) {
+      if (c === exceptChip) continue;
+      if (normalizeCombo(c.dataset.combo) === n) return c;
+    }
+    return null;
+  }
+
+  function commit(chip, combo) {
+    chip.dataset.combo = combo;
+    endCapture();
+    updateRowState(chip.closest('.krow'));
+  }
+
+  function showInlineWarn(chip, combo, otherChip) {
+    clearInlineWarn();
+    capture.pending = combo;
+    chip.classList.remove('capturing');
+    chip.classList.add('pending');
+    chip.textContent = displayCombo(combo);
+
+    const warn = document.createElement('div');
+    warn.className = 'inlinewarn';
+    const msg = document.createElement('span');
+    msg.innerHTML = '<code>' + displayCombo(combo) + '</code> 는 ‘' + otherChip.dataset.name + '’에서 사용 중입니다 —';
+    const goBtn = document.createElement('button');
+    goBtn.className = 'btn sm';
+    goBtn.textContent = '해당 항목으로 이동';
+    goBtn.addEventListener('click', () => {
+      const targetRow = otherChip.closest('.krow');
+      endCapture();
+      targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      targetRow.classList.remove('flash');
+      void targetRow.offsetWidth; // 애니메이션 재시작
+      targetRow.classList.add('flash');
+    });
+    const assignBtn = document.createElement('button');
+    assignBtn.className = 'btn sm';
+    assignBtn.textContent = '무시하고 할당';
+    assignBtn.addEventListener('click', () => commit(chip, combo));
+    warn.append(msg, goBtn, assignBtn);
+    chip.closest('.krow').after(warn);
+  }
+
+  window.addEventListener('keydown', e => {
+    if (!capture) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === 'Escape') { endCapture(); return; }
+    if (['Meta', 'Control', 'Alt', 'Shift'].includes(e.key)) return; // 수정자 단독은 무시
+    const combo = eventToMacCombo(e);
+    const other = findConflict(combo, capture.chip);
+    if (other) showInlineWarn(capture.chip, combo, other);
+    else commit(capture.chip, combo);
+  }, true);
+
+  // 캡처 중 바깥 클릭 → 취소
+  document.addEventListener('mousedown', e => {
+    if (!capture) return;
+    if (e.target === capture.chip || e.target.closest('.inlinewarn')) return;
+    endCapture();
+  });
+
+  // ===== Shift 두 번 (보조 팔레트) 특수 행 =====
+  const dblToggle = document.getElementById('dblShiftToggle');
+  const dblRow = document.getElementById('dblShiftRow');
+  const thVal = document.getElementById('thVal');
+  const TH = { min: 200, max: 800, step: 50 };
+  let threshold = 400;
+
+  function renderDblShift() {
+    const on = dblToggle.classList.contains('on');
+    dblToggle.setAttribute('aria-checked', on);
+    dblRow.classList.toggle('off', !on);
+    thVal.textContent = threshold + 'ms';
+    document.getElementById('thMinus').disabled = threshold <= TH.min;
+    document.getElementById('thPlus').disabled = threshold >= TH.max;
+  }
+  dblToggle.addEventListener('click', () => { dblToggle.classList.toggle('on'); renderDblShift(); });
+  document.getElementById('thMinus').addEventListener('click', () => { threshold = Math.max(TH.min, threshold - TH.step); renderDblShift(); });
+  document.getElementById('thPlus').addEventListener('click', () => { threshold = Math.min(TH.max, threshold + TH.step); renderDblShift(); });
+  renderDblShift();
+
+  // ===== 기본값 전체 복원 =====
+  document.getElementById('resetAll').addEventListener('click', () => {
+    endCapture();
+    document.querySelectorAll('.kbd[data-default]').forEach(c => { c.dataset.combo = c.dataset.default; });
+    refreshAllChips();
+    document.querySelectorAll('.krow').forEach(updateRowState);
+    if (!dblToggle.classList.contains('on')) dblToggle.classList.add('on');
+    threshold = 400;
+    renderDblShift();
+  });
+
+  // ===== 검색 필터 (액션명 + 키 문자열) =====
+  const searchInput = document.getElementById('search');
+  function applyFilter() {
+    const q = searchInput.value.trim().toLowerCase();
+    document.querySelectorAll('.krow').forEach(row => {
+      const name = row.querySelector('.aname').textContent;
+      const keys = [...row.querySelectorAll('.kbd')]
+        .map(c => c.dataset.combo ? displayCombo(c.dataset.combo) + ' ' + c.dataset.combo : c.textContent)
+        .join(' ');
+      row.hidden = !!q && !(name + ' ' + keys).toLowerCase().includes(q);
+    });
+    clearInlineWarn();
+    let anyVisible = false;
+    document.querySelectorAll('.card.kgroup').forEach(g => {
+      const empty = [...g.querySelectorAll('.krow')].every(r => r.hidden);
+      g.hidden = empty;
+      if (!empty) anyVisible = true;
+    });
+    document.getElementById('noresult').hidden = anyVisible;
+  }
+  searchInput.addEventListener('input', applyFilter);
+</script>
+
+<!--
+═══════════════════════════════════════════════════════════════════════
+ 구현 매핑 노트 (v2.0 — 설정 › 단축키)
+═══════════════════════════════════════════════════════════════════════
+
+■ 키바인딩 레지스트리 (single source of truth)
+  - src/shared/keybindings.ts (신규)
+    · 모든 단축키를 commandId 로 등록:
+      interface KeybindingDef {
+        commandId: string;        // 'palette.open', 'terminal.tab.new', ...
+        group: 'global' | 'terminal.view' | 'terminal.input' | 'locked';
+        label: string;            // 한국어 액션명 (이 목업의 행 텍스트)
+        default: { mac: string; win: string };  // canonical 표기
+        customizable: boolean;    // locked 그룹 = false
+      }
+    · 이 목업의 인벤토리 그대로 초기 시드. NEW 칩 = v2.0 신설 커맨드
+      (terminal.pane.splitRight/splitDown/focusMove, terminal.taskDrawer.toggle)
+
+■ Renderer
+  - src/renderer/src/components/Settings/KeybindingsSettings.tsx (신규)
+    · 이 목업의 우측 콘텐츠. 검색/플랫폼 세그먼트/그룹 카드/키 캡처.
+    · 키 캡처는 keydown 캡처 페이즈 리스너 + Esc 취소 — 이 목업 JS 로직 이식.
+  - src/renderer/src/hooks/useShortcut.ts (신규 또는 기존 정리)
+    · useShortcut(commandId, handler) — 하드코딩된 keydown 분기들을
+      레지스트리 조회로 치환. 오버라이드가 있으면 그 조합으로 리스닝.
+  - src/renderer/src/components/common/ds/Kbd.tsx
+    · <Kbd commandId="palette.open" /> — 표기는 formatBinding(commandId, platform)
+      한 곳에서. 커맨드 팔레트 목록·ClaudeManual 의 키 표기가 자동 동기화됨
+      (하단 캡션 "커맨드 팔레트와 매뉴얼의 키 표기도 함께 갱신됩니다"의 근거).
+  - src/shared/keybindings.ts 의 formatBinding(combo, platform):
+    mac 심볼(⌘⇧⌥⌃) ↔ Windows 'Ctrl+Alt+Shift+X' 변환. vitest 단위 테스트 필수.
+
+■ 저장
+  - electron-store settings 'keybindings' 키:
+    { overrides: Record<commandId, { mac?: string; win?: string }>,
+      doubleShiftPalette: { enabled: boolean; thresholdMs: number } }  // 기본 400ms
+  - 기본값과 같으면 override 를 저장하지 않음(기본값 전체 복원 = overrides 비우기).
+
+■ 충돌 감지
+  - normalize(수정자 정렬) 후 동일 조합 검색 — 잠금(시스템 메뉴) 항목 포함.
+  - 신규 할당 시: 경고 + [해당 항목으로 이동] / [무시하고 할당] (이 목업 데모).
+  - 기존 충돌 C1~C4 는 v2.0 마이그레이션의 수용 기준(AC) — 릴리즈 전 해소:
+    C1: ⌘K  커맨드 팔레트 ↔ 터미널 화면 지우기 (터미널 포커스 시 이중 발화)
+    C2: ⌘T  새 터미널 탭 ↔ 세션 뷰 새 세션 (마지막 등록 핸들러만 동작)
+    C3: ⌘W  탭/pane 닫기 ↔ Electron 창 닫기 role (pane 대신 창이 닫힘)
+    C4: ⌘1-9 터미널 탭 전환 ↔ 세션 목록 1~9 전환 (뷰 포커스별 상이 동작)
+
+■ 연계
+  - 설정 뷰(SettingsView) 카테고리에 'keybindings' 추가 (이 목업 좌측 네비).
+  - ClaudeManual.tsx SECTIONS 에 '단축키 설정' 항목 추가 (DoD).
+  - 터미널 입력/편집 그룹은 xterm attachCustomKeyEventHandler 와 연동 —
+    셸 제어문자(⌘K=clear 등) 충돌 주의 캡션 유지.
+═══════════════════════════════════════════════════════════════════════
+-->
+</body>
+</html>

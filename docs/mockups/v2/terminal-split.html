@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clauday — 터미널 Split Pane + 검색 고도화 · v2.0 목업</title>
+<style>
+  :root{
+    --bg:#0e1014; --panel:#161a22; --panel2:#1c212b; --border:#272d3a; --border2:#333b4a;
+    --tx:#e7ebf2; --tx2:#9aa4b6; --tx3:#6b7484;
+    --orange:#ff7a1a; --blue:#4a9eff;
+    --ok:#34d399; --warn:#fbbf24; --bad:#f87171;
+    --radius:10px;
+    --term-bg:#0a0c10;
+    font-synthesis:none;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--tx);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    font-size:13px; line-height:1.5; overflow:hidden;
+  }
+  /* ===== App shell ===== */
+  .app{display:flex; flex-direction:column; height:100vh}
+  .titlebar{height:38px; background:#0b0d11; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:10px; padding:0 14px; flex:none; -webkit-user-select:none}
+  .lights{display:flex; gap:7px}
+  .lights i{width:11px;height:11px;border-radius:50%}
+  .lights i:nth-child(1){background:#ff5f57}.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}
+  .title{font-weight:600; font-size:12.5px; letter-spacing:.2px}
+  .title b{background:linear-gradient(90deg,var(--orange),var(--blue));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .titlebar .spacer{flex:1}
+  .cmdk{font-size:11px; color:var(--tx3); border:1px solid var(--border2); padding:3px 8px; border-radius:6px}
+  .body{display:flex; flex:1; min-height:0}
+  /* sidebar */
+  .sidebar{width:56px; background:#0b0d11; border-right:1px solid var(--border); flex:none;
+    display:flex; flex-direction:column; align-items:center; padding-top:10px; gap:5px}
+  .nav{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    color:var(--tx3); cursor:pointer; font-size:17px; position:relative}
+  .nav:hover{background:#181c24;color:var(--tx2)}
+  .nav.active{background:linear-gradient(135deg,rgba(255,122,26,.22),rgba(74,158,255,.22));color:var(--tx)}
+  .nav.active::before{content:"";position:absolute;left:-10px;top:8px;bottom:8px;width:3px;border-radius:3px;background:linear-gradient(var(--orange),var(--blue))}
+  .nav.term-ic{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:13px;font-weight:700;letter-spacing:-1px}
+  .sidebar .sspacer{flex:1}
+  /* main */
+  .main{flex:1; display:flex; flex-direction:column; min-width:0}
+
+  /* ===== Tab bar ===== */
+  .tabbar{display:flex;align-items:flex-end;gap:3px;padding:8px 12px 0;background:var(--panel);
+    border-bottom:1px solid var(--border);flex:none;position:relative}
+  .ttab{display:flex;align-items:center;gap:7px;padding:7px 13px;font-size:12px;color:var(--tx2);cursor:pointer;
+    border:1px solid transparent;border-bottom:none;border-radius:8px 8px 0 0;white-space:nowrap;
+    font-family:"JetBrains Mono",ui-monospace,Menlo,monospace}
+  .ttab:hover{color:var(--tx)}
+  .ttab.active{color:var(--tx);background:var(--term-bg);border-color:var(--border);position:relative;top:1px}
+  .ttab .panecnt{font-size:9.5px;font-weight:700;color:var(--blue);background:rgba(74,158,255,.14);
+    border:1px solid rgba(74,158,255,.35);padding:0 6px;border-radius:8px;font-family:inherit}
+  .ttab .tclose{color:var(--tx3);font-size:11px;margin-left:2px}
+  .ttab .tclose:hover{color:var(--tx)}
+  .ttab.newtab{padding:7px 10px;font-size:14px;color:var(--tx3);border-radius:8px}
+  .ttab.newtab:hover{background:var(--panel2);color:var(--tx)}
+  .tabbar .spacer{flex:1}
+  /* renderer toggle dropdown */
+  .rwrap{position:relative;align-self:center;margin-bottom:6px}
+  .rbtn{font-size:11px;color:var(--tx2);background:var(--panel2);border:1px solid var(--border2);
+    border-radius:7px;padding:4px 10px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .rbtn:hover{border-color:var(--blue);color:var(--tx)}
+  .rmenu{display:none;position:absolute;right:0;top:calc(100% + 5px);z-index:60;width:210px;
+    background:var(--panel2);border:1px solid var(--border2);border-radius:10px;padding:5px;
+    box-shadow:0 10px 28px rgba(0,0,0,.55)}
+  .rmenu.open{display:block}
+  .ropt{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;font-size:11.5px;color:var(--tx2);cursor:pointer}
+  .ropt:hover{background:rgba(74,158,255,.1);color:var(--tx)}
+  .ropt .chk{width:14px;text-align:center;color:var(--ok);font-weight:700}
+  .ropt b{color:var(--tx);font-weight:600}
+  .ropt small{color:var(--tx3);font-size:10px;display:block;margin-top:-1px}
+
+  /* ===== Split area ===== */
+  .term-area{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--term-bg)}
+  .split{flex:1;min-height:0;display:flex;padding:7px;gap:0}
+  .pane{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;
+    background:var(--term-bg);border:1px solid var(--border);border-radius:9px;overflow:hidden}
+  .pane.focused{border:1.5px solid var(--blue);box-shadow:0 0 0 1px rgba(74,158,255,.15), 0 0 14px rgba(74,158,255,.08)}
+  .pane.dimmed .tout{opacity:.7}
+  .pane-left{flex:0 0 60%}
+  .right-col{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+  .pane-rt{flex:0 0 calc(50% - 2px)}
+  .pane-rb{flex:1}
+  /* resize handles */
+  .handle{flex:none;background:transparent;transition:background .1s;z-index:20}
+  .handle.v{width:4px;cursor:col-resize;margin:2px 0}
+  .handle.h{height:4px;cursor:row-resize;margin:0 2px}
+  .handle:hover,.handle.dragging{background:var(--blue)}
+
+  /* pane label chip */
+  .plabel{position:absolute;top:6px;left:8px;z-index:5;font-size:9.5px;color:var(--tx3);
+    background:rgba(22,26,34,.85);border:1px solid var(--border);padding:1px 7px;border-radius:8px;
+    font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;-webkit-user-select:none}
+
+  /* ===== Terminal output ===== */
+  .tout{flex:1;min-height:0;overflow:auto;padding:12px 20px 12px 12px;
+    font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:12px;line-height:1.62;
+    color:#c6cfde;white-space:pre-wrap;word-break:break-all}
+  .tout .cl-star{color:var(--orange);font-weight:700}
+  .tout .cl-path{color:var(--tx3)}
+  .tout .cl-user{color:var(--tx)}
+  .tout .cl-tool{color:var(--blue)}
+  .tout .cl-dim{color:var(--tx3)}
+  .tout .cl-ok{color:var(--ok)}
+  .tout .cl-bad{color:var(--bad)}
+  .tout .cl-warn{color:var(--warn)}
+  .tout .cl-prompt{color:var(--ok);font-weight:700}
+  .cursor{display:inline-block;width:7.5px;height:15px;background:var(--tx);vertical-align:-2.5px;
+    animation:blink 1.05s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  /* search match highlight */
+  .match{background:rgba(255,122,26,.38);color:#ffd9b8;border-radius:2px;padding:0 1px}
+  .match.cur{background:var(--orange);color:#1a0e03;outline:1.5px solid #ffc78f}
+
+  /* ===== Search bar (pane 1) ===== */
+  .searchbar{position:absolute;top:7px;right:16px;z-index:30;display:flex;align-items:center;gap:5px;
+    background:var(--panel);border:1px solid var(--border2);border-radius:9px;padding:5px 7px;
+    box-shadow:0 6px 20px rgba(0,0,0,.5)}
+  .searchbar input{width:130px;background:var(--term-bg);border:1px solid var(--border2);border-radius:6px;
+    color:var(--tx);font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:11.5px;padding:3px 8px;outline:none}
+  .searchbar input:focus{border-color:var(--blue)}
+  .scount{font-size:10.5px;color:var(--tx2);min-width:36px;text-align:center;
+    font-family:"JetBrains Mono",ui-monospace,Menlo,monospace}
+  .stoggles{display:flex;gap:2px;border-left:1px solid var(--border);border-right:1px solid var(--border);padding:0 5px;margin:0 1px}
+  .stg{font-size:10px;font-weight:700;font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;
+    color:var(--tx3);background:transparent;border:1px solid transparent;border-radius:5px;
+    padding:2px 6px;cursor:pointer}
+  .stg:hover{color:var(--tx2);background:var(--panel2)}
+  .stg.active{color:var(--blue);background:rgba(74,158,255,.14);border-color:rgba(74,158,255,.45)}
+  .snav{font-size:11px;color:var(--tx2);background:transparent;border:none;border-radius:5px;
+    padding:2px 6px;cursor:pointer}
+  .snav:hover{color:var(--tx);background:var(--panel2)}
+
+  /* ===== overview ruler (pane 1) ===== */
+  .ruler{position:absolute;top:0;right:0;bottom:0;width:6px;background:rgba(255,255,255,.03);
+    border-left:1px solid var(--border);z-index:10}
+  .ruler i{position:absolute;left:0;right:0;height:4px;border-radius:1px;background:var(--orange);opacity:.85}
+  .ruler i.cur{outline:1px solid #fff;opacity:1}
+
+  /* ===== exited overlay (pane 3) ===== */
+  .exit-overlay{position:absolute;inset:0;z-index:25;background:rgba(14,16,20,.62);backdrop-filter:blur(1.5px);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+  .exit-badge{display:flex;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--border2);
+    border-radius:10px;padding:9px 16px;font-size:12px;color:var(--tx2);box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  .exit-badge .dot-ok{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none}
+  .exit-badge b{color:var(--tx)}
+  .exit-badge .kbd{margin:0 1px}
+  .exit-close{font-size:12px;padding:6px 18px;border-radius:8px;border:1px solid var(--border2);
+    background:var(--panel2);color:var(--tx);cursor:pointer}
+  .exit-close:hover{border-color:var(--blue)}
+
+  /* ===== 두레이 태스크 드로어 ===== */
+  .drawer{width:280px;flex:none;background:var(--panel);border-left:1px solid var(--border);
+    display:flex;flex-direction:column;min-height:0}
+  .drawer.collapsed{display:none}
+  .drawer-head{padding:12px 14px 11px;border-bottom:1px solid var(--border);flex:none;
+    display:flex;flex-direction:column;gap:9px}
+  .dh-row{display:flex;align-items:center;gap:8px}
+  .dh-row b{font-size:13px}
+  .proj-chip{font-size:10.5px;color:var(--tx2);border:1px solid var(--border2);background:var(--panel2);
+    padding:2px 9px;border-radius:20px;cursor:pointer;white-space:nowrap}
+  .proj-chip:hover{border-color:var(--blue);color:var(--tx)}
+  .dh-row .spacer{flex:1}
+  .dcollapse{border:none;background:transparent;color:var(--tx3);font-size:13px;cursor:pointer;border-radius:6px;padding:2px 6px}
+  .dcollapse:hover{background:var(--panel2);color:var(--tx)}
+  .dsearch{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:8px;color:var(--tx);
+    font-size:11.5px;padding:6px 10px;outline:none}
+  .dsearch:focus{border-color:var(--blue)}
+  .dlist{flex:1;overflow:auto;padding:11px 12px;display:flex;flex-direction:column;gap:8px}
+  .tcard{background:var(--panel2);border:1px solid var(--border2);border-radius:9px;padding:9px 11px;
+    cursor:grab;-webkit-user-select:none;user-select:none;transition:border-color .12s,opacity .12s}
+  .tcard:hover{border-color:var(--blue)}
+  .tcard:active{cursor:grabbing}
+  .tcard.dragging{opacity:.4;border-style:dashed}
+  .tcard .tid{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:10px;color:var(--tx3)}
+  .tcard .tname{font-size:11.5px;font-weight:600;margin-top:1px;line-height:1.45}
+  .tchips{display:flex;gap:5px;margin-top:7px;flex-wrap:wrap;min-height:16px}
+  .linkbadge{font-size:9.5px;font-weight:700;color:var(--blue);background:rgba(74,158,255,.13);
+    border:1px solid rgba(74,158,255,.4);padding:0 7px;border-radius:8px;white-space:nowrap}
+  .repochip{font-size:9.5px;color:var(--tx2);border:1px solid var(--border2);padding:0 7px;border-radius:8px;
+    font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;white-space:nowrap}
+  .dfoot{flex:none;padding:9px 14px;border-top:1px solid var(--border);font-size:10px;color:var(--tx3);line-height:1.55}
+
+  /* ===== 드롭 오버레이 ===== */
+  .drop-overlay{position:absolute;inset:5px;z-index:40;display:none;align-items:center;justify-content:center;
+    border:2px dashed var(--blue);border-radius:8px;background:rgba(74,158,255,.1);pointer-events:none;text-align:center}
+  .pane.dropping .drop-overlay{display:flex}
+  .drop-msg{font-size:12px;color:var(--tx);background:rgba(14,16,20,.88);border:1px solid rgba(74,158,255,.45);
+    border-radius:10px;padding:10px 16px;line-height:1.8;margin:0 14px}
+  .drop-msg code{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:11px;color:var(--blue)}
+
+  /* ===== 바쁜 pane 팝오버 ===== */
+  .busy-pop{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:50;display:none;
+    width:252px;background:var(--panel);border:1px solid var(--border2);border-radius:11px;padding:13px 14px;
+    box-shadow:0 12px 34px rgba(0,0,0,.6)}
+  .busy-pop.open{display:block}
+  .busy-pop .bp-title{font-size:12.5px;font-weight:700}
+  .busy-pop .bp-sub{font-size:11px;color:var(--tx2);margin:3px 0 10px}
+  .bp-actions{display:flex;flex-direction:column;gap:5px}
+  .bp-actions button{font-size:11.5px;padding:6px 10px;border-radius:7px;border:1px solid var(--border2);
+    background:var(--panel2);color:var(--tx);cursor:pointer;text-align:center}
+  .bp-actions button:hover{border-color:var(--blue)}
+  .bp-actions button.primary{background:linear-gradient(135deg,rgba(255,122,26,.85),#ff924a);border:none;color:#1a0e03;font-weight:600}
+  .typed-caption{color:var(--tx3)}
+
+  /* ===== status bar ===== */
+  .statusbar{flex:none;height:28px;display:flex;align-items:center;gap:6px;padding:0 14px;
+    background:var(--panel);border-top:1px solid var(--border);font-size:10.5px;color:var(--tx3);
+    -webkit-user-select:none;white-space:nowrap;overflow:hidden}
+  .kbd{display:inline-block;font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:9.5px;
+    color:var(--tx2);background:var(--panel2);border:1px solid var(--border2);border-bottom-width:2px;
+    border-radius:5px;padding:0 5px;line-height:1.5}
+  .statusbar .sep{color:var(--border2);margin:0 3px}
+  .statusbar .spacer{flex:1}
+  .statusbar .hint{cursor:pointer}
+  .statusbar .hint:hover{color:var(--tx2)}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block;vertical-align:0}
+  .dot.ok{background:var(--ok);box-shadow:0 0 5px rgba(52,211,153,.7)}
+  .renderer-status{display:inline-flex;align-items:center;gap:6px;color:var(--tx2)}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- titlebar -->
+  <div class="titlebar">
+    <div class="lights"><i></i><i></i><i></i></div>
+    <div class="title"><b>Clauday</b> — 터미널 <span style="color:var(--tx3);font-weight:400">· Split Pane</span></div>
+    <div class="spacer"></div>
+    <div class="cmdk">⌘K 빠른 이동</div>
+  </div>
+
+  <div class="body">
+    <!-- 56px icon nav -->
+    <div class="sidebar">
+      <div class="nav" title="대시보드">🗂</div>
+      <div class="nav" title="두레이 업무">✅</div>
+      <div class="nav active term-ic" title="터미널">&gt;_</div>
+      <div class="nav" title="Claude 세션">💬</div>
+      <div class="nav" title="캘린더">📅</div>
+      <div class="nav" title="MCP">🧩</div>
+      <div class="nav" title="Skills">⚡</div>
+      <div class="sspacer"></div>
+      <div class="nav" title="사용량">📊</div>
+      <div class="nav" title="설정">⚙️</div>
+    </div>
+
+    <div class="main">
+      <!-- ===== tab bar ===== -->
+      <div class="tabbar">
+        <div class="ttab active">zsh — clauday <span class="panecnt" id="paneCnt">⫿3</span> <span class="tclose">✕</span></div>
+        <div class="ttab">Clauday ▸ 프론트채널</div>
+        <div class="ttab">빌드</div>
+        <div class="ttab newtab" title="새 탭">＋</div>
+        <div class="spacer"></div>
+        <button class="rbtn" id="drawerBtn" style="align-self:center;margin-bottom:6px" title="태스크 드로어 토글 (⌘⇧T)">📋 태스크</button>
+        <div class="rwrap">
+          <button class="rbtn" id="rendererBtn">렌더러: <b id="rendererLabel" style="color:var(--tx)">WebGL</b> ▾</button>
+          <div class="rmenu" id="rendererMenu">
+            <div class="ropt" data-renderer="WebGL"><span class="chk">✓</span><span><b>WebGL</b><small>GPU 가속 · 기본값</small></span></div>
+            <div class="ropt" data-renderer="DOM"><span class="chk"></span><span><b>DOM</b><small>호환 모드 · GPU 문제 시 폴백</small></span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== split panes ===== -->
+      <div class="term-area">
+        <div class="split" id="split">
+
+          <!-- pane 1 : claude TUI (focused) -->
+          <div class="pane pane-left focused" id="pane1">
+
+            <!-- search bar (열린 상태) -->
+            <div class="searchbar" id="searchbar">
+              <input type="text" value="error" spellcheck="false" aria-label="검색어">
+              <span class="scount" id="scount">3/47</span>
+              <div class="stoggles">
+                <button class="stg" title="대소문자 구분">Aa</button>
+                <button class="stg active" title="정규식">.*</button>
+                <button class="stg" title="단어 단위">\b</button>
+              </div>
+              <button class="snav" id="sprev" title="이전 매치 (⇧Enter)">↑</button>
+              <button class="snav" id="snext" title="다음 매치 (Enter)">↓</button>
+              <button class="snav" id="sclose" title="닫기 (Esc)">✕</button>
+            </div>
+
+            <!-- overview ruler -->
+            <div class="ruler" id="ruler">
+              <i style="top:11%"></i>
+              <i style="top:27%"></i>
+              <i class="cur" style="top:44%"></i>
+              <i style="top:58%"></i>
+              <i style="top:73%"></i>
+              <i style="top:89%"></i>
+            </div>
+
+            <div class="tout"><span class="cl-star">✻ Claude Code</span> <span class="cl-dim">v2.0.3</span>                          <span class="cl-path">~/Clauday-Workspaces/clauday</span>
+
+<span class="cl-user">&gt; 터미널 검색에서 정규식 모드가 안 먹는 버그 고쳐줘</span>
+
+<span class="cl-tool">●</span> 검색 로직부터 확인하겠습니다.
+
+<span class="cl-tool">●</span> Read(src/renderer/src/components/Terminal/TerminalSearchBar.tsx)
+  <span class="cl-dim">⎿ 218줄 읽음</span>
+
+<span class="cl-tool">●</span> Grep(pattern: "searchAddon", glob: "src/**/*.ts*")
+  <span class="cl-dim">⎿ 6개 파일 · 14건 매치</span>
+
+<span class="cl-tool">●</span> Bash(npm run test -- TerminalSearch)
+  <span class="cl-dim">⎿</span> <span class="cl-bad">FAIL</span> <span class="cl-dim">src/renderer/.../TerminalSearchBar.test.tsx</span>
+     <span class="cl-bad">● regex 모드에서 escape 처리</span>
+       Type<span class="match">Error</span>: Cannot read properties of undefined (reading 'flags')
+       <span class="cl-dim">at buildSearchOptions (TerminalSearchBar.tsx:87:31)</span>
+     <span class="cl-dim">Tests: 1 failed, 12 passed</span>
+
+<span class="cl-tool">●</span> 원인: regex 토글 시 <span class="cl-dim">searchOptions</span> 를 새로 만들지 않고 이전 객체를 변이시키고 있습니다.
+  stderr 로그에도 같은 흔적이 있습니다:
+  <span class="cl-dim">⎿ stderr:</span> <span class="match cur">error</span> TS2532: Object is possibly 'undefined'. <span class="cl-dim">(splitTree.ts:41)</span>
+
+<span class="cl-tool">●</span> Edit(src/renderer/src/components/Terminal/TerminalSearchBar.tsx)
+  <span class="cl-dim">⎿ buildSearchOptions 를 불변 객체 생성으로 변경, throw new Search<span class="match">Error</span>('invalid regex flags') 가드 추가</span>
+
+<span class="cl-tool">●</span> Bash(npm run test -- TerminalSearch)
+  <span class="cl-dim">⎿</span> <span class="cl-ok">PASS</span> <span class="cl-dim">Tests: 13 passed · 커버리지 71.4%</span>
+
+<span class="cl-ok">✓</span> 수정 완료. regex 토글 → findNext 흐름에 회귀 테스트 2건을 추가했습니다.
+
+<span class="cl-prompt">❯</span> 커밋 메시지 작성해<span class="cursor"></span></div>
+
+            <!-- 드롭 오버레이 -->
+            <div class="drop-overlay"><div class="drop-msg">여기에 놓으면 이 태스크로 작업 시작<br><code>cd ~/work/ios-dooray</code></div></div>
+
+            <!-- 바쁜 pane 팝오버 -->
+            <div class="busy-pop" id="busyPop">
+              <div class="bp-title">이 pane 은 사용 중입니다</div>
+              <div class="bp-sub">claude 가 실행 중입니다. 태스크를 어디서 시작할까요?</div>
+              <div class="bp-actions">
+                <button class="primary">현재 pane 에서 실행</button>
+                <button>새 탭에서 실행</button>
+                <button>취소</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- vertical resize handle -->
+          <div class="handle v" id="handleV" title="드래그해서 크기 조절"></div>
+
+          <!-- right column -->
+          <div class="right-col" id="rightCol">
+
+            <!-- pane 2 : npm run dev (비포커스) -->
+            <div class="pane pane-rt dimmed" id="pane2">
+              <span class="plabel">npm run dev · pid 48213</span>
+              <div class="tout">
+<span class="cl-dim">$</span> npm run dev
+
+<span class="cl-dim">&gt; clauday@2.0.0 dev
+&gt; electron-vite dev</span>
+
+<span class="cl-ok">vite v5.4.11</span> dev server running at:
+
+  <span class="cl-ok">➜</span>  Local:   <span class="cl-tool">http://localhost:5173/</span>
+  <span class="cl-dim">➜  press h + enter to show help</span>
+
+<span class="cl-dim">오후 2:41:07</span> <span class="cl-tool">[vite]</span> hmr update <span class="cl-dim">/src/renderer/src/components/Terminal/SplitLayout.tsx</span>
+<span class="cl-dim">오후 2:41:22</span> <span class="cl-tool">[vite]</span> hmr update <span class="cl-dim">/src/renderer/src/components/Terminal/TerminalSearchBar.tsx</span>
+<span class="cl-dim">오후 2:42:05</span> <span class="cl-tool">[vite]</span> hmr update <span class="cl-dim">/src/renderer/src/components/Terminal/OverviewRuler.tsx</span>
+<span class="cl-dim">오후 2:43:31</span> <span class="cl-warn">[vite]</span> page reload <span class="cl-dim">src/main/terminal/splitTree.ts (main process 변경)</span></div>
+              <div class="drop-overlay"><div class="drop-msg">여기에 놓으면 이 태스크로 작업 시작<br><code>cd ~/work/ios-dooray</code></div></div>
+            </div>
+
+            <!-- horizontal resize handle -->
+            <div class="handle h" id="handleH" title="드래그해서 크기 조절"></div>
+
+            <!-- pane 3 : 세션 종료됨 -->
+            <div class="pane pane-rb dimmed" id="pane3">
+              <span class="plabel">npm run build · 종료됨</span>
+              <div class="tout" style="opacity:.45">
+<span class="cl-dim">$</span> npm run build
+
+<span class="cl-dim">&gt; clauday@2.0.0 build
+&gt; electron-vite build</span>
+
+<span class="cl-dim">vite v5.4.11 building for production...
+transforming (412) src/renderer/src/App.tsx
+rendering chunks (23)...</span>
+<span class="cl-ok">✓ built in 8.2s</span>
+<span class="cl-dim">out/main   1.9 MB · out/preload 128 kB · out/renderer 4.3 MB</span></div>
+
+              <div class="exit-overlay" id="exitOverlay">
+                <div class="exit-badge">
+                  <span class="dot-ok"></span>
+                  <span><b>세션이 종료되었습니다 (exit 0)</b> · <span class="kbd">⌘W</span> 로 닫기</span>
+                </div>
+                <button class="exit-close" id="exitCloseBtn">닫기</button>
+              </div>
+              <div class="drop-overlay"><div class="drop-msg">여기에 놓으면 이 태스크로 작업 시작<br><code>cd ~/work/ios-dooray</code></div></div>
+            </div>
+
+          </div><!-- /right-col -->
+        </div><!-- /split -->
+
+        <!-- ===== status bar ===== -->
+        <div class="statusbar">
+          <span><span class="kbd">⌘D</span> 우측 분할</span><span class="sep">·</span>
+          <span><span class="kbd">⌘⇧D</span> 아래 분할</span><span class="sep">·</span>
+          <span><span class="kbd">⌥⌘←→↑↓</span> 포커스 이동</span><span class="sep">·</span>
+          <span><span class="kbd">⌘W</span> pane 닫기</span><span class="sep">·</span>
+          <span class="hint" id="searchHint"><span class="kbd">⌘F</span> 검색</span><span class="sep">·</span>
+          <span class="hint" id="drawerHint"><span class="kbd">⌘⇧T</span> 태스크 드로어</span>
+          <span class="spacer"></span>
+          <span class="renderer-status"><span id="rendererStatusLabel">WebGL 렌더러</span> <span class="dot ok"></span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 두레이 태스크 드로어 ===== -->
+    <div class="drawer" id="taskDrawer">
+      <div class="drawer-head">
+        <div class="dh-row">
+          <b>내 태스크</b>
+          <span class="proj-chip">dooray-D-TF ▾</span>
+          <span class="spacer"></span>
+          <button class="dcollapse" id="drawerCollapse" title="드로어 접기 (⌘⇧T)">⟩⟩</button>
+        </div>
+        <input class="dsearch" type="text" placeholder="태스크 검색…">
+      </div>
+      <div class="dlist">
+        <div class="tcard" draggable="true" data-task="2619">
+          <div class="tid">#2619</div>
+          <div class="tname">[iOS] 메일 목록 디자인 개선</div>
+          <div class="tchips"><span class="linkbadge">🔗 세션 연결됨</span><span class="repochip">ios-dooray</span></div>
+        </div>
+        <div class="tcard" draggable="true" data-task="2657">
+          <div class="tid">#2657</div>
+          <div class="tname">[Android/iOS] 푸시 알림 설정 화면</div>
+          <div class="tchips"></div>
+        </div>
+        <div class="tcard" draggable="true" data-task="2596">
+          <div class="tid">#2596</div>
+          <div class="tname">[KMP] load-level 캐시 개선</div>
+          <div class="tchips"><span class="linkbadge">🔗 세션 연결됨</span><span class="repochip">mobile-kmp</span></div>
+        </div>
+        <div class="tcard" draggable="true" data-task="2701">
+          <div class="tid">#2701</div>
+          <div class="tname">[iOS] 첨부 미리보기 크래시</div>
+          <div class="tchips"></div>
+        </div>
+      </div>
+      <div class="dfoot">카드를 터미널 pane 으로 드래그하면 해당 repo 에서 작업을 시작합니다</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── 검색 토글 (Aa / .* / \b) ──────────────────────────────
+  document.querySelectorAll('.stg').forEach(function(b){
+    b.addEventListener('click', function(){ b.classList.toggle('active'); });
+  });
+
+  // ── 매치 이동 (↑/↓) : 카운터 + 활성 하이라이트 + ruler 마커 순환 ──
+  var TOTAL = 47, cur = 3;
+  var matches = Array.prototype.slice.call(document.querySelectorAll('#pane1 .match'));
+  var rmarks  = Array.prototype.slice.call(document.querySelectorAll('#ruler i'));
+  var scount  = document.getElementById('scount');
+  function setCur(n){
+    cur = ((n - 1 + TOTAL) % TOTAL) + 1;
+    scount.textContent = cur + '/' + TOTAL;
+    matches.forEach(function(m){ m.classList.remove('cur'); });
+    matches[(cur - 1) % matches.length].classList.add('cur');
+    rmarks.forEach(function(m){ m.classList.remove('cur'); });
+    rmarks[(cur - 1) % rmarks.length].classList.add('cur');
+  }
+  document.getElementById('snext').addEventListener('click', function(){ setCur(cur + 1); });
+  document.getElementById('sprev').addEventListener('click', function(){ setCur(cur - 1); });
+
+  // ── 검색바 열기/닫기 ──────────────────────────────────────
+  var searchbar = document.getElementById('searchbar');
+  document.getElementById('sclose').addEventListener('click', function(){ searchbar.style.display = 'none'; });
+  document.getElementById('searchHint').addEventListener('click', function(){ searchbar.style.display = 'flex'; });
+
+  // ── 렌더러 토글 드롭다운 ──────────────────────────────────
+  var rbtn = document.getElementById('rendererBtn');
+  var rmenu = document.getElementById('rendererMenu');
+  rbtn.addEventListener('click', function(e){ e.stopPropagation(); rmenu.classList.toggle('open'); });
+  document.addEventListener('click', function(){ rmenu.classList.remove('open'); });
+  rmenu.addEventListener('click', function(e){ e.stopPropagation(); });
+  document.querySelectorAll('.ropt').forEach(function(opt){
+    opt.addEventListener('click', function(){
+      var name = opt.getAttribute('data-renderer');
+      document.getElementById('rendererLabel').textContent = name;
+      document.getElementById('rendererStatusLabel').textContent = name + ' 렌더러';
+      document.querySelectorAll('.ropt .chk').forEach(function(c){ c.textContent = ''; });
+      opt.querySelector('.chk').textContent = '✓';
+      rmenu.classList.remove('open');
+    });
+  });
+
+  // ── pane 3 닫기 (종료 오버레이의 [닫기]) ──────────────────
+  document.getElementById('exitCloseBtn').addEventListener('click', function(){
+    document.getElementById('pane3').style.display = 'none';
+    document.getElementById('handleH').style.display = 'none';
+    document.getElementById('pane2').style.flex = '1';
+    document.getElementById('paneCnt').textContent = '⫿2';
+  });
+
+  // ── pane 클릭으로 포커스 이동 (파랑 보더) ─────────────────
+  ['pane1','pane2','pane3'].forEach(function(id){
+    var p = document.getElementById(id);
+    p.addEventListener('mousedown', function(){
+      document.querySelectorAll('.pane').forEach(function(q){
+        q.classList.remove('focused'); q.classList.add('dimmed');
+      });
+      p.classList.add('focused'); p.classList.remove('dimmed');
+    });
+  });
+
+  // ── 드래그 리사이즈 ───────────────────────────────────────
+  function bindDrag(handle, onMove){
+    handle.addEventListener('mousedown', function(e){
+      e.preventDefault();
+      handle.classList.add('dragging');
+      function move(ev){ onMove(ev); }
+      function up(){
+        handle.classList.remove('dragging');
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', up);
+      }
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', up);
+    });
+  }
+  var split = document.getElementById('split');
+  var pane1 = document.getElementById('pane1');
+  var rightCol = document.getElementById('rightCol');
+  var pane2 = document.getElementById('pane2');
+  bindDrag(document.getElementById('handleV'), function(ev){
+    var r = split.getBoundingClientRect();
+    var p = (ev.clientX - r.left) / r.width * 100;
+    p = Math.max(25, Math.min(75, p));
+    pane1.style.flex = '0 0 ' + p + '%';
+  });
+  bindDrag(document.getElementById('handleH'), function(ev){
+    var r = rightCol.getBoundingClientRect();
+    var p = (ev.clientY - r.top) / r.height * 100;
+    p = Math.max(20, Math.min(80, p));
+    pane2.style.flex = '0 0 calc(' + p + '% - 2px)';
+  });
+
+  // ── 태스크 드로어 열기/접기 ───────────────────────────────
+  var drawer = document.getElementById('taskDrawer');
+  function toggleDrawer(){ drawer.classList.toggle('collapsed'); }
+  document.getElementById('drawerCollapse').addEventListener('click', toggleDrawer);
+  document.getElementById('drawerBtn').addEventListener('click', toggleDrawer);
+  document.getElementById('drawerHint').addEventListener('click', toggleDrawer);
+
+  // ── 태스크 드래그&드롭 ────────────────────────────────────
+  var TASKS = {
+    '2619': { title: '[iOS] 메일 목록 디자인 개선',        repo: 'ios-dooray', linked: true,  session: '3f2a9c…' },
+    '2657': { title: '[Android/iOS] 푸시 알림 설정 화면',  repo: 'ios-dooray', linked: false },
+    '2596': { title: '[KMP] load-level 캐시 개선',         repo: 'mobile-kmp', linked: true,  session: 'b81d4e…' },
+    '2701': { title: '[iOS] 첨부 미리보기 크래시',         repo: 'ios-dooray', linked: false }
+  };
+  var dragTaskId = null;
+  document.querySelectorAll('.tcard').forEach(function(card){
+    card.addEventListener('dragstart', function(e){
+      dragTaskId = card.getAttribute('data-task');
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'copy';
+      e.dataTransfer.setData('text/plain', dragTaskId);
+      // 드롭 안내 문구에 대상 repo 반영
+      document.querySelectorAll('.drop-msg code').forEach(function(c){
+        c.textContent = 'cd ~/work/' + TASKS[dragTaskId].repo;
+      });
+    });
+    card.addEventListener('dragend', function(){
+      card.classList.remove('dragging');
+      dragTaskId = null;
+      document.querySelectorAll('.pane').forEach(function(p){ p.classList.remove('dropping'); });
+    });
+  });
+
+  // 타이핑 효과 — lines: [{ text, cls }]
+  function typeLines(tout, lines, done){
+    var li = 0;
+    (function nextLine(){
+      if(li >= lines.length){ if(done) done(); return; }
+      var line = lines[li++];
+      tout.appendChild(document.createTextNode('\n'));
+      var span = document.createElement('span');
+      if(line.cls) span.className = line.cls;
+      tout.appendChild(span);
+      var ci = 0;
+      (function tick(){
+        if(ci < line.text.length){
+          span.textContent += line.text.charAt(ci++);
+          tout.scrollTop = tout.scrollHeight;
+          setTimeout(tick, 16);
+        } else {
+          setTimeout(nextLine, 240);
+        }
+      })();
+    })();
+  }
+
+  function runDropDemo(pane, taskId){
+    var t = TASKS[taskId];
+    var tout = pane.querySelector('.tout');
+    // 종료된 pane 이면 오버레이 걷어내고 재사용
+    if(pane.id === 'pane3'){
+      var ov = document.getElementById('exitOverlay');
+      if(ov) ov.style.display = 'none';
+      tout.style.opacity = '1';
+    }
+    // 드롭된 pane 으로 포커스 이동
+    document.querySelectorAll('.pane').forEach(function(q){ q.classList.remove('focused'); q.classList.add('dimmed'); });
+    pane.classList.add('focused'); pane.classList.remove('dimmed');
+
+    if(t.linked){
+      // 🔗 연결 있음 → 기존 세션 resume
+      typeLines(tout, [
+        { text: '$ cd ~/work/' + t.repo },
+        { text: '$ claude -r ' + t.session },
+        { text: '⟳ 이전 세션 resume — 프롬프트 재주입 없음', cls: 'typed-caption' }
+      ]);
+    } else {
+      // 연결 없음 → 새 세션 + 태스크 프롬프트 자동 주입
+      typeLines(tout, [
+        { text: '$ cd ~/work/' + t.repo },
+        { text: '$ claude' },
+        { text: '❯ 다음 두레이 태스크를 구현해줘: ' + t.title.slice(0, 20) + '…', cls: 'cl-user' }
+      ], function(){
+        // 세션 감지 후 카드에 🔗 배지 부착 데모
+        t.linked = true; t.session = 'a1c7f0…';
+        var chips = document.querySelector('.tcard[data-task="' + taskId + '"] .tchips');
+        if(chips && !chips.querySelector('.linkbadge')){
+          var b = document.createElement('span');
+          b.className = 'linkbadge'; b.textContent = '🔗 세션 연결됨';
+          chips.appendChild(b);
+          var r = document.createElement('span');
+          r.className = 'repochip'; r.textContent = t.repo;
+          chips.appendChild(r);
+        }
+      });
+    }
+  }
+
+  var busyPop = document.getElementById('busyPop');
+  ['pane1','pane2','pane3'].forEach(function(id){
+    var pane = document.getElementById(id);
+    var depth = 0;
+    pane.addEventListener('dragenter', function(e){
+      if(!dragTaskId) return;
+      e.preventDefault(); depth++; pane.classList.add('dropping');
+    });
+    pane.addEventListener('dragover', function(e){
+      if(!dragTaskId) return;
+      e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
+    });
+    pane.addEventListener('dragleave', function(){
+      if(!dragTaskId) return;
+      depth = Math.max(0, depth - 1);
+      if(depth === 0) pane.classList.remove('dropping');
+    });
+    pane.addEventListener('drop', function(e){
+      e.preventDefault(); depth = 0; pane.classList.remove('dropping');
+      var taskId = e.dataTransfer.getData('text/plain') || dragTaskId;
+      if(!taskId) return;
+      if(id === 'pane1'){ busyPop.classList.add('open'); return; }  // claude 실행 중 → 팝오버
+      runDropDemo(pane, taskId);
+    });
+  });
+  busyPop.querySelectorAll('button').forEach(function(b){
+    b.addEventListener('click', function(){ busyPop.classList.remove('open'); });
+  });
+</script>
+
+<!--
+  ═══════════════════════════════════════════════════════════════════
+  구현 매핑 노트 — Clauday v2.0 터미널 Split Pane + 검색 고도화
+  ═══════════════════════════════════════════════════════════════════
+
+  1) src/main/terminal/splitTree.ts — pane 분할 트리 (탭당 1개, electron-store 직렬화)
+     {
+       "type": "split", "direction": "row", "sizes": [0.6, 0.4],
+       "children": [
+         { "type": "leaf", "paneId": "p1", "sessionId": "term-8123", "focused": true },
+         { "type": "split", "direction": "column", "sizes": [0.5, 0.5],
+           "children": [
+             { "type": "leaf", "paneId": "p2", "sessionId": "term-8124" },
+             { "type": "leaf", "paneId": "p3", "sessionId": "term-8125",
+               "exited": { "code": 0, "at": "2026-07-30T05:43:12Z" } }
+           ]
+         }
+       ]
+     }
+     - splitRight/splitDown: 대상 leaf 를 split 노드로 치환. closePane: leaf 제거 후
+       형제가 1개면 부모 split 을 접음(collapse). 순수 함수로 분리해 vitest 검증.
+     - sizes 는 handle 드래그 종료 시점에만 갱신·영속화 (드래그 중엔 로컬 state).
+
+  2) SplitLayout.tsx (renderer) — 트리를 재귀 렌더. direction=row → flex-row,
+     column → flex-column. 자식 사이에 4px ResizeHandle (hover 시 --blue).
+     탭 전환 시 트리는 유지하고 컨테이너만 숨김 (xterm 인스턴스 보존).
+
+  3) TerminalPane.tsx — props: { paneId, sessionId, isVisible, isFocused, onFocus, onClose }
+     - isFocused: 1.5px --blue 보더 + xterm.focus(). 비포커스 pane 출력은 살짝 dim.
+     - isVisible=false 여도 pty/xterm dispose 하지 않음 — 스크롤백 유지, 재표시 시 fit() 만.
+     - pty exit 이벤트 → exited 오버레이 (exit code 표기, ⌘W/버튼으로 leaf 제거).
+
+  4) TerminalSearchBar.tsx — @xterm/addon-search 래핑
+     - 옵션: { caseSensitive(Aa), regex(.*), wholeWord(\b) } → SearchAddon.findNext/findPrevious
+     - onDidChangeResults 로 매치 카운트(현재/전체) 표시.
+     - 매치 데코레이션(decoration API) 좌표 → OverviewRuler.tsx 가 6px 스트립에
+       주황 마커 렌더. 활성 매치는 흰 테두리. 마커 클릭 시 해당 라인으로 스크롤.
+
+  5) 단축키 (renderer keymap → IPC 불필요, 로컬 dispatch)
+     ⌘D splitRight · ⌘⇧D splitDown · ⌥⌘←→↑↓ focusDirection(공간 기준 최근접 pane)
+     ⌘W closePane(마지막 pane 이면 탭 닫기 확인) · ⌘F 검색바 토글 · Esc 검색바 닫기
+
+  6) 렌더러 토글 — WebglAddon 로드 실패/context-lost 시 DOM 렌더러로 자동 폴백하고
+     상태바 dot·라벨 갱신. 사용자가 드롭다운으로 수동 전환도 가능 (설정 영속화).
+
+  7) TaskDrawer.tsx (renderer) — 두레이 태스크 드로어 (280px, 접이식, ⌘⇧T)
+     - 목록은 기존 Dooray 뷰의 TaskRow 컴포넌트를 재사용 (프로젝트 필터 칩 + 검색).
+     - 태스크↔세션 연결은 taskSessionLinks 맵 — WorkspaceStore(electron-store) 에 저장해
+       Dooray 뷰와 드로어 양쪽에서 공유:
+       { "2619": { repoPath: "~/work/ios-dooray", claudeSessionId: "3f2a9c…", linkedAt } }
+     - 접기 상태는 영속화. 탭바의 [📋 태스크] 버튼과 ⌘⇧T 가 동일 토글.
+
+  8) 드래그&드롭 — HTML5 DnD (dataTransfer: application/x-clauday-task+json)
+     - pane dragover → 파랑 점선 드롭 오버레이 + 대상 repo 경로(cd ~/work/{repo}) 미리보기.
+     - drop 시 대상 pane 상태로 분기:
+       idle/exited → 즉시 실행 · busy(포그라운드 프로세스 감지) → 팝오버로
+       [현재 pane 에서 실행 / 새 탭에서 실행 / 취소] 선택.
+     - 🔗 연결 있음: cd {repoPath} → claude -r {claudeSessionId} (resume — 프롬프트 재주입 없음)
+     - 연결 없음: cd {repoPath} → claude 실행 후 태스크 제목/본문 요약을 첫 프롬프트로 자동 주입.
+
+  9) 세션 감지 (비침습) — 새 claude 실행 뒤 ClaudeSessionService.listSessions(cwd) 로
+     해당 repo 의 최신 세션을 매칭해 taskSessionLinks 에 기록 (claude 프로세스에 훅을
+     심지 않음). 기록되면 드로어 카드에 🔗 세션 연결됨 배지가 붙고, 이후 재드롭 시 resume 경로.
+-->
+</body>
+</html>
