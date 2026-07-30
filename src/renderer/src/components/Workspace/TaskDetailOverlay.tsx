@@ -155,12 +155,33 @@ function TaskDetailOverlay({ task, onClose, onRunInTerminal, promptText }: TaskD
                 <div className="flex flex-col gap-2">
                   {comments.map((c) => (
                     <div key={c.id} className="ds-card">
-                      <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mb-1">
-                        {c.creator?.member?.name ?? '알 수 없음'}
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-medium text-text-primary">
+                          {c.creator?.member?.name ?? '알 수 없음'}
+                        </span>
+                        {c.createdAt && (
+                          <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+                            {new Date(c.createdAt).toLocaleString('ko-KR', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        )}
                       </div>
-                      <div className="text-[calc(12.5px_*_var(--app-font-scale,1))] text-text-secondary whitespace-pre-wrap break-words">
-                        {c.body?.content ?? ''}
-                      </div>
+                      {/* 두레이 댓글은 text/html 과 마크다운이 섞여 온다 — rehypeRaw 로 둘 다 렌더 */}
+                      {c.body?.content && (
+                        <div className="markdown-body text-[calc(12.5px_*_var(--app-font-scale,1))] leading-relaxed">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            rehypePlugins={[rehypeRaw]}
+                            components={markdownComponents}
+                          >
+                            {c.body.content}
+                          </ReactMarkdown>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -114,6 +114,9 @@ vi.mock('@xterm/xterm', () => {
       registeredLinkProviders.push(provider)
       return { dispose: () => {} }
     }
+    onTitleChange(): { dispose: () => void } {
+      return { dispose: () => {} }
+    }
     onData(cb: (data: string) => void): { dispose: () => void } {
       this.dataHandler = cb
       return { dispose: () => { this.dataHandler = null } }

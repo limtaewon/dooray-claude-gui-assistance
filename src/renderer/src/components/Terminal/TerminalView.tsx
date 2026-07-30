@@ -40,6 +40,7 @@ import { useKeybindingOverrides } from '../../hooks/useKeybindings'
 import { matchesBinding } from '@shared/keybindings/binding'
 import TaskDrawer, { TASK_DRAG_MIME, type TaskDragPayload } from './TaskDrawer'
 import { buildTaskDropSteps } from './taskDrop'
+import { tabNameFromCwd, tabNameFromTitle } from './tabAutoName'
 import type { DoorayTask } from '@shared/types/dooray'
 import type {
   TerminalExitPayload,
@@ -77,6 +78,8 @@ interface PaneRuntime {
 interface TabEntry {
   tabId: string
   name: string
+  /** 사용자가 직접 이름을 바꿨으면 셸 제목으로 덮어쓰지 않는다 (Warp 와 동일) */
+  nameIsCustom?: boolean
   tree: SplitNode
   focusedLeafId: string
   panes: Record<string, PaneRuntime>
@@ -456,7 +459,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     const createOpts: { cwd?: string; command?: string; args?: string[] } = {}
     if (cwd) createOpts.cwd = cwd
     const session = await window.api.terminal.create(createOpts)
-    const base = cwd ? (cwd.split('/').pop() || '~') : '~'
+    const base = tabNameFromCwd(cwd)
     const leafId = crypto.randomUUID()
     const tabId = crypto.randomUUID()
     setTabs((prev) => [...prev, {
@@ -634,8 +637,18 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     notifyLayoutChanged()
   }, [tabs, cleanupHost, notifyLayoutChanged])
 
+  /** 셸이 보낸 창 제목으로 탭 이름 자동 갱신 — 사용자가 직접 바꾼 탭은 건드리지 않는다(Warp 식). */
+  const applyAutoName = useCallback((tabId: string, title: string) => {
+    const next = tabNameFromTitle(title)
+    if (!next) return
+    setTabs((prev) => prev.map((t) => (
+      t.tabId === tabId && !t.nameIsCustom && t.name !== next ? { ...t, name: next } : t
+    )))
+  }, [])
+
   const renameTab = useCallback((tabId: string, name: string) => {
-    setTabs((prev) => prev.map((t) => (t.tabId === tabId ? { ...t, name } : t)))
+    // 직접 이름을 정한 순간부터 셸 제목 자동 갱신을 멈춘다
+    setTabs((prev) => prev.map((t) => (t.tabId === tabId ? { ...t, name, nameIsCustom: true } : t)))
     const tab = tabsRef.current.find((t) => t.tabId === tabId)
     if (tab) {
       for (const pane of Object.values(tab.panes)) void window.api.terminal.rename(pane.sessionId, name)
@@ -853,6 +866,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
               suspendAutoResize={isDividerDragging}
               rendererSetting={rendererSetting}
               onWebglUnavailable={handleWebglUnavailable}
+              onTitleChange={focused ? (title) => applyAutoName(tab.tabId, title) : undefined}
             />,
             getOrCreateHost(leafId)
           )

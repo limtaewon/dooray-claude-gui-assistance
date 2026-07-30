@@ -206,22 +206,22 @@
 [data-theme='dark'] {
   /* 캔버스(터미널/에디터)만 가장 어둡고, 크롬(사이드바·패널·카드)은 한 톤 밝게 떠 있다.
      전부 같은 검정으로 눌러버리면 영역 구분이 사라진다 — Orca 대조 후 교정(2026-07-30). */
-  --bg-base:           #0A0A0B;   /* 캔버스 — 가장 어두움 */
+  --bg-base:           #131313;   /* 캔버스(터미널) — 가장 어두움 */
   --bg-primary:        var(--bg-base);
-  --bg-sidebar:        #171719;   /* 크롬 */
-  --bg-surface:        #151517;   /* 패널·카드 */
-  --bg-surface-raised: #212125;   /* 모달·팝오버 */
-  --bg-surface-hover:  #212125;
-  --bg-subtle:         #121214;
-  --bg-hover:          #1E1E22;
-  --bg-active:         #2A2A30;
-  --bg-border:         #292930;
-  --bg-border-light:   #35353D;
-  --bg-border-strong:  #45454E;
+  --bg-sidebar:        #1C1C1C;   /* 크롬 — 캔버스보다 한 톤 밝게 떠 있다 */
+  --bg-surface:        #1A1A1A;   /* 패널·카드 */
+  --bg-surface-raised: #242424;   /* 모달·팝오버 */
+  --bg-surface-hover:  #242424;
+  --bg-subtle:         #171717;
+  --bg-hover:          #212121;
+  --bg-active:         #2C2C2C;
+  --bg-border:         #2B2B2B;
+  --bg-border-light:   #383838;
+  --bg-border-strong:  #484848;
 
-  --text-primary:      #F1F1F3;
-  --text-secondary:    #9B9BA3;
-  --text-tertiary:     #66666E;
+  --text-primary:      #F2F2F2;
+  --text-secondary:    #A0A0A0;
+  --text-tertiary:     #6E6E6E;
 
   --accent-blue:         #3B82F6;
   --accent-blue-light:   #60A5FA;
@@ -260,7 +260,7 @@
   --btn-primary-fg:       #101012;
 
   --link:              var(--c-blue-fg);
-  --code-bg:           #151517;
+  --code-bg:           #1A1A1A;
   --code-text:         #FDBA74;
   --mark-bg:           rgba(251,146,60,0.25);
   --mark-text:         #FDBA74;
@@ -287,9 +287,9 @@
   --ring-selected-color: rgba(251,146,60,0.75);
   --ring-selected:       0 0 0 2px var(--ring-selected-color);
 
-  --bg-disabled:     #151517;
-  --text-disabled:   #4A4A52;
-  --border-disabled: #212125;
+  --bg-disabled:     #1A1A1A;
+  --text-disabled:   #545454;
+  --border-disabled: #2B2B2B;
 
   --wf-backlog-bg:    var(--c-neutral-bg);      --wf-backlog-fg:    var(--c-neutral-fg);  --wf-backlog-dot:    #94A3B8;
   --wf-registered-bg: var(--c-orange-bg);       --wf-registered-fg: var(--c-orange-fg);   --wf-registered-dot: #FB923C;

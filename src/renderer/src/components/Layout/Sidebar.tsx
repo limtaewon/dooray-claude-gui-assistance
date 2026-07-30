@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Server, Sparkles, BarChart3, Calendar, Terminal, BookOpen, MessageSquare, GitBranch, Settings, Users, Radar, Lightbulb, Bot, MessageSquarePlus, Workflow } from 'lucide-react'
+import { Server, Sparkles, BarChart3, Calendar, Terminal, BookOpen, MessageSquare, GitBranch, Settings, Users, Radar, Lightbulb, Bot, MessageSquarePlus, Workflow, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useFeedback } from '../Feedback/FeedbackProvider'
 
 export type SidebarView = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent' | 'harness' | 'workspace'
@@ -67,23 +67,30 @@ function resolveOrderedItems(prefs: SidebarPrefs | null): SidebarNavItem[] {
 /** Design System v1 Sidebar (56px). 36×36 버튼, 20px 아이콘, 활성 상태 blue 그라디언트.
  *  불투명도 낮은 분리선으로 그룹 구분. */
 function NavButton({
-  view, icon: Icon, label, active, onClick, badge, pulse
-}: SidebarNavItem & { active: boolean; onClick: () => void; badge?: number; pulse?: boolean }): JSX.Element {
+  view, icon: Icon, label, active, onClick, badge, pulse, expanded
+}: SidebarNavItem & { active: boolean; onClick: () => void; badge?: number; pulse?: boolean; expanded: boolean }): JSX.Element {
   return (
     <button
       key={view}
       onClick={onClick}
-      title={label}
+      title={expanded ? undefined : label}
       aria-label={label}
-      className={`relative w-9 h-9 rounded-[7px] flex items-center justify-center transition-all duration-150 ${
+      className={`relative h-9 rounded-[7px] flex items-center transition-all duration-150 ${
+        expanded ? 'w-full gap-2.5 px-2.5 justify-start' : 'w-9 justify-center'
+      } ${
         active
           ? 'bg-gradient-to-br from-clauday-blue to-clauday-blue/80 text-white shadow-md shadow-clauday-blue/20'
           : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
       }`}
     >
-      <Icon size={20} />
+      <Icon size={20} className="flex-none" />
+      {expanded && (
+        <span className="text-[calc(12px_*_var(--app-font-scale,1))] font-medium truncate">{label}</span>
+      )}
       {badge !== undefined && badge > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-[3px] rounded-full bg-clauday-orange text-white text-[calc(9px_*_var(--app-font-scale,1))] font-bold flex items-center justify-center border-2 border-bg-surface">
+        <span className={`min-w-[14px] h-[14px] px-[3px] rounded-full bg-clauday-orange text-white text-[calc(9px_*_var(--app-font-scale,1))] font-bold flex items-center justify-center ${
+          expanded ? 'ml-auto flex-none' : 'absolute -top-0.5 -right-0.5 border-2 border-bg-surface'
+        }`}>
           {badge > 99 ? '99+' : badge}
         </span>
       )}
@@ -104,6 +111,23 @@ function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
   const [agentUnread, setAgentUnread] = useState(0)
   const [agentPulse, setAgentPulse] = useState(false)
   const [prefs, setPrefs] = useState<SidebarPrefs | null>(null)
+  /** 아이콘만 보기 ↔ 아이콘+이름. 기본은 이름까지 보이는 확장 상태. */
+  const [expanded, setExpanded] = useState(true)
+
+  useEffect(() => {
+    void window.api.settings
+      .get('sidebarExpanded')
+      .then((v) => { if (v === false) setExpanded(false) })
+      .catch(() => undefined)
+  }, [])
+
+  const toggleExpanded = (): void => {
+    setExpanded((v) => {
+      const next = !v
+      void window.api.settings.set('sidebarExpanded', next)
+      return next
+    })
+  }
 
   // 저장된 prefs 로드 + 변경 이벤트 구독 — 설정에서 바꾸면 즉시 반영
   useEffect(() => {
@@ -158,7 +182,9 @@ function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
   const items = resolveOrderedItems(prefs)
 
   return (
-    <aside className="w-14 bg-bg-surface border-r border-bg-border flex flex-col items-center py-2 gap-0.5 flex-shrink-0">
+    <aside className={`bg-bg-surface border-r border-bg-border flex flex-col py-2 gap-0.5 flex-shrink-0 transition-[width] duration-150 ${
+      expanded ? 'w-44 items-stretch px-2' : 'w-14 items-center'
+    }`}>
       {items.map((item) => (
         <NavButton
           key={item.view}
@@ -173,6 +199,7 @@ function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
             item.view === 'monitoring' ? monitoringPulse :
             item.view === 'agent' ? agentPulse : undefined
           }
+          expanded={expanded}
         />
       ))}
       <div className="flex-1" />
@@ -180,11 +207,14 @@ function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
       {/* 피드백 버튼 */}
       <button
         onClick={() => feedback.open()}
-        title="피드백"
+        title={expanded ? undefined : '피드백'}
         aria-label="피드백"
-        className="w-9 h-9 rounded-[7px] flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover transition-all duration-150"
+        className={`h-9 rounded-[7px] flex items-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover transition-all duration-150 ${
+          expanded ? 'w-full gap-2.5 px-2.5 justify-start' : 'w-9 justify-center'
+        }`}
       >
-        <MessageSquarePlus size={20} />
+        <MessageSquarePlus size={20} className="flex-none" />
+        {expanded && <span className="text-[calc(12px_*_var(--app-font-scale,1))] font-medium">피드백</span>}
       </button>
       {STANDALONE_ITEMS.map((item) => (
         <NavButton
@@ -192,8 +222,21 @@ function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
           {...item}
           active={activeView === item.view}
           onClick={() => onViewChange(item.view)}
+          expanded={expanded}
         />
       ))}
+      <button
+        onClick={toggleExpanded}
+        title={expanded ? '사이드바 접기' : '사이드바 펼치기'}
+        aria-label={expanded ? '사이드바 접기' : '사이드바 펼치기'}
+        aria-expanded={expanded}
+        className={`h-8 rounded-[7px] flex items-center text-text-tertiary hover:text-text-primary hover:bg-bg-surface-hover transition-all duration-150 ${
+          expanded ? 'w-full gap-2.5 px-2.5 justify-start' : 'w-9 justify-center'
+        }`}
+      >
+        {expanded ? <PanelLeftClose size={17} className="flex-none" /> : <PanelLeftOpen size={17} />}
+        {expanded && <span className="text-[calc(11px_*_var(--app-font-scale,1))]">접기</span>}
+      </button>
     </aside>
   )
 }

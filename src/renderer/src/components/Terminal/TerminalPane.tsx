@@ -74,6 +74,8 @@ interface TerminalPaneProps {
   rendererSetting?: 'webgl' | 'dom'
   /** v2.0 B-6: WebGL 초기화 실패 또는 context loss 로 DOM 렌더러 폴백이 발생하면 1회 호출된다. */
   onWebglUnavailable?: () => void
+  /** v2.0: 셸이 OSC 0/2 로 보낸 창 제목 — 호스트가 탭 이름 자동 갱신에 쓴다(Warp 식). */
+  onTitleChange?: (title: string) => void
   /** v2.0 B-7: OSC7 로 새 cwd 를 알게 될 때마다 호출된다(링크 cwd 우선순위 1순위) — 호스트가
    *  `PaneRuntime.cwd` 를 갱신해 스냅샷 저장에도 반영할 수 있게 한다 (ADR-v2-terminal-p2-05 §레이어 4). */
   onCwdChange?: (cwd: string) => void
@@ -120,6 +122,7 @@ function TerminalPaneInner(
     suspendAutoResize,
     rendererSetting,
     onWebglUnavailable,
+    onTitleChange,
     onCwdChange
   }: TerminalPaneProps,
   ref: ForwardedRef<TerminalPaneHandle>
@@ -158,6 +161,8 @@ function TerminalPaneInner(
   // 콜백을 참조하도록 ref 로 동기화한다(onFocusRequestRef 와 동일 패턴).
   const onCwdChangeRef = useRef(onCwdChange)
   useEffect(() => { onCwdChangeRef.current = onCwdChange }, [onCwdChange])
+  const onTitleChangeRef = useRef(onTitleChange)
+  useEffect(() => { onTitleChangeRef.current = onTitleChange }, [onTitleChange])
 
   // v2.0 B-4: 경계 드래그 중엔 ResizeObserver 발 fit/PTY resize 를 억제한다 — 드롭 시 1회만
   // 보내야 TUI 가 프레임마다 재그리기하지 않는다(함정 #9, ADR-02 §6).
@@ -221,12 +226,12 @@ function TerminalPaneInner(
     const terminal = new Terminal({
       theme: {
         // v2.0: 앱 캔버스(--bg-base)와 같은 톤 — 터미널이 가장 어두운 면이다
-        background: '#0A0A0B',
-        foreground: '#F1F1F3',
-        cursor: '#F1F1F3',
-        cursorAccent: '#0A0A0B',
+        background: '#131313',
+        foreground: '#F2F2F2',
+        cursor: '#F2F2F2',
+        cursorAccent: '#131313',
         selectionBackground: '#FFFFFF26',
-        black: '#0A0A0B',
+        black: '#131313',
         red: '#EF4444',
         green: '#22C55E',
         yellow: '#FB923C',
@@ -277,6 +282,8 @@ function TerminalPaneInner(
     try {
       terminal.open(containerRef.current)
     } catch {}
+    // v2.0: 셸/프로그램이 바꾸는 창 제목을 호스트에 전달 — 탭 이름 자동 갱신(Warp 식)
+    const titleDisposable = terminal.onTitleChange((t) => onTitleChangeRef.current?.(t))
     // 5) unicode provider 활성화 — 모든 write 보다 먼저 해야 한다(함정 #7, ADR-03 §7 5단계). Unicode11
     // 위에 ZWJ 이모지 폭 보정을 얹는다 — terminalUnicodeProvider.ts, B-9.
     try {
@@ -745,6 +752,7 @@ function TerminalPaneInner(
     return () => {
       cleanup()
       searchResultsDisposable.dispose()
+      titleDisposable.dispose()
       linkClickPrimingDisposable.dispose()
       ptyMouseSuppressionDisposable.dispose()
       resizeObserver.disconnect()
