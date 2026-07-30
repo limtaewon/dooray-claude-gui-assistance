@@ -127,6 +127,10 @@
   --c-neutral-fg:    #525A6B;
   --c-neutral-solid: #8A91A0;
 
+  /* 알림 배지 (사이드바 unread 등) — 라이트는 브랜드 오렌지 유지 */
+  --badge-bg:            var(--clauday-orange);
+  --badge-fg:            #FFFFFF;
+
   /* 기타 */
   --link:                var(--c-blue-fg);
   --code-bg:             #EDEFF4;
@@ -206,7 +210,10 @@
 [data-theme='dark'] {
   /* 캔버스(터미널/에디터)만 가장 어둡고, 크롬(사이드바·패널·카드)은 한 톤 밝게 떠 있다.
      전부 같은 검정으로 눌러버리면 영역 구분이 사라진다 — Orca 대조 후 교정(2026-07-30). */
-  --bg-base:           #131313;   /* 캔버스(터미널) — 가장 어두움 */
+  --bg-base:           #131313;   /* 앱 캔버스(빈 화면 등) — 가장 어두움 */
+  /* 터미널은 자체 표면을 갖는다 — 크롬(#1A1A1A)·캔버스(#131313)와 구분되게 한 톤 위 (Orca 참고) */
+  --terminal-bg:       #202429;
+  --terminal-fg:       #E8E8EA;
   --bg-primary:        var(--bg-base);
   --bg-sidebar:        #1C1C1C;   /* 크롬 — 캔버스보다 한 톤 밝게 떠 있다 */
   --bg-surface:        #1A1A1A;   /* 패널·카드 */
@@ -223,10 +230,12 @@
   --text-secondary:    #A0A0A0;
   --text-tertiary:     #6E6E6E;
 
-  --accent-blue:         #3B82F6;
-  --accent-blue-light:   #60A5FA;
-  --accent-blue-soft:    rgba(59,130,246,0.18);
-  --accent-blue-fg:      #93C5FD;
+  /* v2.0 무채색 크롬 — 다크에서 clauday-blue 계열 유틸(내비·탭·버튼·테두리)은 전부 회색조가 된다.
+     상태 칩(--c-*)·워크플로(--wf-*)·링크(--link)·AI 그라디언트(--clauday-*)는 그대로 유색. */
+  --accent-blue:         #76767C;
+  --accent-blue-light:   #8E8E95;
+  --accent-blue-soft:    rgba(255,255,255,0.08);
+  --accent-blue-fg:      #C9C9CF;
   --accent-orange:       #FB923C;
   --accent-orange-light: #FDBA74;
   --accent-orange-soft:  rgba(251,146,60,0.18);
@@ -258,6 +267,10 @@
   --btn-primary-bg:       #E9E9EC;
   --btn-primary-bg-hover: #F6F6F8;
   --btn-primary-fg:       #101012;
+
+  /* 알림 배지 — 다크 크롬은 무채색: 밝은 면 + 어두운 글자로 주목만 준다 */
+  --badge-bg:             var(--btn-primary-bg);
+  --badge-fg:             var(--btn-primary-fg);
 
   --link:              var(--c-blue-fg);
   --code-bg:           #1A1A1A;

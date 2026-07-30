@@ -152,7 +152,7 @@ function KeybindingSettings(): JSX.Element {
             key={key}
             type="button"
             onClick={() => setFilter(key)}
-            className={`ds-chip ${filter === key ? 'blue' : 'neutral'} cursor-pointer`}
+            className={`ds-chip ${filter === key ? 'selected' : 'neutral'} cursor-pointer`}
           >
             {label}
           </button>
@@ -182,7 +182,7 @@ function KeybindingSettings(): JSX.Element {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary">{def.title}</span>
-                      {isModified && <Chip tone="blue">변경됨</Chip>}
+                      {isModified && <Chip tone="selected">변경됨</Chip>}
                       {bindings.length === 0 && <Chip tone="neutral">미할당</Chip>}
                       {def.fixed && (
                         <span title="변경할 수 없는 항목" className="text-text-tertiary">
@@ -202,7 +202,7 @@ function KeybindingSettings(): JSX.Element {
                   </div>
 
                   {isCapturing ? (
-                    <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-clauday-blue whitespace-nowrap">
+                    <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary animate-pulse whitespace-nowrap">
                       새 조합을 누르세요… (Esc 취소)
                     </span>
                   ) : (

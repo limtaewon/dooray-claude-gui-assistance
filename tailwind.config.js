@@ -30,6 +30,11 @@ module.exports = {
           primary: 'var(--text-primary)',
           secondary: 'var(--text-secondary)',
           tertiary: 'var(--text-tertiary)'
+        },
+        // 알림 배지 — 테마별 토큰(라이트=브랜드 오렌지 유지, 다크=무채색 밝은 면)
+        badge: {
+          bg: 'var(--badge-bg)',
+          fg: 'var(--badge-fg)'
         }
       },
       fontFamily: {

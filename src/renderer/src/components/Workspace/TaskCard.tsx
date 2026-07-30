@@ -57,7 +57,7 @@ const TaskCard = memo(function TaskCard({
       // content-visibility: 뷰포트 밖 렌더 스킵 (긴 목록에서 브라우저 내장 가상화)
       style={{ contentVisibility: 'auto', containIntrinsicSize: '0 92px' }}
       className={`px-4 py-3 border-b border-bg-border cursor-pointer transition-colors ${
-        selected ? 'bg-bg-surface-hover' : 'hover:bg-bg-surface'
+        selected ? 'bg-bg-active' : 'hover:bg-bg-hover'
       }`}
     >
       {ref && (

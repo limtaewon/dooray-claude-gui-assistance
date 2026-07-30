@@ -225,13 +225,13 @@ function TerminalPaneInner(
 
     const terminal = new Terminal({
       theme: {
-        // v2.0: 앱 캔버스(--bg-base)와 같은 톤 — 터미널이 가장 어두운 면이다
-        background: '#131313',
-        foreground: '#F2F2F2',
-        cursor: '#F2F2F2',
-        cursorAccent: '#131313',
+        // v2.0: 터미널은 크롬·캔버스와 구분되는 자체 표면을 갖는다 (--terminal-bg 와 동일 값)
+        background: '#202429',
+        foreground: '#E8E8EA',
+        cursor: '#E8E8EA',
+        cursorAccent: '#202429',
         selectionBackground: '#FFFFFF26',
-        black: '#131313',
+        black: '#202429',
         red: '#EF4444',
         green: '#22C55E',
         yellow: '#FB923C',

@@ -78,8 +78,8 @@ describe('TaskRow — 상호작용', () => {
   it('workflowClass 없으면 registered 기본 아이콘/색으로 렌더', () => {
     const task = makeTask({ workflowClass: '' as unknown as DoorayTask['workflowClass'] })
     const { container } = render(<TaskRow {...baseProps({ task })} />)
-    // registered 색상 클래스가 아이콘에 적용됨
-    expect(container.querySelector('.text-clauday-orange')).not.toBeNull()
+    // registered 워크플로 시맨틱 토큰 클래스가 아이콘에 적용됨
+    expect(container.innerHTML).toContain('wf-registered')
   })
 })
 

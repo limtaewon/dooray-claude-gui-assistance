@@ -507,13 +507,13 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
                   className="w-full px-2.5 py-1.5 bg-bg-primary border border-bg-border rounded-md text-xs text-text-secondary placeholder-text-tertiary font-mono focus:outline-none focus:border-clauday-blue resize-y mb-2" />
                 <div className="flex items-center justify-between">
                   <label className="flex items-center gap-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">
-                    <input type="checkbox" checked={editing.autoApply} onChange={(e) => setEditing({ ...editing, autoApply: e.target.checked })} className="accent-blue-500" />
+                    <input type="checkbox" checked={editing.autoApply} onChange={(e) => setEditing({ ...editing, autoApply: e.target.checked })} className="accent-clauday-blue" />
                     자동 적용
                   </label>
                   <div className="flex gap-1.5">
                     <button onClick={() => { setEditing(null); setMode('list') }} className="px-2.5 py-1 rounded-md text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary hover:text-text-primary border border-bg-border">취소</button>
                     <button onClick={saveSkill} disabled={!editing.name.trim()}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-blue-500 text-white text-[calc(10px_*_var(--app-font-scale,1))] font-medium hover:bg-blue-600 disabled:opacity-40">
+                      className="ds-btn primary xs">
                       <Save size={10} /> 저장
                     </button>
                   </div>

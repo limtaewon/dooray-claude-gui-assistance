@@ -127,7 +127,7 @@ function TaskDrawer({ onClose, onRunInTerminal }: TaskDrawerProps): JSX.Element 
                 key={key}
                 type="button"
                 onClick={() => setFilter(key)}
-                className={`ds-chip ${filter === key ? 'blue' : 'neutral'} cursor-pointer`}
+                className={`ds-chip ${filter === key ? 'selected' : 'neutral'} cursor-pointer`}
               >
                 {label}
               </button>

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Server, Sparkles, BarChart3, Calendar, Terminal, BookOpen, MessageSquare, GitBranch, Settings, Users, Radar, Lightbulb, Bot, MessageSquarePlus, Workflow, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import { useFeedback } from '../Feedback/FeedbackProvider'
+import { Server, Sparkles, BarChart3, Calendar, Terminal, BookOpen, MessageSquare, GitBranch, Settings, Users, Radar, Lightbulb, Bot, Workflow } from 'lucide-react'
 
 export type SidebarView = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent' | 'harness' | 'workspace'
 // 호환성 유지를 위해 기존 별칭도 export
@@ -9,6 +8,8 @@ export type View = SidebarView
 interface SidebarProps {
   activeView: View
   onViewChange: (view: View) => void
+  /** 아이콘만 보기 ↔ 아이콘+이름. 토글 버튼은 타이틀바에 있다. */
+  expanded?: boolean
 }
 
 export interface SidebarNavItem { view: View; icon: typeof Server; label: string }
@@ -18,7 +19,7 @@ export const CUSTOMIZABLE_NAV_ITEMS: SidebarNavItem[] = [
   { view: 'dooray', icon: Calendar, label: '두레이' },
   { view: 'monitoring', icon: Radar, label: '모니터링' },
   { view: 'agent', icon: Bot, label: '에이전트' },
-  { view: 'terminal', icon: Terminal, label: '워크스페이스' },
+  { view: 'terminal', icon: Terminal, label: '터미널' },
   { view: 'git', icon: GitBranch, label: '브랜치 작업' },
   { view: 'harness', icon: Workflow, label: 'Harness Studio' },
   { view: 'community', icon: Users, label: '커뮤니티' },
@@ -64,8 +65,8 @@ function resolveOrderedItems(prefs: SidebarPrefs | null): SidebarNavItem[] {
   return ordered.filter((i) => !hidden.has(i.view))
 }
 
-/** Design System v1 Sidebar (56px). 36×36 버튼, 20px 아이콘, 활성 상태 blue 그라디언트.
- *  불투명도 낮은 분리선으로 그룹 구분. */
+/** Design System Sidebar. 36×36 버튼, 20px 아이콘. 활성 상태는 무채색(--bg-active 면 + 밝은 글자) —
+ *  크롬에는 색을 쓰지 않는다. 배지는 --badge-* 토큰(라이트=오렌지, 다크=밝은 회색 면). */
 function NavButton({
   view, icon: Icon, label, active, onClick, badge, pulse, expanded
 }: SidebarNavItem & { active: boolean; onClick: () => void; badge?: number; pulse?: boolean; expanded: boolean }): JSX.Element {
@@ -79,7 +80,7 @@ function NavButton({
         expanded ? 'w-full gap-2.5 px-2.5 justify-start' : 'w-9 justify-center'
       } ${
         active
-          ? 'bg-gradient-to-br from-clauday-blue to-clauday-blue/80 text-white shadow-md shadow-clauday-blue/20'
+          ? 'bg-bg-active text-text-primary'
           : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
       }`}
     >
@@ -88,46 +89,28 @@ function NavButton({
         <span className="text-[calc(12px_*_var(--app-font-scale,1))] font-medium truncate">{label}</span>
       )}
       {badge !== undefined && badge > 0 && (
-        <span className={`min-w-[14px] h-[14px] px-[3px] rounded-full bg-clauday-orange text-white text-[calc(9px_*_var(--app-font-scale,1))] font-bold flex items-center justify-center ${
-          expanded ? 'ml-auto flex-none' : 'absolute -top-0.5 -right-0.5 border-2 border-bg-surface'
+        <span className={`min-w-[14px] h-[14px] px-[3px] rounded-full bg-badge-bg text-badge-fg text-[calc(9px_*_var(--app-font-scale,1))] font-bold flex items-center justify-center ${
+          expanded ? 'ml-auto flex-none' : 'absolute -top-0.5 -right-0.5 border-2 border-bg-sidebar'
         }`}>
           {badge > 99 ? '99+' : badge}
         </span>
       )}
       {pulse && (!badge || badge === 0) && (
         <span className="absolute top-0.5 right-0.5 flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full rounded-full bg-clauday-orange opacity-75 animate-ping" />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-clauday-orange" />
+          <span className="absolute inline-flex h-full w-full rounded-full bg-badge-bg opacity-75 animate-ping" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-badge-bg" />
         </span>
       )}
     </button>
   )
 }
 
-function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
-  const feedback = useFeedback()
+function Sidebar({ activeView, onViewChange, expanded = true }: SidebarProps): JSX.Element {
   const [monitoringUnread, setMonitoringUnread] = useState(0)
   const [monitoringPulse, setMonitoringPulse] = useState(false)
   const [agentUnread, setAgentUnread] = useState(0)
   const [agentPulse, setAgentPulse] = useState(false)
   const [prefs, setPrefs] = useState<SidebarPrefs | null>(null)
-  /** 아이콘만 보기 ↔ 아이콘+이름. 기본은 이름까지 보이는 확장 상태. */
-  const [expanded, setExpanded] = useState(true)
-
-  useEffect(() => {
-    void window.api.settings
-      .get('sidebarExpanded')
-      .then((v) => { if (v === false) setExpanded(false) })
-      .catch(() => undefined)
-  }, [])
-
-  const toggleExpanded = (): void => {
-    setExpanded((v) => {
-      const next = !v
-      void window.api.settings.set('sidebarExpanded', next)
-      return next
-    })
-  }
 
   // 저장된 prefs 로드 + 변경 이벤트 구독 — 설정에서 바꾸면 즉시 반영
   useEffect(() => {
@@ -182,7 +165,7 @@ function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
   const items = resolveOrderedItems(prefs)
 
   return (
-    <aside className={`bg-bg-surface border-r border-bg-border flex flex-col py-2 gap-0.5 flex-shrink-0 transition-[width] duration-150 ${
+    <aside className={`bg-bg-sidebar border-r border-bg-border flex flex-col py-2 gap-0.5 flex-shrink-0 transition-[width] duration-150 ${
       expanded ? 'w-44 items-stretch px-2' : 'w-14 items-center'
     }`}>
       {items.map((item) => (
@@ -204,18 +187,6 @@ function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
       ))}
       <div className="flex-1" />
       <div className="w-7 h-px bg-bg-border/60 my-1" />
-      {/* 피드백 버튼 */}
-      <button
-        onClick={() => feedback.open()}
-        title={expanded ? undefined : '피드백'}
-        aria-label="피드백"
-        className={`h-9 rounded-[7px] flex items-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover transition-all duration-150 ${
-          expanded ? 'w-full gap-2.5 px-2.5 justify-start' : 'w-9 justify-center'
-        }`}
-      >
-        <MessageSquarePlus size={20} className="flex-none" />
-        {expanded && <span className="text-[calc(12px_*_var(--app-font-scale,1))] font-medium">피드백</span>}
-      </button>
       {STANDALONE_ITEMS.map((item) => (
         <NavButton
           key={item.view}
@@ -225,18 +196,6 @@ function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
           expanded={expanded}
         />
       ))}
-      <button
-        onClick={toggleExpanded}
-        title={expanded ? '사이드바 접기' : '사이드바 펼치기'}
-        aria-label={expanded ? '사이드바 접기' : '사이드바 펼치기'}
-        aria-expanded={expanded}
-        className={`h-8 rounded-[7px] flex items-center text-text-tertiary hover:text-text-primary hover:bg-bg-surface-hover transition-all duration-150 ${
-          expanded ? 'w-full gap-2.5 px-2.5 justify-start' : 'w-9 justify-center'
-        }`}
-      >
-        {expanded ? <PanelLeftClose size={17} className="flex-none" /> : <PanelLeftOpen size={17} />}
-        {expanded && <span className="text-[calc(11px_*_var(--app-font-scale,1))]">접기</span>}
-      </button>
     </aside>
   )
 }

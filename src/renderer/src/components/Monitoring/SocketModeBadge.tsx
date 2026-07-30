@@ -78,7 +78,7 @@ export default function SocketModeBadge(): JSX.Element {
   const tone = isActive
     ? { dot: 'bg-emerald-400', text: 'text-emerald-400', label: 'ACTIVE', desc: '실시간 push 수신 중' }
     : isConnecting
-      ? { dot: 'bg-clauday-blue animate-pulse', text: 'text-clauday-blue', label: 'CONNECTING', desc: '연결 중...' }
+      ? { dot: 'bg-[color:var(--c-blue-solid)] animate-pulse', text: 'text-[color:var(--c-blue-fg)]', label: 'CONNECTING', desc: '연결 중...' }
       : isStandby
         ? { dot: 'bg-amber-400', text: 'text-amber-400', label: 'STANDBY', desc: '다른 세션 활성 — 대기 중' }
         : !domain
@@ -140,7 +140,7 @@ export default function SocketModeBadge(): JSX.Element {
             <div className="px-2 py-1.5 mb-2 rounded text-[calc(10px_*_var(--app-font-scale,1))] flex items-center gap-1.5"
               style={{ background: 'var(--bg-primary)', border: '1px solid var(--bg-border)' }}>
               {isActive && <><Check size={10} className="text-emerald-400" /><span className="text-emerald-400 font-semibold">ACTIVE</span></>}
-              {isConnecting && <><Loader2 size={10} className="text-clauday-blue animate-spin" /><span className="text-clauday-blue font-semibold">CONNECTING</span></>}
+              {isConnecting && <><Loader2 size={10} className="text-[color:var(--c-blue-fg)] animate-spin" /><span className="text-[color:var(--c-blue-fg)] font-semibold">CONNECTING</span></>}
               {isStandby && <><AlertCircle size={10} className="text-amber-400" /><span className="text-amber-400 font-semibold">STANDBY</span></>}
               {!isActive && !isConnecting && !isStandby && (
                 <><span className="w-1.5 h-1.5 rounded-full bg-text-tertiary/40" /><span className="text-text-tertiary">DISCONNECTED</span></>

@@ -11,18 +11,19 @@ const WORKFLOW_ICONS: Record<string, typeof Circle> = {
   closed: CheckCircle2
 }
 
+/* 상태 색은 워크플로 시맨틱 토큰(--wf-*) 사용 — 다크 무채색 크롬 정리에서도 상태 컬러는 유지된다. */
 const WORKFLOW_COLORS: Record<string, string> = {
-  registered: 'text-clauday-orange',
-  working: 'text-clauday-blue',
-  done: 'text-emerald-400',
+  registered: 'text-[color:var(--wf-registered-dot)]',
+  working: 'text-[color:var(--wf-working-dot)]',
+  done: 'text-[color:var(--wf-resolved-dot)]',
   closed: 'text-text-secondary'
 }
 
 const WORKFLOW_BG: Record<string, string> = {
-  backlog: 'bg-gray-400/10 border-gray-400/20',
-  registered: 'bg-clauday-orange/10 border-clauday-orange/20',
-  working: 'bg-clauday-blue/10 border-clauday-blue/20',
-  closed: 'bg-emerald-400/10 border-emerald-400/20'
+  backlog: 'bg-[color:var(--wf-backlog-bg)] border-bg-border',
+  registered: 'bg-[color:var(--wf-registered-bg)] border-[color:var(--wf-registered-dot)]',
+  working: 'bg-[color:var(--wf-working-bg)] border-[color:var(--wf-working-dot)]',
+  closed: 'bg-[color:var(--wf-resolved-bg)] border-[color:var(--wf-resolved-dot)]'
 }
 
 const WORKFLOW_LABELS: Record<string, string> = {

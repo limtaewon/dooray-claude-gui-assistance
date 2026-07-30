@@ -40,6 +40,7 @@ import { useKeybindingOverrides } from '../../hooks/useKeybindings'
 import { matchesBinding } from '@shared/keybindings/binding'
 import TaskDrawer, { TASK_DRAG_MIME, type TaskDragPayload } from './TaskDrawer'
 import { buildTaskDropSteps } from './taskDrop'
+import TerminalEmptyState from './TerminalEmptyState'
 import { tabNameFromCwd, tabNameFromTitle } from './tabAutoName'
 import type { DoorayTask } from '@shared/types/dooray'
 import type {
@@ -816,7 +817,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
               aria-pressed={drawerOpen}
               className={`flex items-center gap-1.5 h-7 px-2.5 rounded-[7px] text-[calc(11.5px_*_var(--app-font-scale,1))] font-medium border transition-colors ${
                 drawerOpen
-                  ? 'text-text-primary bg-bg-surface-hover border-bg-border-light'
+                  ? 'text-text-primary bg-bg-active border-bg-border-light'
                   : 'text-text-secondary border-bg-border hover:text-text-primary hover:bg-bg-surface-hover'
               }`}
               title="두레이 업무 패널 (⌘⇧T)">
@@ -874,18 +875,11 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
         })}
 
         {tabs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-4">
-            <Terminal size={48} className="text-text-tertiary" />
-            <div className="text-center">
-              <p className="text-sm text-text-primary font-medium mb-1">터미널</p>
-              <p className="text-xs text-text-secondary mb-4">셸 세션을 시작하세요</p>
-            </div>
-            <button onClick={() => createTab()}
-              className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-clauday-blue text-white text-sm hover:bg-clauday-blue/80 transition-colors">
-              <Terminal size={14} /> 새 터미널
-            </button>
-            <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">⌘T로 언제든 새 탭을 열 수 있습니다</p>
-          </div>
+          <TerminalEmptyState
+            onCreateTab={() => void createTab()}
+            onOpenTaskDrawer={() => { if (!drawerOpen) toggleDrawer() }}
+            drawerOpen={drawerOpen}
+          />
         ) : (
           tabs.map((tab) => (
             <div
@@ -903,7 +897,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
                 onDragActiveChange={setIsDividerDragging}
               />
               {dropHint && tab.tabId === activeTabId && (
-                <div className="absolute inset-2 z-20 pointer-events-none rounded-lg border-2 border-dashed border-clauday-blue bg-clauday-blue/5 flex items-center justify-center">
+                <div className="absolute inset-2 z-20 pointer-events-none rounded-lg border-2 border-dashed border-bg-border-strong bg-black/10 flex items-center justify-center">
                   <span className="px-3 py-1.5 rounded-md bg-bg-surface border border-bg-border text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-primary shadow">
                     {dropHint}
                   </span>
@@ -938,7 +932,7 @@ function computeInsertionIndex(ids: string[], activeId: string, overId: string):
 
 /** 삽입 위치를 나타내는 2px 세로 인디케이터 — 탭바 높이 전체를 채운다. */
 function TabDropIndicator(): JSX.Element {
-  return <div aria-hidden className="self-stretch w-0.5 rounded-full bg-clauday-blue flex-shrink-0" />
+  return <div aria-hidden className="self-stretch w-0.5 rounded-full bg-text-secondary flex-shrink-0" />
 }
 
 /** useSortable 배선을 TabLabel 에 연결하는 얇은 래퍼 — transform/transition 은 적용하지 않는다. */
@@ -1044,7 +1038,7 @@ function TabLabel({
           onBlur={commit}
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
-          className="font-mono text-[calc(11px_*_var(--app-font-scale,1))] bg-transparent border border-clauday-blue/40 rounded px-1 outline-none focus:border-clauday-blue"
+          className="font-mono text-[calc(11px_*_var(--app-font-scale,1))] bg-transparent border border-bg-border-light rounded px-1 outline-none focus:border-bg-border-strong"
           style={{ minWidth: 80, maxWidth: 200 }}
         />
       ) : (
@@ -1052,7 +1046,7 @@ function TabLabel({
           <span className="font-mono truncate max-w-[140px]" title="더블클릭하여 이름 변경">{name}</span>
           {paneCount >= 2 && (
             <span
-              className="text-[calc(9.5px_*_var(--app-font-scale,1))] font-semibold text-clauday-blue bg-clauday-blue/10 border border-clauday-blue/30 px-1.5 rounded-full flex-shrink-0"
+              className="text-[calc(9.5px_*_var(--app-font-scale,1))] font-semibold text-text-secondary bg-bg-hover border border-bg-border-light px-1.5 rounded-full flex-shrink-0"
               title={`분할된 pane ${paneCount}개`}
             >
               ⫿{paneCount}

@@ -52,10 +52,10 @@ export default function RendererToggle({ setting, fellBack, onChange }: Renderer
               key={opt}
               onClick={() => { onChange(opt); setOpen(false) }}
               className={`w-full flex items-start gap-2 px-3 py-2 text-left hover:bg-bg-surface-hover ${
-                setting === opt ? 'bg-clauday-blue/10' : ''
+                setting === opt ? 'bg-bg-active' : ''
               }`}
             >
-              <span className="w-3.5 text-clauday-blue text-[calc(11px_*_var(--app-font-scale,1))]">
+              <span className="w-3.5 text-text-primary text-[calc(11px_*_var(--app-font-scale,1))]">
                 {setting === opt ? '✓' : ''}
               </span>
               <span className="flex-1 min-w-0">

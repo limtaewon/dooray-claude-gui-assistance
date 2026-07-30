@@ -22,6 +22,8 @@
 .ds-chip.violet   { background: var(--c-violet-bg);  color: var(--c-violet-fg); }
 .ds-chip.yellow   { background: var(--c-yellow-bg);  color: var(--c-yellow-fg); }
 .ds-chip.neutral  { background: var(--bg-surface); color: var(--text-secondary); border: 1px solid var(--bg-border); }
+/* selected: 필터/토글 등 '크롬' 칩의 활성 상태 — 상태 칩과 달리 무채색으로 표현한다 */
+.ds-chip.selected { background: var(--bg-active); color: var(--text-primary); border: 1px solid var(--bg-border-strong); }
 .ds-chip .dot     { width: 5px; height: 5px; border-radius: 999px; background: currentColor; }
 
 /* ---------- Buttons ----------
@@ -87,7 +89,7 @@
 .ds-toolbar-btn:hover:not(:disabled) {
   background: rgba(255,255,255,0.10);
   color: var(--text-primary);
-  border-color: rgba(148, 175, 230, 0.28);
+  border-color: var(--bg-border-strong);
 }
 .ds-toolbar-btn:disabled { cursor: not-allowed; }
 .ds-btn.secondary:hover { background: var(--bg-surface-hover); }
@@ -518,3 +520,29 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
   background: linear-gradient(90deg, var(--c-orange-bg), var(--c-blue-bg));
   color: var(--text-primary);
 }
+
+/* ============================================================
+   v2.0 다크 무채색 크롬 오버라이드
+   탭·세그먼트·포커스·스피너·배지의 컬러 액센트를 회색조로 눌러
+   컬러가 상태 칩과 AI 액션에만 남게 한다. 라이트 테마는 기존 유지.
+   ============================================================ */
+[data-theme='dark'] .ds-tab.active,
+[data-theme='dark'] .ds-tab.ai.active {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+[data-theme='dark'] .ds-seg .seg-item:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+[data-theme='dark'] .ds-seg .seg-item.active,
+[data-theme='dark'] .ds-seg .seg-item.active:hover {
+  background: var(--bg-active);
+  color: var(--text-primary);
+  filter: none;
+}
+[data-theme='dark'] .ds-input:focus { border-color: var(--bg-border-strong); }
+[data-theme='dark'] .ds-spinner { border-top-color: var(--text-secondary); }
+[data-theme='dark'] .ds-badge-pill { background: var(--badge-bg); color: var(--badge-fg); }
+/* 타이틀바의 브랜드 그라디언트 워시 제거 — 다크 크롬은 순수 무채색 */
+[data-theme='dark'] .ds-titlebar::before { background: none; }

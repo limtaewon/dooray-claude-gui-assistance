@@ -687,7 +687,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
         {WEEKDAYS.map((w, i) => (
           <div key={w}
             className={`px-2 py-1.5 text-[calc(10px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-right ${
-              i === 0 ? 'text-rose-400' : i === 6 ? 'text-clauday-blue' : 'text-text-secondary'
+              i === 0 ? 'text-rose-400' : i === 6 ? 'text-[color:var(--c-blue-fg)]' : 'text-text-secondary'
             }`}>{w}</div>
         ))}
       </div>
@@ -726,7 +726,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                             di === 0
                               ? inMonth ? 'text-rose-400' : 'text-rose-400/45'
                               : di === 6
-                                ? inMonth ? 'text-clauday-blue' : 'text-clauday-blue/45'
+                                ? inMonth ? 'text-[color:var(--c-blue-fg)]' : 'text-[color:var(--c-blue-fg)] opacity-45'
                                 : inMonth ? 'text-text-secondary' : 'text-text-tertiary/40'
                           }`}>{day.getDate()}일</span>
                         )}

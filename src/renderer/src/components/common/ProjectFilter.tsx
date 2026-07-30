@@ -128,11 +128,11 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
   return (
     <div className="relative">
       <button onClick={() => setOpen(!open)}
-        className={`ds-btn icon sm relative ${pinnedCount > 0 ? 'text-clauday-blue' : ''}`}
+        className={`ds-btn icon sm relative ${pinnedCount > 0 ? 'text-text-primary' : ''}`}
         title="표시할 프로젝트 설정">
         <Settings size={14} />
         {pinnedCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-clauday-blue text-[calc(8px_*_var(--app-font-scale,1))] text-white flex items-center justify-center font-bold">
+          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-badge-bg text-badge-fg text-[calc(8px_*_var(--app-font-scale,1))] flex items-center justify-center font-bold">
             {pinnedCount}
           </span>
         )}
@@ -156,7 +156,7 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="프로젝트 검색..."
-                  className="w-full pl-6 pr-6 py-1 bg-bg-primary border border-bg-border rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
+                  className="w-full pl-6 pr-6 py-1 bg-bg-primary border border-bg-border rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-bg-border-strong"
                 />
                 {searchQuery && (
                   <button onClick={() => setSearchQuery('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary">
@@ -192,7 +192,7 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
                     </button>
                     {isCustom && (
                       <button onClick={() => removeCustomProject(p.id)}
-                        className="px-1.5 opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all"
+                        className="px-1.5 opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-red-400 transition-all"
                         title="수동 추가 프로젝트 제거">
                         <Trash2 size={10} />
                       </button>
@@ -212,16 +212,16 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
                       onChange={(e) => { setAddInput(e.target.value); setAddError('') }}
                       onKeyDown={(e) => e.key === 'Enter' && handleAddProject()}
                       placeholder="프로젝트 ID 또는 URL"
-                      className="flex-1 px-2 py-1 bg-bg-primary border border-bg-border rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
+                      className="flex-1 px-2 py-1 bg-bg-primary border border-bg-border rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-bg-border-strong"
                       autoFocus
                     />
                     <button onClick={handleAddProject} disabled={adding || !addInput.trim()}
-                      className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-text-tertiary rounded text-[calc(10px_*_var(--app-font-scale,1))] text-white transition-colors">
+                      className="ds-btn primary xs">
                       {adding ? '...' : '추가'}
                     </button>
                   </div>
                   {addError && <div className="text-[calc(9px_*_var(--app-font-scale,1))] text-red-400 px-1">{addError}</div>}
-                  <div className="text-[calc(9px_*_var(--app-font-scale,1))] text-gray-600 px-1">예: 3787724725029315943 또는 Dooray URL</div>
+                  <div className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary px-1">예: 3787724725029315943 또는 Dooray URL</div>
                 </div>
               ) : (
                 <button onClick={() => setShowAddForm(true)}

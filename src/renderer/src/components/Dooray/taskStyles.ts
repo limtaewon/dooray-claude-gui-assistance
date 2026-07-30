@@ -6,14 +6,15 @@ import type { DoorayTask } from '../../../../shared/types/dooray'
 export const WORKFLOW_ICONS: Record<string, typeof Circle> = {
   backlog: Circle, registered: AlertCircle, working: Clock, done: CheckCircle2, closed: CheckCircle2
 }
+/* 상태 색은 워크플로 시맨틱 토큰(--wf-*) 사용 — 다크 무채색 크롬 정리에서도 상태 컬러는 유지된다. */
 export const WORKFLOW_COLORS: Record<string, string> = {
-  backlog: 'text-text-tertiary', registered: 'text-clauday-orange', working: 'text-clauday-blue',
-  done: 'text-emerald-400', closed: 'text-text-tertiary'
+  backlog: 'text-text-tertiary', registered: 'text-[color:var(--wf-registered-dot)]', working: 'text-[color:var(--wf-working-dot)]',
+  done: 'text-[color:var(--wf-resolved-dot)]', closed: 'text-text-tertiary'
 }
 export const WORKFLOW_BG_COLORS: Record<string, string> = {
-  backlog: 'bg-gray-500/10 text-gray-400', registered: 'bg-clauday-orange/10 text-clauday-orange',
-  working: 'bg-clauday-blue/10 text-clauday-blue', done: 'bg-emerald-400/10 text-emerald-400',
-  closed: 'bg-gray-500/10 text-gray-400'
+  backlog: 'bg-[color:var(--wf-backlog-bg)] text-[color:var(--wf-backlog-fg)]', registered: 'bg-[color:var(--wf-registered-bg)] text-[color:var(--wf-registered-fg)]',
+  working: 'bg-[color:var(--wf-working-bg)] text-[color:var(--wf-working-fg)]', done: 'bg-[color:var(--wf-resolved-bg)] text-[color:var(--wf-resolved-fg)]',
+  closed: 'bg-[color:var(--wf-closed-bg)] text-[color:var(--wf-closed-fg)]'
 }
 
 export function getWorkflowName(task: DoorayTask): string {

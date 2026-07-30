@@ -20,19 +20,20 @@ export const RUN_STATUS_TONE: Record<AgentRunStatus, ChipTone> = {
   discarded: 'neutral'
 }
 
-/** 좌측 태스크 목록의 상태 dot 클래스. running 만 pulse 로 진행 중임을 알린다. */
+/** 좌측 태스크 목록의 상태 dot 클래스. running 만 pulse 로 진행 중임을 알린다.
+ *  상태 색은 칩 시맨틱 토큰(--c-*-solid) 사용 — 크롬 무채색화와 무관하게 유지된다. */
 export function runStatusDotClass(status: AgentRunStatus): string {
   switch (status) {
     case 'running':
-      return 'bg-clauday-blue animate-pulse'
+      return 'bg-[color:var(--c-blue-solid)] animate-pulse'
     case 'spawning':
       return 'bg-text-tertiary animate-pulse'
     case 'awaiting-input':
-      return 'bg-clauday-orange'
+      return 'bg-[color:var(--c-orange-solid)]'
     case 'failed':
-      return 'bg-red-500'
+      return 'bg-[color:var(--c-red-solid)]'
     case 'adopted':
-      return 'bg-emerald-500'
+      return 'bg-[color:var(--c-emerald-solid)]'
     default:
       return 'bg-text-tertiary'
   }

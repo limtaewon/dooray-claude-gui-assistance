@@ -54,6 +54,21 @@ function App(): JSX.Element {
   const [doorayConfigured, setDoorayConfigured] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
   const [quickTodoOpen, setQuickTodoOpen] = useState(false)
+  /** 사이드바 아이콘/이름 토글 — 타이틀바 버튼이 제어하고 설정에 저장한다. */
+  const [sidebarExpanded, setSidebarExpanded] = useState(true)
+  useEffect(() => {
+    void window.api.settings
+      .get('sidebarExpanded')
+      .then((v) => { if (v === false) setSidebarExpanded(false) })
+      .catch(() => undefined)
+  }, [])
+  const toggleSidebar = useCallback(() => {
+    setSidebarExpanded((v) => {
+      const next = !v
+      void window.api.settings.set('sidebarExpanded', next)
+      return next
+    })
+  }, [])
   const { theme, toggle: toggleTheme } = useTheme()
 
   // 앱 시작 시 startupView 설정 적용
@@ -251,7 +266,7 @@ function App(): JSX.Element {
         { id: 'go-dooray:report', label: '두레이 — AI 보고서', icon: <FileText size={13} /> },
         { id: 'go-monitoring', label: '모니터링', icon: <Radar size={13} />, hint: '⌘2' },
         { id: 'go-agent', label: '에이전트', icon: <Bot size={13} /> },
-        { id: 'go-terminal', label: '워크스페이스 (터미널)', icon: <TerminalIcon size={13} />, hint: '⌘3' },
+        { id: 'go-terminal', label: '터미널', icon: <TerminalIcon size={13} />, hint: '⌘3' },
         { id: 'go-git', label: '브랜치 작업', icon: <GitBranch size={13} />, hint: '⌘4' },
         { id: 'go-harness', label: 'Harness Studio', icon: <Workflow size={13} /> },
         { id: 'go-community', label: '커뮤니티', icon: <Users size={13} /> },
@@ -309,9 +324,13 @@ function App(): JSX.Element {
       <ErrorReportProvider>
       <FeedbackProvider>
       <div className="flex flex-col h-full bg-bg-primary">
-        <TitleBar onOpenCommandPalette={() => setCmdOpen(true)} />
+        <TitleBar
+          onOpenCommandPalette={() => setCmdOpen(true)}
+          sidebarExpanded={sidebarExpanded}
+          onToggleSidebar={toggleSidebar}
+        />
         <div className="flex flex-1 overflow-hidden">
-          <Sidebar activeView={activeView} onViewChange={setActiveView} />
+          <Sidebar activeView={activeView} onViewChange={setActiveView} expanded={sidebarExpanded} />
           <main className="flex-1 overflow-hidden relative">
             <div className={`absolute inset-0 ${vis('dooray')}`}>
               {doorayConfigured ? (
@@ -405,7 +424,7 @@ function RecentViewsPalette({ open, items, index, onHover, onPick, onClose }: {
       switch (v) {
         case 'dooray': return { label: '두레이', icon: <CalendarIcon size={13} /> }
         case 'monitoring': return { label: '모니터링', icon: <Radar size={13} /> }
-        case 'terminal': return { label: '워크스페이스', icon: <TerminalIcon size={13} /> }
+        case 'terminal': return { label: '터미널', icon: <TerminalIcon size={13} /> }
         case 'git': return { label: '브랜치 작업', icon: <GitBranch size={13} /> }
         case 'community': return { label: '커뮤니티', icon: <Users size={13} /> }
         case 'mcp': return { label: 'MCP 서버', icon: <Server size={13} /> }

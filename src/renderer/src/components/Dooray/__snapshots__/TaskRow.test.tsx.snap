@@ -7,7 +7,7 @@ exports[`TaskRow — 렌더 스냅샷 > isSelected=true 렌더 1`] = `
     style="content-visibility: auto; contain-intrinsic-size: 0 60px;"
   >
     <svg
-      class="lucide lucide-clock flex-shrink-0 text-clauday-blue"
+      class="lucide lucide-clock flex-shrink-0 text-[color:var(--wf-working-dot)]"
       fill="none"
       height="14"
       stroke="currentColor"
@@ -39,7 +39,7 @@ exports[`TaskRow — 렌더 스냅샷 > isSelected=true 렌더 1`] = `
         class="flex items-center gap-1.5 mt-1 flex-wrap"
       >
         <span
-          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-clauday-blue/10 text-clauday-blue"
+          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-[color:var(--wf-working-bg)] text-[color:var(--wf-working-fg)]"
         >
           working
         </span>
@@ -72,7 +72,7 @@ exports[`TaskRow — 렌더 스냅샷 > 기본 렌더 1`] = `
     style="content-visibility: auto; contain-intrinsic-size: 0 60px;"
   >
     <svg
-      class="lucide lucide-clock flex-shrink-0 text-clauday-blue"
+      class="lucide lucide-clock flex-shrink-0 text-[color:var(--wf-working-dot)]"
       fill="none"
       height="14"
       stroke="currentColor"
@@ -104,7 +104,7 @@ exports[`TaskRow — 렌더 스냅샷 > 기본 렌더 1`] = `
         class="flex items-center gap-1.5 mt-1 flex-wrap"
       >
         <span
-          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-clauday-blue/10 text-clauday-blue"
+          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-[color:var(--wf-working-bg)] text-[color:var(--wf-working-fg)]"
         >
           working
         </span>
@@ -137,7 +137,7 @@ exports[`TaskRow — 렌더 스냅샷 > 태그 4개 + milestone + dueDateAt 렌�
     style="content-visibility: auto; contain-intrinsic-size: 0 60px;"
   >
     <svg
-      class="lucide lucide-clock flex-shrink-0 text-clauday-blue"
+      class="lucide lucide-clock flex-shrink-0 text-[color:var(--wf-working-dot)]"
       fill="none"
       height="14"
       stroke="currentColor"
@@ -169,7 +169,7 @@ exports[`TaskRow — 렌더 스냅샷 > 태그 4개 + milestone + dueDateAt 렌�
         class="flex items-center gap-1.5 mt-1 flex-wrap"
       >
         <span
-          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-clauday-blue/10 text-clauday-blue"
+          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-[color:var(--wf-working-bg)] text-[color:var(--wf-working-fg)]"
         >
           working
         </span>

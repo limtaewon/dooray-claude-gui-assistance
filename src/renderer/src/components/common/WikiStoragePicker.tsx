@@ -292,7 +292,7 @@ function WikiStoragePicker({
                       <button
                         onClick={handleManualAdd}
                         disabled={adding || !addInput.trim()}
-                        className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-text-tertiary rounded text-[calc(10px_*_var(--app-font-scale,1))] text-white transition-colors flex items-center gap-1"
+                        className="ds-btn primary xs"
                         type="button"
                       >
                         {adding ? <Loader2 size={10} className="animate-spin" /> : null}

@@ -177,7 +177,7 @@ function WorkspaceSettings(): JSX.Element {
         <div className="mt-2 flex flex-col gap-1 text-[calc(11px_*_var(--app-font-scale,1))]">
           <div>
             <span className="text-text-tertiary mr-2">미리보기</span>
-            <code className="text-clauday-blue">{preview}</code>
+            <code className="text-text-primary font-medium">{preview}</code>
           </div>
           <div>
             <span className="text-text-tertiary mr-2">taskNumber 없음</span>
@@ -198,6 +198,7 @@ function WorkspaceSettings(): JSX.Element {
           <label className="flex items-center gap-2 text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary">
             <input
               type="checkbox"
+              className="accent-clauday-blue"
               checked={settings.autoApproveDefault}
               onChange={(e) => void patch({ autoApproveDefault: e.target.checked })}
             />
@@ -206,6 +207,7 @@ function WorkspaceSettings(): JSX.Element {
           <label className="flex items-center gap-2 text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary">
             <input
               type="checkbox"
+              className="accent-clauday-blue"
               checked={settings.transitionDoorayDefault}
               onChange={(e) => void patch({ transitionDoorayDefault: e.target.checked })}
             />
@@ -214,6 +216,7 @@ function WorkspaceSettings(): JSX.Element {
           <label className="flex items-center gap-2 text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary">
             <input
               type="checkbox"
+              className="accent-clauday-blue"
               checked={settings.commentBranchDefault}
               onChange={(e) => void patch({ commentBranchDefault: e.target.checked })}
             />
