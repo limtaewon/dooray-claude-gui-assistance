@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
-import { Check, Cpu, Key, Eye, EyeOff, ExternalLink, SlidersHorizontal, LogOut, BarChart2, Moon, Sun, Type, CalendarDays, Loader2, AlertCircle, Zap, X, ChevronUp, ChevronDown, GripVertical, RotateCcw } from 'lucide-react'
+import { Check, Cpu, Key, Eye, EyeOff, ExternalLink, SlidersHorizontal, LogOut, BarChart2, Moon, Sun, Type, CalendarDays, Loader2, AlertCircle, Zap, X, ChevronUp, ChevronDown, GripVertical, RotateCcw, FolderGit2 } from 'lucide-react'
 import { CUSTOMIZABLE_NAV_ITEMS, DEFAULT_SIDEBAR_PREFS, type SidebarPrefs, type SidebarView } from '../Layout/Sidebar'
 import type { AIModelConfig, AIModelName } from '../../../../shared/types/ai'
 import UsageInsights from './UsageInsights'
+import WorkspaceSettings from './WorkspaceSettings'
 import { useTheme } from '../../hooks/useTheme'
 import { useFontSettings, FONT_FAMILY_LABELS, type FontFamily } from '../../hooks/useFontSettings'
 import ThemePicker from './ThemePicker'
 import { Modal } from '../common/ds'
 
-type SettingsTab = 'models' | 'dooray' | 'caldav' | 'app' | 'insights'
+type SettingsTab = 'models' | 'dooray' | 'caldav' | 'app' | 'insights' | 'workspace'
 
 function SettingsView(): JSX.Element {
   const [activeTab, setActiveTab] = useState<SettingsTab>('models')
@@ -28,6 +29,7 @@ function SettingsView(): JSX.Element {
     { id: 'insights', icon: BarChart2, label: '사용 인사이트' },
     { id: 'dooray', icon: Key, label: '두레이 연결' },
     { id: 'caldav', icon: CalendarDays, label: '캘린더 연결' },
+    { id: 'workspace', icon: FolderGit2, label: '워크스페이스' },
     { id: 'app', icon: SlidersHorizontal, label: '외관 & 동작' }
   ]
 
@@ -48,6 +50,7 @@ function SettingsView(): JSX.Element {
         {activeTab === 'insights' && <UsageInsights />}
         {activeTab === 'dooray' && <DoorayTokenSettings />}
         {activeTab === 'caldav' && <CalDAVSettings />}
+        {activeTab === 'workspace' && <WorkspaceSettings />}
         {activeTab === 'app' && <AppBehaviorSettings />}
       </div>
     </div>

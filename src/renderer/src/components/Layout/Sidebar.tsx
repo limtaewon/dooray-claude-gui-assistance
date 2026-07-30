@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Server, Sparkles, BarChart3, Calendar, Terminal, BookOpen, MessageSquare, GitBranch, Settings, Users, Radar, Lightbulb, Bot, MessageSquarePlus, Workflow } from 'lucide-react'
+import { Server, Sparkles, BarChart3, Calendar, Terminal, BookOpen, MessageSquare, GitBranch, Settings, Users, Radar, Lightbulb, Bot, MessageSquarePlus, Workflow, KanbanSquare } from 'lucide-react'
 import { useFeedback } from '../Feedback/FeedbackProvider'
 
-export type SidebarView = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent' | 'harness'
+export type SidebarView = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent' | 'harness' | 'workspace'
 // 호환성 유지를 위해 기존 별칭도 export
 export type View = SidebarView
 
@@ -16,6 +16,7 @@ export interface SidebarNavItem { view: View; icon: typeof Server; label: string
 /** 사용자가 순서/노출을 커스텀할 수 있는 항목 전체 (settings/manual 은 standalone, 항상 노출/고정). */
 export const CUSTOMIZABLE_NAV_ITEMS: SidebarNavItem[] = [
   { view: 'dooray', icon: Calendar, label: '두레이' },
+  { view: 'workspace', icon: KanbanSquare, label: '워크스페이스' },
   { view: 'monitoring', icon: Radar, label: '모니터링' },
   { view: 'agent', icon: Bot, label: '에이전트' },
   { view: 'terminal', icon: Terminal, label: '터미널' },

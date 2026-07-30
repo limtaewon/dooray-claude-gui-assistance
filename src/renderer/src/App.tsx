@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   Calendar as CalendarIcon, Terminal as TerminalIcon, GitBranch, Users, Server, Sparkles,
   MessageSquare, BarChart3, BookOpen, Settings as SettingsIcon, Radar, Moon, Sun, Lightbulb, Bot,
-  LayoutDashboard, ListTodo, MessageCircle, FileText, CheckSquare, Workflow
+  LayoutDashboard, ListTodo, MessageCircle, FileText, CheckSquare, Workflow, KanbanSquare
 } from 'lucide-react'
 import Sidebar from './components/Layout/Sidebar'
 import TitleBar from './components/Layout/TitleBar'
@@ -23,13 +23,14 @@ import CommunityView from './components/Community/CommunityView'
 import MonitoringView from './components/Monitoring/MonitoringView'
 import AIRecommendView from './components/AIRecommend/AIRecommendView'
 import HarnessStudioView from './components/HarnessStudio/HarnessStudioView'
+import WorkspaceView from './components/Workspace/WorkspaceView'
 import QuickTodoModal from './components/Dooray/QuickTodoModal'
 import { ToastHost, CommandPalette, type CommandGroup, type CommandItem } from './components/common/ds'
 import ErrorReportProvider from './components/ErrorReport/ErrorReportProvider'
 import FeedbackProvider from './components/Feedback/FeedbackProvider'
 import { useTheme } from './hooks/useTheme'
 
-type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent' | 'harness'
+type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent' | 'harness' | 'workspace'
 
 /** Cmd+E 최근 뷰 LRU 항목 — sub 가 있으면 같은 view 안의 sub-tab 별로 별개 entry */
 interface RecentViewItem {
@@ -251,6 +252,7 @@ function App(): JSX.Element {
         { id: 'go-dooray:messenger', label: '두레이 — 메신저', icon: <MessageCircle size={13} /> },
         { id: 'go-dooray:briefing', label: '두레이 — AI 브리핑', icon: <Sparkles size={13} /> },
         { id: 'go-dooray:report', label: '두레이 — AI 보고서', icon: <FileText size={13} /> },
+        { id: 'go-workspace', label: '워크스페이스', icon: <KanbanSquare size={13} /> },
         { id: 'go-monitoring', label: '모니터링', icon: <Radar size={13} />, hint: '⌘2' },
         { id: 'go-agent', label: '에이전트', icon: <Bot size={13} /> },
         { id: 'go-terminal', label: '터미널', icon: <TerminalIcon size={13} />, hint: '⌘3' },
@@ -325,6 +327,11 @@ function App(): JSX.Element {
               ) : (
                 <DooraySetup onConfigured={() => setDoorayConfigured(true)} />
               )}
+            </div>
+            <div className={`absolute inset-0 ${vis('workspace')}`}>
+              <ErrorBoundary>
+                <WorkspaceView active={activeView === 'workspace'} />
+              </ErrorBoundary>
             </div>
             <div className={`absolute inset-0 ${vis('terminal')}`}>
               <TerminalView active={activeView === 'terminal'} />
@@ -419,6 +426,7 @@ function RecentViewsPalette({ open, items, index, onHover, onPick, onClose }: {
         case 'settings': return { label: '설정', icon: <SettingsIcon size={13} /> }
         case 'agent': return { label: '에이전트', icon: <Bot size={13} /> }
         case 'harness': return { label: 'Harness Studio', icon: <Workflow size={13} /> }
+        case 'workspace': return { label: '워크스페이스', icon: <KanbanSquare size={13} /> }
         default: return { label: v, icon: <BookOpen size={13} /> }
       }
     })()
