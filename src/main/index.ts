@@ -80,6 +80,7 @@ import { AnalyticsService } from './analytics/AnalyticsService'
 // v2.0 C-2 — 워크스페이스(태스크 ↔ 워크트리 ↔ claude 세션) 도메인
 import { WorkspaceStore } from './workspace/WorkspaceStore'
 import { WorkspaceService } from './workspace/WorkspaceService'
+import { TaskDropService } from './workspace/TaskDropService'
 import { AgentRunSpawner } from './workspace/AgentRunSpawner'
 import { WorkspaceHookHandler, WORKSPACE_HOOK_KIND } from './workspace/WorkspaceHookHandler'
 import { preApproveTrust, writeHookSettings } from './claude/claudeDirSetup'
@@ -256,6 +257,11 @@ const workspaceService = new WorkspaceService({
   getWorkspaceRoot: () => agentWorkspace.getRoot(),
   getAgentRoot: () => agentWorkspace.getAgentRoot(),
   claudeDir: { preApproveTrust, writeHookSettings }
+})
+// 터미널 태스크 드로어(C-3.5) — 워크트리 없이 매핑 저장소에서 claude 를 띄우는 경량 흐름
+const taskDropService = new TaskDropService({
+  store: workspaceStore,
+  listSessions: (cwd) => claudeSessions.listSessions(cwd)
 })
 const workspaceHookHandler = new WorkspaceHookHandler({ workspaceService })
 // 멘션이 1순위 — C-0 의 보존 약속(ADR-v2-workspace-p0-01). 워크트리는 agentRoot 밖이므로 충돌 없음.
@@ -1648,6 +1654,22 @@ ${data}`,
   workspaceHandle(IPC_CHANNELS.WORKSPACE_RUN_ADOPT, (runId) => workspaceService.adoptRun(runId as string))
   workspaceHandle(IPC_CHANNELS.WORKSPACE_RUN_CLEANUP, (params) => workspaceService.cleanupRun(params as CleanupRunParams))
   workspaceHandle(IPC_CHANNELS.WORKSPACE_RECONCILE, () => workspaceService.reconcile())
+
+  // 터미널 태스크 드로어 (C-3.5)
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_TASK_DROP_RESOLVE, (params) => {
+    const { projectId, taskId } = params as { projectId: string; taskId: string }
+    return taskDropService.resolve(projectId, taskId)
+  })
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINK, (params) => {
+    const { projectId, taskId, cwd, since } = params as { projectId: string; taskId: string; cwd: string; since: number }
+    return taskDropService.link(projectId, taskId, cwd, since)
+  })
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_TASK_DROP_UNLINK, (params) => {
+    const { projectId, taskId } = params as { projectId: string; taskId: string }
+    taskDropService.unlink(projectId, taskId)
+    return null
+  })
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINKED, () => taskDropService.linkedKeys())
 
   // Analytics (로컬 전용 사용 분석)
   ipcMain.on(IPC_CHANNELS.ANALYTICS_TRACK, (_, event: { type: string; params?: Record<string, unknown> }) => {

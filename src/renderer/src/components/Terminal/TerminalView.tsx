@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, X, Terminal, Trash2, Pencil } from 'lucide-react'
+import { Plus, X, Terminal, Trash2, Pencil, ClipboardList } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -36,6 +36,8 @@ import { moveTab, pickNextActiveTab, pushMru } from './tabOrder'
 import RendererToggle from './RendererToggle'
 import type { TerminalRendererSetting } from './RendererToggle'
 import { resetGlobalWebglFailure } from './webglPolicy'
+import TaskDrawer, { TASK_DRAG_MIME, type TaskDragPayload } from './TaskDrawer'
+import { buildTaskDropSteps } from './taskDrop'
 import type {
   TerminalExitPayload,
   TerminalSession,
@@ -91,6 +93,10 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
   const [tabs, setTabs] = useState<TabEntry[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
   const [isDividerDragging, setIsDividerDragging] = useState(false)
+  /** v2.0 C-3.5 — 두레이 태스크 드로어 */
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [dropHint, setDropHint] = useState<string | null>(null)
+  const [dropBusy, setDropBusy] = useState<string | null>(null)
   const restored = useRef(false)
   /** 탭 닫기 시 다음 활성 탭 선택에 쓰는 최근 사용 스택 (세션 수명 동안만 유지, 영속화 안 함). */
   const mruRef = useRef<string[]>([])
@@ -248,6 +254,84 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     mruRef.current = pushMru(mruRef.current, tabId)
     notifyLayoutChanged()
   }, [notifyLayoutChanged])
+
+  // ===== v2.0 C-3.5: 태스크 드로어 드래그&드롭 =====
+
+  const readTaskPayload = (e: React.DragEvent): TaskDragPayload | null => {
+    const raw = e.dataTransfer.getData(TASK_DRAG_MIME)
+    if (!raw) return null
+    try {
+      return JSON.parse(raw) as TaskDragPayload
+    } catch {
+      return null
+    }
+  }
+
+  const onTaskDragOver = useCallback((e: React.DragEvent): void => {
+    // getData 는 drop 에서만 읽을 수 있으므로 type 존재 여부로만 판정한다
+    if (!e.dataTransfer.types.includes(TASK_DRAG_MIME)) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+    setDropHint('여기에 놓으면 이 업무로 claude 를 시작합니다')
+  }, [])
+
+  const onTaskDragLeave = useCallback((e: React.DragEvent): void => {
+    // 자식으로 이동하는 중이면 무시 — 깜빡임 방지
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
+    setDropHint(null)
+  }, [])
+
+  /**
+   * 태스크를 활성 탭의 포커스 pane 에 떨어뜨렸을 때: 매핑 저장소로 `cd` → claude 실행.
+   * 세션이 이미 연결돼 있으면 `--resume`, 아니면 새로 띄우고 완료 후 세션을 매핑한다.
+   */
+  const onTaskDrop = useCallback(async (e: React.DragEvent, tabId: string): Promise<void> => {
+    const payload = readTaskPayload(e)
+    setDropHint(null)
+    if (!payload) return
+    e.preventDefault()
+
+    const tab = tabsRef.current.find((t) => t.tabId === tabId)
+    const pane = tab?.panes[tab.focusedLeafId]
+    if (!tab || !pane) return
+    if (pane.exitInfo) {
+      setDropBusy('종료된 pane 에는 놓을 수 없습니다')
+      setTimeout(() => setDropBusy(null), 2500)
+      return
+    }
+
+    const target = await window.api.workspace.taskDrop.resolve(payload.projectId, payload.taskId).catch(() => null)
+    if (!target) {
+      setDropBusy('저장소가 등록되어 있지 않습니다 — 설정 → 워크스페이스')
+      setTimeout(() => setDropBusy(null), 4000)
+      return
+    }
+
+    const since = Date.now()
+    const steps = buildTaskDropSteps({
+      target,
+      subject: payload.subject,
+      taskNumber: undefined
+    })
+    for (const step of steps) {
+      setDropBusy(step.label)
+      window.api.terminal.input(pane.sessionId, step.data)
+      if (step.delayMs > 0) await new Promise((r) => setTimeout(r, step.delayMs))
+    }
+    setDropBusy(null)
+
+    // 새 세션이면 방금 만들어진 것을 태스크에 연결한다 (resume 은 이미 연결돼 있음)
+    if (!target.claudeSessionId) {
+      setTimeout(() => {
+        void window.api.workspace.taskDrop
+          .link(payload.projectId, payload.taskId, target.cwd, since)
+          .then((sid) => {
+            if (sid) window.dispatchEvent(new CustomEvent('task-session-linked'))
+          })
+          .catch(() => undefined)
+      }, 8000)
+    }
+  }, [])
 
   const setFocusedLeaf = useCallback((tabId: string, leafId: string) => {
     setTabs((prev) => prev.map((t) => (
@@ -508,6 +592,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       if (shortcut) {
         switch (shortcut) {
           case 'newTab': e.preventDefault(); void createTab(); return
+          case 'toggleTaskDrawer': e.preventDefault(); setDrawerOpen((v) => !v); return
           case 'closePane': {
             e.preventDefault()
             const tabId = activeTabIdRef.current
@@ -602,7 +687,8 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
   }
 
   return (
-    <div className="flex flex-col h-full bg-bg-primary">
+    <div className="flex h-full min-h-0">
+    <div className="flex flex-col h-full min-w-0 flex-1 bg-bg-primary">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -638,6 +724,13 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
           </button>
           <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary ml-1 flex-shrink-0">⌘T 새탭 · ⌘D 오른쪽 분할 · ⌘⇧D 아래 분할 · ⌘W 닫기</span>
           <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+            <button onClick={() => setDrawerOpen((v) => !v)}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[calc(10px_*_var(--app-font-scale,1))] transition-colors ${
+                drawerOpen ? 'text-clauday-blue bg-clauday-blue/10' : 'text-text-tertiary hover:text-text-primary hover:bg-bg-surface-hover'
+              }`}
+              title="두레이 태스크 드로어 (⌘⇧T)">
+              <ClipboardList size={11} /> 태스크
+            </button>
             <RendererToggle setting={rendererSetting} fellBack={rendererFellBack} onChange={handleRendererChange} />
             {tabs.length >= 3 && (
               <button onClick={closeAll}
@@ -701,6 +794,9 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
             <div
               key={tab.tabId}
               className={`absolute inset-0 ${tab.tabId === activeTabId ? 'z-10' : 'z-0 pointer-events-none invisible'}`}
+              onDragOver={tab.tabId === activeTabId ? onTaskDragOver : undefined}
+              onDragLeave={tab.tabId === activeTabId ? onTaskDragLeave : undefined}
+              onDrop={tab.tabId === activeTabId ? (e) => void onTaskDrop(e, tab.tabId) : undefined}
             >
               <SplitLayout
                 tree={tab.tree}
@@ -709,10 +805,24 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
                 onRatioCommit={(path, ratio) => commitRatio(tab.tabId, path, ratio)}
                 onDragActiveChange={setIsDividerDragging}
               />
+              {dropHint && tab.tabId === activeTabId && (
+                <div className="absolute inset-2 z-20 pointer-events-none rounded-lg border-2 border-dashed border-clauday-blue bg-clauday-blue/5 flex items-center justify-center">
+                  <span className="px-3 py-1.5 rounded-md bg-bg-surface-raised border border-bg-border text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-primary shadow">
+                    {dropHint}
+                  </span>
+                </div>
+              )}
             </div>
           ))
         )}
+        {dropBusy && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-md bg-bg-surface-raised border border-bg-border text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary shadow">
+            {dropBusy}
+          </div>
+        )}
       </div>
+    </div>
+    {drawerOpen && <TaskDrawer onClose={() => setDrawerOpen(false)} />}
     </div>
   )
 }

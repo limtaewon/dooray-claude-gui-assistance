@@ -174,6 +174,7 @@ import type {
   CleanupRunParams,
   CleanupRunResult,
   ReconcileResult,
+  TaskDropTarget,
   WorkspaceRunUpdatedPayload
 } from '../shared/types/workspace'
 
@@ -652,6 +653,18 @@ const api = {
         ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_RUN_CLEANUP, params)
     },
     reconcile: (): Promise<ReconcileResult> => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_RECONCILE),
+    /** 터미널 태스크 드로어(C-3.5) — 드래그&드롭으로 태스크를 pane 에 떨어뜨릴 때 쓴다. */
+    taskDrop: {
+      resolve: (projectId: string, taskId: string): Promise<TaskDropTarget | null> =>
+        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_RESOLVE, { projectId, taskId }),
+      /** 드롭 직후 생긴 세션을 태스크에 연결. `since` 이후 활동한 세션만 후보다. */
+      link: (projectId: string, taskId: string, cwd: string, since: number): Promise<string | null> =>
+        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINK, { projectId, taskId, cwd, since }),
+      unlink: (projectId: string, taskId: string): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_UNLINK, { projectId, taskId }),
+      /** 세션이 연결된 `projectId:taskId` 키 목록 — 드로어 🔗 배지용 */
+      linked: (): Promise<string[]> => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINKED)
+    },
     /** run 변경 push 구독. unsubscribe 함수 반환. */
     onRunUpdated: (callback: (payload: WorkspaceRunUpdatedPayload) => void): (() => void) => {
       const handler = (_: IpcRendererEvent, payload: WorkspaceRunUpdatedPayload): void => callback(payload)

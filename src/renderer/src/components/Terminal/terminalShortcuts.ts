@@ -15,6 +15,7 @@ export type TerminalShortcutId =
   | 'focusDown'
   | 'closePane'
   | 'newTab'
+  | 'toggleTaskDrawer'
 
 /** 단축키 판정에 필요한 최소 필드 — KeyboardEvent 를 그대로 넘겨도 되지만 테스트에선 리터럴로 구성. */
 export interface ShortcutKeyState {
@@ -102,6 +103,14 @@ export const TERMINAL_SHORTCUTS: TerminalShortcutBinding[] = [
     winLabel: 'Ctrl+T',
     matchesMac: (e) => isPlainKey(e, 't', true, false, false, false),
     matchesWin: (e) => isPlainKey(e, 't', false, true, false, false)
+  },
+  {
+    // v2.0 C-3.5 — 두레이 태스크 드로어 토글
+    id: 'toggleTaskDrawer',
+    macLabel: '⌘⇧T',
+    winLabel: 'Ctrl+Shift+T',
+    matchesMac: (e) => isPlainKey(e, 't', true, false, true, false),
+    matchesWin: (e) => isPlainKey(e, 't', false, true, true, false)
   }
 ]
 

@@ -67,13 +67,18 @@ export interface TaskWorkspace {
   updatedAt: number
 }
 
-/**
- * 터미널 태스크 드로어(C-3.5)용 스키마 선반영. 이 트랙(C-1/C-2)은 읽기/쓰기 서비스를 만들지 않는다.
- */
+/** 터미널 태스크 드로어(C-3.5) — 태스크 ↔ claude 세션 매핑. */
 export interface TaskSessionLink {
   cwd: string
   claudeSessionId: string
   lastUsedAt: number
+}
+
+/** 태스크를 터미널 pane 에 드롭했을 때 열 대상 — `cd` 할 폴더와 이어갈 세션(있으면). */
+export interface TaskDropTarget {
+  cwd: string
+  repoName: string
+  claudeSessionId?: string
 }
 
 /** [작업 시작] 모달에서 마지막으로 사용한 옵션 — 다음 원클릭 시작에 재사용된다. */

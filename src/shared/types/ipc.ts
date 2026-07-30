@@ -393,6 +393,11 @@ export const IPC_CHANNELS = {
   WORKSPACE_RUN_ADOPT: 'workspace:run:adopt',
   WORKSPACE_RUN_CLEANUP: 'workspace:run:cleanup',
   WORKSPACE_RECONCILE: 'workspace:reconcile',
+  /** 터미널 태스크 드로어(C-3.5) — 드롭 대상 폴더/세션 해석과 세션 매핑 */
+  WORKSPACE_TASK_DROP_RESOLVE: 'workspace:task-drop:resolve',
+  WORKSPACE_TASK_DROP_LINK: 'workspace:task-drop:link',
+  WORKSPACE_TASK_DROP_UNLINK: 'workspace:task-drop:unlink',
+  WORKSPACE_TASK_DROP_LINKED: 'workspace:task-drop:linked',
   /** main → renderer push 전용. ipcMain.handle 등록 금지. */
   WORKSPACE_RUN_UPDATED: 'workspace:run:updated',
   DOORAY_PROJECT_WORKFLOWS: 'dooray:project:workflows',

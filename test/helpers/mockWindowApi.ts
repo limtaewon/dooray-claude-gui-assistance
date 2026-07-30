@@ -249,6 +249,12 @@ export function createMockWindowApi(): Record<string, unknown> {
         cleanup: vi.fn().mockResolvedValue(null)
       },
       reconcile: vi.fn().mockResolvedValue({ detached: 0, discarded: 0 }),
+      taskDrop: {
+        resolve: vi.fn().mockResolvedValue(null),
+        link: vi.fn().mockResolvedValue(null),
+        unlink: vi.fn().mockResolvedValue(undefined),
+        linked: vi.fn().mockResolvedValue([])
+      },
       onRunUpdated: vi.fn().mockReturnValue(noopUnsub)
     },
     analytics: {

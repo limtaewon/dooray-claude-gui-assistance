@@ -131,8 +131,12 @@ export class WorkspaceStore {
     return this.state.taskSessionLinks[key] ?? null
   }
 
-  setTaskSessionLink(key: WorkspaceKey, link: TaskSessionLink): void {
-    this.state.taskSessionLinks = { ...this.state.taskSessionLinks, [key]: link }
+  /** link 가 null 이면 매핑을 해제한다 (터미널 태스크 드로어의 "연결 해제"). */
+  setTaskSessionLink(key: WorkspaceKey, link: TaskSessionLink | null): void {
+    const next = { ...this.state.taskSessionLinks }
+    if (link) next[key] = link
+    else delete next[key]
+    this.state.taskSessionLinks = next
     this.persist()
   }
 }
