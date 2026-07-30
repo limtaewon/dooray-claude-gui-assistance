@@ -20,6 +20,10 @@
   --clauday-orange-light:  #FB923C;
   --clauday-orange-soft:   #FBE4D5;
   --clauday-blue:          #2563EB;   /* Claude */
+  /* 도메인 식별색 — 크롬 무채색화(--accent-*)와 무관하게 항상 유색으로 남는다.
+     Claude 계열 기능은 주황, 두레이 계열 기능은 파랑. */
+  --brand-claude:          #EA580C;
+  --brand-dooray:          #2563EB;
   --clauday-blue-light:    #3B82F6;
   --clauday-blue-soft:     #DCE6FB;
 
@@ -238,6 +242,9 @@
   --accent-blue-fg:      #C9C9CF;
   --accent-orange:       #FB923C;
   --accent-orange-light: #FDBA74;
+  /* 도메인 식별색 — 어두운 면 위에서 읽히도록 밝은 쪽으로 */
+  --brand-claude:        #FB923C;
+  --brand-dooray:        #60A5FA;
   --accent-orange-soft:  rgba(251,146,60,0.18);
 
   /* Mode-aware semantic — DARK. 칩은 채도를 낮추고 텍스트를 밝게: 검정 위에서 '빛나는 알약'. */

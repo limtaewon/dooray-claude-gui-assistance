@@ -12,22 +12,30 @@ interface SidebarProps {
   expanded?: boolean
 }
 
-export interface SidebarNavItem { view: View; icon: typeof Server; label: string }
+/** 도메인 식별색 — Claude 계열은 주황, 두레이 계열은 파랑. 나머지는 무채색. */
+export type NavAccent = 'claude' | 'dooray' | undefined
+
+export interface SidebarNavItem { view: View; icon: typeof Server; label: string; accent?: NavAccent }
+
+const ACCENT_CLASS: Record<'claude' | 'dooray', string> = {
+  claude: 'text-brand-claude',
+  dooray: 'text-brand-dooray'
+}
 
 /** 사용자가 순서/노출을 커스텀할 수 있는 항목 전체 (settings/manual 은 standalone, 항상 노출/고정). */
 export const CUSTOMIZABLE_NAV_ITEMS: SidebarNavItem[] = [
-  { view: 'dooray', icon: Calendar, label: '두레이' },
-  { view: 'monitoring', icon: Radar, label: '모니터링' },
-  { view: 'agent', icon: Bot, label: '에이전트' },
+  { view: 'dooray', icon: Calendar, label: '두레이', accent: 'dooray' },
+  { view: 'monitoring', icon: Radar, label: '모니터링', accent: 'dooray' },
+  { view: 'agent', icon: Bot, label: '에이전트', accent: 'dooray' },
   { view: 'terminal', icon: Terminal, label: '터미널' },
   { view: 'git', icon: GitBranch, label: '브랜치 작업' },
-  { view: 'harness', icon: Workflow, label: 'Harness Studio' },
-  { view: 'community', icon: Users, label: '커뮤니티' },
-  { view: 'mcp', icon: Server, label: 'MCP 서버' },
-  { view: 'skills', icon: Sparkles, label: 'Claude 스킬' },
-  { view: 'ai-recommend', icon: Lightbulb, label: 'AI 추천' },
-  { view: 'sessions', icon: MessageSquare, label: 'Claude 채팅' },
-  { view: 'usage', icon: BarChart3, label: '사용량' }
+  { view: 'harness', icon: Workflow, label: 'Harness Studio', accent: 'claude' },
+  { view: 'community', icon: Users, label: '커뮤니티', accent: 'dooray' },
+  { view: 'mcp', icon: Server, label: 'MCP 서버', accent: 'claude' },
+  { view: 'skills', icon: Sparkles, label: 'Claude 스킬', accent: 'claude' },
+  { view: 'ai-recommend', icon: Lightbulb, label: 'AI 추천', accent: 'claude' },
+  { view: 'sessions', icon: MessageSquare, label: 'Claude 채팅', accent: 'claude' },
+  { view: 'usage', icon: BarChart3, label: '사용량', accent: 'claude' }
 ]
 
 const STANDALONE_ITEMS: SidebarNavItem[] = [
@@ -68,8 +76,10 @@ function resolveOrderedItems(prefs: SidebarPrefs | null): SidebarNavItem[] {
 /** Design System Sidebar. 36×36 버튼, 20px 아이콘. 활성 상태는 무채색(--bg-active 면 + 밝은 글자) —
  *  크롬에는 색을 쓰지 않는다. 배지는 --badge-* 토큰(라이트=오렌지, 다크=밝은 회색 면). */
 function NavButton({
-  view, icon: Icon, label, active, onClick, badge, pulse, expanded
+  view, icon: Icon, label, accent, active, onClick, badge, pulse, expanded
 }: SidebarNavItem & { active: boolean; onClick: () => void; badge?: number; pulse?: boolean; expanded: boolean }): JSX.Element {
+  // 도메인 색은 활성/비활성과 무관하게 유지한다 — 클릭할 때 색이 빠지면 이질적이다.
+  const iconClass = accent ? ACCENT_CLASS[accent] : ''
   return (
     <button
       key={view}
@@ -84,7 +94,7 @@ function NavButton({
           : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
       }`}
     >
-      <Icon size={20} className="flex-none" />
+      <Icon size={20} className={`flex-none ${iconClass}`} />
       {expanded && (
         <span className="text-[calc(12px_*_var(--app-font-scale,1))] font-medium truncate">{label}</span>
       )}

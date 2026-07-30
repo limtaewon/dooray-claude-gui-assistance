@@ -420,7 +420,7 @@ function MCPManager(): JSX.Element {
       <div className="px-5 py-4 space-y-4">
         {/* DS PageHeader */}
         <div className="flex items-center gap-3 flex-wrap">
-          <Server size={18} className="text-clauday-blue" />
+          <Server size={18} className="text-brand-claude" />
           <h2 className="text-[calc(14px_*_var(--app-font-scale,1))] font-semibold text-text-primary">MCP 서버</h2>
           <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
             · {entries.length}개 · 활성 {activeCount}
@@ -604,7 +604,7 @@ function MCPManager(): JSX.Element {
                       <div className="w-8 h-8 rounded-[6px] flex-none flex items-center justify-center bg-clauday-blue/10">
                         {isRemote
                           ? <Globe size={16} className="text-clauday-blue" />
-                          : <Server size={16} className="text-clauday-blue" />}
+                          : <Server size={16} className="text-brand-claude" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -699,7 +699,7 @@ function MCPManager(): JSX.Element {
         open={!!previewItem}
         onClose={() => setPreviewItem(null)}
         width="min(800px, 92vw)"
-        icon={<Server size={14} className="text-clauday-blue" />}
+        icon={<Server size={14} className="text-brand-claude" />}
         title={previewItem?.name}
         footer={
           <>

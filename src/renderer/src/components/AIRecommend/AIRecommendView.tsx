@@ -297,7 +297,7 @@ function PostDetail({ post, onBack }: { post: DoorayTask; onBack: () => void }):
           {/* 댓글 (읽기 전용) */}
           <div className="flex items-center gap-2 mb-3">
             <div className="flex items-center gap-1.5">
-              <MessageSquare size={13} className="text-clauday-blue" />
+              <MessageSquare size={13} className="text-brand-claude" />
               <span className="text-xs font-bold text-text-primary">댓글</span>
               {comments.length > 0 && (
                 <span className="px-1.5 py-0.5 rounded-full text-[calc(9px_*_var(--app-font-scale,1))] font-bold"
@@ -771,7 +771,7 @@ function AIRecommendView(): JSX.Element {
             <div className="ds-card flex items-center justify-center" style={{ padding: '14px 16px' }}>
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-[8px] flex-none flex items-center justify-center bg-clauday-blue/10">
-                  <Sparkles size={16} className="text-clauday-blue" />
+                  <Sparkles size={16} className="text-brand-claude" />
                 </div>
                 <div className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary leading-relaxed text-center">
                   <strong className="text-text-primary">AI 활용 사례 공유 프로젝트</strong>의 최신 사례를

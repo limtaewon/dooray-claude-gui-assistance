@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Copy, ExternalLink, Send, TerminalSquare, X } from 'lucide-react'
+import { Copy, ExternalLink, Hash, Send, TerminalSquare, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -123,11 +123,40 @@ function TaskDetailOverlay({ task, onClose, onRunInTerminal, promptText }: TaskD
               <TerminalSquare size={14} /> 터미널에서 시작
             </Button>
           )}
+          {/* 액션은 아이콘 버튼으로 헤더에 둔다 — 별도 레일을 두면 폭만 잡아먹는다 */}
+          <button
+            type="button"
+            title="업무 번호 복사"
+            aria-label="업무 번호 복사"
+            onClick={() => void copy(ref || task.id, '업무 번호')}
+            className="ds-btn ghost icon"
+          >
+            <Hash size={15} />
+          </button>
+          <button
+            type="button"
+            title="프롬프트 복사"
+            aria-label="프롬프트 복사"
+            onClick={() => void copy(promptText(detail), '프롬프트')}
+            className="ds-btn ghost icon"
+          >
+            <Copy size={15} />
+          </button>
+          <a
+            href={`https://nhnent.dooray.com/project/posts/${task.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Dooray 에서 열기"
+            aria-label="Dooray 에서 열기"
+            className="ds-btn ghost icon"
+          >
+            <ExternalLink size={15} />
+          </a>
           <button
             type="button"
             aria-label="상세 닫기"
             onClick={onClose}
-            className="text-text-tertiary hover:text-text-primary mt-0.5"
+            className="text-text-tertiary hover:text-text-primary ml-1 mt-1.5"
           >
             <X size={18} />
           </button>
@@ -189,32 +218,6 @@ function TaskDetailOverlay({ task, onClose, onRunInTerminal, promptText }: TaskD
             )}
           </div>
 
-          <aside className="w-[248px] flex-none border-l border-t border-bg-border pt-5 px-4 flex flex-col gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="justify-start w-full"
-              onClick={() => void copy(ref || task.id, '업무 번호')}
-            >
-              <Copy size={13} /> 업무 번호 복사
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="justify-start w-full"
-              onClick={() => void copy(promptText(detail), '프롬프트')}
-            >
-              <Copy size={13} /> 프롬프트 복사
-            </Button>
-            <a
-              href={`https://nhnent.dooray.com/project/posts/${task.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ds-btn ghost sm justify-start w-full"
-            >
-              <ExternalLink size={13} /> Dooray 에서 열기
-            </a>
-          </aside>
         </div>
 
         <div className="flex items-end gap-2 px-7 py-4 border-t border-bg-border flex-none">

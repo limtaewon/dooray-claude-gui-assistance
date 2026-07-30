@@ -72,7 +72,7 @@ function SkillCard({
       )}
       <div className="flex items-start gap-2.5">
         <div className="w-7 h-7 rounded-[6px] flex-none flex items-center justify-center bg-clauday-blue/10">
-          <Sparkles size={15} className="text-clauday-blue" />
+          <Sparkles size={15} className="text-brand-claude" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary truncate">{skill.name}</div>

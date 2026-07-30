@@ -461,7 +461,7 @@ function SkillsManager(): JSX.Element {
       <div className="px-5 py-4 space-y-3">
         {/* PageHeader */}
         <div className="flex items-center gap-3 flex-wrap">
-          <Sparkles size={18} className="text-clauday-blue" />
+          <Sparkles size={18} className="text-brand-claude" />
           <h2 className="text-[calc(14px_*_var(--app-font-scale,1))] font-semibold text-text-primary">Claude 스킬</h2>
           <span className="ds-chip neutral">
             {tab === 'mine' ? `${skills.length}개` : `${wikiItems.length}개 공유됨`}
@@ -675,7 +675,7 @@ function SkillsManager(): JSX.Element {
                   >
                     <div className="flex items-start gap-2.5">
                       <div className="w-7 h-7 rounded-[6px] flex-none flex items-center justify-center bg-clauday-blue/10">
-                        <Sparkles size={15} className="text-clauday-blue" />
+                        <Sparkles size={15} className="text-brand-claude" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary truncate">{item.name}</div>
@@ -799,7 +799,7 @@ function SkillsManager(): JSX.Element {
                       checked ? 'bg-clauday-blue/10 border-clauday-blue/40' : 'bg-bg-surface border-bg-border hover:bg-bg-surface-hover'
                     }`}>
                     <input type="checkbox" className="accent-clauday-blue flex-shrink-0" checked={checked} onChange={toggle} />
-                    <Sparkles size={13} className="text-clauday-blue flex-shrink-0" />
+                    <Sparkles size={13} className="text-brand-claude flex-shrink-0" />
                     <span className="text-sm text-text-primary truncate flex-1" title={skill.name}>{skill.name}</span>
                     {alreadyShared && <span className="ds-chip neutral flex-shrink-0">공유됨</span>}
                   </label>
@@ -817,7 +817,7 @@ function SkillsManager(): JSX.Element {
         open={!!activeSkill}
         onClose={closeEditor}
         width="min(1000px, 92vw)"
-        icon={<Sparkles size={14} className="text-clauday-blue" />}
+        icon={<Sparkles size={14} className="text-brand-claude" />}
         title={activeSkill ? `스킬 편집 — ${activeSkill.name}` : ''}
         footer={
           <>
@@ -850,7 +850,7 @@ function SkillsManager(): JSX.Element {
         open={!!previewShared}
         onClose={() => setPreviewShared(null)}
         width="min(900px, 92vw)"
-        icon={<Sparkles size={14} className="text-clauday-blue" />}
+        icon={<Sparkles size={14} className="text-brand-claude" />}
         title={previewShared?.name}
         footer={
           <>
@@ -929,7 +929,7 @@ function SkillsManager(): JSX.Element {
                   className="w-full flex items-center gap-2 px-4 py-2 text-left text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary hover:bg-bg-surface-hover transition-colors"
                   type="button"
                 >
-                  <Sparkles size={12} className="text-clauday-blue" />
+                  <Sparkles size={12} className="text-brand-claude" />
                   <span className="flex-1">{w.wikiName || w.wikiId}</span>
                 </button>
               ))}

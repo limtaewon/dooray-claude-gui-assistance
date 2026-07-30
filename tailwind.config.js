@@ -6,6 +6,10 @@ module.exports = {
     extend: {
       colors: {
         // 'clover-blue' / 'clover-orange' 였던 초기 브랜드 명을 Clauday 로 통일.
+        brand: {
+          claude: 'var(--brand-claude)',
+          dooray: 'var(--brand-dooray)'
+        },
         clauday: {
           blue: 'var(--accent-blue)',
           'blue-light': 'var(--accent-blue-light)',

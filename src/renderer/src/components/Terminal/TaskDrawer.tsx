@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronsRight, RefreshCw, Search, Unlink } from 'lucide-react'
+import { ChevronsRight, ClipboardList, RefreshCw, Search, Unlink } from 'lucide-react'
 import type { DoorayTask } from '@shared/types/dooray'
 import { workspaceKey } from '@shared/workspace/workspaceKey'
 import { Button, Input, LoadingView } from '../common/ds'
@@ -94,6 +94,7 @@ function TaskDrawer({ onClose, onRunInTerminal }: TaskDrawerProps): JSX.Element 
     <>
       <div className="w-[320px] flex-none flex flex-col min-h-0 border-l border-bg-border bg-bg-surface">
         <div className="flex items-center gap-1 px-3 py-2.5 flex-none">
+          <ClipboardList size={14} className="text-brand-dooray flex-none" />
           <span className="text-[calc(12px_*_var(--app-font-scale,1))] font-semibold text-text-primary">두레이 업무</span>
           <Button variant="ghost" size="xs" className="ml-auto" onClick={() => void load(true)} aria-label="업무 새로고침">
             <RefreshCw size={12} />

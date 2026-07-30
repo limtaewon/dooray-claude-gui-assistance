@@ -27,6 +27,11 @@ import { installTerminalLinkPtyMouseSuppression } from './links/ptyMouseSuppress
 import { isLinkActivationEvent } from './links/linkActivation'
 import { parseOsc7 } from './links/parseOsc7'
 import type { CachedPathResolution } from './links/pathExistsCache'
+import {
+  createDeferredEnterSender,
+  isEnterCode,
+  isMultilineNewlineChord
+} from './imeDeferredNewline'
 import { windowsPtyOptions } from '@shared/utils/windowsPty'
 import { trimSerializedToBytes } from '@shared/utils/textBytes'
 import type { TerminalPaneSnapshot } from '@shared/types/terminal'
@@ -472,13 +477,30 @@ function TerminalPaneInner(
       if (exitInfoRef.current) return
       try { window.api.terminal.input(sessionId, s) } catch { /* ok */ }
     }
+    // 조합 중 Shift/Alt+Enter 를 조합 종료 후로 미루고, 재발행 Enter 를 흡수한다.
+    const deferredEnter = createDeferredEnterSender()
     terminal.attachCustomKeyEventHandler((e) => {
       if (e.type !== 'keydown') return true
+
       // IME(한글/일본어/중국어) 조합 중에는 어떤 단축키도 가로채지 않는다.
       // Why: 합성 중인 글자(예: "세")가 아직 commit 되지 않은 상태에서 Shift+Enter
       // 같은 커스텀 시퀀스를 PTY 로 먼저 보내면, xterm IME overlay 와 PTY 커서 위치가
       // 어긋나 합성 박스가 본문과 분리되어 떠 보이는 desync 가 발생.
-      if (e.isComposing || e.keyCode === 229) return true
+      // 단 하나의 예외: 멀티라인 개행(Shift/Alt+Enter). 그냥 흘려보내면 개행이 먼저 도착해
+      // 커밋된 마지막 글자가 다음 줄로 밀린다 → 조합이 끝난 뒤에 보낸다(imeDeferredNewline.ts).
+      if (e.isComposing || e.keyCode === 229) {
+        if (isEnterCode(e.code) && isMultilineNewlineChord(e)) {
+          e.preventDefault()
+          deferredEnter.defer({ code: e.code, timeStamp: e.timeStamp }, terminal.element, () => send('\x1b\r'))
+          return false
+        }
+        return true
+      }
+      // 조합 종료 후 Chromium 이 같은 native 이벤트로 Enter 를 한 번 더 발행한다 — 이중 개행 방지.
+      if (isEnterCode(e.code) && deferredEnter.absorb({ code: e.code, timeStamp: e.timeStamp })) {
+        e.preventDefault()
+        return false
+      }
       const meta = e.metaKey
       const alt = e.altKey
       const shift = e.shiftKey
@@ -753,6 +775,7 @@ function TerminalPaneInner(
       cleanup()
       searchResultsDisposable.dispose()
       titleDisposable.dispose()
+      deferredEnter.clear()
       linkClickPrimingDisposable.dispose()
       ptyMouseSuppressionDisposable.dispose()
       resizeObserver.disconnect()
