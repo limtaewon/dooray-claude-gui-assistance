@@ -14,6 +14,7 @@ import { Button, SegTabs, useToast } from '../common/ds'
 import SkillQuickToggle from '../Dooray/SkillQuickToggle'
 import AIToolsPopover from '../common/AIToolsPopover'
 import { useErrorReport } from '../ErrorReport/ErrorReportProvider'
+import { ViewOnboarding } from '../common/onboarding/viewOnboarding'
 
 /** Dooray AI 활용 사례 공유 프로젝트 */
 const AI_SHARING_PROJECT_ID = '4138743749699736544'
@@ -741,11 +742,15 @@ function AIRecommendView(): JSX.Element {
             ) : postsError ? (
               <ErrorView message={postsError} onRetry={loadPosts} />
             ) : filtered.length === 0 ? (
-              <EmptyView
-                icon={Lightbulb}
-                title={search ? '검색 결과가 없습니다' : '게시글이 없습니다'}
-                description={search ? '다른 키워드로 검색해보세요' : '프로젝트에 아직 등록된 사례가 없습니다'}
-              />
+              search ? (
+                <EmptyView
+                  icon={Lightbulb}
+                  title="검색 결과가 없습니다"
+                  description="다른 키워드로 검색해보세요"
+                />
+              ) : (
+                <ViewOnboarding view="ai-recommend" />
+              )
             ) : (
               <div className="space-y-2">
                 {filtered.map((p) => <PostCard key={p.id} post={p} onSelect={() => setSelected(p)} />)}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus, Sparkles, History, PanelLeftClose, PanelLeftOpen, Edit3, Check, X, FolderOpen, RotateCcw, Star, Search } from 'lucide-react'
+import { ViewOnboarding } from '../common/onboarding/viewOnboarding'
 import ClaudeChatPane from '../Terminal/ClaudeChatPane'
 
 interface SessionMeta {
@@ -251,18 +252,10 @@ export default function ClaudeCodeSessionsView({ active = true }: { active?: boo
       {/* 우측 채팅 영역 */}
       <div className="flex-1 relative">
         {!activeCwd ? (
-          <div className="h-full flex flex-col items-center justify-center gap-3 text-text-tertiary">
-            <Sparkles size={36} className="text-clauday-orange/60" />
-            <div className="text-center">
-              <div className="text-sm font-medium text-text-primary">Claude Code</div>
-              <div className="text-[calc(11px_*_var(--app-font-scale,1))] mt-1">왼쪽에서 이전 세션을 고르거나 "새 채팅"을 시작하세요</div>
-            </div>
-            <button onClick={startNewChat}
-              className="mt-2 flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm hover:opacity-90"
-              style={{ background: 'linear-gradient(135deg, #fb923c 0%, #3b82f6 100%)' }}>
-              <Plus size={13} /> 새 채팅
-            </button>
-          </div>
+          <ViewOnboarding
+            view="sessions"
+            actions={[{ label: '새 채팅', variant: 'primary', icon: Plus, onClick: startNewChat }]}
+          />
         ) : (
           <ClaudeChatPane
             key={chatKey}

@@ -97,7 +97,9 @@ describe('TerminalView (integration)', () => {
     renderWithDs(<TerminalView />)
 
     expect(await screen.findByText('터미널')).toBeInTheDocument()
-    expect(screen.getByText('셸 세션을 열어 작업을 시작하세요.')).toBeInTheDocument()
+    expect(
+      screen.getByText(/셸 세션을 열어 작업을 시작하세요/)
+    ).toBeInTheDocument()
     // 빈 상태의 "새 터미널" 버튼 + 단축키 가이드
     expect(screen.getByRole('button', { name: '새 터미널' })).toBeInTheDocument()
     expect(screen.getByText('오른쪽으로 분할')).toBeInTheDocument()

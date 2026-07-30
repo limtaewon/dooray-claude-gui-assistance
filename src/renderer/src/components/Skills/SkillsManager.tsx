@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plus, Save, Sparkles, Search, X, Download, Upload, User, Loader2, RefreshCw, Trash2, CheckSquare } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { ViewOnboarding } from '../common/onboarding/viewOnboarding'
 import SkillCard from './SkillCard'
 import SkillEditor from './SkillEditor'
 import SkillCreateModal from './SkillCreateModal'
@@ -595,14 +596,10 @@ function SkillsManager(): JSX.Element {
         {/* Grid */}
         {tab === 'mine' ? (
           skills.length === 0 ? (
-            <div className="py-16 text-center">
-              <Sparkles size={32} className="mx-auto text-text-tertiary mb-3" />
-              <p className="text-sm font-medium text-text-primary mb-1">스킬이 없습니다</p>
-              <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mb-4">'스킬 추가' 버튼으로 첫 스킬을 만들어보세요</p>
-              <Button variant="primary" onClick={() => setCreating(true)} leftIcon={<Plus size={13} />}>
-                스킬 추가
-              </Button>
-            </div>
+            <ViewOnboarding
+              view="skills"
+              actions={[{ label: '스킬 추가', variant: 'primary', icon: Plus, onClick: () => setCreating(true) }]}
+            />
           ) : filteredSkills.length === 0 ? (
             <div className="py-12 text-center text-[calc(12px_*_var(--app-font-scale,1))] text-text-tertiary">
               "{search}"에 일치하는 스킬이 없습니다

@@ -9,6 +9,7 @@ import {
 } from 'recharts'
 import type { UsageSummary, UsageQueryParams } from '../../../../shared/types/usage'
 import { useTheme } from '../../hooks/useTheme'
+import { ViewOnboarding } from '../common/onboarding/viewOnboarding'
 
 type Period = UsageQueryParams['period']
 
@@ -92,7 +93,7 @@ function UsageDashboard(): JSX.Element {
   }), [chart])
 
   if (loading) return <div className="flex items-center justify-center h-full text-text-secondary text-sm">사용량 데이터 불러오는 중...</div>
-  if (!summary) return <div className="flex items-center justify-center h-full text-text-secondary text-sm">데이터 없음</div>
+  if (!summary) return <ViewOnboarding view="usage" />
 
   return (
     <div className="h-full overflow-y-auto p-6">

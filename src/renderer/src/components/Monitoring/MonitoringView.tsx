@@ -8,6 +8,7 @@ import WatcherEditModal from './WatcherEditModal'
 import MessageTimeline from './MessageTimeline'
 import SocketModeBadge from './SocketModeBadge'
 import { Button } from '../common/ds'
+import { ViewOnboarding } from '../common/onboarding/viewOnboarding'
 
 function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Element {
   const [watchers, setWatchers] = useState<Watcher[]>([])
@@ -306,7 +307,14 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
       {/* 타임라인 */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {!selected ? (
-          <EmptyView icon={Radar} title="와처를 선택하세요" description="왼쪽에서 와처를 선택하거나 새로 만드세요" />
+          watchers.length === 0 ? (
+            <ViewOnboarding
+              view="monitoring"
+              actions={[{ label: '새 와처 만들기', variant: 'primary', onClick: () => setEditing('new') }]}
+            />
+          ) : (
+            <EmptyView icon={Radar} title="와처를 선택하세요" description="왼쪽에서 와처를 선택하거나 새로 만드세요" />
+          )
         ) : (
           <>
             <div className="px-5 py-2.5 border-b border-bg-border flex items-center gap-2 flex-shrink-0">

@@ -22,6 +22,7 @@ import { DoctorPanel } from './views/DoctorPanel'
 import { CompareView } from './views/CompareView'
 import { downloadHtmlReport } from './export/exportHtml'
 import { EditPanel } from './edit/EditPanel'
+import { ViewOnboarding } from '@/components/common/onboarding/viewOnboarding'
 
 interface HarnessStudioViewProps {
   active?: boolean
@@ -294,29 +295,13 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
           )}
           {!opening && !cachedLoading && cachedList !== null && discovered !== null && (
             cachedList.length === 0 && discovered.length === 0 ? (
-              <div className="flex items-center justify-center h-full">
-                <EmptyView
-                  icon={Workflow}
-                  title="하네스를 찾지 못했습니다"
-                  body={
-                    <span className="text-center">
-                      ~/.claude/skills 에서 bmad 번들을 찾지 못했습니다.<br />
-                      폴더를 직접 가져오면 에이전트 구조·레벨 체인·게이트·<br />
-                      산출물을 한눈에 시각화합니다.
-                    </span>
-                  }
-                  action={
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      leftIcon={<Plus size={12} />}
-                      onClick={() => setWizardOpen(true)}
-                    >
-                      하네스 가져오기
-                    </Button>
-                  }
-                />
-              </div>
+              <ViewOnboarding
+                view="harness"
+                description="~/.claude/skills 에서 bmad 번들을 찾지 못했습니다. 폴더를 직접 가져오면 구조를 시각화합니다."
+                actions={[
+                  { label: '하네스 가져오기', variant: 'primary', icon: Plus, onClick: () => setWizardOpen(true) }
+                ]}
+              />
             ) : (
               <div className="flex flex-col gap-5">
                 {cachedList.length > 0 && (

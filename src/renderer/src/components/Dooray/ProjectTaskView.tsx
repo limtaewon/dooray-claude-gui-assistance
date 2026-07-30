@@ -9,6 +9,7 @@ import ResizeHandle from '../common/ResizeHandle'
 import ProjectFilter from '../common/ProjectFilter'
 import TaskRow from './TaskRow'
 import { getWorkflowName, tagStyle } from './taskStyles'
+import { ViewOnboarding } from '../common/onboarding/viewOnboarding'
 
 function ProjectTaskView(): JSX.Element {
   const [projects, setProjects] = useState<DoorayProject[]>([])
@@ -413,9 +414,14 @@ function ProjectTaskView(): JSX.Element {
             </div>
           </>
         ) : (
-          <div className="flex items-center justify-center h-full text-text-secondary text-sm">
-            {sidebarCollapsed ? '좌측 버튼으로 프로젝트 목록을 여세요' : '좌측에서 프로젝트를 선택하세요'}
-          </div>
+          <ViewOnboarding
+            view="dooray"
+            description={
+              sidebarCollapsed
+                ? '좌측 버튼으로 프로젝트 목록을 열고 작업할 프로젝트를 고르세요.'
+                : '좌측에서 프로젝트를 고르면 내 담당 업무가 여기 표시됩니다.'
+            }
+          />
         )}
       </div>
 

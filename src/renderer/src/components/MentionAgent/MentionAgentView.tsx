@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { X, Bot } from 'lucide-react'
 import TerminalPane from '../Terminal/TerminalPane'
 import type { TerminalExitPayload, TerminalSession } from '../../../../shared/types/terminal'
+import { ViewOnboarding } from '../common/onboarding/viewOnboarding'
 
 interface Entry {
   session: TerminalSession
@@ -98,19 +99,7 @@ function MentionAgentView(): JSX.Element {
 
       <div className="flex-1 relative">
         {entries.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3">
-            <Bot size={48} className="text-text-tertiary" />
-            <div className="text-center max-w-md">
-              <p className="text-sm text-text-primary font-medium mb-1">에이전트 대기 중</p>
-              <p className="text-xs text-text-secondary leading-relaxed">
-                두레이 채팅방에서 본인이 <code className="px-1 rounded bg-bg-surface text-clauday-blue">@clauday</code> 라고
-                호출하면, 그 채널 전용 작업 폴더와 세션이 자동으로 시작됩니다.
-              </p>
-              <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-3">
-                작업물 위치: ~/Clauday-Workspaces/agent/{'{channelId}'}/
-              </p>
-            </div>
-          </div>
+          <ViewOnboarding view="agent" />
         ) : (
           entries.map(({ session, exitInfo }) => (
             <TerminalPane

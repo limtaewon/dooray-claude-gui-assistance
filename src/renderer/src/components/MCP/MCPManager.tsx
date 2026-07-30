@@ -5,6 +5,7 @@ import MCPForm from './MCPForm'
 import type { McpServerConfig } from '../../../../shared/types/mcp'
 import { getMcpTransport } from '../../../../shared/types/mcp'
 import { Button, EmptyView, LoadingView, Modal, SegTabs, useToast } from '../common/ds'
+import { ViewOnboarding } from '../common/onboarding/viewOnboarding'
 import { DEFAULT_WIKIS } from '../../../../shared/wiki-storage-defaults'
 import WikiStoragePicker from '../common/WikiStoragePicker'
 
@@ -540,10 +541,16 @@ function MCPManager(): JSX.Element {
           loading ? (
             <LoadingView label="MCP 서버 목록을 불러오는 중..." />
           ) : entries.length === 0 ? (
-            <EmptyView
-              icon={Server}
-              title="등록된 MCP 서버가 없습니다"
-              body="'서버 추가' 버튼을 눌러 시작하세요"
+            <ViewOnboarding
+              view="mcp"
+              actions={[
+                {
+                  label: '서버 추가',
+                  variant: 'primary',
+                  icon: Plus,
+                  onClick: () => setFormState({ mode: 'add' })
+                }
+              ]}
             />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

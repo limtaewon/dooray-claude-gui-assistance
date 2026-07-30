@@ -9,6 +9,7 @@ import rehypeRaw from 'rehype-raw'
 import type { DoorayTask, DoorayTaskDetail, DoorayTaskComment } from '../../../../shared/types/dooray'
 import DoorayImage, { DoorayFileContext } from '../common/DoorayImage'
 import { LoadingView, ErrorView, EmptyView } from '../common/StateViews'
+import { ViewOnboarding } from '../common/onboarding/viewOnboarding'
 
 /** Clauday 커뮤니티 프로젝트 (공개 프로젝트) */
 const COMMUNITY_PROJECT_ID = '4312559241344624232'
@@ -196,13 +197,18 @@ function CommunityView({ active = true }: { active?: boolean } = {}): JSX.Elemen
         ) : error ? (
           <ErrorView message={error} onRetry={load} />
         ) : filtered.length === 0 ? (
-          <EmptyView
-            icon={MessageSquare}
-            title={search ? '검색 결과가 없습니다' : '아직 글이 없습니다'}
-            description={search ? '다른 키워드로 검색해보세요' : '첫 글을 작성해보세요!'}
-            actionLabel={search ? undefined : '새 글 쓰기'}
-            onAction={search ? undefined : () => setWriting(true)}
-          />
+          search ? (
+            <EmptyView
+              icon={MessageSquare}
+              title="검색 결과가 없습니다"
+              description="다른 키워드로 검색해보세요"
+            />
+          ) : (
+            <ViewOnboarding
+              view="community"
+              actions={[{ label: '새 글 쓰기', variant: 'primary', onClick: () => setWriting(true) }]}
+            />
+          )
         ) : (
           <div className="p-4 space-y-2">
             {filtered.map((p) => (
