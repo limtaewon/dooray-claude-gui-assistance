@@ -16,7 +16,6 @@ import TerminalView from './components/Terminal/TerminalView'
 import MentionAgentView from './components/MentionAgent/MentionAgentView'
 import ClaudeManual from './components/ClaudeManual/ClaudeManual'
 import ClaudeCodeSessionsView from './components/Sessions/ClaudeCodeSessionsView'
-import BranchWorkspace from './components/Git/BranchWorkspace'
 import SettingsView from './components/Settings/SettingsView'
 import ImageLightbox from './components/common/ImageLightbox'
 import CommunityView from './components/Community/CommunityView'
@@ -30,7 +29,7 @@ import FeedbackProvider from './components/Feedback/FeedbackProvider'
 import { useTheme } from './hooks/useTheme'
 import { useShortcut } from './hooks/useKeybindings'
 
-type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent' | 'harness' | 'workspace'
+type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent' | 'harness' | 'workspace'
 
 /** Cmd+E 최근 뷰 LRU 항목 — sub 가 있으면 같은 view 안의 sub-tab 별로 별개 entry */
 interface RecentViewItem {
@@ -78,7 +77,10 @@ function App(): JSX.Element {
       if (v === 'last') {
         const last = await window.api.settings.get('lastView') as View | null
         if (last) setActiveView(last)
-      } else if (v && ['dooray', 'terminal', 'git'].includes(v)) {
+      } else if (v === 'git') {
+        // v2.0: '브랜치 작업' 뷰가 터미널 우측 패널로 흡수됐다 — 기존 설정값을 터미널로 넘긴다.
+        setActiveView('terminal')
+      } else if (v && ['dooray', 'terminal'].includes(v)) {
         setActiveView(v as View)
       }
     })()
@@ -267,7 +269,7 @@ function App(): JSX.Element {
         { id: 'go-monitoring', label: '모니터링', icon: <Radar size={13} />, hint: '⌘2' },
         { id: 'go-agent', label: '에이전트', icon: <Bot size={13} /> },
         { id: 'go-terminal', label: '터미널', icon: <TerminalIcon size={13} />, hint: '⌘3' },
-        { id: 'go-git', label: '브랜치 작업', icon: <GitBranch size={13} />, hint: '⌘4' },
+        { id: 'go-git', label: '브랜치 · 소스 제어', icon: <GitBranch size={13} />, hint: '터미널 우측 패널' },
         { id: 'go-harness', label: 'Harness Studio', icon: <Workflow size={13} /> },
         { id: 'go-community', label: '커뮤니티', icon: <Users size={13} /> },
         { id: 'go-mcp', label: 'MCP 서버', icon: <Server size={13} /> },
@@ -299,6 +301,14 @@ function App(): JSX.Element {
   ], [theme])
 
   const runCommand = (item: CommandItem): void => {
+    if (item.id === 'go-git') {
+      // v2.0: 브랜치/소스 제어는 터미널 우측 패널로 흡수됐다.
+      setActiveView('terminal')
+      Promise.resolve().then(() => {
+        window.dispatchEvent(new CustomEvent('open-terminal-drawer', { detail: { tab: 'branches' } }))
+      })
+      return
+    }
     if (item.id.startsWith('go-')) {
       const target = item.id.slice(3) // e.g. "dooray:tasks" or "monitoring"
       const [view, subTab] = target.split(':') as [View, string | undefined]
@@ -348,9 +358,6 @@ function App(): JSX.Element {
             </div>
             <div className={`absolute inset-0 ${vis('agent')}`}>
               <MentionAgentView />
-            </div>
-            <div className={`absolute inset-0 ${vis('git')}`}>
-              <BranchWorkspace onOpenTerminal={() => setActiveView('terminal')} />
             </div>
             <div className={`absolute inset-0 ${vis('mcp')}`}><MCPManager /></div>
             <div className={`absolute inset-0 ${vis('skills')}`}>
@@ -425,7 +432,6 @@ function RecentViewsPalette({ open, items, index, onHover, onPick, onClose }: {
         case 'dooray': return { label: '두레이', icon: <CalendarIcon size={13} /> }
         case 'monitoring': return { label: '모니터링', icon: <Radar size={13} /> }
         case 'terminal': return { label: '터미널', icon: <TerminalIcon size={13} /> }
-        case 'git': return { label: '브랜치 작업', icon: <GitBranch size={13} /> }
         case 'community': return { label: '커뮤니티', icon: <Users size={13} /> }
         case 'mcp': return { label: 'MCP 서버', icon: <Server size={13} /> }
         case 'skills': return { label: 'Claude 스킬', icon: <Sparkles size={13} /> }

@@ -180,6 +180,23 @@
   --wf-closed-bg:     #E5E7EB;             --wf-closed-fg:     #6B7280;              --wf-closed-dot:     #9CA3AF;
   --wf-overdue-bg:    var(--c-red-bg);     --wf-overdue-fg:    var(--c-red-fg);      --wf-overdue-dot:    #DC2626;
 
+  /* 커밋 그래프 레인 — 무채색 크롬(--accent-*)과 무관한 도메인 식별색.
+     색맹 안전(IBM) 팔레트 계열이라 5개 레인이 인접해도 구분된다. */
+  --git-graph-ref:        #007ACC;
+  --git-graph-remote-ref: #9A5CD0;
+  --git-graph-base-ref:   #EA5C00;
+  --git-graph-lane-1:     #C9A100;
+  --git-graph-lane-2:     #DC267F;
+  --git-graph-lane-3:     #994F00;
+  --git-graph-lane-4:     #2E8B84;
+  --git-graph-lane-5:     #7C5CD0;
+
+  /* diff 상태 — 추가/삭제/수정 */
+  --git-added:     #16A34A;
+  --git-deleted:   #DC2626;
+  --git-modified:  #D97706;
+  --git-untracked: #6B7280;
+
   /* Chart — series & chrome */
   --chart-1: #2563EB;
   --chart-2: #EA580C;
@@ -317,6 +334,20 @@
   --wf-resolved-bg:   var(--c-emerald-bg);      --wf-resolved-fg:   var(--c-emerald-fg);  --wf-resolved-dot:   #4ADE80;
   --wf-closed-bg:     rgba(148,163,184,0.10);   --wf-closed-fg:     #6B7180;              --wf-closed-dot:     #6B7180;
   --wf-overdue-bg:    var(--c-red-bg);          --wf-overdue-fg:    var(--c-red-fg);      --wf-overdue-dot:    #F87171;
+
+  --git-graph-ref:        #3794FF;
+  --git-graph-remote-ref: #B66DFF;
+  --git-graph-base-ref:   #EA5C00;
+  --git-graph-lane-1:     #FFB000;
+  --git-graph-lane-2:     #FF6FA5;
+  --git-graph-lane-3:     #CE9178;
+  --git-graph-lane-4:     #40B0A6;
+  --git-graph-lane-5:     #B66DFF;
+
+  --git-added:     #4ADE80;
+  --git-deleted:   #F87171;
+  --git-modified:  #FBBF24;
+  --git-untracked: #94A3B8;
 
   --chart-1: #60A5FA;
   --chart-2: #FB923C;

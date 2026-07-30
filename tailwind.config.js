@@ -10,6 +10,13 @@ module.exports = {
           claude: 'var(--brand-claude)',
           dooray: 'var(--brand-dooray)'
         },
+        // 소스 제어 — 파일 상태 색. 그래프 레인 색은 SVG 에서 var() 로 직접 읽는다.
+        git: {
+          added: 'var(--git-added)',
+          deleted: 'var(--git-deleted)',
+          modified: 'var(--git-modified)',
+          untracked: 'var(--git-untracked)'
+        },
         clauday: {
           blue: 'var(--accent-blue)',
           'blue-light': 'var(--accent-blue-light)',

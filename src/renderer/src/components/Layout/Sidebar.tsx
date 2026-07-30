@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Server, Sparkles, BarChart3, Calendar, Terminal, BookOpen, MessageSquare, GitBranch, Settings, Users, Radar, Lightbulb, Bot, Workflow } from 'lucide-react'
 
-export type SidebarView = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent' | 'harness' | 'workspace'
+export type SidebarView = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent' | 'harness' | 'workspace'
 // 호환성 유지를 위해 기존 별칭도 export
 export type View = SidebarView
 
@@ -28,7 +28,6 @@ export const CUSTOMIZABLE_NAV_ITEMS: SidebarNavItem[] = [
   { view: 'monitoring', icon: Radar, label: '모니터링', accent: 'dooray' },
   { view: 'agent', icon: Bot, label: '에이전트', accent: 'dooray' },
   { view: 'terminal', icon: Terminal, label: '터미널' },
-  { view: 'git', icon: GitBranch, label: '브랜치 작업' },
   { view: 'harness', icon: Workflow, label: 'Harness Studio', accent: 'claude' },
   { view: 'community', icon: Users, label: '커뮤니티', accent: 'dooray' },
   { view: 'mcp', icon: Server, label: 'MCP 서버', accent: 'claude' },

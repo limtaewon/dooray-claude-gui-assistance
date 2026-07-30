@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronsRight, ClipboardList, RefreshCw, Search, Unlink } from 'lucide-react'
+import { ClipboardList, RefreshCw, Search, Unlink } from 'lucide-react'
 import type { DoorayTask } from '@shared/types/dooray'
 import { workspaceKey } from '@shared/workspace/workspaceKey'
 import { Button, Input, LoadingView } from '../common/ds'
@@ -23,7 +23,6 @@ const PROJECTS_SETTINGS_KEY = 'terminalTaskProjects'
 type WorkflowFilter = 'mine' | 'all' | 'done'
 
 interface TaskDrawerProps {
-  onClose: () => void
   /** 카드를 특정 pane 없이 "터미널에서 시작" 할 때 — 호스트가 활성 pane 에 실행한다 */
   onRunInTerminal?: (task: DoorayTask) => void
 }
@@ -33,7 +32,7 @@ interface TaskDrawerProps {
  * 카드를 pane 에 끌어다 놓으면 매핑된 저장소로 `cd` 하고 claude 를 띄운다(세션은 태스크에 매핑).
  * 워크트리 생성은 이 패널의 책임이 아니다 — '브랜치 작업' 뷰가 담당한다.
  */
-function TaskDrawer({ onClose, onRunInTerminal }: TaskDrawerProps): JSX.Element {
+function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
   const [tasks, setTasks] = useState<DoorayTask[]>([])
   const [linked, setLinked] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
@@ -92,19 +91,15 @@ function TaskDrawer({ onClose, onRunInTerminal }: TaskDrawerProps): JSX.Element 
 
   return (
     <>
-      <div className="w-[320px] flex-none flex flex-col min-h-0 border-l border-bg-border bg-bg-surface">
-        <div className="flex items-center gap-1 px-3 py-2.5 flex-none">
-          <ClipboardList size={14} className="text-brand-dooray flex-none" />
-          <span className="text-[calc(12px_*_var(--app-font-scale,1))] font-semibold text-text-primary">두레이 업무</span>
-          <Button variant="ghost" size="xs" className="ml-auto" onClick={() => void load(true)} aria-label="업무 새로고침">
-            <RefreshCw size={12} />
-          </Button>
-          <Button variant="ghost" size="xs" onClick={onClose} aria-label="패널 닫기">
-            <ChevronsRight size={13} />
-          </Button>
-        </div>
-
-        <div className="px-3 pb-2.5 flex flex-col gap-2 flex-none">
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="px-3 pt-2.5 pb-2.5 flex flex-col gap-2 flex-none">
+          <div className="flex items-center gap-1">
+            <ClipboardList size={13} className="text-brand-dooray flex-none" />
+            <span className="text-[calc(11.5px_*_var(--app-font-scale,1))] font-semibold text-text-primary">두레이 업무</span>
+            <Button variant="ghost" size="xs" className="ml-auto" onClick={() => void load(true)} aria-label="업무 새로고침">
+              <RefreshCw size={12} />
+            </Button>
+          </div>
           <ProjectFilter settingsKey={PROJECTS_SETTINGS_KEY} onChanged={() => void load(true)} />
           <div className="relative">
             <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />

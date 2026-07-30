@@ -39,6 +39,13 @@ import { resetGlobalWebglFailure } from './webglPolicy'
 import { useKeybindingOverrides } from '../../hooks/useKeybindings'
 import { matchesBinding } from '@shared/keybindings/binding'
 import TaskDrawer, { TASK_DRAG_MIME, type TaskDragPayload } from './TaskDrawer'
+import SideDrawer, { type DrawerTab } from './SideDrawer'
+import SourceControlPanel from '../Git/scm/SourceControlPanel'
+import GitHistoryPanel from '../Git/scm/GitHistoryPanel'
+import BranchesPanel from '../Git/scm/BranchesPanel'
+import DiffViewerOverlay, { type DiffRequest } from '../Git/scm/DiffViewerOverlay'
+import DrawerRepoEmptyState from '../Git/scm/DrawerRepoEmptyState'
+import { useRepoRoot } from '../Git/scm/useRepoRoot'
 import { buildTaskDropSteps } from './taskDrop'
 import TerminalEmptyState from './TerminalEmptyState'
 import { tabNameFromCwd, tabNameFromTitle } from './tabAutoName'
@@ -100,8 +107,10 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
   const [tabs, setTabs] = useState<TabEntry[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
   const [isDividerDragging, setIsDividerDragging] = useState(false)
-  /** v2.0 C-3.5 — 두레이 태스크 드로어 */
+  /** v2.0 C-3.5 — 우측 드로어(두레이 업무 / 소스 제어). 탭 선택도 함께 영속화한다. */
   const [drawerOpen, setDrawerOpen] = useState(true)
+  const [drawerTab, setDrawerTab] = useState<DrawerTab>('tasks')
+  const [diffRequest, setDiffRequest] = useState<DiffRequest | null>(null)
   const [dropHint, setDropHint] = useState<string | null>(null)
   const [dropBusy, setDropBusy] = useState<string | null>(null)
   // v2.0 D — 단축키 오버라이드. keydown 클로저가 최신 값을 보도록 ref 로 동기화한다.
@@ -513,11 +522,17 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     return () => window.removeEventListener('adopt-terminal', handler)
   }, [adoptSession])
 
-  // 업무 패널 열림 상태 영속화 — 기본은 열림(두레이 업무가 이 화면의 출발점이라서)
+  // 드로어 열림/선택 탭 영속화 — 기본은 열림 + 두레이 업무(이 화면의 출발점이라서)
   useEffect(() => {
     void window.api.settings
       .get('terminalTaskDrawerOpen')
       .then((v) => { if (v === false) setDrawerOpen(false) })
+      .catch(() => undefined)
+    void window.api.settings
+      .get('terminalDrawerTab')
+      .then((v) => {
+        if (v === 'tasks' || v === 'changes' || v === 'history' || v === 'branches') setDrawerTab(v)
+      })
       .catch(() => undefined)
   }, [])
   const toggleDrawer = useCallback(() => {
@@ -527,6 +542,30 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       return next
     })
   }, [])
+  const changeDrawerTab = useCallback((tab: DrawerTab) => {
+    setDrawerTab(tab)
+    void window.api.settings.set('terminalDrawerTab', tab)
+  }, [])
+
+  /** 소스 제어 패널은 지금 보고 있는 터미널의 저장소를 따라간다 — 별도 선택 UI 를 두지 않는다. */
+  const focusedCwd = (() => {
+    const tab = tabs.find((t) => t.tabId === activeTabId)
+    return tab?.panes[tab.focusedLeafId]?.cwd
+  })()
+  const { repoRoot, resolving: repoResolving } = useRepoRoot(focusedCwd)
+
+  /** 패널이 git 을 다시 읽게 하는 신호. 스테이징/커밋 등 쓰기 직후 탭 간에 공유한다. */
+  const notifyRepoChanged = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('git-repo-maybe-changed'))
+  }, [])
+
+  // 터미널에서 직접 git 을 쓰는 경우가 많다 — 창으로 돌아올 때 한 번 다시 읽는다.
+  // (셸 통합 없이 명령 종료를 알 방법이 없어, 폴링 대신 이 경계만 잡는다)
+  useEffect(() => {
+    if (!drawerOpen) return
+    window.addEventListener('focus', notifyRepoChanged)
+    return () => window.removeEventListener('focus', notifyRepoChanged)
+  }, [drawerOpen, notifyRepoChanged])
 
   /** v2.0 B-4: split 은 항상 새 PTY — 현재 focused pane 의 cwd 를 상속한다(ADR-02 §7). */
   const splitFocusedPane = useCallback(async (direction: SplitDirection) => {
@@ -657,7 +696,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     notifyLayoutChanged()
   }, [notifyLayoutChanged])
 
-  // 외부에서 터미널 생성 요청 수신 (BranchWorkspace, Claude 채팅 등)
+  // 외부에서 터미널 생성 요청 수신 (Claude 채팅, 워크스페이스 등)
   useEffect(() => {
     const handler = (e: Event): void => {
       const { cwd, initialCommand } = (e as CustomEvent).detail || {}
@@ -666,6 +705,18 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     window.addEventListener('create-terminal', handler)
     return () => window.removeEventListener('create-terminal', handler)
   }, [createTab])
+
+  // 커맨드 팔레트 등이 특정 드로어 탭을 바로 열 때 (구 '브랜치 작업' 뷰 진입점 대체)
+  useEffect(() => {
+    const handler = (e: Event): void => {
+      const tab = (e as CustomEvent<{ tab?: DrawerTab }>).detail?.tab
+      if (!tab) return
+      if (!drawerOpen) toggleDrawer()
+      changeDrawerTab(tab)
+    }
+    window.addEventListener('open-terminal-drawer', handler)
+    return () => window.removeEventListener('open-terminal-drawer', handler)
+  }, [drawerOpen, toggleDrawer, changeDrawerTab])
 
   // v2.0 B-4: ⌘D/⌘⇧D/⌥⌘화살표/⌘W/⌘T/⌘1~9 — 테이블 기반 판정(terminalShortcuts.ts) + `active` 가드.
   // Workstream D-1 이 레지스트리로 흡수하기 쉽도록 테이블은 별도 모듈에 둔다(ADR-02 §8).
@@ -913,7 +964,26 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
         )}
       </div>
     </div>
-    {drawerOpen && <TaskDrawer onClose={toggleDrawer} onRunInTerminal={runTaskInFocusedPane} />}
+    {drawerOpen && (
+      <SideDrawer tab={drawerTab} onTabChange={changeDrawerTab} onClose={toggleDrawer}>
+        {drawerTab === 'tasks' ? (
+          <TaskDrawer onRunInTerminal={runTaskInFocusedPane} />
+        ) : !repoRoot ? (
+          <DrawerRepoEmptyState tab={drawerTab} cwd={focusedCwd} resolving={repoResolving} />
+        ) : drawerTab === 'changes' ? (
+          <SourceControlPanel repoPath={repoRoot} onOpenDiff={setDiffRequest} onRepoChanged={notifyRepoChanged} />
+        ) : drawerTab === 'history' ? (
+          <GitHistoryPanel repoPath={repoRoot} onOpenDiff={setDiffRequest} />
+        ) : (
+          <BranchesPanel
+            repoPath={repoRoot}
+            onOpenInTerminal={(cwd) => void createTab({ cwd })}
+            onRepoChanged={notifyRepoChanged}
+          />
+        )}
+      </SideDrawer>
+    )}
+    {diffRequest && <DiffViewerOverlay request={diffRequest} onClose={() => setDiffRequest(null)} />}
     </div>
   )
 }

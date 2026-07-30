@@ -28,6 +28,9 @@ export { default as Input, Textarea, FieldLabel } from './Input'
 export type { InputProps, TextareaProps, InputSize } from './Input'
 
 export { default as Kbd } from './Kbd'
+
+export { default as OnboardingView } from './Onboarding'
+export type { OnboardingViewProps, OnboardingStep, OnboardingAction } from './Onboarding'
 export { default as SegTabs } from './SegTabs'
 export type { SegTabsProps, SegTabItem } from './SegTabs'
 
