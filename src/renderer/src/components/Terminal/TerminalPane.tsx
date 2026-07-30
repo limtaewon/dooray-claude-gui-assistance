@@ -906,9 +906,7 @@ function TerminalPaneInner(
 
   return (
     <div
-      className={`absolute inset-0 ${visible ? 'z-10' : 'z-0 pointer-events-none invisible'} ${
-        showFocusRing && focused ? 'border-[1.5px] border-clauday-blue rounded-sm' : ''
-      }`}
+      className={`absolute inset-0 ${visible ? 'z-10' : 'z-0 pointer-events-none invisible'}`}
       onPointerDownCapture={() => onFocusRequest?.()}
       onDragOver={(e) => {
         // v2.0 B-1: 파일 드롭도 입력 차단 대상 (경로 ③, sendFileAsPath 로 귀결).
@@ -925,10 +923,11 @@ function TerminalPaneInner(
         for (const f of files) await sendFileAsPath(f)
       }}
     >
-      {/* terminal 컨테이너 — 사이드 패널 열린 만큼 right padding 줘서 안 가리게. showFocusRing
-          호스트(SplitLayout, B-4)에서만 비포커스 pane 출력을 dim 한다 (목업 .pane.dimmed .tout). */}
+      {/* terminal 컨테이너 — 사이드 패널 열린 만큼 right padding 줘서 안 가리게.
+          분할 시 어느 pane 이 활성인지는 테두리가 아니라 비활성 pane 을 살짝 흐리게 해서 알린다
+          (테두리는 시각적으로 거슬린다는 사용자 피드백, 2026-07-30). */}
       <div ref={containerRef}
-        className={`absolute inset-0 ${showFocusRing && !focused ? 'opacity-70' : ''}`}
+        className={`absolute inset-0 transition-opacity ${showFocusRing && !focused ? 'opacity-60' : ''}`}
         style={{ padding: '4px 8px', paddingRight: imageSidebarOpen ? 'calc(8px + 220px)' : 8 }} />
 
       {/* #2 이미지 사이드 패널 토글 — 우측 가장자리 작은 탭 */}
