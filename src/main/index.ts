@@ -76,6 +76,7 @@ import Store from 'electron-store'
 import { TerminalManager } from './terminal/TerminalManager'
 import { SkillStore } from './skills/SkillStore'
 import { GitService } from './git/GitService'
+import { gitScmService } from './git/GitScmService'
 import { AnalyticsService } from './analytics/AnalyticsService'
 // v2.0 C-2 — 워크스페이스(태스크 ↔ 워크트리 ↔ claude 세션) 도메인
 import { WorkspaceStore } from './workspace/WorkspaceStore'
@@ -96,6 +97,14 @@ import type {
   TerminalResolvePathRequest
 } from '../shared/types/terminal'
 import type { GitWorktreeCreateParams, GitWorktreeRemoveParams } from '../shared/types/git'
+import type { GitHistoryOptions } from '../shared/git/historyTypes'
+import type {
+  GitCommitParams,
+  GitCreateBranchParams,
+  GitFileDiffParams,
+  GitPullParams,
+  GitPushParams
+} from '../shared/git/scmTypes'
 import type {
   StartTaskParams,
   ResumeRunParams,
@@ -1619,6 +1628,78 @@ ${data}`,
   gitHandle(IPC_CHANNELS.GIT_DELETE_BRANCH, (args) => {
     const { repoPath, branch, opts } = args as { repoPath: string; branch: string; opts?: { force?: boolean } }
     return gitService.deleteBranch(repoPath, branch, opts)
+  })
+
+  // 소스 제어 (v2.0) — 워크트리 오케스트레이션과 분리된 저장소 내 변경 관리
+  gitHandle(IPC_CHANNELS.GIT_SCM_STATUS, (args) => {
+    const { repoPath, limit } = args as { repoPath: string; limit?: number }
+    return gitScmService.status(repoPath, { limit })
+  })
+  gitHandle(IPC_CHANNELS.GIT_SCM_HISTORY, (args) => {
+    const { repoPath, options } = args as { repoPath: string; options?: GitHistoryOptions }
+    return gitScmService.history(repoPath, options)
+  })
+  gitHandle(IPC_CHANNELS.GIT_SCM_COMMIT_DETAIL, (args) => {
+    const { repoPath, commitOid } = args as { repoPath: string; commitOid: string }
+    return gitScmService.commitDetail(repoPath, commitOid)
+  })
+  gitHandle(IPC_CHANNELS.GIT_SCM_FILE_DIFF, (params) =>
+    gitScmService.fileDiff(params as GitFileDiffParams)
+  )
+  gitHandle(IPC_CHANNELS.GIT_SCM_STAGE, (args) => {
+    const { repoPath, paths } = args as { repoPath: string; paths: string[] }
+    return gitScmService.stage(repoPath, paths)
+  })
+  gitHandle(IPC_CHANNELS.GIT_SCM_UNSTAGE, (args) => {
+    const { repoPath, paths } = args as { repoPath: string; paths: string[] }
+    return gitScmService.unstage(repoPath, paths)
+  })
+  gitHandle(IPC_CHANNELS.GIT_SCM_DISCARD, (args) => {
+    const { repoPath, paths } = args as { repoPath: string; paths: string[] }
+    return gitScmService.discard(repoPath, paths)
+  })
+  gitHandle(IPC_CHANNELS.GIT_SCM_COMMIT, (params) =>
+    gitScmService.commit(params as GitCommitParams)
+  )
+  gitHandle(IPC_CHANNELS.GIT_SCM_LAST_COMMIT_MESSAGE, (repoPath) =>
+    gitScmService.lastCommitMessage(repoPath as string)
+  )
+  gitHandle(IPC_CHANNELS.GIT_SCM_PUSH, (params) => gitScmService.push(params as GitPushParams))
+  gitHandle(IPC_CHANNELS.GIT_SCM_PULL, (params) => gitScmService.pull(params as GitPullParams))
+  gitHandle(IPC_CHANNELS.GIT_SCM_FETCH, (args) => {
+    const { repoPath, remote } = args as { repoPath: string; remote?: string }
+    return gitScmService.fetch(repoPath, remote)
+  })
+  gitHandle(IPC_CHANNELS.GIT_SCM_REMOTES, (repoPath) => gitScmService.remotes(repoPath as string))
+  gitHandle(IPC_CHANNELS.GIT_SCM_STASH_LIST, (repoPath) =>
+    gitScmService.stashList(repoPath as string)
+  )
+  gitHandle(IPC_CHANNELS.GIT_SCM_STASH_PUSH, (args) => {
+    const { repoPath, message, includeUntracked } = args as {
+      repoPath: string
+      message?: string
+      includeUntracked?: boolean
+    }
+    return gitScmService.stashPush(repoPath, { message, includeUntracked })
+  })
+  gitHandle(IPC_CHANNELS.GIT_SCM_STASH_ACTION, (args) => {
+    const { repoPath, action, ref } = args as {
+      repoPath: string
+      action: 'apply' | 'pop' | 'drop'
+      ref: string
+    }
+    return gitScmService.stashAction(repoPath, action, ref)
+  })
+  gitHandle(IPC_CHANNELS.GIT_SCM_CREATE_BRANCH, (params) =>
+    gitScmService.createBranch(params as GitCreateBranchParams)
+  )
+  gitHandle(IPC_CHANNELS.GIT_SCM_CHECKOUT, (args) => {
+    const { repoPath, branch } = args as { repoPath: string; branch: string }
+    return gitScmService.checkoutBranch(repoPath, branch)
+  })
+  gitHandle(IPC_CHANNELS.GIT_SCM_ABORT, (args) => {
+    const { repoPath, operation } = args as { repoPath: string; operation: 'merge' | 'rebase' }
+    return gitScmService.abortOperation(repoPath, operation)
   })
 
   // Workspace (v2.0 C-2) — 두레이 태스크 ↔ 워크트리 ↔ 에이전트 run (에러 시 메시지 정규화)

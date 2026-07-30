@@ -161,6 +161,20 @@ import type {
   GitWorktreeRemoveParams,
   GitFileCompare
 } from '../shared/types/git'
+import type { GitStatusResult } from '../shared/git/statusTypes'
+import type { GitHistoryOptions, GitHistoryResult } from '../shared/git/historyTypes'
+import type {
+  GitCommitDetail,
+  GitCommitParams,
+  GitCreateBranchParams,
+  GitFileDiffContent,
+  GitFileDiffParams,
+  GitPullParams,
+  GitPushParams,
+  GitRemoteInfo,
+  GitRemoteOpResult,
+  GitStashEntry
+} from '../shared/git/scmTypes'
 import type {
   RepoRegistryEntry,
   AddRepoParams,
@@ -621,7 +635,56 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.GIT_PRUNE, repoPath),
     /** v2.0 C-2: 로컬 브랜치 삭제. force 없으면 안전 삭제(-d), force 면 -D. */
     deleteBranch: (repoPath: string, branch: string, opts?: { force?: boolean }): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.GIT_DELETE_BRANCH, { repoPath, branch, opts })
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_DELETE_BRANCH, { repoPath, branch, opts }),
+
+    /** v2.0: 소스 제어 — 워크트리 오케스트레이션(위 API)과 달리 한 저장소 안의 변경을 다룬다. */
+    scm: {
+      status: (repoPath: string, limit?: number): Promise<GitStatusResult> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_STATUS, { repoPath, limit }),
+      history: (repoPath: string, options?: GitHistoryOptions): Promise<GitHistoryResult> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_HISTORY, { repoPath, options }),
+      commitDetail: (repoPath: string, commitOid: string): Promise<GitCommitDetail> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_COMMIT_DETAIL, { repoPath, commitOid }),
+      fileDiff: (params: GitFileDiffParams): Promise<GitFileDiffContent> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_FILE_DIFF, params),
+      stage: (repoPath: string, paths: string[]): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_STAGE, { repoPath, paths }),
+      unstage: (repoPath: string, paths: string[]): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_UNSTAGE, { repoPath, paths }),
+      discard: (repoPath: string, paths: string[]): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_DISCARD, { repoPath, paths }),
+      commit: (params: GitCommitParams): Promise<{ ok: boolean; message: string }> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_COMMIT, params),
+      lastCommitMessage: (repoPath: string): Promise<string> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_LAST_COMMIT_MESSAGE, repoPath),
+      push: (params: GitPushParams): Promise<GitRemoteOpResult> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_PUSH, params),
+      pull: (params: GitPullParams): Promise<GitRemoteOpResult> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_PULL, params),
+      fetch: (repoPath: string, remote?: string): Promise<GitRemoteOpResult> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_FETCH, { repoPath, remote }),
+      remotes: (repoPath: string): Promise<GitRemoteInfo[]> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_REMOTES, repoPath),
+      stashList: (repoPath: string): Promise<GitStashEntry[]> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_STASH_LIST, repoPath),
+      stashPush: (
+        repoPath: string,
+        options?: { message?: string; includeUntracked?: boolean }
+      ): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_STASH_PUSH, { repoPath, ...options }),
+      stashAction: (
+        repoPath: string,
+        action: 'apply' | 'pop' | 'drop',
+        ref: string
+      ): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_STASH_ACTION, { repoPath, action, ref }),
+      createBranch: (params: GitCreateBranchParams): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_CREATE_BRANCH, params),
+      checkout: (repoPath: string, branch: string): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_CHECKOUT, { repoPath, branch }),
+      abort: (repoPath: string, operation: 'merge' | 'rebase'): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_ABORT, { repoPath, operation })
+    }
   },
 
   // Workspace (v2.0 C-2) — 두레이 태스크 ↔ 워크트리 ↔ 에이전트 run. renderer 뷰는 C-3, 여기서는 표면만 완성.

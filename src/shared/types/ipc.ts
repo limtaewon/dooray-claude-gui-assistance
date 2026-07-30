@@ -401,7 +401,28 @@ export const IPC_CHANNELS = {
   /** main → renderer push 전용. ipcMain.handle 등록 금지. */
   WORKSPACE_RUN_UPDATED: 'workspace:run:updated',
   DOORAY_PROJECT_WORKFLOWS: 'dooray:project:workflows',
-  GIT_DELETE_BRANCH: 'git:delete-branch'
+  GIT_DELETE_BRANCH: 'git:delete-branch',
+
+  // 소스 제어 (v2.0 — 터미널 우측 드로어의 '변경사항'/'히스토리' 탭)
+  GIT_SCM_STATUS: 'git:scm:status',
+  GIT_SCM_HISTORY: 'git:scm:history',
+  GIT_SCM_COMMIT_DETAIL: 'git:scm:commit-detail',
+  GIT_SCM_FILE_DIFF: 'git:scm:file-diff',
+  GIT_SCM_STAGE: 'git:scm:stage',
+  GIT_SCM_UNSTAGE: 'git:scm:unstage',
+  GIT_SCM_DISCARD: 'git:scm:discard',
+  GIT_SCM_COMMIT: 'git:scm:commit',
+  GIT_SCM_LAST_COMMIT_MESSAGE: 'git:scm:last-commit-message',
+  GIT_SCM_PUSH: 'git:scm:push',
+  GIT_SCM_PULL: 'git:scm:pull',
+  GIT_SCM_FETCH: 'git:scm:fetch',
+  GIT_SCM_REMOTES: 'git:scm:remotes',
+  GIT_SCM_STASH_LIST: 'git:scm:stash-list',
+  GIT_SCM_STASH_PUSH: 'git:scm:stash-push',
+  GIT_SCM_STASH_ACTION: 'git:scm:stash-action',
+  GIT_SCM_CREATE_BRANCH: 'git:scm:create-branch',
+  GIT_SCM_CHECKOUT: 'git:scm:checkout',
+  GIT_SCM_ABORT: 'git:scm:abort'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
