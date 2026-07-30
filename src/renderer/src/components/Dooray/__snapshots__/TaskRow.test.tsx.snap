@@ -1,0 +1,232 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`TaskRow — 렌더 스냅샷 > isSelected=true 렌더 1`] = `
+<div>
+  <div
+    class="flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors bg-clauday-blue/5"
+    style="content-visibility: auto; contain-intrinsic-size: 0 60px;"
+  >
+    <svg
+      class="lucide lucide-clock flex-shrink-0 text-clauday-blue"
+      fill="none"
+      height="14"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="14"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="10"
+      />
+      <polyline
+        points="12 6 12 12 16 14"
+      />
+    </svg>
+    <div
+      class="flex-1 min-w-0"
+    >
+      <p
+        class="text-xs text-text-primary truncate"
+      >
+        태스크 제목
+      </p>
+      <div
+        class="flex items-center gap-1.5 mt-1 flex-wrap"
+      >
+        <span
+          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-clauday-blue/10 text-clauday-blue"
+        >
+          working
+        </span>
+      </div>
+    </div>
+    <svg
+      class="lucide lucide-chevron-right text-text-tertiary flex-shrink-0"
+      fill="none"
+      height="12"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="12"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="m9 18 6-6-6-6"
+      />
+    </svg>
+  </div>
+</div>
+`;
+
+exports[`TaskRow — 렌더 스냅샷 > 기본 렌더 1`] = `
+<div>
+  <div
+    class="flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors hover:bg-bg-surface-hover"
+    style="content-visibility: auto; contain-intrinsic-size: 0 60px;"
+  >
+    <svg
+      class="lucide lucide-clock flex-shrink-0 text-clauday-blue"
+      fill="none"
+      height="14"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="14"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="10"
+      />
+      <polyline
+        points="12 6 12 12 16 14"
+      />
+    </svg>
+    <div
+      class="flex-1 min-w-0"
+    >
+      <p
+        class="text-xs text-text-primary truncate"
+      >
+        태스크 제목
+      </p>
+      <div
+        class="flex items-center gap-1.5 mt-1 flex-wrap"
+      >
+        <span
+          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-clauday-blue/10 text-clauday-blue"
+        >
+          working
+        </span>
+      </div>
+    </div>
+    <svg
+      class="lucide lucide-chevron-right text-text-tertiary flex-shrink-0"
+      fill="none"
+      height="12"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="12"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="m9 18 6-6-6-6"
+      />
+    </svg>
+  </div>
+</div>
+`;
+
+exports[`TaskRow — 렌더 스냅샷 > 태그 4개 + milestone + dueDateAt 렌더 — +1 배지와 title 1`] = `
+<div>
+  <div
+    class="flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors hover:bg-bg-surface-hover"
+    style="content-visibility: auto; contain-intrinsic-size: 0 60px;"
+  >
+    <svg
+      class="lucide lucide-clock flex-shrink-0 text-clauday-blue"
+      fill="none"
+      height="14"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="14"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="10"
+      />
+      <polyline
+        points="12 6 12 12 16 14"
+      />
+    </svg>
+    <div
+      class="flex-1 min-w-0"
+    >
+      <p
+        class="text-xs text-text-primary truncate"
+      >
+        태스크 제목
+      </p>
+      <div
+        class="flex items-center gap-1.5 mt-1 flex-wrap"
+      >
+        <span
+          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-clauday-blue/10 text-clauday-blue"
+        >
+          working
+        </span>
+        <span
+          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full border"
+          style="background-color: rgb(243, 237, 237); color: rgb(115, 13, 13); border-color: rgb(217, 166, 166);"
+        >
+          긴급
+        </span>
+        <span
+          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full border"
+          style="background-color: rgb(237, 243, 237); color: rgb(13, 115, 13); border-color: rgb(166, 217, 166);"
+        >
+          버그
+        </span>
+        <span
+          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full border"
+          style="background-color: rgb(237, 237, 243); color: rgb(13, 13, 115); border-color: rgb(166, 166, 217);"
+        >
+          문서
+        </span>
+        <span
+          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-bg-surface border border-bg-border text-text-tertiary cursor-default"
+          title="기타"
+        >
+          +
+          1
+        </span>
+        <span
+          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-400"
+        >
+          2026 Q1
+        </span>
+        <span
+          class="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary"
+        >
+          마감 
+          8월 15일
+        </span>
+      </div>
+    </div>
+    <svg
+      class="lucide lucide-chevron-right text-text-tertiary flex-shrink-0"
+      fill="none"
+      height="12"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="12"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="m9 18 6-6-6-6"
+      />
+    </svg>
+  </div>
+</div>
+`;

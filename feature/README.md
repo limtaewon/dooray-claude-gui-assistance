@@ -27,6 +27,7 @@ feature/
 - `mcp-skills/`
 - `ai-service/`
 - `renderer-only/` (UI 만 영향. main 손 안 댐)
+- `workspace/` (v2.0 Workstream C — 두레이 태스크 ↔ 워크트리 ↔ 병렬 에이전트. wiki `domain-workspace.md` 는 C-1/C-2 착수 시 신설 예정)
 - `multi/` (도메인 3개 이상 걸치는 큰 작업)
 
 ### task-id

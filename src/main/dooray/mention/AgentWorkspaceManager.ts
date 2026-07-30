@@ -1,20 +1,23 @@
-import { mkdirSync, writeFileSync, readFileSync, existsSync, renameSync } from 'fs'
+import { mkdirSync, writeFileSync, existsSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
+import { preApproveTrust, writeHookSettings } from '../../claude/claudeDirSetup'
 
 const DEFAULT_ROOT = join(homedir(), 'Clauday-Workspaces')
 const AGENT_DIRNAME = 'agent'
 const TASKS_DIRNAME = 'tasks'
 const CLAUDE_MD = 'CLAUDE.md'
-const CLAUDE_LOCAL_SETTINGS_DIR = '.claude'
-const CLAUDE_LOCAL_SETTINGS_FILE = 'settings.local.json'
-/** claude code의 사용자 설정 — 폴더별 trust 상태가 여기 저장됨 */
-const CLAUDE_USER_CONFIG = join(homedir(), '.claude.json')
 
 export interface ChannelWorkspace {
   channelDir: string
   tasksDir: string
   claudeMdPath: string
+}
+
+/** `.claude` 준비(trust/hook settings) 의존성 — 테스트에서 홈 오염 없이 대체 주입 가능 */
+export interface ClaudeDirSetupDeps {
+  preApproveTrust: typeof preApproveTrust
+  writeHookSettings: typeof writeHookSettings
 }
 
 /**
@@ -38,7 +41,10 @@ export class AgentWorkspaceManager {
   /** claude code hook을 우리 main 프로세스로 라우팅하기 위한 loopback 서버 정보 */
   private hookConfig: { port: number; secret: string } | null = null
 
-  constructor(root: string = DEFAULT_ROOT) {
+  constructor(
+    root: string = DEFAULT_ROOT,
+    private deps: ClaudeDirSetupDeps = { preApproveTrust, writeHookSettings }
+  ) {
     this.root = root
   }
 
@@ -72,74 +78,13 @@ export class AgentWorkspaceManager {
 
     // claude code의 trust 다이얼로그 회피 — 폴더를 미리 trust 등록해서
     // 새 세션 시작 시 사용자 입력 차단 없이 바로 작업할 수 있게 한다.
-    this.preApproveTrust(channelDir)
+    this.deps.preApproveTrust(channelDir)
 
     // claude code의 hook 설정 (.claude/settings.local.json) 자동 작성.
     // 매 호출 시 현재 hookConfig 기준으로 갱신 (port/secret이 부팅마다 바뀜).
-    this.writeHookSettings(channelDir)
+    this.deps.writeHookSettings(channelDir, this.hookConfig)
 
     return { channelDir, tasksDir, claudeMdPath }
-  }
-
-  /**
-   * 채널 폴더의 .claude/settings.local.json 작성.
-   * PostToolUse / Stop hook을 우리 loopback HTTP 서버로 라우팅.
-   */
-  private writeHookSettings(channelDir: string): void {
-    if (!this.hookConfig) return
-    const dir = join(channelDir, CLAUDE_LOCAL_SETTINGS_DIR)
-    mkdirSync(dir, { recursive: true })
-    const settingsPath = join(dir, CLAUDE_LOCAL_SETTINGS_FILE)
-    const baseUrl = `http://127.0.0.1:${this.hookConfig.port}/clauday-hook`
-    const headers = { 'X-Clauday-Secret': this.hookConfig.secret }
-    const settings = {
-      hooks: {
-        PostToolUse: [
-          {
-            matcher: 'Edit|Write|Bash|Read|Glob|Grep|TodoWrite|WebFetch|WebSearch',
-            hooks: [{ type: 'http', url: `${baseUrl}?event=post_tool_use`, headers }]
-          }
-        ],
-        Stop: [
-          {
-            hooks: [{ type: 'http', url: `${baseUrl}?event=stop`, headers }]
-          }
-        ]
-      }
-    }
-    const next = JSON.stringify(settings, null, 2)
-    let prev = ''
-    if (existsSync(settingsPath)) {
-      try { prev = readFileSync(settingsPath, 'utf8') } catch { /* ignore */ }
-    }
-    if (prev.trim() !== next.trim()) {
-      writeFileSync(settingsPath, next, 'utf8')
-    }
-  }
-
-  /**
-   * ~/.claude.json 의 projects.{absPath}.hasTrustDialogAccepted = true 로 미리 표시.
-   * - claude 미설치/설정 없으면 no-op (이번 호출은 무시; 사용자가 답하면 다음부터 적용됨)
-   * - 이미 true면 no-op
-   * - atomic write (tmp → rename) 로 동시 쓰기 race 최소화
-   */
-  private preApproveTrust(channelDir: string): void {
-    if (!existsSync(CLAUDE_USER_CONFIG)) return
-    try {
-      const raw = readFileSync(CLAUDE_USER_CONFIG, 'utf8')
-      const config = JSON.parse(raw) as { projects?: Record<string, Record<string, unknown>> }
-      const projects = config.projects || {}
-      const cur = projects[channelDir] || {}
-      if (cur.hasTrustDialogAccepted === true) return
-      cur.hasTrustDialogAccepted = true
-      projects[channelDir] = cur
-      config.projects = projects
-      const tmp = CLAUDE_USER_CONFIG + '.clauday-tmp'
-      writeFileSync(tmp, JSON.stringify(config, null, 2), 'utf8')
-      renameSync(tmp, CLAUDE_USER_CONFIG)
-    } catch (err) {
-      console.warn('[AgentWorkspace] trust 사전 등록 실패 (무시):', err)
-    }
   }
 
   /** prompt 파일 저장. 반환값은 채널 폴더 기준 상대경로 (예: tasks/{logId}.md) */

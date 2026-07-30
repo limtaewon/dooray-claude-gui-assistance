@@ -14,10 +14,12 @@ import {
   AlertCircle,
   CheckCircle2,
   X,
-  Search,
-  Eye
+  Search
 } from 'lucide-react'
 import TerminalPane from '../Terminal/TerminalPane'
+import DiffPanel from './DiffPanel'
+import FileComparePanel from './FileComparePanel'
+import type { TerminalExitPayload } from '../../../../shared/types/terminal'
 
 interface Worktree {
   path: string
@@ -99,6 +101,12 @@ function BranchWorkspace({ onOpenTerminal: _onOpenTerminal }: BranchWorkspacePro
   const [activeTermPath, setActiveTermPath] = useState<string | null>(null)
   /** 앱 시작 후 터미널 복원 완료 여부 (중복 방지) */
   const termRestoredRef = useRef(false)
+  /** v2.0 B-1: 세션 id → PTY 종료 정보. onExit 구독 클로저의 stale 방지용으로 termSessions 를 ref 로도 유지. */
+  const [termExitInfo, setTermExitInfo] = useState<Record<string, TerminalExitPayload>>({})
+  const termSessionsRef = useRef(termSessions)
+  useEffect(() => {
+    termSessionsRef.current = termSessions
+  }, [termSessions])
 
   // 상태를 localStorage에 영속화
   useEffect(() => {
@@ -107,6 +115,15 @@ function BranchWorkspace({ onOpenTerminal: _onOpenTerminal }: BranchWorkspacePro
   useEffect(() => {
     localStorage.setItem('branchWorkspace.activeTermPath', activeTermPath || '')
   }, [activeTermPath])
+
+  // v2.0 B-1: PTY 종료 통지 구독 — termSessions(path→sessionId) 역매핑으로 자기 세션만 반영.
+  useEffect(() => {
+    const off = window.api.terminal.onExit((payload) => {
+      if (!Object.values(termSessionsRef.current).includes(payload.id)) return
+      setTermExitInfo((prev) => (prev[payload.id] ? prev : { ...prev, [payload.id]: payload }))
+    })
+    return off
+  }, [])
 
   // 앱 시작 시 터미널 세션 복원 — 마지막으로 열려있던 브랜치 터미널들을 재생성
   useEffect(() => {
@@ -296,6 +313,12 @@ function BranchWorkspace({ onOpenTerminal: _onOpenTerminal }: BranchWorkspacePro
     const sessionId = termSessions[path]
     if (sessionId) {
       try { await window.api.terminal.kill(sessionId) } catch { /* ignore */ }
+      setTermExitInfo((prev) => {
+        if (!(sessionId in prev)) return prev
+        const next = { ...prev }
+        delete next[sessionId]
+        return next
+      })
     }
     setTermSessions((prev) => {
       const next = { ...prev }
@@ -606,15 +629,17 @@ function BranchWorkspace({ onOpenTerminal: _onOpenTerminal }: BranchWorkspacePro
                   const label = wt?.branch || path.split('/').pop() || path
                   const shortcutKey = idx < 9 ? String(idx + 1) : null
                   const modKey = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform) ? '⌘' : 'Ctrl+'
+                  const sessionId = termSessions[path]
+                  const isExited = Boolean(sessionId && termExitInfo[sessionId])
                   return (
                     <div key={path}
                       onClick={() => setActiveTermPath(path)}
-                      title={shortcutKey ? `${modKey}${shortcutKey} 로 전환` : undefined}
+                      title={isExited ? '종료됨' : shortcutKey ? `${modKey}${shortcutKey} 로 전환` : undefined}
                       className={`group flex items-center gap-1.5 px-3 py-2 text-[calc(11px_*_var(--app-font-scale,1))] cursor-pointer border-r border-bg-border transition-colors ${
                         isActive
                           ? 'bg-bg-primary text-clauday-blue border-b-2 border-b-clauday-blue'
                           : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
-                      }`}>
+                      } ${isExited ? 'opacity-50' : ''}`}>
                       {shortcutKey && (
                         <span className={`text-[calc(9px_*_var(--app-font-scale,1))] font-mono px-1 rounded ${
                           isActive ? 'bg-clauday-blue/20 text-clauday-blue' : 'bg-bg-border text-text-tertiary'
@@ -624,6 +649,9 @@ function BranchWorkspace({ onOpenTerminal: _onOpenTerminal }: BranchWorkspacePro
                       )}
                       <Terminal size={10} className={isActive ? 'text-clauday-blue' : 'text-text-tertiary'} />
                       <span className="font-mono truncate max-w-[160px]">{label}</span>
+                      {isExited && (
+                        <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">종료됨</span>
+                      )}
                       <button
                         onClick={(e) => { e.stopPropagation(); closeTerminalTab(path) }}
                         className="p-0.5 rounded hover:bg-red-500/10 text-text-tertiary hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -669,6 +697,8 @@ function BranchWorkspace({ onOpenTerminal: _onOpenTerminal }: BranchWorkspacePro
                       key={sessionId}
                       sessionId={sessionId}
                       isActive={activeTermPath === path}
+                      exitInfo={termExitInfo[sessionId] ?? null}
+                      onRequestClose={() => closeTerminalTab(path)}
                     />
                   )
                 })}
@@ -798,126 +828,6 @@ function ChangedFilesList({ worktreePath }: { worktreePath: string }): JSX.Eleme
       {files.length > 10 && (
         <div className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">+{files.length - 10}개 더...</div>
       )}
-    </div>
-  )
-}
-
-/** Diff 패널 (변경사항 상세) */
-function DiffPanel({
-  result,
-  branch,
-  repoPath,
-  onFileCompare
-}: {
-  result: DiffResult
-  branch: string
-  repoPath: string
-  onFileCompare?: (filePath: string) => void
-}): JSX.Element {
-  const statusIcon = (s: string): string => {
-    switch (s) {
-      case 'M': return '수정'
-      case 'A': return '추가'
-      case 'D': return '삭제'
-      case '?': return '미추적'
-      default: return s
-    }
-  }
-
-  const statusColor = (s: string): string => {
-    switch (s) {
-      case 'M': return 'text-clauday-orange bg-clauday-orange/10'
-      case 'A': return 'text-emerald-400 bg-emerald-400/10'
-      case 'D': return 'text-red-400 bg-red-400/10'
-      default: return 'text-text-tertiary bg-bg-surface'
-    }
-  }
-
-  if (result.files.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-text-tertiary">
-        <CheckCircle2 size={24} className="text-emerald-400 mb-2" />
-        <span className="text-xs">변경사항 없음</span>
-      </div>
-    )
-  }
-
-  return (
-    <div className="p-3 space-y-1.5">
-      <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mb-2">
-        {result.files.length}개 파일 변경 · {result.summary}
-      </div>
-      {result.files.map((f) => (
-        <div key={f.file} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-bg-surface/50 group">
-          <span className={`text-[calc(8px_*_var(--app-font-scale,1))] px-1 py-0.5 rounded font-medium ${statusColor(f.status)}`}>
-            {statusIcon(f.status)}
-          </span>
-          <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary truncate flex-1 font-mono">{f.file}</span>
-          {onFileCompare && (
-            <button
-              onClick={() => onFileCompare(f.file)}
-              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-bg-surface-hover text-text-tertiary transition-all"
-              title="파일 비교"
-            >
-              <Eye size={11} />
-            </button>
-          )}
-        </div>
-      ))}
-
-      {/* Patch 미리보기 */}
-      {result.patch && (
-        <div className="mt-3">
-          <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mb-1">Diff 미리보기</div>
-          <pre className="text-[calc(9px_*_var(--app-font-scale,1))] leading-relaxed font-mono bg-bg-primary rounded-lg p-3 overflow-x-auto max-h-[400px] overflow-y-auto border border-bg-border">
-            {result.patch.split('\n').map((line, i) => (
-              <div
-                key={i}
-                className={
-                  line.startsWith('+') && !line.startsWith('+++') ? 'text-emerald-400 bg-emerald-400/5' :
-                  line.startsWith('-') && !line.startsWith('---') ? 'text-red-400 bg-red-400/5' :
-                  line.startsWith('@@') ? 'text-clauday-blue' :
-                  'text-text-tertiary'
-                }
-              >
-                {line}
-              </div>
-            ))}
-          </pre>
-        </div>
-      )}
-    </div>
-  )
-}
-
-/** 파일 비교 패널 (좌우 분할) */
-function FileComparePanel({ result, onBack }: { result: CompareResult; onBack: () => void }): JSX.Element {
-  return (
-    <div className="flex flex-col h-full">
-      <div className="px-3 py-1.5 border-b border-bg-border flex items-center gap-2 flex-shrink-0">
-        <button onClick={onBack} className="text-[calc(10px_*_var(--app-font-scale,1))] text-clauday-blue hover:underline">← 목록으로</button>
-        <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary font-mono">{result.file}</span>
-      </div>
-      <div className="flex-1 flex overflow-hidden">
-        {/* 좌측 브랜치 */}
-        <div className="flex-1 flex flex-col border-r border-bg-border overflow-hidden">
-          <div className="px-3 py-1 bg-bg-surface/50 border-b border-bg-border text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">
-            {result.leftBranch}
-          </div>
-          <pre className="flex-1 text-[calc(9px_*_var(--app-font-scale,1))] leading-relaxed font-mono p-2 overflow-auto text-text-secondary">
-            {result.leftContent}
-          </pre>
-        </div>
-        {/* 우측 브랜치 */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="px-3 py-1 bg-bg-surface/50 border-b border-bg-border text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">
-            {result.rightBranch}
-          </div>
-          <pre className="flex-1 text-[calc(9px_*_var(--app-font-scale,1))] leading-relaxed font-mono p-2 overflow-auto text-text-secondary">
-            {result.rightContent}
-          </pre>
-        </div>
-      </div>
     </div>
   )
 }
