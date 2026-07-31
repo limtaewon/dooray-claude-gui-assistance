@@ -36,6 +36,7 @@ import { moveTab, pickNextActiveTab, pushMru } from './tabOrder'
 import { resetGlobalWebglFailure, type TerminalRendererSetting } from './webglPolicy'
 import { useKeybindingOverrides } from '../../hooks/useKeybindings'
 import { useToast } from '../common/ds'
+import OpenInEditorButton from '../common/OpenInEditorButton'
 import { matchesBinding } from '@shared/keybindings/binding'
 import TaskDrawer, { TASK_DRAG_MIME, type TaskDragPayload } from './TaskDrawer'
 import SideDrawer, { type DrawerTab } from './SideDrawer'
@@ -1323,6 +1324,14 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
                 <Rows2 size={13} />
               </button>
             </div>
+            {/* 지금 터미널이 있는 폴더(대개 업무 워크트리)를 IDE 에서 바로 연다. */}
+            {focusedCwd && (
+              <OpenInEditorButton
+                path={focusedCwd}
+                compact
+                className="w-7 h-7 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover"
+              />
+            )}
             <button onClick={toggleDrawer}
               data-tour="terminal-drawer-toggle"
               aria-pressed={drawerOpen}

@@ -427,6 +427,15 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.SHELL_SHOW_IN_FOLDER, target)
   },
 
+  // 외부 에디터 — 워크트리 폴더를 IntelliJ 등에서 프로젝트로 연다
+  editor: {
+    /** 설치된 에디터만 돌려준다. force 면 다시 훑는다(설치 직후 갱신용) */
+    list: (force?: boolean): Promise<import('../shared/types/editor').DetectedEditor[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.EDITOR_LIST, force),
+    open: (req: import('../shared/types/editor').OpenInEditorRequest): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.EDITOR_OPEN, req)
+  },
+
   // CLAUDE.md 카탈로그 (#3) — 앱 내장 템플릿 목록 + 적용
   claudeMdTemplates: {
     list: (): Promise<Array<{ id: string; name: string; description: string }>> =>

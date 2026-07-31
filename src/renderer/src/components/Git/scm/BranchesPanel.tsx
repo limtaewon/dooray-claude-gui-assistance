@@ -14,6 +14,7 @@ import {
 import type { GitBranch as GitBranchInfo, GitWorktree } from '@shared/types/git'
 import type { GitStashEntry } from '@shared/git/scmTypes'
 import { Button, Input, useToast } from '../../common/ds'
+import OpenInEditorButton from '../../common/OpenInEditorButton'
 import WorktreeCleanupModal from './WorktreeCleanupModal'
 
 interface BranchesPanelProps {
@@ -234,6 +235,7 @@ function BranchesPanel({ repoPath, onOpenInTerminal, onRepoChanged }: BranchesPa
               >
                 <TerminalIcon size={11} />
               </button>
+              <OpenInEditorButton path={worktree.path} compact className="ds-btn ghost icon" />
               {!worktree.isMain && (
                 <button
                   onClick={() =>

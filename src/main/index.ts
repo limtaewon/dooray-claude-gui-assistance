@@ -72,6 +72,7 @@ import { buildStartTaskSpawn } from './terminal/startTaskSpawn'
 import { ClaudeChatService } from './claude/ClaudeChatService'
 import { ClaudeSessionService } from './claude/ClaudeSessionService'
 import { ClaudeRetentionService } from './claude/ClaudeRetentionService'
+import { EditorLauncher } from './editor/EditorLauncher'
 import { AttachmentService } from './claude/AttachmentService'
 import Store from 'electron-store'
 import { TerminalManager } from './terminal/TerminalManager'
@@ -94,6 +95,7 @@ import { AgentRunSpawner } from './workspace/AgentRunSpawner'
 import { WorkspaceHookHandler, WORKSPACE_HOOK_KIND } from './workspace/WorkspaceHookHandler'
 import { preApproveTrust, writeHookSettings } from './claude/claudeDirSetup'
 import { IPC_CHANNELS } from '../shared/types/ipc'
+import type { OpenInEditorRequest } from '../shared/types/editor'
 import type { McpServerConfig } from '../shared/types/mcp'
 import type { SkillSaveRequest } from '../shared/types/skills'
 import type { UsageQueryParams } from '../shared/types/usage'
@@ -222,6 +224,7 @@ const aiService = new AIService()
 const claudeChat = new ClaudeChatService(getClaudeBin())
 const claudeSessions = new ClaudeSessionService()
 const claudeRetention = new ClaudeRetentionService()
+const editorLauncher = new EditorLauncher()
 const claudeAttachments = new AttachmentService()
 const store = new Store({ name: 'clauday-data' })
 const githubService = new GitHubService()
@@ -1125,6 +1128,10 @@ function registerIpcHandlers(): void {
     async (_, { sessionId, starred }: { sessionId: string; starred: boolean }) => {
       claudeSessions.setStarred(sessionId, starred)
     }
+  )
+  ipcMain.handle(IPC_CHANNELS.EDITOR_LIST, (_, force?: boolean) => editorLauncher.detect(force))
+  ipcMain.handle(IPC_CHANNELS.EDITOR_OPEN, (_, req: OpenInEditorRequest) =>
+    editorLauncher.open(req.editorId, req.path)
   )
   ipcMain.handle(IPC_CHANNELS.CLAUDE_RETENTION_GET, () => claudeRetention.get())
   ipcMain.handle(IPC_CHANNELS.CLAUDE_RETENTION_SET, (_, days: number | null) =>

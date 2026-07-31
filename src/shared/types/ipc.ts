@@ -190,6 +190,10 @@ export const IPC_CHANNELS = {
   CLAUDE_SESSION_RENAME: 'claude:session:rename',
   /** 세션 즐겨찾기 토글 */
   CLAUDE_SESSION_STAR: 'claude:session:star',
+  /** 설치된 외부 에디터 목록 (IntelliJ·VS Code 등) — 없는 것은 돌려주지 않는다 */
+  EDITOR_LIST: 'editor:list',
+  /** 폴더를 그 에디터에서 프로젝트로 연다 */
+  EDITOR_OPEN: 'editor:open',
   /** ~/.claude/settings.json 의 세션 보관 기간(cleanupPeriodDays) 조회 */
   CLAUDE_RETENTION_GET: 'claude:retention:get',
   /** 세션 보관 기간 저장 — null 이면 키를 지워 claude 기본값을 따른다 */
