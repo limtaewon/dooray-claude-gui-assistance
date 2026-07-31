@@ -14,6 +14,8 @@ export interface TaskDropCandidate {
   repoId: string
   name: string
   path: string
+  /** 새 브랜치를 딸 기준 브랜치 (repo.defaultBaseBranch) */
+  baseBranch?: string
   /** 그 폴더에서 이 업무로 쓰던 claude 세션 (있으면 이어간다) */
   sessionId?: string
 }
@@ -24,22 +26,42 @@ export type TaskDropPlan =
    * `needsCd` 가 true 면 `cwd`·`repoName` 이 반드시 있다. 둘 다 없는 경우는 터미널 위치를
    * 알아내지 못한 것 — 있는 자리에서 그대로 실행한다(Windows 는 cwd 실측 수단이 없다).
    */
-  | { kind: 'start'; cwd?: string; repoName?: string; sessionId?: string; needsCd: boolean }
+  | {
+      kind: 'start'
+      cwd?: string
+      repoName?: string
+      sessionId?: string
+      needsCd: boolean
+      /** 이 업무를 진행할 저장소 — 있으면 여기에 업무용 워크트리를 만들어 그리로 간다 */
+      repo?: { path: string; name: string; baseBranch?: string }
+    }
   /** 어느 저장소에서 할지 물어야 한다. */
   | { kind: 'choose'; candidates: TaskDropCandidate[] }
 
 export interface TaskDropPlanInput {
   /** 드롭한 터미널이 지금 있는 폴더 */
   currentCwd?: string
+  /**
+   * 그 폴더가 속한 **본 저장소** 경로(워크트리면 워크트리가 아니라 본 저장소).
+   * 이미 이 프로젝트의 저장소에서 작업 중인지 판정하는 기준 — 워크트리 안에 있어도 같은 저장소다.
+   */
+  currentRepoRoot?: string
   /** 이 프로젝트에 매핑된 저장소들 */
   mappedRepos: RepoRegistryEntry[]
   /** 이 업무가 폴더별로 쓰던 세션 */
   links: TaskSessionLink[]
 }
 
-function sessionFor(links: TaskSessionLink[], cwd: string): string | undefined {
+function repoOf(repo: RepoRegistryEntry): { path: string; name: string; baseBranch?: string } {
+  return { path: repo.path, name: repo.name, baseBranch: repo.defaultBaseBranch }
+}
+
+/** 그 폴더에서 이 업무로 쓰던 세션 — 세션은 (업무 × 폴더) 로 기억한다. */
+export function sessionForCwd(links: TaskSessionLink[], cwd: string): string | undefined {
   return links.find((link) => samePath(link.cwd, cwd))?.claudeSessionId
 }
+
+const sessionFor = sessionForCwd
 
 /**
  * 업무를 어디서 시작할지 정한다.
@@ -50,18 +72,19 @@ function sessionFor(links: TaskSessionLink[], cwd: string): string | undefined {
  * 매핑이 아예 없으면 지금 자리에서 시작한다 — 설정을 안 했다고 드롭이 죽으면 안 된다.
  */
 export function resolveTaskDropPlan(input: TaskDropPlanInput): TaskDropPlan {
-  const { currentCwd, mappedRepos, links } = input
+  const { currentCwd, currentRepoRoot, mappedRepos, links } = input
 
-  const here = currentCwd
-    ? mappedRepos.find((repo) => samePath(repo.path, currentCwd))
-    : undefined
-  if (here && currentCwd) {
+  const here = mappedRepos.find(
+    (repo) => samePath(repo.path, currentCwd) || samePath(repo.path, currentRepoRoot)
+  )
+  if (here) {
     return {
       kind: 'start',
       cwd: here.path,
       repoName: here.name,
       sessionId: sessionFor(links, here.path),
-      needsCd: false
+      needsCd: false,
+      repo: repoOf(here)
     }
   }
 
@@ -72,7 +95,8 @@ export function resolveTaskDropPlan(input: TaskDropPlanInput): TaskDropPlan {
       cwd: only.path,
       repoName: only.name,
       sessionId: sessionFor(links, only.path),
-      needsCd: !samePath(currentCwd, only.path)
+      needsCd: !samePath(currentCwd, only.path),
+      repo: repoOf(only)
     }
   }
 
@@ -83,6 +107,7 @@ export function resolveTaskDropPlan(input: TaskDropPlanInput): TaskDropPlan {
         repoId: repo.id,
         name: repo.name,
         path: repo.path,
+        baseBranch: repo.defaultBaseBranch,
         sessionId: sessionFor(links, repo.path)
       }))
     }
@@ -114,6 +139,7 @@ export function planFromCandidate(
     cwd: candidate.path,
     repoName: candidate.name,
     sessionId: candidate.sessionId,
-    needsCd: !samePath(currentCwd, candidate.path)
+    needsCd: !samePath(currentCwd, candidate.path),
+    repo: { path: candidate.path, name: candidate.name, baseBranch: candidate.baseBranch }
   }
 }

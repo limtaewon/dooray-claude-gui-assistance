@@ -191,6 +191,8 @@ import type {
   ReconcileResult,
   TaskDropTarget,
   TaskSessionLink,
+  EnsureTaskWorktreeParams,
+  TaskWorktreeInfo,
   WorkspaceRunUpdatedPayload
 } from '../shared/types/workspace'
 
@@ -620,6 +622,9 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.GIT_IS_REPO, path),
     repoRoot: (path: string): Promise<string | null> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_REPO_ROOT, path),
+    /** 워크트리 안이면 그 워크트리가 딸린 본 저장소 경로 (저장소가 아니면 null) */
+    mainRepoRoot: (path: string): Promise<string | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_MAIN_REPO_ROOT, path),
     branches: (repoPath: string): Promise<GitBranch[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_BRANCHES, repoPath),
     worktrees: (repoPath: string): Promise<GitWorktree[]> =>
@@ -741,6 +746,9 @@ const api = {
       linked: (): Promise<Record<string, TaskSessionLink[]>> =>
         ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINKED)
     },
+    /** 업무용 워크트리 보장 — 이미 그 브랜치가 체크아웃돼 있으면 그 폴더를 그대로 준다. */
+    taskWorktree: (params: EnsureTaskWorktreeParams): Promise<TaskWorktreeInfo> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_WORKTREE, params),
     /** run 변경 push 구독. unsubscribe 함수 반환. */
     onRunUpdated: (callback: (payload: WorkspaceRunUpdatedPayload) => void): (() => void) => {
       const handler = (_: IpcRendererEvent, payload: WorkspaceRunUpdatedPayload): void => callback(payload)

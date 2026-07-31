@@ -167,7 +167,7 @@ describe('TerminalView — 업무 드래그&드롭', () => {
     }, { timeout: 4000 })
   })
 
-  it('매핑된 저장소가 하나면 묻지 않고 그리로 이동한다', async () => {
+  it('매핑된 저장소가 하나면 묻지 않고 그 업무의 워크트리로 이동한다', async () => {
     vi.mocked(window.api.workspace.settings.get).mockResolvedValue({
       projectOverrides: { p1: { repoIds: ['r1'] } }
     } as never)
@@ -182,8 +182,11 @@ describe('TerminalView — 업무 드래그&드롭', () => {
 
     await waitFor(() => {
       const sent = vi.mocked(window.api.terminal.input).mock.calls.map((c) => c[1]).join('')
-      expect(sent).toContain("cd '/Users/me/Desktop/2NEON'")
+      expect(sent).toContain("cd '/Users/me/Desktop/2NEON-worktrees/feature-task-t1'")
     })
+    expect(window.api.workspace.taskWorktree).toHaveBeenCalledWith(
+      expect.objectContaining({ repoPath: '/Users/me/Desktop/2NEON', branch: 'feature/task-t1' })
+    )
   })
 
   it('매핑된 저장소가 여럿이고 지금 자리가 그중 아니면 어디서 할지 묻는다', async () => {
@@ -208,11 +211,11 @@ describe('TerminalView — 업무 드래그&드롭', () => {
 
     await waitFor(() => {
       const sent = vi.mocked(window.api.terminal.input).mock.calls.map((c) => c[1]).join('')
-      expect(sent).toContain("cd '/Users/me/Desktop/neon-ai'")
+      expect(sent).toContain("cd '/Users/me/Desktop/neon-ai-worktrees/feature-task-t1'")
     })
   })
 
-  it('지금 자리가 이미 매핑된 저장소면 묻지도 cd 하지도 않는다', async () => {
+  it('이미 그 업무의 워크트리 안이면 묻지도 cd 하지도 않는다', async () => {
     vi.mocked(window.api.workspace.settings.get).mockResolvedValue({
       projectOverrides: { p1: { repoIds: ['r1', 'r2'] } }
     } as never)
@@ -220,7 +223,16 @@ describe('TerminalView — 업무 드래그&드롭', () => {
       { id: 'r1', path: '/Users/me/Desktop/2NEON', name: '2NEON' },
       { id: 'r2', path: '/Users/me/Desktop/neon-ai', name: 'neon-ai' }
     ])
-    vi.mocked(window.api.terminal.sessionCwd).mockResolvedValue('/Users/me/Desktop/neon-ai')
+    // 터미널이 2NEON 의 워크트리 안에 있다 — 경로는 저장소와 다르지만 같은 저장소로 쳐야 한다.
+    const worktree = '/Users/me/Desktop/.2NEON-worktrees/feature-task-t1'
+    vi.mocked(window.api.terminal.sessionCwd).mockResolvedValue(worktree)
+    vi.mocked(window.api.git.mainRepoRoot).mockResolvedValue('/Users/me/Desktop/2NEON')
+    vi.mocked(window.api.workspace.taskWorktree).mockResolvedValue({
+      path: worktree,
+      branch: 'feature/task-t1',
+      created: false,
+      isMainRepo: false
+    })
 
     renderWithDs(<TerminalView active />)
     await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))

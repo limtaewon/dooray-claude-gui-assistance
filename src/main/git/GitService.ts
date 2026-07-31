@@ -63,6 +63,23 @@ export class GitService {
     }
   }
 
+  /**
+   * 워크트리 안이면 그 워크트리가 딸린 **본 저장소** 경로를 준다(저장소가 아니면 null).
+   *
+   * `--show-toplevel` 은 워크트리 자신을 가리켜서, 터미널이 워크트리에 있으면 등록된 저장소와
+   * 매칭되지 않는다. 공용 git 디렉터리(`.git`)의 부모가 본 저장소다.
+   */
+  async getMainRepoRoot(path: string): Promise<string | null> {
+    try {
+      const commonDir = await this.resolveGitCommonDir(path)
+      // bare 저장소는 공용 디렉터리 자신이 저장소다.
+      return basename(commonDir) === '.git' ? dirname(commonDir) : commonDir
+    } catch (err) {
+      if (isNotARepository(err)) return null
+      throw err
+    }
+  }
+
   /** 브랜치 목록 (로컬 + 리모트) */
   async listBranches(repoPath: string): Promise<GitBranch[]> {
     const [localRaw, remoteRaw, currentRaw] = await Promise.all([

@@ -105,6 +105,18 @@ describe('GitService.isGitRepo / getRepoRoot', () => {
     expect(await new GitService().getRepoRoot('/Users/me')).toBeNull()
   })
 
+  it('getMainRepoRoot — 워크트리 안이면 본 저장소를 준다', async () => {
+    mockGit('rev-parse --git-common-dir', '/Users/me/Desktop/2NEON/.git')
+    expect(await new GitService().getMainRepoRoot('/Users/me/Desktop/.2NEON-worktrees/x')).toBe(
+      '/Users/me/Desktop/2NEON'
+    )
+  })
+
+  it('getMainRepoRoot — 저장소가 아니면 null', async () => {
+    mockGitError('rev-parse --git-common-dir', 'fatal: not a git repository (or any of the parent directories): .git')
+    expect(await new GitService().getMainRepoRoot('/Users/me')).toBeNull()
+  })
+
   it('getRepoRoot — 그 밖의 실패는 삼키지 않는다', async () => {
     mockGitError('rev-parse --show-toplevel', 'fatal: detected dubious ownership')
     await expect(new GitService().getRepoRoot('/x')).rejects.toThrow('dubious ownership')

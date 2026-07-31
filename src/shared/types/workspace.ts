@@ -84,6 +84,25 @@ export interface TaskSessionLink {
 }
 
 /** 태스크를 터미널 pane 에 드롭했을 때 열 대상 — `cd` 할 폴더와 이어갈 세션(있으면). */
+/** 업무용 워크트리 보장 요청 */
+export interface EnsureTaskWorktreeParams {
+  repoPath: string
+  /** 브랜치 이름 규칙(`branchName.ts`)으로 만들어진 이름 */
+  branch: string
+  /** 새로 만들 때의 기준 브랜치. 없으면 현재 HEAD */
+  baseBranch?: string
+}
+
+export interface TaskWorktreeInfo {
+  /** 실제로 작업할 폴더 — 워크트리이거나, 이미 그 브랜치인 본 저장소 */
+  path: string
+  branch: string
+  /** 이번 호출에서 새로 만들었는지 */
+  created: boolean
+  /** 본 저장소가 이미 그 브랜치라 워크트리를 만들지 않았는지 */
+  isMainRepo: boolean
+}
+
 export interface TaskDropTarget {
   cwd: string
   repoName: string

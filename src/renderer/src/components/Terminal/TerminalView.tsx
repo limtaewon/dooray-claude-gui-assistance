@@ -59,9 +59,12 @@ import { resolveProjectConfig } from '@shared/workspace/projectConfig'
 import {
   planFromCandidate,
   resolveTaskDropPlan,
+  samePath,
+  sessionForCwd,
   type TaskDropCandidate,
   type TaskDropPlan
 } from '@shared/workspace/taskDropPlan'
+import { buildBranchName } from '@shared/workspace/branchName'
 import RepoChoiceModal from '../Workspace/RepoChoiceModal'
 import type {
   RepoRegistryEntry,
@@ -169,6 +172,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     candidates: TaskDropCandidate[]
     currentCwd?: string
     settings: WorkspaceSettingsShape | null
+    links: TaskSessionLink[]
   } | null>(null)
   const [dropBusy, setDropBusy] = useState<string | null>(null)
   // v2.0 D — 단축키 오버라이드. keydown 클로저가 최신 값을 보도록 ref 로 동기화한다.
@@ -383,6 +387,52 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     setDropHint(null)
   }, [])
 
+  /**
+   * 계획에 업무용 워크트리를 반영한다 — 업무마다 폴더가 갈려야 여러 브랜치를 동시에 진행할 수 있다.
+   *
+   * 브랜치 이름은 프로젝트 규칙(`branchTemplate`)을 따르고, 그 브랜치가 이미 어딘가에 체크아웃돼
+   * 있으면 그 폴더를 그대로 쓴다. 만들지 못하면 저장소 폴더 그대로 진행한다 — 드롭을 죽이지 않는다.
+   */
+  const withWorktree = useCallback(async (
+    plan: Extract<TaskDropPlan, { kind: 'start' }>,
+    task: TaskDropRequest,
+    settings: WorkspaceSettingsShape | null,
+    links: TaskSessionLink[],
+    currentCwd?: string
+  ): Promise<Extract<TaskDropPlan, { kind: 'start' }>> => {
+    const repo = plan.repo
+    if (!repo || !settings) return plan
+
+    const branch = buildBranchName({
+      template: resolveProjectConfig(settings, task.projectId).branchTemplate,
+      projectCode: task.projectCode,
+      taskNumber: task.number,
+      taskId: task.taskId
+    })
+
+    setDropBusy(`${branch} 워크트리 준비 중…`)
+    const info = await window.api.workspace
+      .taskWorktree({ repoPath: repo.path, branch, baseBranch: repo.baseBranch })
+      .catch((err: unknown) => {
+        toast.error(
+          '워크트리를 만들지 못했습니다',
+          err instanceof Error ? err.message : `${repo.name} 폴더에서 그대로 시작합니다`
+        )
+        return null
+      })
+    setDropBusy(null)
+    if (!info) return plan
+
+    return {
+      ...plan,
+      cwd: info.path,
+      repoName: info.isMainRepo ? repo.name : `${repo.name} · ${branch}`,
+      // 세션은 (업무 × 폴더) 라 폴더가 워크트리로 바뀌면 그 폴더의 세션을 다시 찾아야 한다.
+      sessionId: sessionForCwd(links, info.path),
+      needsCd: !samePath(currentCwd, info.path)
+    }
+  }, [toast])
+
   /** 계획이 정해진 뒤의 실행 — cd(필요할 때만) → claude → 첫 지시. */
   const executeDropPlan = useCallback(async (
     task: TaskDropRequest,
@@ -470,22 +520,32 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       window.api.workspace.taskDrop.linked().catch(() => ({}) as Record<string, TaskSessionLink[]>)
     ])
 
+    // 워크트리 안이면 경로가 등록된 저장소와 다르다 — 본 저장소로 환산해 비교한다.
+    const currentRepoRoot = liveCwd
+      ? await window.api.git.mainRepoRoot(liveCwd).catch(() => null)
+      : null
+
     const repoIds = settings ? resolveProjectConfig(settings, task.projectId).repoIds : []
     const mappedRepos = repoIds
       .map((id) => repos.find((r) => r.id === id))
       .filter((r): r is RepoRegistryEntry => Boolean(r))
     const links = linkMap[workspaceKey(task.projectId, task.taskId)] ?? []
 
-    const plan = resolveTaskDropPlan({ currentCwd: liveCwd, mappedRepos, links })
+    const plan = resolveTaskDropPlan({
+      currentCwd: liveCwd,
+      currentRepoRoot: currentRepoRoot ?? undefined,
+      mappedRepos,
+      links
+    })
 
     if (plan.kind === 'choose') {
       // 사용자가 고르면 그 뒤를 이어서 실행한다.
-      setRepoChoice({ task, pane, candidates: plan.candidates, currentCwd: liveCwd, settings })
+      setRepoChoice({ task, pane, candidates: plan.candidates, currentCwd: liveCwd, settings, links })
       return
     }
 
-    await executeDropPlan(task, pane, plan, settings)
-  }, [toast, executeDropPlan])
+    await executeDropPlan(task, pane, await withWorktree(plan, task, settings, links, liveCwd), settings)
+  }, [toast, executeDropPlan, withWorktree])
 
   // createTab 은 아래에서 선언되므로 ref 로 우회한다 (선언 순서 의존 제거)
   const createTabRef = useRef<
@@ -1272,12 +1332,15 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
         onChoose={(candidate) => {
           const choice = repoChoice
           setRepoChoice(null)
-          void executeDropPlan(
-            choice.task,
-            choice.pane,
-            planFromCandidate(candidate, choice.currentCwd),
-            choice.settings
-          )
+          void (async () => {
+            const plan = planFromCandidate(candidate, choice.currentCwd)
+            await executeDropPlan(
+              choice.task,
+              choice.pane,
+              await withWorktree(plan, choice.task, choice.settings, choice.links, choice.currentCwd),
+              choice.settings
+            )
+          })()
         }}
       />
     )}

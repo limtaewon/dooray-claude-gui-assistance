@@ -82,6 +82,7 @@ import { AnalyticsService } from './analytics/AnalyticsService'
 import { WorkspaceStore } from './workspace/WorkspaceStore'
 import { WorkspaceService } from './workspace/WorkspaceService'
 import { TaskDropService } from './workspace/TaskDropService'
+import { TaskWorktreeService } from './workspace/TaskWorktreeService'
 import { AgentRunSpawner } from './workspace/AgentRunSpawner'
 import { WorkspaceHookHandler, WORKSPACE_HOOK_KIND } from './workspace/WorkspaceHookHandler'
 import { preApproveTrust, writeHookSettings } from './claude/claudeDirSetup'
@@ -110,6 +111,7 @@ import type {
   ResumeRunParams,
   CleanupRunParams,
   AddRepoParams,
+  EnsureTaskWorktreeParams,
   RepoRegistryEntry,
   WorkspaceSettings
 } from '../shared/types/workspace'
@@ -271,6 +273,11 @@ const workspaceService = new WorkspaceService({
 const taskDropService = new TaskDropService({
   store: workspaceStore,
   listSessions: (cwd) => claudeSessions.listSessions(cwd)
+})
+// 업무 드롭은 항상 워크트리에서 — 업무마다 폴더가 갈려야 여러 브랜치를 동시에 진행할 수 있다.
+const taskWorktreeService = new TaskWorktreeService({
+  git: gitService,
+  claudeDir: { preApproveTrust }
 })
 const workspaceHookHandler = new WorkspaceHookHandler({ workspaceService })
 // 멘션이 1순위 — C-0 의 보존 약속(ADR-v2-workspace-p0-01). 워크트리는 agentRoot 밖이므로 충돌 없음.
@@ -1604,6 +1611,9 @@ ${data}`,
   gitHandle(IPC_CHANNELS.GIT_REPO_ROOT, (path) =>
     gitService.getRepoRoot(path as string)
   )
+  gitHandle(IPC_CHANNELS.GIT_MAIN_REPO_ROOT, (path) =>
+    gitService.getMainRepoRoot(path as string)
+  )
   gitHandle(IPC_CHANNELS.GIT_BRANCHES, (repoPath) =>
     gitService.listBranches(repoPath as string)
   )
@@ -1769,6 +1779,9 @@ ${data}`,
     return null
   })
   workspaceHandle(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINKED, () => taskDropService.linkedMap())
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_TASK_WORKTREE, (params) =>
+    taskWorktreeService.ensure(params as EnsureTaskWorktreeParams)
+  )
 
   // Analytics (로컬 전용 사용 분석)
   ipcMain.on(IPC_CHANNELS.ANALYTICS_TRACK, (_, event: { type: string; params?: Record<string, unknown> }) => {

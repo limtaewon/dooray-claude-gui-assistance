@@ -31,7 +31,8 @@ describe('resolveTaskDropPlan — 지금 자리가 이미 매핑된 저장소', 
       cwd: AI.path,
       repoName: 'neon-ai',
       sessionId: undefined,
-      needsCd: false
+      needsCd: false,
+      repo: { path: AI.path, name: 'neon-ai', baseBranch: undefined }
     })
   })
 
@@ -42,6 +43,19 @@ describe('resolveTaskDropPlan — 지금 자리가 이미 매핑된 저장소', 
       links: [link(NEON.path, 'neon-sess'), link(AI.path, 'ai-sess')]
     })
     expect(plan).toMatchObject({ kind: 'start', sessionId: 'ai-sess' })
+  })
+})
+
+describe('resolveTaskDropPlan — 워크트리 안에 있을 때', () => {
+  it('워크트리에 있어도 그 저장소에서 작업 중인 것으로 본다', () => {
+    // 업무마다 워크트리가 갈리므로 터미널 경로가 등록된 저장소와 같을 일이 오히려 드물다.
+    const plan = resolveTaskDropPlan({
+      currentCwd: '/Users/me/Desktop/.2NEON-worktrees/feature-neon-6793',
+      currentRepoRoot: NEON.path,
+      mappedRepos: [NEON, AI],
+      links: []
+    })
+    expect(plan).toMatchObject({ kind: 'start', repo: { path: NEON.path } })
   })
 })
 
@@ -57,7 +71,8 @@ describe('resolveTaskDropPlan — 매핑되지 않은 자리에 놓았을 때', 
       cwd: NEON.path,
       repoName: '2NEON',
       sessionId: 's1',
-      needsCd: true
+      needsCd: true,
+      repo: { path: NEON.path, name: '2NEON', baseBranch: undefined }
     })
   })
 
@@ -70,8 +85,8 @@ describe('resolveTaskDropPlan — 매핑되지 않은 자리에 놓았을 때', 
     expect(plan.kind).toBe('choose')
     if (plan.kind !== 'choose') throw new Error('unreachable')
     expect(plan.candidates).toEqual([
-      { repoId: 'r1', name: '2NEON', path: NEON.path, sessionId: undefined },
-      { repoId: 'r2', name: 'neon-ai', path: AI.path, sessionId: 'ai-sess' }
+      { repoId: 'r1', name: '2NEON', path: NEON.path, baseBranch: undefined, sessionId: undefined },
+      { repoId: 'r2', name: 'neon-ai', path: AI.path, baseBranch: undefined, sessionId: 'ai-sess' }
     ])
   })
 
@@ -125,7 +140,8 @@ describe('planFromCandidate', () => {
       cwd: NEON.path,
       repoName: '2NEON',
       sessionId: 's1',
-      needsCd: true
+      needsCd: true,
+      repo: { path: NEON.path, name: '2NEON', baseBranch: undefined }
     })
   })
 

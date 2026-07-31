@@ -217,6 +217,7 @@ export function createMockWindowApi(): Record<string, unknown> {
     git: {
       isRepo: vi.fn().mockResolvedValue(false),
       repoRoot: vi.fn().mockResolvedValue(''),
+      mainRepoRoot: vi.fn().mockResolvedValue(null),
       branches: vi.fn().mockResolvedValue([]),
       worktrees: vi.fn().mockResolvedValue([]),
       createWorktree: vi.fn().mockResolvedValue(null),
@@ -279,6 +280,12 @@ export function createMockWindowApi(): Record<string, unknown> {
         cleanup: vi.fn().mockResolvedValue(null)
       },
       reconcile: vi.fn().mockResolvedValue({ detached: 0, discarded: 0 }),
+      taskWorktree: vi.fn().mockImplementation(async (params: { repoPath: string; branch: string }) => ({
+        path: `${params.repoPath}-worktrees/${params.branch.replace(/\//g, '-')}`,
+        branch: params.branch,
+        created: true,
+        isMainRepo: false
+      })),
       taskDrop: {
         resolve: vi.fn().mockResolvedValue(null),
         link: vi.fn().mockResolvedValue(null),
