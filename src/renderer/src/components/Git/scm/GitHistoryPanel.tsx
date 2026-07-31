@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, ChevronDown, ChevronRight, GitBranch, RefreshCw, Search, X } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronRight, GitBranch, RefreshCw } from 'lucide-react'
 import type { GitCommitDetail } from '@shared/git/scmTypes'
 import type {
   GitHistoryFilter,
@@ -7,29 +7,21 @@ import type {
   GitHistoryItemRef,
   GitHistoryResult
 } from '@shared/git/historyTypes'
-import { hasHistoryFilter } from '@shared/git/historyTypes'
+import { hasHistoryFilter, sameHistoryFilter } from '@shared/git/historyTypes'
 import {
   buildDefaultGitHistoryColorMap,
   buildGitHistoryViewModels,
   type GitHistoryItemViewModel
 } from '@shared/git/historyGraph'
-import { Button, Input } from '../../common/ds'
+import { Button } from '../../common/ds'
 import GitHistoryGraphSvg from './GitHistoryGraphSvg'
+import GitHistoryFilterBar from './GitHistoryFilterBar'
 import { STATUS_COLORS, STATUS_LABELS, splitPath } from './statusDisplay'
 import type { DiffRequest } from './DiffView'
 
 const PAGE_SIZE = 50
 /** 타이핑 중에 git 을 매번 부르지 않는다. */
 const SEARCH_DEBOUNCE_MS = 300
-
-type FilterField = 'message' | 'author' | 'path' | 'content'
-
-const FILTER_FIELDS: { id: FilterField; label: string; placeholder: string; hint: string }[] = [
-  { id: 'message', label: '메시지', placeholder: '커밋 메시지 검색', hint: '커밋 제목·본문에서 찾습니다' },
-  { id: 'author', label: '작성자', placeholder: '작성자 이름 또는 이메일', hint: '작성자로 거릅니다' },
-  { id: 'path', label: '파일', placeholder: '경로 (예: src/main)', hint: '그 경로를 건드린 커밋만' },
-  { id: 'content', label: '코드', placeholder: '추가·삭제된 문자열', hint: '그 문자열이 추가되거나 삭제된 커밋만' }
-]
 
 interface GitHistoryPanelProps {
   repoPath: string
@@ -67,19 +59,34 @@ function GitHistoryPanel({ repoPath, onOpenDiff }: GitHistoryPanelProps): JSX.El
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
-  const [field, setField] = useState<FilterField>('message')
-  const [query, setQuery] = useState('')
+  /** 입력 중인 필터 — 타이핑마다 조회하지 않는다. */
+  const [draftFilter, setDraftFilter] = useState<GitHistoryFilter>({})
   /** 디바운스가 끝난 값 — 실제 조회에 쓰인다. */
   const [appliedFilter, setAppliedFilter] = useState<GitHistoryFilter>({})
+  const [branches, setBranches] = useState<string[]>([])
   const repoRef = useRef(repoPath)
   repoRef.current = repoPath
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setAppliedFilter(query.trim() ? { [field]: query.trim() } : {})
+      // 조건이 실제로 달라졌을 때만 새 객체를 심는다 — 참조만 바뀌면 히스토리를 다시 읽게 된다.
+      setAppliedFilter((prev) => (sameHistoryFilter(prev, draftFilter) ? prev : draftFilter))
     }, SEARCH_DEBOUNCE_MS)
     return () => window.clearTimeout(timer)
-  }, [query, field])
+  }, [draftFilter])
+
+  // 브랜치 칩 목록. 저장소가 바뀔 때만 읽는다.
+  useEffect(() => {
+    let cancelled = false
+    setBranches([])
+    void window.api.git
+      .branches(repoPath)
+      .then((list) => {
+        if (!cancelled) setBranches(list.filter((b) => !b.isRemote).map((b) => b.name))
+      })
+      .catch(() => undefined)
+    return () => { cancelled = true }
+  }, [repoPath])
 
   const load = useCallback(
     async (options: {
@@ -167,21 +174,10 @@ function GitHistoryPanel({ repoPath, onOpenDiff }: GitHistoryPanelProps): JSX.El
         <span className="text-[calc(11.5px_*_var(--app-font-scale,1))] font-medium text-text-primary truncate">
           {meta?.currentRef?.name ?? '—'}
         </span>
-        <button
-          onClick={() => setAllBranches((v) => !v)}
-          aria-pressed={allBranches}
-          className={`ml-auto flex-none px-1.5 h-5 rounded text-[calc(10px_*_var(--app-font-scale,1))] border transition-colors ${
-            allBranches
-              ? 'text-text-primary bg-bg-active border-bg-border-light'
-              : 'text-text-tertiary border-bg-border hover:text-text-primary'
-          }`}
-          title="모든 브랜치의 커밋을 함께 표시"
-        >
-          모든 브랜치
-        </button>
         <Button
           variant="ghost"
           size="xs"
+          className="ml-auto"
           onClick={() => void load({ skip: 0, all: allBranches, append: false, filter: appliedFilter })}
           aria-label="히스토리 새로고침"
         >
@@ -189,42 +185,13 @@ function GitHistoryPanel({ repoPath, onOpenDiff }: GitHistoryPanelProps): JSX.El
         </Button>
       </div>
 
-      <div className="px-3 pt-2 pb-1.5 flex flex-col gap-1.5 flex-none">
-        <div className="relative">
-          <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={FILTER_FIELDS.find((f) => f.id === field)?.placeholder}
-            aria-label="커밋 검색"
-            style={{ paddingLeft: 24, paddingRight: query ? 22 : undefined }}
-            className="sm"
-          />
-          {query && (
-            <button
-              onClick={() => setQuery('')}
-              aria-label="검색 지우기"
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary"
-            >
-              <X size={11} />
-            </button>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
-          {FILTER_FIELDS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => setField(f.id)}
-              aria-pressed={field === f.id}
-              title={f.hint}
-              className={`ds-chip ${field === f.id ? 'selected' : 'neutral'} cursor-pointer`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <GitHistoryFilterBar
+        filter={draftFilter}
+        onChange={setDraftFilter}
+        branches={branches}
+        allBranches={allBranches}
+        onAllBranchesChange={setAllBranches}
+      />
 
       <div className="px-3 pb-1.5 flex items-baseline gap-1.5 flex-none">
         <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-text-tertiary">

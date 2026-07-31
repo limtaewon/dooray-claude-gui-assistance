@@ -152,7 +152,7 @@ describe('loadGitHistory — 커밋 필터', () => {
 
   it('메시지 검색은 --grep 과 리터럴/대소문자무시를 함께 건다', async () => {
     const { git, calls } = makeGit(base)
-    const result = await loadGitHistory(git, '/repo', { filter: { message: 'feat(git):' } })
+    const result = await loadGitHistory(git, '/repo', { filter: { text: 'feat(git):' } })
     const logArgs = calls.find((a) => a[0] === 'log')!
     // 정규식으로 해석되면 `(` 때문에 아무것도 안 걸린다 — 리터럴이어야 한다
     expect(logArgs).toEqual(
@@ -184,7 +184,7 @@ describe('loadGitHistory — 커밋 필터', () => {
   it('여러 필터를 함께 건다', async () => {
     const { git, calls } = makeGit(base)
     await loadGitHistory(git, '/repo', {
-      filter: { message: 'fix', author: 'me', content: 'foo', path: 'src' }
+      filter: { text: 'fix', author: 'me', content: 'foo', path: 'src' }
     })
     const logArgs = calls.find((a) => a[0] === 'log')!
     expect(logArgs).toEqual(
@@ -194,17 +194,119 @@ describe('loadGitHistory — 커밋 필터', () => {
 
   it('공백뿐인 값은 필터로 치지 않는다', async () => {
     const { git, calls } = makeGit(base)
-    const result = await loadGitHistory(git, '/repo', { filter: { message: '   ' } })
+    const result = await loadGitHistory(git, '/repo', { filter: { text: '   ' } })
     expect(calls.find((a) => a[0] === 'log')!.some((a) => a.startsWith('--grep'))).toBe(false)
     expect(result.filtered).toBeUndefined()
   })
 
   it('필터 값은 한 토큰(`--opt=value`)이라 옵션 주입이 되지 않는다', async () => {
     const { git, calls } = makeGit(base)
-    await loadGitHistory(git, '/repo', { filter: { message: '--upload-pack=evil' } })
+    await loadGitHistory(git, '/repo', { filter: { text: '--upload-pack=evil' } })
     const logArgs = calls.find((a) => a[0] === 'log')!
     expect(logArgs).toContain('--grep=--upload-pack=evil')
     expect(logArgs).not.toContain('--upload-pack=evil')
+  })
+})
+
+describe('loadGitHistory — 필터 조합 (IntelliJ 식 독립 조건)', () => {
+  const base: Array<[(args: string[]) => boolean, string]> = [
+    [(a) => a[0] === 'rev-parse', HEAD_OID],
+    [(a) => a[0] === 'symbolic-ref', ''],
+    [(a) => a[0] === 'log', logRecord(HEAD_OID)]
+  ]
+
+  it('기간 필터는 --since / --until', async () => {
+    const { git, calls } = makeGit(base)
+    await loadGitHistory(git, '/repo', { filter: { since: '2026-07-01', until: '2026-07-31' } })
+    const logArgs = calls.find((a) => a[0] === 'log')!
+    expect(logArgs).toEqual(expect.arrayContaining(['--since=2026-07-01', '--until=2026-07-31']))
+  })
+
+  it('정규식 토글을 켜면 --extended-regexp, 끄면 --fixed-strings', async () => {
+    const on = makeGit(base)
+    await loadGitHistory(on.git, '/repo', { filter: { text: 'fix.*', regex: true } })
+    expect(on.calls.find((a) => a[0] === 'log')).toContain('--extended-regexp')
+
+    const off = makeGit(base)
+    await loadGitHistory(off.git, '/repo', { filter: { text: 'fix.*' } })
+    expect(off.calls.find((a) => a[0] === 'log')).toContain('--fixed-strings')
+  })
+
+  it('대소문자 구분을 켜면 --regexp-ignore-case 를 빼고, 기본은 무시한다', async () => {
+    const sensitive = makeGit(base)
+    await loadGitHistory(sensitive.git, '/repo', { filter: { text: 'Fix', caseSensitive: true } })
+    expect(sensitive.calls.find((a) => a[0] === 'log')).not.toContain('--regexp-ignore-case')
+
+    const insensitive = makeGit(base)
+    await loadGitHistory(insensitive.git, '/repo', { filter: { text: 'Fix' } })
+    expect(insensitive.calls.find((a) => a[0] === 'log')).toContain('--regexp-ignore-case')
+  })
+
+  it('특정 브랜치 필터는 전 브랜치 설정보다 우선한다', async () => {
+    const { git, calls } = makeGit(base)
+    await loadGitHistory(git, '/repo', { allBranches: true, filter: { branch: 'develop' } })
+    const logArgs = calls.find((a) => a[0] === 'log')!
+    expect(logArgs).toContain('develop')
+    expect(logArgs).not.toContain('--branches')
+  })
+
+  it('브랜치 필터도 leading dash 는 거부한다', async () => {
+    const { git, calls } = makeGit(base)
+    await loadGitHistory(git, '/repo', { filter: { branch: '--exec=evil' } })
+    expect(calls.find((a) => a[0] === 'log')).not.toContain('--exec=evil')
+  })
+
+  it('조건들이 서로를 밀어내지 않고 함께 걸린다', async () => {
+    const { git, calls } = makeGit(base)
+    await loadGitHistory(git, '/repo', {
+      filter: { text: 'fix', author: 'me', path: 'src', content: 'foo', since: '어제' }
+    })
+    const logArgs = calls.find((a) => a[0] === 'log')!
+    expect(logArgs).toEqual(
+      expect.arrayContaining(['--grep=fix', '--author=me', '-Sfoo', '--since=어제', '--', 'src'])
+    )
+  })
+})
+
+describe('loadGitHistory — 텍스트 또는 해시', () => {
+  const HASH = 'abc1234'
+
+  it('7자 이상 hex 가 실제 커밋이면 그 커밋 하나만 보여준다', async () => {
+    const { git, calls } = makeGit([
+      [(a) => a[0] === 'rev-parse' && a.includes('HEAD^{commit}'), HEAD_OID],
+      [(a) => a[0] === 'symbolic-ref', ''],
+      [(a) => a[0] === 'rev-parse' && a.includes(`${HASH}^{commit}`), UPSTREAM_OID],
+      [(a) => a[0] === 'log', logRecord(UPSTREAM_OID)]
+    ])
+
+    const result = await loadGitHistory(git, '/repo', { filter: { text: HASH } })
+
+    const logArgs = calls.find((a) => a[0] === 'log')!
+    expect(logArgs).toContain('-n1')
+    expect(logArgs).toContain(UPSTREAM_OID)
+    // 해시로 특정했으면 메시지 검색은 걸지 않는다
+    expect(logArgs.some((a) => a.startsWith('--grep'))).toBe(false)
+    expect(result.hasMore).toBe(false)
+  })
+
+  it('hex 라도 그런 커밋이 없으면 평범한 메시지 검색으로 떨어진다', async () => {
+    const { git, calls } = makeGit([
+      [(a) => a[0] === 'rev-parse' && a.includes('HEAD^{commit}'), HEAD_OID],
+      [(a) => a[0] === 'symbolic-ref', ''],
+      [(a) => a[0] === 'log', logRecord(HEAD_OID)]
+    ])
+    await loadGitHistory(git, '/repo', { filter: { text: 'deadbeef' } })
+    expect(calls.find((a) => a[0] === 'log')).toContain('--grep=deadbeef')
+  })
+
+  it('6자 이하 hex 는 해시로 보지 않는다 — 평범한 단어일 수 있다', async () => {
+    const { git, calls } = makeGit([
+      [(a) => a[0] === 'rev-parse', HEAD_OID],
+      [(a) => a[0] === 'symbolic-ref', ''],
+      [(a) => a[0] === 'log', logRecord(HEAD_OID)]
+    ])
+    await loadGitHistory(git, '/repo', { filter: { text: 'added' } })
+    expect(calls.find((a) => a[0] === 'log')).toContain('--grep=added')
   })
 })
 
