@@ -182,7 +182,7 @@ function WikiStoragePicker({
                       }`}
                       type="button"
                     >
-                      <FolderOpen size={11} className={isActive ? 'text-clauday-blue' : 'text-text-tertiary'} />
+                      <FolderOpen size={11} className={isActive ? 'text-text-primary' : 'text-text-tertiary'} />
                       <span className="truncate flex-1">{w.wikiName || w.wikiId}</span>
                       {isLocked && <Lock size={9} className="text-text-tertiary" />}
                     </button>
@@ -251,7 +251,7 @@ function WikiStoragePicker({
                         {w.isCustom ? (
                           <Link size={11} className={`flex-shrink-0 ${checked ? 'text-clauday-orange' : 'text-text-tertiary'}`} />
                         ) : (
-                          <FolderOpen size={11} className={`flex-shrink-0 ${checked ? 'text-clauday-blue' : 'text-text-tertiary'}`} />
+                          <FolderOpen size={11} className={`flex-shrink-0 ${checked ? 'text-text-primary' : 'text-text-tertiary'}`} />
                         )}
                         <span className={`text-[calc(11px_*_var(--app-font-scale,1))] truncate min-w-0 flex-1 ${checked ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>
                           {w.wikiName || w.wikiId}

@@ -221,7 +221,7 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
                       {isCustom ? (
                         <Link size={11} className={`flex-shrink-0 ${checked ? 'text-clauday-orange' : 'text-text-tertiary'}`} />
                       ) : (
-                        <FolderOpen size={11} className={`flex-shrink-0 ${checked ? 'text-clauday-blue' : 'text-text-tertiary'}`} />
+                        <FolderOpen size={11} className={`flex-shrink-0 ${checked ? 'text-text-primary' : 'text-text-tertiary'}`} />
                       )}
                       <span className={`text-[calc(11px_*_var(--app-font-scale,1))] truncate min-w-0 ${checked ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>{p.code}</span>
                     </button>

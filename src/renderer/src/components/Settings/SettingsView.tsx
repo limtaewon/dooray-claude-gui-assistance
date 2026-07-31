@@ -227,7 +227,7 @@ const MODEL_FEATURES: ModelFeatureDef[] = [
 
 const MODEL_INFO: Record<AIModelName, { label: string; speed: string; quality: string; cost: string; color: string }> = {
   haiku: { label: 'Haiku', speed: '매우 빠름', quality: '기본', cost: '$', color: 'text-emerald-400 bg-emerald-400/10' },
-  sonnet: { label: 'Sonnet', speed: '빠름', quality: '좋음', cost: '$$', color: 'text-clauday-blue bg-bg-active' },
+  sonnet: { label: 'Sonnet', speed: '빠름', quality: '좋음', cost: '$$', color: 'text-text-primary bg-bg-active' },
   opus: { label: 'Opus', speed: '느림', quality: '최상', cost: '$$$', color: 'text-clauday-orange bg-bg-active' }
 }
 
@@ -543,7 +543,7 @@ function SocketModeSettings({ hasApiToken }: { hasApiToken: boolean }): JSX.Elem
             <p className="text-xs text-text-primary font-medium">현재 상태</p>
             <p className={`text-[calc(10px_*_var(--app-font-scale,1))] mt-0.5 flex items-center gap-1.5 ${
               isActive ? 'text-emerald-400'
-                : isConnecting ? 'text-clauday-blue'
+                : isConnecting ? 'text-text-primary'
                 : isStandby ? 'text-amber-400'
                 : !domain ? 'text-text-tertiary'
                 : 'text-red-400'
@@ -989,9 +989,9 @@ function TerminalRendererSection(): JSX.Element {
           }`}>
           <input type="radio" name="terminal-renderer" checked={value === opt.value}
             onChange={() => save(opt.value)}
-            className="accent-clauday-blue" />
+            className="accent-[var(--text-secondary)]" />
           <div className="flex-1 min-w-0">
-            <p className={`text-xs ${value === opt.value ? 'text-clauday-blue font-medium' : 'text-text-primary'}`}>{opt.label}</p>
+            <p className={`text-xs ${value === opt.value ? 'text-text-primary font-medium' : 'text-text-primary'}`}>{opt.label}</p>
             <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">{opt.description}</p>
           </div>
         </label>
@@ -1089,7 +1089,7 @@ function SidebarPrefsSection(): JSX.Element {
               </button>
               <label className="flex items-center gap-1 cursor-pointer ml-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-secondary">
                 <input type="checkbox" checked={!isHidden} onChange={() => toggleHidden(item.view)}
-                  className="accent-clauday-blue" />
+                  className="accent-[var(--text-secondary)]" />
                 <span>{isHidden ? '숨김' : '표시'}</span>
               </label>
             </div>
@@ -1135,7 +1135,7 @@ function AiRecommendNotifyToggle(): JSX.Element {
   return (
     <label className="flex items-start gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-bg-surface-hover">
       <input type="checkbox" checked={enabled} onChange={toggle} disabled={loading || saving}
-        className="accent-clauday-blue mt-0.5" />
+        className="accent-[var(--text-secondary)] mt-0.5" />
       <div className="flex-1 min-w-0">
         <p className="text-xs text-text-primary">AI 추천 새 글 알림</p>
         <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
@@ -1174,9 +1174,9 @@ function FontSettingsSection(): JSX.Element {
             return (
               <button key={f} onClick={() => setFamily(f)}
                 className={`px-3 py-2 rounded-md text-left transition-colors border ${
-                  active ? 'bg-bg-active border-bg-border-light' : 'bg-bg-primary border-bg-border hover:border-bg-border-light'
+                  active ? 'bg-bg-active border-bg-border-strong' : 'bg-bg-primary border-bg-border hover:border-bg-border-light'
                 }`}>
-                <span className={`block text-xs ${active ? 'text-clauday-blue font-medium' : 'text-text-primary'}`}>
+                <span className={`block text-xs ${active ? 'text-text-primary font-medium' : 'text-text-primary'}`}>
                   {FONT_FAMILY_LABELS[f]}
                 </span>
                 <span className="block text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">안녕하세요 Abc 123</span>
@@ -1199,14 +1199,14 @@ function FontSettingsSection(): JSX.Element {
           step={5}
           value={pct}
           onChange={(e) => setScale(Number(e.target.value) / 100)}
-          className="w-full accent-clauday-blue"
+          className="w-full accent-[var(--text-secondary)]"
         />
         <div className="flex flex-wrap gap-1.5 mt-2">
           {SCALE_PRESETS.map((p) => (
             <button key={p.value} onClick={() => setScale(p.value)}
               className={`px-2.5 py-1 rounded-md text-[calc(10px_*_var(--app-font-scale,1))] border transition-colors ${
                 Math.abs(settings.scale - p.value) < 0.01
-                  ? 'bg-bg-active border-bg-border-light text-clauday-blue font-medium'
+                  ? 'bg-bg-active border-bg-border-strong text-text-primary font-medium'
                   : 'bg-bg-primary border-bg-border text-text-secondary hover:text-text-primary'
               }`}>
               {p.label} <span className="text-text-tertiary">{Math.round(p.value * 100)}%</span>

@@ -198,7 +198,7 @@ function WorkspaceSettings(): JSX.Element {
           <label className="flex items-center gap-2 text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary">
             <input
               type="checkbox"
-              className="accent-clauday-blue"
+              className="accent-[var(--text-secondary)]"
               checked={settings.autoApproveDefault}
               onChange={(e) => void patch({ autoApproveDefault: e.target.checked })}
             />
@@ -207,7 +207,7 @@ function WorkspaceSettings(): JSX.Element {
           <label className="flex items-center gap-2 text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary">
             <input
               type="checkbox"
-              className="accent-clauday-blue"
+              className="accent-[var(--text-secondary)]"
               checked={settings.transitionDoorayDefault}
               onChange={(e) => void patch({ transitionDoorayDefault: e.target.checked })}
             />
@@ -216,7 +216,7 @@ function WorkspaceSettings(): JSX.Element {
           <label className="flex items-center gap-2 text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary">
             <input
               type="checkbox"
-              className="accent-clauday-blue"
+              className="accent-[var(--text-secondary)]"
               checked={settings.commentBranchDefault}
               onChange={(e) => void patch({ commentBranchDefault: e.target.checked })}
             />

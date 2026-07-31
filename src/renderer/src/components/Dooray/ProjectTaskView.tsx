@@ -258,11 +258,11 @@ function ProjectTaskView(): JSX.Element {
                       onClick={() => setSelectedProject(p)}
                       className={`w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors ${
                         isSelected
-                          ? 'bg-bg-active text-clauday-blue border-r-2 border-clauday-blue'
+                          ? 'bg-bg-active text-text-primary border-r-2 border-clauday-blue'
                           : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
                       }`}
                     >
-                      <FolderOpen size={13} className={`flex-shrink-0 ${isSelected ? 'text-clauday-blue' : 'text-text-tertiary'}`} />
+                      <FolderOpen size={13} className={`flex-shrink-0 ${isSelected ? 'text-text-primary' : 'text-text-tertiary'}`} />
                       <span className="text-xs font-medium truncate min-w-0">{p.code}</span>
                     </button>
                   )
@@ -314,7 +314,7 @@ function ProjectTaskView(): JSX.Element {
                   <button
                     onClick={() => { setShowWfDropdown(!showWfDropdown); setShowTagDropdown(false) }}
                     className={`flex items-center gap-1 px-2.5 py-1 rounded text-[calc(11px_*_var(--app-font-scale,1))] border transition-colors ${
-                      wfFilter !== '전체' ? 'bg-bg-active border-bg-border-light text-clauday-blue' : 'bg-bg-surface border-bg-border text-text-secondary hover:border-bg-border-light'
+                      wfFilter !== '전체' ? 'bg-bg-active border-bg-border-strong text-clauday-blue' : 'bg-bg-surface border-bg-border text-text-secondary hover:border-bg-border-light'
                     }`}
                   >
                     상태: {wfFilter} <ChevronRight size={10} className={`transition-transform ${showWfDropdown ? 'rotate-90' : ''}`} />
@@ -322,13 +322,13 @@ function ProjectTaskView(): JSX.Element {
                   {showWfDropdown && (
                     <div className="absolute top-full left-0 mt-1 w-48 bg-bg-surface border border-bg-border rounded-lg shadow-xl z-20 py-1 max-h-60 overflow-y-auto">
                       <button onClick={() => { setWfFilter('전체'); setShowWfDropdown(false) }}
-                        className={`w-full text-left px-3 py-1.5 text-[calc(11px_*_var(--app-font-scale,1))] transition-colors ${wfFilter === '전체' ? 'bg-bg-active text-clauday-blue' : 'text-text-secondary hover:bg-bg-surface-hover'}`}>
+                        className={`w-full text-left px-3 py-1.5 text-[calc(11px_*_var(--app-font-scale,1))] transition-colors ${wfFilter === '전체' ? 'bg-bg-active text-text-primary' : 'text-text-secondary hover:bg-bg-surface-hover'}`}>
                         전체
                       </button>
                       {workflowCounts.map((wf) => (
                         <button key={wf.name} onClick={() => { setWfFilter(wf.name); setShowWfDropdown(false) }}
                           className={`w-full text-left px-3 py-1.5 text-[calc(11px_*_var(--app-font-scale,1))] flex items-center justify-between transition-colors ${
-                            wfFilter === wf.name ? 'bg-bg-active text-clauday-blue' : 'text-text-secondary hover:bg-bg-surface-hover'
+                            wfFilter === wf.name ? 'bg-bg-active text-text-primary' : 'text-text-secondary hover:bg-bg-surface-hover'
                           }`}>
                           <span className="flex items-center gap-1.5">
                             <span className={`w-1.5 h-1.5 rounded-full ${
@@ -348,7 +348,7 @@ function ProjectTaskView(): JSX.Element {
                   <button
                     onClick={() => { setShowTagDropdown(!showTagDropdown); setShowWfDropdown(false) }}
                     className={`flex items-center gap-1 px-2.5 py-1 rounded text-[calc(11px_*_var(--app-font-scale,1))] border transition-colors ${
-                      tagFilter !== '전체' ? 'bg-bg-active border-bg-border-light text-clauday-blue' : 'bg-bg-surface border-bg-border text-text-secondary hover:border-bg-border-light'
+                      tagFilter !== '전체' ? 'bg-bg-active border-bg-border-strong text-clauday-blue' : 'bg-bg-surface border-bg-border text-text-secondary hover:border-bg-border-light'
                     }`}
                   >
                     태그: {tagFilter} <ChevronRight size={10} className={`transition-transform ${showTagDropdown ? 'rotate-90' : ''}`} />
@@ -356,13 +356,13 @@ function ProjectTaskView(): JSX.Element {
                   {showTagDropdown && (
                     <div className="absolute top-full left-0 mt-1 w-56 bg-bg-surface border border-bg-border rounded-lg shadow-xl z-20 py-1 max-h-60 overflow-y-auto">
                       <button onClick={() => { setTagFilter('전체'); setShowTagDropdown(false) }}
-                        className={`w-full text-left px-3 py-1.5 text-[calc(11px_*_var(--app-font-scale,1))] transition-colors ${tagFilter === '전체' ? 'bg-bg-active text-clauday-blue' : 'text-text-secondary hover:bg-bg-surface-hover'}`}>
+                        className={`w-full text-left px-3 py-1.5 text-[calc(11px_*_var(--app-font-scale,1))] transition-colors ${tagFilter === '전체' ? 'bg-bg-active text-text-primary' : 'text-text-secondary hover:bg-bg-surface-hover'}`}>
                         전체
                       </button>
                       {tagList.map((tag) => (
                         <button key={tag.name} onClick={() => { setTagFilter(tag.name); setShowTagDropdown(false) }}
                           className={`w-full text-left px-3 py-1.5 text-[calc(11px_*_var(--app-font-scale,1))] flex items-center justify-between transition-colors ${
-                            tagFilter === tag.name ? 'bg-bg-active text-clauday-blue' : 'text-text-secondary hover:bg-bg-surface-hover'
+                            tagFilter === tag.name ? 'bg-bg-active text-text-primary' : 'text-text-secondary hover:bg-bg-surface-hover'
                           }`}>
                           <span className="flex items-center gap-1.5">
                             <span className="px-1.5 py-0.5 rounded text-[calc(9px_*_var(--app-font-scale,1))] border" style={tagStyle(tag.color)}>{tag.name}</span>

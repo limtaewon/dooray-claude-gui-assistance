@@ -125,7 +125,7 @@ function SkillEditor({ filename, content, onChange }: SkillEditorProps): JSX.Ele
             onClick={() => setMode('edit')}
             className={`flex items-center gap-1 px-2 py-0.5 text-[calc(11px_*_var(--app-font-scale,1))] transition-colors ${
               mode === 'edit'
-                ? 'bg-bg-active text-clauday-blue'
+                ? 'bg-bg-active text-text-primary'
                 : 'text-text-tertiary hover:text-text-primary'
             }`}
           >
@@ -136,7 +136,7 @@ function SkillEditor({ filename, content, onChange }: SkillEditorProps): JSX.Ele
             onClick={() => setMode('preview')}
             className={`flex items-center gap-1 px-2 py-0.5 text-[calc(11px_*_var(--app-font-scale,1))] border-l border-bg-border transition-colors ${
               mode === 'preview'
-                ? 'bg-bg-active text-clauday-blue'
+                ? 'bg-bg-active text-text-primary'
                 : 'text-text-tertiary hover:text-text-primary'
             }`}
           >

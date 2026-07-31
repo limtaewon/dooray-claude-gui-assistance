@@ -493,7 +493,7 @@ function RecentViewsPalette({ open, items, index, onHover, onPick, onClose }: {
                   hi ? 'bg-bg-active' : 'hover:bg-bg-surface-hover'
                 }`}
               >
-                <span className={hi ? 'text-clauday-blue' : isCurrent ? 'text-text-tertiary' : 'text-text-secondary'}>
+                <span className={hi ? 'text-text-primary' : isCurrent ? 'text-text-tertiary' : 'text-text-secondary'}>
                   {icon}
                 </span>
                 <span className={`text-[calc(12px_*_var(--app-font-scale,1))] flex-1 truncate ${hi ? 'text-text-primary font-medium' : isCurrent ? 'text-text-tertiary' : 'text-text-primary'}`}>

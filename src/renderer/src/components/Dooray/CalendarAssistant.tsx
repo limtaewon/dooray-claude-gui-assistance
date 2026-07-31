@@ -669,7 +669,7 @@ function CalendarAssistant(): JSX.Element {
                               <span className="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-emerald-400/15 text-emerald-400 font-medium">진행 중</span>
                             )}
                             {isUpcoming && (
-                              <span className="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-bg-active text-clauday-blue font-medium">예정</span>
+                              <span className="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-bg-active text-text-primary font-medium">예정</span>
                             )}
                           </div>
                           <div className="flex items-center gap-3 mt-0.5">
@@ -695,7 +695,7 @@ function CalendarAssistant(): JSX.Element {
               const isToday = dateKey === todayKey
               return (
                 <div key={dateKey}>
-                  <h3 className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isToday ? 'text-clauday-blue' : 'text-text-secondary'}`}>
+                  <h3 className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isToday ? 'text-text-primary' : 'text-text-secondary'}`}>
                     {safeDate(dateKey + 'T00:00:00+09:00')} {isToday && '(오늘)'} <span className="text-text-tertiary font-normal">{dayEvents.length}개</span>
                   </h3>
                   <div className="space-y-1.5">

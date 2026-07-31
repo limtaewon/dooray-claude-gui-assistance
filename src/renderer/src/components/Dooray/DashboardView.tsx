@@ -375,7 +375,7 @@ JSON 형태로만 응답:
                   ].map((opt) => (
                     <div
                       key={opt.v}
-                      className={`ds-menu-item ${autoSyncMin === opt.v ? 'text-clauday-blue font-semibold' : ''}`}
+                      className={`ds-menu-item ${autoSyncMin === opt.v ? 'text-text-primary font-semibold' : ''}`}
                       onClick={() => setAndSaveAutoSync(opt.v)}
                     >
                       {opt.label}

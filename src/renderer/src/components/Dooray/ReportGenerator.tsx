@@ -195,7 +195,7 @@ function ReportGenerator(): JSX.Element {
                 <FileText size={14} className="text-clauday-orange" />
                 <span className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary">{report.title}</span>
                 <span className={`text-[calc(10px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full font-medium ${
-                  reportType === 'daily' ? 'bg-bg-active text-clauday-blue' : 'bg-bg-active text-clauday-orange'
+                  reportType === 'daily' ? 'bg-bg-active text-text-primary' : 'bg-bg-active text-clauday-orange'
                 }`}>
                   {reportType === 'daily' ? '일일' : '주간'}
                 </span>
@@ -230,7 +230,7 @@ function ReportGenerator(): JSX.Element {
               <button onClick={() => editMode ? setEditMode(false) : startEdit()}
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[calc(11px_*_var(--app-font-scale,1))] transition-colors border ${
                   editMode
-                    ? 'bg-bg-active border-bg-border-light text-clauday-blue'
+                    ? 'bg-bg-active border-bg-border-strong text-clauday-blue'
                     : 'bg-bg-surface border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light'
                 }`}>
                 {editMode ? '미리보기' : '편집'}

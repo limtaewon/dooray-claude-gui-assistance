@@ -99,7 +99,7 @@ function renderMentions(text: string, terms: string[]): JSX.Element {
         if (MENTION_RE.test(p)) {
           MENTION_RE.lastIndex = 0
           return (
-            <span key={i} className="px-1 rounded bg-bg-active text-clauday-blue font-medium text-[calc(11.5px_*_var(--app-font-scale,1))]">
+            <span key={i} className="px-1 rounded bg-bg-active text-text-primary font-medium text-[calc(11.5px_*_var(--app-font-scale,1))]">
               {p}
             </span>
           )

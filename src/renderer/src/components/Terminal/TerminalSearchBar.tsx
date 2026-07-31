@@ -122,7 +122,7 @@ function ToggleButton({
       aria-pressed={active}
       className={`px-1.5 py-0.5 rounded text-[calc(10px_*_var(--app-font-scale,1))] font-mono font-bold border ${
         active
-          ? 'text-clauday-blue bg-bg-active border-bg-border-light'
+          ? 'text-text-primary bg-bg-active border-bg-border-strong'
           : 'text-text-tertiary border-transparent hover:bg-bg-surface-hover hover:text-text-secondary'
       }`}
     >

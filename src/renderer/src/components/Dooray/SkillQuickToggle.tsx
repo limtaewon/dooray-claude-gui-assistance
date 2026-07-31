@@ -458,7 +458,7 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
                           <button key={name} onClick={() => toggleMcp(name)}
                             className={`flex items-center gap-1 px-2 py-1 rounded-md text-[calc(10px_*_var(--app-font-scale,1))] border transition-colors ${
                               checked
-                                ? 'bg-bg-active border-bg-border-light text-clauday-blue font-medium'
+                                ? 'bg-bg-active border-bg-border-strong text-text-primary font-medium'
                                 : 'bg-bg-primary border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light'
                             }`}>
                             <span className={`w-3 h-3 rounded border flex items-center justify-center flex-shrink-0 ${
@@ -507,7 +507,7 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
                   className="w-full px-2.5 py-1.5 bg-bg-primary border border-bg-border rounded-md text-xs text-text-secondary placeholder-text-tertiary font-mono focus:outline-none focus:border-clauday-blue resize-y mb-2" />
                 <div className="flex items-center justify-between">
                   <label className="flex items-center gap-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">
-                    <input type="checkbox" checked={editing.autoApply} onChange={(e) => setEditing({ ...editing, autoApply: e.target.checked })} className="accent-clauday-blue" />
+                    <input type="checkbox" checked={editing.autoApply} onChange={(e) => setEditing({ ...editing, autoApply: e.target.checked })} className="accent-[var(--text-secondary)]" />
                     자동 적용
                   </label>
                   <div className="flex gap-1.5">

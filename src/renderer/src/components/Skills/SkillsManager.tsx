@@ -793,9 +793,9 @@ function SkillsManager(): JSX.Element {
                 return (
                   <label key={skill.filename}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer select-none transition-colors ${
-                      checked ? 'bg-bg-active border-bg-border-light' : 'bg-bg-surface border-bg-border hover:bg-bg-surface-hover'
+                      checked ? 'bg-bg-active border-bg-border-strong' : 'bg-bg-surface border-bg-border hover:bg-bg-surface-hover'
                     }`}>
-                    <input type="checkbox" className="accent-clauday-blue flex-shrink-0" checked={checked} onChange={toggle} />
+                    <input type="checkbox" className="accent-[var(--text-secondary)] flex-shrink-0" checked={checked} onChange={toggle} />
                     <Sparkles size={13} className="text-brand-claude flex-shrink-0" />
                     <span className="text-sm text-text-primary truncate flex-1" title={skill.name}>{skill.name}</span>
                     {alreadyShared && <span className="ds-chip neutral flex-shrink-0">공유됨</span>}

@@ -977,7 +977,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
               aria-pressed={drawerOpen}
               className={`flex items-center gap-1.5 h-7 px-2.5 rounded-[7px] text-[calc(11.5px_*_var(--app-font-scale,1))] font-medium border transition-colors ${
                 drawerOpen
-                  ? 'text-text-primary bg-bg-active border-bg-border-light'
+                  ? 'text-text-primary bg-bg-active border-bg-border-strong'
                   : 'text-text-secondary border-bg-border hover:text-text-primary hover:bg-bg-surface-hover'
               }`}
               title="작업 패널 (⌘⇧T)">

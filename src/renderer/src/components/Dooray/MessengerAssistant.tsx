@@ -117,7 +117,7 @@ function MessengerAssistant(): JSX.Element {
                       active ? 'bg-bg-active border-l-2 border-brand-dooray' : 'hover:bg-bg-surface border-l-2 border-transparent'
                     }`}>
                     <Icon size={12} className={active ? 'text-brand-dooray' : 'text-text-tertiary'} />
-                    <span className={`flex-1 min-w-0 truncate text-xs ${active ? 'text-clauday-blue font-medium' : 'text-text-primary'}`}>
+                    <span className={`flex-1 min-w-0 truncate text-xs ${active ? 'text-text-primary font-medium' : 'text-text-primary'}`}>
                       {c.displayName || c.title}
                     </span>
                     {!!c.unreadCount && c.unreadCount > 0 && (

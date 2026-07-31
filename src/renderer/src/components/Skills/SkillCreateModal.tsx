@@ -181,7 +181,7 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
                       <button key={name} onClick={() => toggleMcp(name)}
                         className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[calc(11px_*_var(--app-font-scale,1))] border transition-colors ${
                           checked
-                            ? 'bg-bg-active border-bg-border-light text-clauday-blue font-medium'
+                            ? 'bg-bg-active border-bg-border-strong text-text-primary font-medium'
                             : 'bg-bg-subtle border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light'
                         }`}>
                         <span className={`w-3 h-3 rounded border flex items-center justify-center flex-shrink-0 ${

@@ -964,7 +964,7 @@ function EventDetailBody({ event, calendarName, colorBg }: {
           <span className="truncate max-w-[140px]">{calendarName}</span>
           <span className={`px-1.5 py-0.5 rounded text-[calc(9px_*_var(--app-font-scale,1))] font-medium ${
             event.source === 'local' ? 'bg-emerald-500/15 text-emerald-400'
-              : event.source === 'caldav' ? 'bg-bg-active text-clauday-blue'
+              : event.source === 'caldav' ? 'bg-bg-active text-text-primary'
               : 'bg-rose-500/15 text-rose-400'
           }`}>{event.source === 'local' ? '내 일정' : event.source === 'caldav' ? '두레이' : '공휴일'}</span>
         </div>
@@ -1214,7 +1214,7 @@ function NewEventModal({ range, calendars, onClose, onCreate }: {
           </select>
         </Field>
         <label className="flex items-center gap-1.5 text-text-secondary">
-          <input type="checkbox" className="accent-clauday-blue" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />종일
+          <input type="checkbox" className="accent-[var(--text-secondary)]" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />종일
         </label>
         {!allDay && (
           <div className="grid grid-cols-2 gap-2">

@@ -75,7 +75,7 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
           <h3 className="text-sm font-semibold text-text-primary leading-snug">{task.subject}</h3>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             {task.projectCode && (
-              <span className="text-[calc(10px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded bg-bg-active text-clauday-blue font-mono">{task.projectCode}</span>
+              <span className="text-[calc(10px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded bg-bg-active text-text-primary font-mono">{task.projectCode}</span>
             )}
             <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">{wfName}</span>
             {task.dueDateAt && (
