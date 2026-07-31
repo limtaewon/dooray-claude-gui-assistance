@@ -1275,10 +1275,8 @@ function registerIpcHandlers(): void {
   })
 
   // Settings
-  // GitHub 연동 — 토큰은 키체인에만 두고 렌더러에는 계정 정보만 돌려준다.
+  // GitHub 연동 — 앱은 토큰을 받지 않는다. `gh` CLI 상태만 본다.
   ipcMain.handle(IPC_CHANNELS.GITHUB_STATUS, (_, refresh?: boolean) => githubService.status(refresh === true))
-  ipcMain.handle(IPC_CHANNELS.GITHUB_CONNECT, (_, token: string) => githubService.connect(token))
-  ipcMain.handle(IPC_CHANNELS.GITHUB_DISCONNECT, () => githubService.disconnect())
 
   ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, (_, key: string) => store.get(key))
   ipcMain.handle(IPC_CHANNELS.SETTINGS_SET, (_, { key, value }: { key: string; value: unknown }) => {

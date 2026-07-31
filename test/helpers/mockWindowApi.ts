@@ -218,9 +218,7 @@ export function createMockWindowApi(): Record<string, unknown> {
       info: vi.fn().mockResolvedValue({ version: '', mainHelp: '', mcpHelp: '', authHelp: '', agentsHelp: '', pluginHelp: '' })
     },
     github: {
-      status: vi.fn().mockResolvedValue({ connected: false }),
-      connect: vi.fn().mockResolvedValue({ connected: false }),
-      disconnect: vi.fn().mockResolvedValue(undefined)
+      status: vi.fn().mockResolvedValue({ state: 'not-installed', accounts: [] })
     },
     git: {
       isRepo: vi.fn().mockResolvedValue(false),

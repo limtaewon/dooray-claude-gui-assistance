@@ -37,8 +37,6 @@ export const IPC_CHANNELS = {
 
   // Dooray
   GITHUB_STATUS: 'github:status',
-  GITHUB_CONNECT: 'github:connect',
-  GITHUB_DISCONNECT: 'github:disconnect',
 
   DOORAY_TOKEN_SET: 'dooray:token:set',
   DOORAY_TOKEN_GET: 'dooray:token:get',

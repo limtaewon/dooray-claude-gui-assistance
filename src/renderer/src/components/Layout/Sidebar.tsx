@@ -86,7 +86,7 @@ export function resolveOrderedItems(
 }
 
 /** Design System Sidebar. 36×36 버튼, 20px 아이콘. 활성 상태는 무채색(--bg-active 면 + 밝은 글자) —
- *  크롬에는 색을 쓰지 않는다. 배지는 --badge-* 토큰(라이트=오렌지, 다크=밝은 회색 면). */
+ *  크롬에는 색을 쓰지 않는다. 다만 **읽지 않음 배지는 정보**라 색을 쓴다(--badge-*: 라이트 주황 / 다크 노랑). */
 function NavButton({
   view, icon: Icon, label, accent, active, onClick, badge, pulse, expanded
 }: SidebarNavItem & { active: boolean; onClick: () => void; badge?: number; pulse?: boolean; expanded: boolean }): JSX.Element {

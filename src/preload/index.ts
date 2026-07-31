@@ -634,13 +634,10 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_CLI_INFO)
   },
 
-  /** GitHub 연동 — 토큰은 키체인에만, 렌더러로는 계정 정보만 온다. */
+  /** GitHub 연동 — 앱은 토큰을 받지 않는다. `gh` CLI 상태를 그대로 본다. */
   github: {
     status: (refresh?: boolean): Promise<GitHubStatus> =>
-      ipcRenderer.invoke(IPC_CHANNELS.GITHUB_STATUS, refresh),
-    connect: (token: string): Promise<GitHubStatus> =>
-      ipcRenderer.invoke(IPC_CHANNELS.GITHUB_CONNECT, token),
-    disconnect: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.GITHUB_DISCONNECT)
+      ipcRenderer.invoke(IPC_CHANNELS.GITHUB_STATUS, refresh)
   },
 
   // Git Worktree

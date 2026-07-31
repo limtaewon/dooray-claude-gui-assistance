@@ -36,7 +36,10 @@ function SetupWizard({ onClose }: { onClose: () => void }): JSX.Element {
       dooray: { done: dooray?.valid === true, detail: dooray?.name },
       bot: { done: Boolean(bot?.domain), detail: bot?.domain },
       caldav: { done: caldav?.connected === true },
-      github: { done: github?.connected === true, detail: github?.account?.login }
+      github: {
+        done: github?.state === 'connected',
+        detail: github?.accounts.find((a) => a.active)?.login ?? github?.accounts[0]?.login
+      }
     })
     setLoading(false)
   }, [])
@@ -66,7 +69,7 @@ function SetupWizard({ onClose }: { onClose: () => void }): JSX.Element {
           <DoorayStep state={state.dooray} onDone={refresh} />
           <BotStep state={state.bot} onDone={refresh} />
           <CalDavStep state={state.caldav} />
-          <GitHubStep state={state.github} onDone={refresh} />
+          <GitHubStep state={state.github} />
         </div>
       )}
 
@@ -218,48 +221,19 @@ function CalDavStep({ state }: { state: StepState }): JSX.Element {
   )
 }
 
-function GitHubStep({ state, onDone }: { state: StepState; onDone: () => void }): JSX.Element {
-  const [token, setToken] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-
-  const save = async (): Promise<void> => {
-    setBusy(true)
-    setError('')
-    try {
-      const result = await window.api.github.connect(token.trim())
-      if (!result.connected) {
-        setError(result.error || '연결하지 못했습니다')
-        return
-      }
-      setToken('')
-      onDone()
-    } finally {
-      setBusy(false)
-    }
-  }
-
+function GitHubStep({ state }: { state: StepState }): JSX.Element {
   return (
     <Step
-      title="GitHub 토큰 (선택)"
-      description="GitHub 계정을 연결합니다. 터미널의 git 은 이 토큰이 아니라 기존 자격증명을 그대로 씁니다."
+      title="GitHub (선택)"
+      description="앱이 토큰을 받지 않습니다 — 터미널에서 gh auth login 으로 로그인해 두면 그 계정을 그대로 씁니다."
       state={state}
     >
-      <div className="flex items-center gap-2">
-        <Input
-          type="password"
-          size="sm"
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          placeholder="ghp_… 또는 github_pat_…"
-          className="font-mono"
-          aria-label="GitHub 개인 액세스 토큰"
-        />
-        <Button variant="primary" size="sm" className="flex-none" disabled={busy || !token.trim()} onClick={() => void save()}>
-          {busy ? '확인 중…' : '연결'}
-        </Button>
-      </div>
-      {error && <p className="text-[calc(10.5px_*_var(--app-font-scale,1))] text-c-red-fg">{error}</p>}
+      <button
+        onClick={() => window.dispatchEvent(new CustomEvent('goto-settings', { detail: { tab: 'github' } }))}
+        className="self-start flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-link"
+      >
+        설정에서 상태 확인 <ExternalLink size={10} />
+      </button>
     </Step>
   )
 }

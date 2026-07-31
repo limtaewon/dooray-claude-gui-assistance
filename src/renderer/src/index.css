@@ -303,9 +303,10 @@
   --btn-primary-bg-hover: #F6F6F8;
   --btn-primary-fg:       #101012;
 
-  /* 알림 배지 — 다크 크롬은 무채색: 밝은 면 + 어두운 글자로 주목만 준다 */
-  --badge-bg:             var(--btn-primary-bg);
-  --badge-fg:             var(--btn-primary-fg);
+  /* 알림 배지 — "읽지 않은 것이 있다" 는 정보다. 무채색으로 두면 다른 크롬에 묻혀
+     한눈에 안 들어와서 노랑을 쓴다(위험은 빨강, 주의·대기는 노랑). */
+  --badge-bg:             var(--c-yellow-solid);
+  --badge-fg:             #1A1400;
 
   --link:              var(--c-blue-fg);
   --code-bg:           #1A1A1A;
