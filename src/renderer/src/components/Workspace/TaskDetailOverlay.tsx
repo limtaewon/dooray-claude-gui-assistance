@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Copy, ExternalLink, Hash, Play, Send, Terminal as TerminalIcon, TerminalSquare, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
@@ -7,7 +7,7 @@ import rehypeRaw from 'rehype-raw'
 import type { DoorayTask, DoorayTaskComment, DoorayTaskDetail } from '@shared/types/dooray'
 import type { TaskSessionLink } from '@shared/types/workspace'
 import { workspaceKey } from '@shared/workspace/workspaceKey'
-import DoorayImage from '../common/DoorayImage'
+import DoorayImage, { DoorayFileContext } from '../common/DoorayImage'
 import { Button, Chip, LoadingView, useToast } from '../common/ds'
 import { getWorkflowName } from '../Dooray/taskStyles'
 
@@ -99,9 +99,17 @@ function TaskDetailOverlay({ task, onClose, onRunInTerminal, promptText }: TaskD
 
   const ref = task.projectCode ? `${task.projectCode}/${task.number ?? ''}` : String(task.number ?? '')
 
+  // 본문·댓글의 첨부 이미지는 게시글 스코프 경로(/projects/{pid}/posts/{postId}/files/{id})로만
+  // 받을 수 있다 — 이 컨텍스트가 없으면 범용 경로로 떨어져 전부 404 가 된다.
+  const fileContext = useMemo(
+    () => ({ projectId: task.projectId, postId: task.id }),
+    [task.projectId, task.id]
+  )
+
   // 앱 루트 밖(body)으로 포털 — 터미널 flex 컨테이너 안에서는 absolute 기준이 어긋나
   // 드로어와 쌓임 순서가 뒤집힌다 (DS Modal 과 동일 전략).
   return createPortal(
+    <DoorayFileContext.Provider value={fileContext}>
     <div className="fixed inset-0 z-[60] flex" role="dialog" aria-modal="true" aria-label={task.subject}>
       <button
         type="button"
@@ -238,7 +246,8 @@ function TaskDetailOverlay({ task, onClose, onRunInTerminal, promptText }: TaskD
           </Button>
         </div>
       </div>
-    </div>,
+    </div>
+    </DoorayFileContext.Provider>,
     document.body
   )
 }
