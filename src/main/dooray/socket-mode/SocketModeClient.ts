@@ -9,6 +9,7 @@ import {
   SESSION_LIMIT_CLOSE_CODE,
   SESSION_LIMIT_CLOSE_REASON,
   STANDBY_RETRY_INTERVAL_MS,
+  reconnectDelayMs,
   PING_INTERVAL_MS,
   WS_PATH,
   SOCKET_MODE_TOKEN_PATH
@@ -55,6 +56,9 @@ export class SocketModeClient extends EventEmitter {
 
   private shouldReconnect = false
   private inStandbyLoop = false
+  /** 연속 실패 횟수 — 붙는 순간 0 으로 돌아간다(백오프 리셋) */
+  private reconnectAttempt = 0
+  private reconnectTimer: NodeJS.Timeout | null = null
   private lastCloseCode: number | null = null
   private lastCloseReason: string | null = null
 
@@ -87,8 +91,13 @@ export class SocketModeClient extends EventEmitter {
   /** 정상 종료. 재연결 루프도 멈춤. */
   async disconnect(): Promise<void> {
     this.shouldReconnect = false
+    this.reconnectAttempt = 0
     this.setState('DISCONNECTED')
     this.clearTimers()
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
     if (this.ws) {
       try { this.ws.close(1000, 'client_disconnect') } catch { /* ok */ }
       this.ws = null
@@ -124,14 +133,29 @@ export class SocketModeClient extends EventEmitter {
         continue
       }
 
-      // 일반 close/오류면 그대로 종료 (외부에서 재기동 결정)
+      // 끊기면 스스로 다시 붙는다. 사용자가 재연결 버튼을 눌러야 데이터가 들어오는 구조는
+      // '켜두면 알아서 모아준다' 는 이 기능의 전제를 깬다.
+      this.reconnectAttempt += 1
+      const delay = reconnectDelayMs(this.reconnectAttempt)
       console.log(
-        `[SocketMode] 연결 종료 (code=${this.lastCloseCode}, reason=${this.lastCloseReason}) — 재시도 안 함`
+        `[SocketMode] 연결 종료 (code=${this.lastCloseCode}, reason=${this.lastCloseReason}) — ` +
+          `${Math.round(delay / 1000)}초 후 재연결 (${this.reconnectAttempt}번째)`
       )
-      this.setState('DISCONNECTED')
-      this.shouldReconnect = false
-      break
+      this.setState('CONNECTING')
+      // 토큰은 만료됐을 수 있으므로 버리고 다시 받는다.
+      this.tokenInfo = null
+      await this.waitBeforeReconnect(delay)
     }
+  }
+
+  /** 재연결 대기 — disconnect() 가 오면 즉시 깨어나 루프를 빠져나간다. */
+  private waitBeforeReconnect(delay: number): Promise<void> {
+    return new Promise<void>((resolve) => {
+      this.reconnectTimer = setTimeout(() => {
+        this.reconnectTimer = null
+        resolve()
+      }, delay)
+    })
   }
 
   private awaitClose(): Promise<void> {

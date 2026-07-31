@@ -1,21 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { FolderPlus, Trash2 } from 'lucide-react'
 import type { RepoRegistryEntry, WorkspaceSettings as WorkspaceSettingsShape } from '@shared/types/workspace'
-import { DEFAULT_BRANCH_TEMPLATE, buildBranchName } from '@shared/workspace/branchName'
-import { Button, Chip, FieldLabel, Input, LoadingView, useToast } from '../common/ds'
+import { Button, FieldLabel, Input, LoadingView, useToast } from '../common/ds'
 import ProjectFilter from '../common/ProjectFilter'
 import ProjectRuleCard from './ProjectRuleCard'
 import { resolveProjectConfig, withProjectOverride } from '@shared/workspace/projectConfig'
-import { renderTaskDropPrompt } from '@shared/workspace/taskDropPrompt'
 import type { DoorayProject } from '@shared/types/dooray'
 import { SettingsRow, SettingsSwitchRow } from './controls'
-import { TASK_DROP_PLACEHOLDERS } from '@shared/workspace/taskDropPrompt'
 
 /** 터미널 우측 두레이 패널이 보여줄 프로젝트 — TaskDrawer 와 같은 키를 쓴다. */
 const TASK_PROJECTS_KEY = 'terminalTaskProjects'
 
 /** 브랜치 템플릿 미리보기용 샘플 — 목업(docs/mockups/v2/workspace-settings.html)의 값과 동일. */
-const SAMPLE = { projectCode: 'D-TF', taskNumber: 2619, taskId: 'a1b2c39f3a2c' }
 
 /** 설정 → 워크스페이스: 저장소 레지스트리 + 브랜치 템플릿 + 실행/정리 정책. */
 function WorkspaceSettings(): JSX.Element {
@@ -87,25 +83,6 @@ function WorkspaceSettings(): JSX.Element {
     setRepos((prev) => prev.filter((r) => r.id !== repo.id))
   }
 
-  const preview = useMemo(() => {
-    if (!settings) return ''
-    return buildBranchName({
-      template: settings.branchTemplate || DEFAULT_BRANCH_TEMPLATE,
-      projectCode: SAMPLE.projectCode,
-      taskNumber: SAMPLE.taskNumber,
-      taskId: SAMPLE.taskId
-    })
-  }, [settings])
-
-  const previewFallback = useMemo(() => {
-    if (!settings) return ''
-    return buildBranchName({
-      template: settings.branchTemplate || DEFAULT_BRANCH_TEMPLATE,
-      projectCode: SAMPLE.projectCode,
-      taskId: SAMPLE.taskId
-    })
-  }, [settings])
-
   if (loading || !settings) return <LoadingView label="워크스페이스 설정을 불러오는 중" />
 
   return (
@@ -144,8 +121,8 @@ function WorkspaceSettings(): JSX.Element {
               프로젝트별 규칙
             </h3>
             <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
-              작업 패널 &lsquo;업무&rsquo; 탭에 띄울 두레이 프로젝트를 고르고, 프로젝트마다 저장소·브랜치 규칙·첫 지시 문구를
-              따로 정합니다. 비워두면 아래 기본값을 씁니다.
+              작업 패널 &lsquo;업무&rsquo; 탭에 띄울 두레이 프로젝트를 고르고, 프로젝트마다 저장소·브랜치 이름·첫 지시 문구를
+              정합니다. 비워두면 앱 기본값(<code className="font-mono">feature/&#123;projectCode&#125;-&#123;taskNumber&#125;</code>)을 씁니다.
             </p>
           </div>
           <div className="flex-none">
@@ -231,73 +208,6 @@ function WorkspaceSettings(): JSX.Element {
         </Button>
       </section>
 
-      <section className="ds-card">
-        <h3 className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary mb-1">
-          기본값
-        </h3>
-        <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mb-3">
-          프로젝트에서 따로 정하지 않았을 때 쓰는 값입니다.
-        </p>
-        <FieldLabel>브랜치 이름 템플릿</FieldLabel>
-        <Input
-          value={settings.branchTemplate}
-          onChange={(e) => setSettings({ ...settings, branchTemplate: e.target.value })}
-          onBlur={(e) => void patchSettings({ branchTemplate: e.target.value.trim() || DEFAULT_BRANCH_TEMPLATE })}
-          className="font-mono"
-          aria-label="브랜치 이름 템플릿"
-        />
-        <div className="flex items-center gap-2 mt-2 flex-wrap">
-          <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">사용 가능 토큰</span>
-          {['{projectCode}', '{taskNumber}', '{taskId6}', '{prefix}'].map((t) => (
-            <Chip key={t} tone="neutral">
-              <span className="font-mono">{t}</span>
-            </Chip>
-          ))}
-        </div>
-        <div className="mt-2 flex flex-col gap-1 text-[calc(11px_*_var(--app-font-scale,1))]">
-          <div>
-            <span className="text-text-tertiary mr-2">미리보기</span>
-            <code className="text-text-primary font-medium">{preview}</code>
-          </div>
-          <div>
-            <span className="text-text-tertiary mr-2">taskNumber 없음</span>
-            <code className="text-text-secondary">{previewFallback}</code>
-          </div>
-        </div>
-        <p className="mt-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
-          taskNumber 가 없으면 taskId 뒤 6자리로 대체됩니다. 같은 이름이 이미 있으면 <code>-2</code>, <code>-3</code> 이
-          붙습니다.
-        </p>
-
-        <div className="mt-4">
-          <FieldLabel>첫 지시 문구</FieldLabel>
-          <textarea
-            defaultValue={settings.taskDropPromptTemplate}
-            onBlur={(e) => void patchSettings({ taskDropPromptTemplate: e.target.value })}
-            rows={2}
-            placeholder="비우면 지시를 보내지 않고 claude 만 띄웁니다"
-            aria-label="기본 첫 지시 문구"
-            className="ds-input resize-none text-[calc(11.5px_*_var(--app-font-scale,1))]"
-          />
-          <div className="flex flex-wrap gap-1 mt-1.5">
-            {TASK_DROP_PLACEHOLDERS.map((t) => (
-              <span key={t.token} title={t.label} className="ds-chip neutral font-mono">
-                {t.token}
-              </span>
-            ))}
-          </div>
-          <p className="mt-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary truncate">
-            보낼 메시지{' '}
-            <code className="text-text-secondary">
-              {renderTaskDropPrompt(settings.taskDropPromptTemplate, {
-                title: 'AI 유의어 사전 - 신규 메뉴 개발',
-                number: 6793,
-                projectCode: 'NEON'
-              }) ?? '(보내지 않음)'}
-            </code>
-          </p>
-        </div>
-      </section>
 
       <section className="ds-card">
         <h3 className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary mb-2">

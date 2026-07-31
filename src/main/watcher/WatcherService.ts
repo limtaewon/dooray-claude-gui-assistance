@@ -9,13 +9,9 @@ import { MessengerService } from '../dooray/MessengerService'
 import type { DoorayChannelLog } from '../dooray/MessengerService'
 import type { SocketModeEvent } from '../dooray/socket-mode/types'
 
-const POLL_INTERVAL_MS = 2 * 60 * 1000
 const RETENTION_MS = 3 * 24 * 60 * 60 * 1000 // 3일
-/** 정기 폴링 시 채널당 fetch 개수. 두레이 API는 since/cursor 기반 조회를 지원하지 않아
- * 매번 최신 N개를 가져온다. 활발한 채널에서 2분 사이 N개를 초과하면 매치 메시지가
- * 영구 누락되므로 충분한 여유를 둔다. */
-const POLL_FETCH_SIZE = 300
-/** 사용자 명시 새로고침/첫 진입 시. 누락분 catch-up 위해 더 크게. */
+/** 사용자 명시 새로고침 / 소켓 재연결 직후 catch-up 시 채널당 fetch 개수.
+ * 두레이 API 는 since/cursor 조회를 지원하지 않아 매번 최신 N개를 가져온다. */
 const REFRESH_FETCH_SIZE = 500
 
 interface WatcherStoreShape {
@@ -26,9 +22,8 @@ interface WatcherStoreShape {
 export class WatcherService {
   private store: Store<WatcherStoreShape>
   private mainWindow: BrowserWindow | null = null
-  private pollTimer: NodeJS.Timeout | null = null
-  /** 진행 중인 폴링이 있는지 (중복 방지) */
-  private polling = false
+  /** 진행 중인 catch-up 수집이 있는지 (중복 방지) */
+  private catchingUp = false
 
   constructor(private messenger: MessengerService) {
     this.store = new Store<WatcherStoreShape>({
@@ -41,18 +36,45 @@ export class WatcherService {
     this.mainWindow = win
   }
 
-  /** 앱 시작 시 폴링 시작 */
+  /**
+   * 앱 시작. 수집은 **소켓 이벤트로만** 한다 — 주기 폴링은 없다.
+   *
+   * 두 경로(폴링 + 소켓)로 같은 메시지를 모으면 어느 쪽이 늦었는지에 따라 타임라인 순서가
+   * 흔들리고, 한쪽이 조용히 죽어도 다른 쪽이 가려서 문제를 늦게 안다.
+   */
   start(): void {
     this.pruneOldMessages()
-    this.pollTimer = setInterval(() => void this.poll(), POLL_INTERVAL_MS)
-    // 앱 시작 3초 후 첫 폴링 (네트워크 준비 대기)
-    setTimeout(() => void this.poll(), 3000)
   }
 
   stop(): void {
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer)
-      this.pollTimer = null
+    // 타이머가 없다 — 소켓은 BotService 가 소유한다.
+  }
+
+  /**
+   * 소켓이 (다시) 붙었을 때의 catch-up 1회.
+   *
+   * 끊겨 있던 동안의 메시지는 소켓으로 오지 않는다. 여기서 메우지 않으면 타임라인에
+   * 조용히 구멍이 남는다 — 주기 폴링이 아니라 **연결 경계에서만** 한 번 훑는다.
+   */
+  async catchUp(reason: string): Promise<void> {
+    if (this.catchingUp) return
+    this.catchingUp = true
+    const t0 = Date.now()
+    try {
+      const watchers = this.listWatchers().filter((w) => w.enabled)
+      if (watchers.length === 0) return
+      console.log(`[WatcherService] catch-up START (${reason}, 와처 ${watchers.length}개)`)
+      await Promise.all(
+        watchers.map((w) =>
+          this.collectForWatcher(w).catch((err) => {
+            console.error(`[WatcherService] catch-up 실패 ${w.name}:`, err)
+          })
+        )
+      )
+      this.pruneOldMessages()
+      console.log(`[WatcherService] catch-up DONE (${Date.now() - t0}ms)`)
+    } finally {
+      this.catchingUp = false
     }
   }
 
@@ -80,7 +102,7 @@ export class WatcherService {
     this.store.set('watchers', list)
 
     // 생성 직후 백그라운드로 과거 3일 히스토리 한번 fetch
-    void this.collectForWatcher(watcher, true)
+    void this.collectForWatcher(watcher)
     return watcher
   }
 
@@ -148,10 +170,7 @@ export class WatcherService {
     return counts
   }
 
-  /** 수동 재수집 (UI의 새로고침 버튼에서).
-   * 진행 중인 백그라운드 폴링(this.polling)이 있어도 무시되지 않게,
-   * watcher별로 직접 collectForWatcher를 호출한다. (이전에는 글로벌 refresh가
-   * polling 락에 부딪혀 조용히 무시되는 버그가 있었다.) */
+  /** 수동 재수집 (UI의 새로고침 버튼에서). catch-up 락과 무관하게 항상 수행한다. */
   async refresh(watcherId?: string): Promise<void> {
     const t0 = Date.now()
     if (watcherId) {
@@ -161,17 +180,17 @@ export class WatcherService {
         return
       }
       console.log(`[WatcherService] refresh START watcher="${w.name}" (단일, force=true)`)
-      await this.collectForWatcher(w, true)
+      await this.collectForWatcher(w)
       console.log(`[WatcherService] refresh DONE watcher="${w.name}" (${Date.now() - t0}ms)`)
       return
     }
 
     // 글로벌 새로고침: enabled 와처 전체를 병렬 수집 (락 우회)
     const watchers = this.listWatchers().filter((w) => w.enabled)
-    console.log(`[WatcherService] refresh START 전체 (${watchers.length}개 와처, polling=${this.polling})`)
+    console.log(`[WatcherService] refresh START 전체 (${watchers.length}개 와처)`)
     await Promise.all(
       watchers.map((w) =>
-        this.collectForWatcher(w, true).catch((err) => {
+        this.collectForWatcher(w).catch((err) => {
           console.error(`[WatcherService] refresh 실패 ${w.name}:`, err)
         })
       )
@@ -183,10 +202,10 @@ export class WatcherService {
   /**
    * Socket Mode 실시간 이벤트 처리.
    * BotService.addEventListener를 통해 들어오는 메시지를 즉시 와처 매치 로직에 통과시킨다.
-   * 폴링과 dedup이 같이 동작 (hashId 기반)이라 양쪽 다 활성화돼있어도 중복 안 쌓임.
+   * catch-up 과 dedup 이 같이 동작(hashId 기반)이라 같은 메시지가 두 번 쌓이지 않는다.
    *
    * 멤버 이름 lookup을 await로 처리하여 저장 시점에 이미 authorName이 들어가있게 함
-   * (폴링과 동일한 흐름. 이전 비동기 보정 방식은 UI가 이름 없는 첫 그림을 그려서 사용자가
+   * (catch-up 과 동일한 흐름. 이전 비동기 보정 방식은 UI가 이름 없는 첫 그림을 그려서 사용자가
    *  다른 탭 갔다와야 이름이 보이는 문제가 있었음).
    */
   async handleSocketEvent(event: SocketModeEvent): Promise<void> {
@@ -272,7 +291,7 @@ export class WatcherService {
     )
   }
 
-  // ===== 내부: 폴링/매칭 =====
+  // ===== 내부: 수집/매칭 =====
 
   private allMessages(): CollectedMessage[] {
     const raw = this.store.get('messages', [])
@@ -286,26 +305,8 @@ export class WatcherService {
     }))
   }
 
-  private async poll(): Promise<void> {
-    if (this.polling) return
-    this.polling = true
-    try {
-      const watchers = this.listWatchers().filter((w) => w.enabled)
-      for (const w of watchers) {
-        try {
-          await this.collectForWatcher(w, false)
-        } catch (err) {
-          console.error(`[WatcherService] poll 실패 ${w.name}:`, err)
-        }
-      }
-      this.pruneOldMessages()
-    } finally {
-      this.polling = false
-    }
-  }
-
   /** 특정 watcher에 대해 채널들에서 새 메시지 fetch + 매칭 + 저장 */
-  private async collectForWatcher(watcher: Watcher, firstRun: boolean): Promise<void> {
+  private async collectForWatcher(watcher: Watcher): Promise<void> {
     const cutoff = new Date(Date.now() - RETENTION_MS).toISOString()
 
     const existing = this.allMessages()
@@ -328,10 +329,9 @@ export class WatcherService {
       const channelName = watcher.channelNames[i] || channelId
       let logs: DoorayChannelLog[] = []
       try {
-        // firstRun: 더 큰 catch-up size, 이후: 폴링 size.
         // 두레이 메신저 API는 cursor/since 기반 조회를 지원하지 않아 매번 최신 N개를
         // 가져온다. 활발한 채널에서 N을 초과한 메시지는 누락되므로 여유를 크게 둔다.
-        const size = firstRun ? REFRESH_FETCH_SIZE : POLL_FETCH_SIZE
+        const size = REFRESH_FETCH_SIZE
         logs = await this.messenger.fetchChannelLogs(channelId, size)
       } catch (err) {
         console.error(`[WatcherService] fetchChannelLogs 실패 ${channelName}:`, err)

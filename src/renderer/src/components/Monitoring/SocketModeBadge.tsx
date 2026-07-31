@@ -78,11 +78,11 @@ export default function SocketModeBadge(): JSX.Element {
   const tone = isActive
     ? { dot: 'bg-emerald-400', text: 'text-emerald-400', label: 'ACTIVE', desc: '실시간 push 수신 중' }
     : isConnecting
-      ? { dot: 'bg-[color:var(--c-blue-solid)] animate-pulse', text: 'text-[color:var(--c-blue-fg)]', label: 'CONNECTING', desc: '연결 중...' }
+      ? { dot: 'bg-[color:var(--c-blue-solid)] animate-pulse', text: 'text-[color:var(--c-blue-fg)]', label: 'CONNECTING', desc: '연결 중… (끊기면 자동 재시도)' }
       : isStandby
         ? { dot: 'bg-amber-400', text: 'text-amber-400', label: 'STANDBY', desc: '다른 세션 활성 — 대기 중' }
         : !domain
-          ? { dot: 'bg-text-tertiary', text: 'text-text-tertiary', label: '폴링만', desc: '도메인 설정 시 실시간 모드' }
+          ? { dot: 'bg-text-tertiary', text: 'text-text-tertiary', label: '수집 안 함', desc: '도메인을 설정해야 메시지를 받습니다' }
           : { dot: 'bg-red-400', text: 'text-red-400', label: '연결 안 됨', desc: status?.lastError || '에러' }
 
   return (
@@ -124,8 +124,9 @@ export default function SocketModeBadge(): JSX.Element {
             </div>
 
             <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary leading-relaxed mb-2">
-              두레이 도메인을 입력하면 WebSocket으로 메시지를 실시간 수신합니다 (폴링 누락 0).
-              두레이 API 토큰을 그대로 재사용해요.
+              메시지는 WebSocket 으로만 받습니다 — 도메인을 설정해야 수집이 시작됩니다.
+              연결이 끊기면 자동으로 다시 붙고(최대 30초 간격), 붙는 순간 끊겨 있던 동안의 메시지를 한 번 메웁니다.
+              두레이 API 토큰을 그대로 재사용합니다.
             </p>
 
             {hasApiToken === false && (

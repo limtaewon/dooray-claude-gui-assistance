@@ -342,6 +342,15 @@ function createWindow(): BrowserWindow {
   // 두레이 봇 (Socket Mode WebSocket) — 토큰/도메인이 설정돼있고 enabled면 부팅 시 자동 시작
   botService.setMainWindow(mainWindow)
   // 들어오는 메시지를 와처에 실시간 전달 (폴링과 공존, dedup 자동)
+  // 소켓이 (다시) 붙으면 끊겨 있던 동안의 메시지를 한 번 메운다 — 수집 경로는 소켓 하나뿐이라
+  // 여기서 안 메우면 타임라인에 조용히 구멍이 남는다.
+  botService.addStateListener((state) => {
+    if (state === 'ACTIVE') {
+      void watcherService.catchUp('socket ACTIVE').catch((err) =>
+        console.error('[WatcherService] catch-up 실패:', err)
+      )
+    }
+  })
   botService.addEventListener((ev) => {
     void watcherService.handleSocketEvent(ev).catch((err) =>
       console.error('[WatcherService] handleSocketEvent 실패:', err)

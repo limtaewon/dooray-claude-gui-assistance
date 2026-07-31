@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('electron-store', async () => {
   const { MemElectronStore } = await import('../../../test/mocks/electron-store')
@@ -202,5 +202,69 @@ describe('WatcherService — markRead / unreadCounts', () => {
     await svc.handleSocketEvent({ service: 'messenger', type: 'message', text: 'x', channelId: 'c1', senderId: 'u', logId: 'L1' } as never)
     svc.markAllRead(w.id)
     expect(svc.unreadCounts()[w.id]).toBeUndefined()
+  })
+})
+
+describe('WatcherService — 수집 경로는 소켓 하나뿐', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  /** 와처를 만들면 그 자리에서 1회 수집한다(첫 채움) — 그 호출은 세고 싶지 않다. */
+  async function makeWatcher(channelIds: string[]): Promise<ReturnType<WatcherService['createWatcher']>> {
+    const w = svc.createWatcher({
+      name: 'A',
+      instruction: '',
+      channelIds,
+      channelNames: channelIds.map((c) => `ch-${c}`),
+      filter: {}
+    } as never)
+    // 생성 시 수집은 fire-and-forget 이라 한 틱 흘려보낸 뒤 기록을 지운다.
+    await new Promise((r) => setTimeout(r, 0))
+    messenger.fetchChannelLogs.mockClear()
+    return w
+  }
+
+  it('start() 는 주기 폴링을 걸지 않는다 — 두 경로가 같은 메시지를 모으면 순서가 흔들린다', async () => {
+    await makeWatcher(['c1'])
+    // 가짜 타이머는 와처 생성 뒤에 켠다 — 먼저 켜면 위의 setTimeout(0) 이 영원히 안 온다.
+    vi.useFakeTimers()
+
+    svc.start()
+    await vi.advanceTimersByTimeAsync(10 * 60 * 1000)
+
+    expect(messenger.fetchChannelLogs).not.toHaveBeenCalled()
+    vi.useRealTimers()
+  })
+
+  it('catchUp 은 활성 와처의 채널을 훑는다 — 끊겨 있던 동안의 구멍을 메운다', async () => {
+    await makeWatcher(['c1', 'c2'])
+
+    await svc.catchUp('테스트')
+
+    expect(messenger.fetchChannelLogs).toHaveBeenCalledTimes(2)
+  })
+
+  it('catchUp 은 겹쳐 돌지 않는다', async () => {
+    await makeWatcher(['c1'])
+    let resolveFetch: (v: unknown) => void = () => {}
+    messenger.fetchChannelLogs.mockImplementation(() => new Promise((r) => { resolveFetch = r }))
+
+    const first = svc.catchUp('첫 번째')
+    await svc.catchUp('두 번째') // 진행 중이라 즉시 반환
+    expect(messenger.fetchChannelLogs).toHaveBeenCalledTimes(1)
+
+    resolveFetch([])
+    await first
+  })
+
+  it('비활성 와처는 훑지 않는다', async () => {
+    const w = await makeWatcher(['c1'])
+    svc.updateWatcher(w.id, { enabled: false } as never)
+    messenger.fetchChannelLogs.mockClear()
+
+    await svc.catchUp('테스트')
+
+    expect(messenger.fetchChannelLogs).not.toHaveBeenCalled()
   })
 })

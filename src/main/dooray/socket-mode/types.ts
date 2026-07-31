@@ -74,6 +74,21 @@ export const SESSION_LIMIT_CLOSE_REASON = 'AGENT_ALREADY_CONNECTED'
 /** STANDBY 상태에서 재시도 간격 (서버 Redis 락 30초 + 하트비트 10초 고려) */
 export const STANDBY_RETRY_INTERVAL_MS = 15_000
 
+/**
+ * 연결이 끊겼을 때 다시 붙기까지의 대기 — 시도할수록 늘어난다(지수 백오프).
+ * 네트워크가 잠깐 끊긴 경우엔 1초 만에 붙고, 서버가 오래 죽어 있으면 30초 간격으로 두드린다.
+ */
+export const RECONNECT_BASE_DELAY_MS = 1_000
+export const RECONNECT_MAX_DELAY_MS = 30_000
+
+/** 지수 백오프 대기 시간 — 같은 순간에 몰리지 않게 지터를 섞는다. */
+export function reconnectDelayMs(attempt: number, random = Math.random): number {
+  const exponential = Math.min(RECONNECT_BASE_DELAY_MS * 2 ** Math.max(0, attempt - 1), RECONNECT_MAX_DELAY_MS)
+  // 지터 ±20% — 여러 클라이언트가 동시에 재연결을 시도해 서버를 때리지 않게.
+  const jitter = exponential * 0.2 * (random() * 2 - 1)
+  return Math.max(RECONNECT_BASE_DELAY_MS, Math.round(exponential + jitter))
+}
+
 /** Ping 주기 */
 export const PING_INTERVAL_MS = 30_000
 

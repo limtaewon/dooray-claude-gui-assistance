@@ -26,6 +26,7 @@ export class BotService {
   private lastError: string | null = null
   /** 매치 핸들러 (와처가 등록) */
   private eventListeners: Set<(ev: SocketModeEvent) => void> = new Set()
+  private stateListeners = new Set<(state: ConnectionState) => void>()
 
   constructor(private doorayClient: DoorayClient) {
     this.store = new Store<BotConfigShape>({
@@ -85,6 +86,9 @@ export class BotService {
     client.on('state', (newState: ConnectionState) => {
       this.state = newState
       this.emitStateUpdate()
+      for (const listener of this.stateListeners) {
+        try { listener(newState) } catch (err) { console.error('[BotService] state listener 에러:', err) }
+      }
     })
 
     client.on('event', (ev: SocketModeEvent) => {
@@ -130,6 +134,12 @@ export class BotService {
   }
 
   // ===== 이벤트 listener (와처 등 내부 모듈용) =====
+
+  /** 연결 상태 구독 — 재연결 직후 catch-up 같은 경계 처리에 쓴다. */
+  addStateListener(listener: (state: ConnectionState) => void): () => void {
+    this.stateListeners.add(listener)
+    return () => { this.stateListeners.delete(listener) }
+  }
 
   addEventListener(listener: (ev: SocketModeEvent) => void): () => void {
     this.eventListeners.add(listener)
