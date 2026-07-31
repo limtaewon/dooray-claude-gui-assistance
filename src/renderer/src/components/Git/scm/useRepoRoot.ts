@@ -55,7 +55,7 @@ export function useTerminalRepo(target: TerminalRepoTarget): TerminalRepo {
         setResolving(false)
         return
       }
-      const root = await window.api.git.repoRoot(effective).catch(() => '')
+      const root = (await window.api.git.repoRoot(effective).catch(() => null)) ?? ''
       if (cancelled) return
       setRepoRoot(root.trim() || null)
       setResolving(false)

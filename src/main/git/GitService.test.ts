@@ -99,6 +99,16 @@ describe('GitService.isGitRepo / getRepoRoot', () => {
     mockGit('rev-parse --show-toplevel', '/Users/me/repo')
     expect(await new GitService().getRepoRoot('/x')).toBe('/Users/me/repo')
   })
+
+  it('getRepoRoot — 저장소가 아니면 null (홈 디렉터리 터미널은 정상 상태다)', async () => {
+    mockGitError('rev-parse --show-toplevel', 'fatal: not a git repository (or any of the parent directories): .git')
+    expect(await new GitService().getRepoRoot('/Users/me')).toBeNull()
+  })
+
+  it('getRepoRoot — 그 밖의 실패는 삼키지 않는다', async () => {
+    mockGitError('rev-parse --show-toplevel', 'fatal: detected dubious ownership')
+    await expect(new GitService().getRepoRoot('/x')).rejects.toThrow('dubious ownership')
+  })
 })
 
 describe('GitService.listBranches', () => {

@@ -618,7 +618,7 @@ const api = {
   git: {
     isRepo: (path: string): Promise<boolean> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_IS_REPO, path),
-    repoRoot: (path: string): Promise<string> =>
+    repoRoot: (path: string): Promise<string | null> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_REPO_ROOT, path),
     branches: (repoPath: string): Promise<GitBranch[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_BRANCHES, repoPath),

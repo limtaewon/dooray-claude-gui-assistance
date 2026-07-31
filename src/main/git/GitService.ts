@@ -4,6 +4,7 @@ import { join, basename, dirname, isAbsolute, resolve as resolvePath } from 'pat
 import { decodeProcessText } from '../utils/procText'
 import { writeFileAtomic } from '../utils/atomicWrite'
 import { isSafeGitRef } from '../../shared/workspace/gitRef'
+import { isNotARepository } from '../../shared/git/remoteError'
 import { samePath } from '../utils/paths'
 import type {
   GitWorktree,
@@ -52,9 +53,14 @@ export class GitService {
     }
   }
 
-  /** git 저장소의 루트 경로 */
-  async getRepoRoot(path: string): Promise<string> {
-    return git(['rev-parse', '--show-toplevel'], path)
+  /** git 저장소의 루트 경로 — 저장소가 아니면 null (홈 디렉터리 등, 장애가 아니다) */
+  async getRepoRoot(path: string): Promise<string | null> {
+    try {
+      return await git(['rev-parse', '--show-toplevel'], path)
+    } catch (err) {
+      if (isNotARepository(err)) return null
+      throw err
+    }
   }
 
   /** 브랜치 목록 (로컬 + 리모트) */

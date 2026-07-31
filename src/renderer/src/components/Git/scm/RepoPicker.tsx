@@ -45,7 +45,7 @@ function RepoPicker({ repo, pinned, recents, onPin, autoCwd }: RepoPickerProps):
     setOpen(false)
     const folder = await window.api.dialog.selectFolder()
     if (!folder) return
-    const root = await window.api.git.repoRoot(folder).catch(() => '')
+    const root = (await window.api.git.repoRoot(folder).catch(() => null)) ?? ''
     if (!root.trim()) {
       toast.error('git 저장소가 아닙니다', folder)
       return

@@ -6,7 +6,8 @@ import {
   normalizeGitErrorMessage,
   pullArgsSpecifyReconciliation,
   runPullWithDivergenceFallback,
-  stripCredentialsFromMessage
+  stripCredentialsFromMessage,
+  isNotARepository
 } from './remoteError'
 
 describe('stripCredentialsFromMessage', () => {
@@ -128,5 +129,18 @@ describe('runPullWithDivergenceFallback', () => {
 
   it('divergent 판정은 Error 에만 적용된다', () => {
     expect(isDivergentPullReconciliationError('문자열')).toBe(false)
+  })
+})
+
+describe('isNotARepository', () => {
+  it('git 의 not-a-repository 메시지를 알아본다', () => {
+    expect(
+      isNotARepository(new Error('fatal: not a git repository (or any of the parent directories): .git'))
+    ).toBe(true)
+  })
+
+  it('다른 실패는 저장소 문제로 뭉뚱그리지 않는다', () => {
+    expect(isNotARepository(new Error('fatal: detected dubious ownership'))).toBe(false)
+    expect(isNotARepository(undefined)).toBe(false)
   })
 })

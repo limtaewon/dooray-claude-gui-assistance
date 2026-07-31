@@ -123,3 +123,14 @@ export function normalizeGitErrorMessage(error: unknown, operation?: GitRemoteOp
 
   return extractTailLine(raw)
 }
+
+/**
+ * "여기는 git 저장소가 아니다" 를 나타내는 에러인지.
+ *
+ * 홈 디렉터리에 있는 터미널처럼 **정상적으로 자주 일어나는 상태**라 장애로 다루면 안 된다.
+ * git 은 로케일에 따라 메시지를 번역하지만 실행 환경을 `LC_ALL=C` 로 고정하므로 영문으로 판정한다.
+ */
+export function isNotARepository(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? '')
+  return /not a git repository/i.test(message)
+}
