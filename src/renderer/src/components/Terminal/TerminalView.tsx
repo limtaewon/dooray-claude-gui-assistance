@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, X, Terminal, Trash2, Pencil, ClipboardList, FileDiff } from 'lucide-react'
+import { Plus, X, Terminal, Trash2, Pencil, FileDiff } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -39,13 +39,16 @@ import { resetGlobalWebglFailure } from './webglPolicy'
 import { useKeybindingOverrides } from '../../hooks/useKeybindings'
 import { matchesBinding } from '@shared/keybindings/binding'
 import TaskDrawer, { TASK_DRAG_MIME, type TaskDragPayload } from './TaskDrawer'
-import SideDrawer, { type DrawerTab } from './SideDrawer'
+import SideDrawer, { DRAWER_TABS, type DrawerTab } from './SideDrawer'
 import SourceControlPanel from '../Git/scm/SourceControlPanel'
 import GitHistoryPanel from '../Git/scm/GitHistoryPanel'
 import BranchesPanel from '../Git/scm/BranchesPanel'
 import DiffView, { diffTabId, type DiffRequest } from '../Git/scm/DiffView'
 import DrawerRepoEmptyState from '../Git/scm/DrawerRepoEmptyState'
 import { useTerminalRepo } from '../Git/scm/useRepoRoot'
+import { useScmRepoSelection } from '../Git/scm/useScmRepoSelection'
+import RepoPicker from '../Git/scm/RepoPicker'
+import { resolveStoredDrawerWidth, DRAWER_DEFAULT_WIDTH } from './drawerWidth'
 import { buildTaskDropSteps } from './taskDrop'
 import TerminalEmptyState from './TerminalEmptyState'
 import { tabNameFromCwd, tabNameFromTitle } from './tabAutoName'
@@ -120,9 +123,10 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
   const [tabs, setTabs] = useState<TabEntry[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
   const [isDividerDragging, setIsDividerDragging] = useState(false)
-  /** v2.0 C-3.5 — 우측 드로어(두레이 업무 / 소스 제어). 탭 선택도 함께 영속화한다. */
+  /** v2.0 — 우측 사이드 패널(업무 / 변경사항 / 히스토리 / 브랜치). 탭·폭도 함께 영속화한다. */
   const [drawerOpen, setDrawerOpen] = useState(true)
   const [drawerTab, setDrawerTab] = useState<DrawerTab>('tasks')
+  const [drawerWidth, setDrawerWidth] = useState(DRAWER_DEFAULT_WIDTH)
   const [dropHint, setDropHint] = useState<string | null>(null)
   const [dropBusy, setDropBusy] = useState<string | null>(null)
   // v2.0 D — 단축키 오버라이드. keydown 클로저가 최신 값을 보도록 ref 로 동기화한다.
@@ -299,7 +303,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     notifyLayoutChanged()
   }, [notifyLayoutChanged])
 
-  // ===== v2.0 C-3.5: 태스크 드로어 드래그&드롭 =====
+  // ===== v2.0 C-3.5: 업무 카드 드래그&드롭 =====
 
   const readTaskPayload = (e: React.DragEvent): TaskDragPayload | null => {
     const raw = e.dataTransfer.getData(TASK_DRAG_MIME)
@@ -572,7 +576,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     return () => window.removeEventListener('adopt-terminal', handler)
   }, [adoptSession])
 
-  // 드로어 열림/선택 탭 영속화 — 기본은 열림 + 두레이 업무(이 화면의 출발점이라서)
+  // 사이드 패널 열림/탭/폭 영속화 — 기본은 열림 + 업무 탭(이 화면의 출발점이라서)
   useEffect(() => {
     void window.api.settings
       .get('terminalTaskDrawerOpen')
@@ -583,6 +587,10 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       .then((v) => {
         if (v === 'tasks' || v === 'changes' || v === 'history' || v === 'branches') setDrawerTab(v)
       })
+      .catch(() => undefined)
+    void window.api.settings
+      .get('terminalDrawerWidth')
+      .then((v) => setDrawerWidth(resolveStoredDrawerWidth(v)))
       .catch(() => undefined)
   }, [])
   const toggleDrawer = useCallback(() => {
@@ -627,6 +635,8 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     resolving: repoResolving,
     refresh: refreshRepoRoot
   } = useTerminalRepo({ sessionId: focusedPane?.sessionId, cwd: focusedPane?.cwd })
+  // 자동 추종이 기본, 목록에서 고르면 고정 — Windows 의 cd 추적 불가/터미널 미개방 등을 덮는다.
+  const { repo: scmRepo, pinned, recents, pin } = useScmRepoSelection(repoRoot)
 
   /** 패널이 git 을 다시 읽게 하는 신호. 스테이징/커밋 등 쓰기 직후 탭 간에 공유한다. */
   const notifyRepoChanged = useCallback(() => {
@@ -645,7 +655,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     return () => window.removeEventListener('focus', resync)
   }, [drawerOpen, refreshRepoRoot, notifyRepoChanged])
 
-  // 드로어를 열거나 git 탭으로 옮길 때도 cwd 를 다시 잰다 — 그 사이 `cd` 했을 수 있다.
+  // 패널을 열거나 git 탭으로 옮길 때도 cwd 를 다시 잰다 — 그 사이 `cd` 했을 수 있다.
   useEffect(() => {
     if (drawerOpen && drawerTab !== 'tasks') refreshRepoRoot()
   }, [drawerOpen, drawerTab, activeTabId, refreshRepoRoot])
@@ -955,8 +965,12 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
                   ? 'text-text-primary bg-bg-active border-bg-border-light'
                   : 'text-text-secondary border-bg-border hover:text-text-primary hover:bg-bg-surface-hover'
               }`}
-              title="두레이 업무 패널 (⌘⇧T)">
-              <ClipboardList size={13} /> 업무
+              title="사이드 패널 (⌘⇧T)">
+              {(() => {
+                const current = DRAWER_TABS.find((t) => t.id === drawerTab) ?? DRAWER_TABS[0]
+                const Icon = current.icon
+                return <><Icon size={13} style={current.accent ? { color: current.accent } : undefined} /> {current.label}</>
+              })()}
             </button>
             <RendererToggle setting={rendererSetting} fellBack={rendererFellBack} onChange={handleRendererChange} />
             {tabs.length >= 3 && (
@@ -1054,18 +1068,36 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       </div>
     </div>
     {drawerOpen && (
-      <SideDrawer tab={drawerTab} onTabChange={changeDrawerTab} onClose={toggleDrawer}>
+      <SideDrawer
+        tab={drawerTab}
+        onTabChange={changeDrawerTab}
+        onClose={toggleDrawer}
+        width={drawerWidth}
+        onWidthChange={setDrawerWidth}
+        onWidthCommit={(w) => void window.api.settings.set('terminalDrawerWidth', w)}
+        subheader={
+          drawerTab === 'tasks' ? undefined : (
+            <RepoPicker
+              repo={scmRepo}
+              pinned={pinned}
+              recents={recents}
+              onPin={pin}
+              autoCwd={focusedCwd}
+            />
+          )
+        }
+      >
         {drawerTab === 'tasks' ? (
           <TaskDrawer onRunInTerminal={runTaskInFocusedPane} />
-        ) : !repoRoot ? (
+        ) : !scmRepo ? (
           <DrawerRepoEmptyState tab={drawerTab} cwd={focusedCwd ?? undefined} resolving={repoResolving} />
         ) : drawerTab === 'changes' ? (
-          <SourceControlPanel repoPath={repoRoot} onOpenDiff={openDiffTab} onRepoChanged={notifyRepoChanged} />
+          <SourceControlPanel repoPath={scmRepo} onOpenDiff={openDiffTab} onRepoChanged={notifyRepoChanged} />
         ) : drawerTab === 'history' ? (
-          <GitHistoryPanel repoPath={repoRoot} onOpenDiff={openDiffTab} />
+          <GitHistoryPanel repoPath={scmRepo} onOpenDiff={openDiffTab} />
         ) : (
           <BranchesPanel
-            repoPath={repoRoot}
+            repoPath={scmRepo}
             onOpenInTerminal={(cwd) => void createTab({ cwd })}
             onRepoChanged={notifyRepoChanged}
           />

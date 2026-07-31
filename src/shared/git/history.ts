@@ -18,11 +18,38 @@ import {
 import {
   GIT_HISTORY_DEFAULT_LIMIT,
   GIT_HISTORY_MAX_LIMIT,
+  hasHistoryFilter,
   type GitHistoryExecutor,
+  type GitHistoryFilter,
   type GitHistoryItemRef,
   type GitHistoryOptions,
   type GitHistoryResult
 } from './historyTypes'
+
+/**
+ * 커밋 필터를 git log 인자로 옮긴다.
+ * `--fixed-strings` 로 리터럴 검색을 강제한다 — 검색창에 `feat(git):` 을 치면 정규식으로 해석돼
+ * 아무것도 안 걸리는 것이 더 놀랍다. 값은 전부 `--opt=value` 한 토큰이라 옵션 주입이 되지 않는다.
+ */
+function historyFilterArgs(filter: GitHistoryFilter | undefined): { args: string[]; paths: string[] } {
+  const args: string[] = []
+  const paths: string[] = []
+  if (!filter) return { args, paths }
+
+  const message = filter.message?.trim()
+  const author = filter.author?.trim()
+  const content = filter.content?.trim()
+  const path = filter.path?.trim()
+
+  if (message) args.push(`--grep=${message}`)
+  if (author) args.push(`--author=${author}`)
+  if (message || author) args.push('--fixed-strings', '--regexp-ignore-case')
+  // pickaxe 는 기본이 리터럴이라 --fixed-strings 와 무관하게 동작한다.
+  if (content) args.push(`-S${content}`)
+  if (path) paths.push(path)
+
+  return { args, paths }
+}
 
 function clampHistoryLimit(limit: number | undefined): number {
   if (!Number.isFinite(limit)) return GIT_HISTORY_DEFAULT_LIMIT
@@ -162,6 +189,8 @@ export async function loadGitHistory(
     }
   }
 
+  const { args: filterArgs, paths: filterPaths } = historyFilterArgs(options.filter)
+
   const { stdout } = await git(
     [
       'log',
@@ -172,11 +201,13 @@ export async function loadGitHistory(
       // 한 건 더 받아서 hasMore 를 판정한다.
       `-n${limit + 1}`,
       ...(skip > 0 ? [`--skip=${skip}`] : []),
+      ...filterArgs,
       // `--all` 은 refs/stash 까지 포함해 스태시와 그 내부 커밋(index/untracked)이 목록에 섞인다.
       // 소스트리처럼 브랜치·원격·태그만 본다.
       ...(options.allBranches ? ['--branches', '--remotes', '--tags'] : [headOid]),
-      // 뒤따르는 인자가 경로로 해석되지 않게 못박는다.
-      '--'
+      // 뒤따르는 인자가 경로로 해석되지 않게 못박는다. 경로 필터는 이 뒤에만 온다.
+      '--',
+      ...filterPaths
     ],
     cwd
   )
@@ -192,6 +223,7 @@ export async function loadGitHistory(
     mergeBase,
     hasMore: parsed.length > limit,
     limit,
-    skip
+    skip,
+    filtered: hasHistoryFilter(options.filter) || undefined
   }
 }

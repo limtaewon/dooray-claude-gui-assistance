@@ -81,7 +81,7 @@ export const VIEW_ONBOARDING: Record<OnboardingViewId, OnboardingCopy> = {
   terminal: {
     icon: Terminal,
     title: '터미널',
-    description: '셸 세션을 열어 작업을 시작하세요. 두레이 업무와 소스 제어가 오른쪽 패널에 함께 붙습니다.',
+    description: '셸 세션을 열어 작업을 시작하세요. 업무·변경사항·히스토리·브랜치가 사이드 패널에 함께 붙습니다.',
     steps: [],
     hint: '업무 카드를 터미널로 끌어다 놓으면 그 폴더에서 바로 시작합니다'
   },

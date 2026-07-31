@@ -135,6 +135,79 @@ describe('loadGitHistory — 조회 범위/페이지네이션 (Orca 대비 Claud
   })
 })
 
+describe('loadGitHistory — 커밋 필터', () => {
+  const base: Array<[(args: string[]) => boolean, string]> = [
+    [(a) => a[0] === 'rev-parse', HEAD_OID],
+    [(a) => a[0] === 'symbolic-ref', ''],
+    [(a) => a[0] === 'log', logRecord(HEAD_OID)]
+  ]
+
+  it('필터가 없으면 검색 인자를 넣지 않는다', async () => {
+    const { git, calls } = makeGit(base)
+    const result = await loadGitHistory(git, '/repo')
+    const logArgs = calls.find((a) => a[0] === 'log')!
+    expect(logArgs.some((a) => a.startsWith('--grep'))).toBe(false)
+    expect(result.filtered).toBeUndefined()
+  })
+
+  it('메시지 검색은 --grep 과 리터럴/대소문자무시를 함께 건다', async () => {
+    const { git, calls } = makeGit(base)
+    const result = await loadGitHistory(git, '/repo', { filter: { message: 'feat(git):' } })
+    const logArgs = calls.find((a) => a[0] === 'log')!
+    // 정규식으로 해석되면 `(` 때문에 아무것도 안 걸린다 — 리터럴이어야 한다
+    expect(logArgs).toEqual(
+      expect.arrayContaining(['--grep=feat(git):', '--fixed-strings', '--regexp-ignore-case'])
+    )
+    expect(result.filtered).toBe(true)
+  })
+
+  it('작성자 검색은 --author', async () => {
+    const { git, calls } = makeGit(base)
+    await loadGitHistory(git, '/repo', { filter: { author: '임태원' } })
+    expect(calls.find((a) => a[0] === 'log')).toContain('--author=임태원')
+  })
+
+  it('내용 검색은 pickaxe(-S) — 그 문자열이 추가·삭제된 커밋만', async () => {
+    const { git, calls } = makeGit(base)
+    await loadGitHistory(git, '/repo', { filter: { content: 'GitScmService' } })
+    expect(calls.find((a) => a[0] === 'log')).toContain('-SGitScmService')
+  })
+
+  it('경로 필터는 `--` 뒤에만 온다 — 리비전으로 오해되지 않게', async () => {
+    const { git, calls } = makeGit(base)
+    await loadGitHistory(git, '/repo', { filter: { path: 'src/main' } })
+    const logArgs = calls.find((a) => a[0] === 'log')!
+    expect(logArgs.at(-1)).toBe('src/main')
+    expect(logArgs.at(-2)).toBe('--')
+  })
+
+  it('여러 필터를 함께 건다', async () => {
+    const { git, calls } = makeGit(base)
+    await loadGitHistory(git, '/repo', {
+      filter: { message: 'fix', author: 'me', content: 'foo', path: 'src' }
+    })
+    const logArgs = calls.find((a) => a[0] === 'log')!
+    expect(logArgs).toEqual(
+      expect.arrayContaining(['--grep=fix', '--author=me', '-Sfoo', '--', 'src'])
+    )
+  })
+
+  it('공백뿐인 값은 필터로 치지 않는다', async () => {
+    const { git, calls } = makeGit(base)
+    const result = await loadGitHistory(git, '/repo', { filter: { message: '   ' } })
+    expect(calls.find((a) => a[0] === 'log')!.some((a) => a.startsWith('--grep'))).toBe(false)
+    expect(result.filtered).toBeUndefined()
+  })
+
+  it('필터 값은 한 토큰(`--opt=value`)이라 옵션 주입이 되지 않는다', async () => {
+    const { git, calls } = makeGit(base)
+    await loadGitHistory(git, '/repo', { filter: { message: '--upload-pack=evil' } })
+    const logArgs = calls.find((a) => a[0] === 'log')!
+    expect(logArgs).toContain('--grep=--upload-pack=evil')
+    expect(logArgs).not.toContain('--upload-pack=evil')
+  })
+})
+
 describe('loadGitHistory — ref 검증 (Orca 방식: 정규식 대신 --end-of-options)', () => {
   it('revspec(`HEAD~1`)을 그대로 baseRef 로 넘긴다 — isSafeGitRef 로 막던 것이 여기서 풀린다', async () => {
     const { git, calls } = makeGit([
