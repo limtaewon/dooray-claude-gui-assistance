@@ -4,6 +4,8 @@ import type { RepoRegistryEntry, WorkspaceSettings as WorkspaceSettingsShape } f
 import { DEFAULT_BRANCH_TEMPLATE, buildBranchName } from '@shared/workspace/branchName'
 import { Button, Chip, FieldLabel, Input, LoadingView, useToast } from '../common/ds'
 import ProjectFilter from '../common/ProjectFilter'
+import { SettingsRow, SettingsSegmentedControl, SettingsSwitchRow } from './controls'
+import { TASK_DROP_PLACEHOLDERS } from '@shared/workspace/taskDropPrompt'
 
 /** 터미널 우측 두레이 패널이 보여줄 프로젝트 — TaskDrawer 와 같은 키를 쓴다. */
 const TASK_PROJECTS_KEY = 'terminalTaskProjects'
@@ -90,6 +92,88 @@ function WorkspaceSettings(): JSX.Element {
 
   return (
     <div className="flex flex-col gap-5">
+      <section className="ds-card">
+        <h3 className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary mb-1">
+          업무 드롭
+        </h3>
+        <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mb-1">
+          업무 카드를 터미널에 끌어다 놓았을 때의 동작입니다.
+        </p>
+
+        <SettingsRow
+          label="시작 폴더"
+          description={
+            settings.taskDropStartIn === 'mapped'
+              ? '프로젝트에 매핑된 저장소로 이동한 뒤 시작합니다.'
+              : '지금 터미널이 있는 폴더에서 그대로 시작합니다 — 폴더 이동은 직접 하세요. 업무 하나가 여러 저장소에 걸치는 경우에 맞는 기본값입니다.'
+          }
+          searchKeywords={['drop', 'cd', '폴더', '드래그']}
+          control={
+            <SettingsSegmentedControl
+              value={settings.taskDropStartIn}
+              onChange={(v) => void patch({ taskDropStartIn: v })}
+              ariaLabel="업무 드롭 시작 폴더"
+              options={[
+                { value: 'current' as const, label: '현재 터미널' },
+                { value: 'mapped' as const, label: '매핑된 저장소' }
+              ]}
+            />
+          }
+        />
+
+        <SettingsSwitchRow
+          label="이전 세션 이어가기"
+          description="그 폴더에서 이 업무로 쓰던 claude 세션이 있으면 --resume 으로 이어갑니다."
+          searchKeywords={['resume', '세션']}
+          checked={settings.taskDropResume}
+          onChange={() => void patch({ taskDropResume: !settings.taskDropResume })}
+        />
+
+        <SettingsRow
+          label="첫 지시 문구"
+          description="claude 를 띄운 뒤 자동으로 보낼 메시지입니다. 비우면 아무것도 보내지 않고 지시는 직접 합니다."
+          searchKeywords={['prompt', '프롬프트', '지시', '템플릿']}
+          alignTop
+          control={
+            <div className="w-[340px] max-w-full flex flex-col gap-1.5">
+              <textarea
+                value={settings.taskDropPromptTemplate}
+                onChange={(e) => void patch({ taskDropPromptTemplate: e.target.value })}
+                rows={2}
+                placeholder="비우면 지시를 보내지 않습니다"
+                aria-label="첫 지시 문구"
+                className="ds-input resize-none text-[calc(11.5px_*_var(--app-font-scale,1))]"
+              />
+              <div className="flex flex-wrap gap-1">
+                {TASK_DROP_PLACEHOLDERS.map((p) => (
+                  <button
+                    key={p.token}
+                    type="button"
+                    title={p.label}
+                    onClick={() =>
+                      void patch({
+                        taskDropPromptTemplate: `${settings.taskDropPromptTemplate} ${p.token}`.trim()
+                      })
+                    }
+                    className="ds-chip neutral cursor-pointer font-mono"
+                  >
+                    {p.token}
+                  </button>
+                ))}
+              </div>
+            </div>
+          }
+        />
+
+        <SettingsSwitchRow
+          label="권한 확인 건너뛰기"
+          description="--dangerously-skip-permissions 로 실행합니다. claude 가 파일 수정·명령 실행을 묻지 않고 바로 합니다."
+          searchKeywords={['permission', '권한', 'dangerously']}
+          checked={settings.taskDropSkipPermissions}
+          onChange={() => void patch({ taskDropSkipPermissions: !settings.taskDropSkipPermissions })}
+        />
+      </section>
+
       <section className="ds-card">
         <h3 className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary mb-1">
           두레이 프로젝트

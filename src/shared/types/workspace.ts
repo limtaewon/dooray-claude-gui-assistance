@@ -100,6 +100,15 @@ export interface WorkspaceLastStartOptions {
 }
 
 /** 워크스페이스 기능 전역 설정. 기본값은 `src/main/workspace/workspaceState.ts` 의 `DEFAULT_WORKSPACE_SETTINGS`. */
+/**
+ * 업무를 터미널에 놓았을 때 어디서 시작할지.
+ *
+ * 기본이 `current` 인 이유: 업무 하나가 저장소 하나에 대응한다는 가정은 현실과 다르다.
+ * 한 업무를 서버·AI 양쪽에서 고치는 일이 흔해서, **사용자가 터미널을 원하는 폴더로 옮겨두고
+ * 거기에 놓는 것**이 실제 흐름이다. 미리 지정한 폴더로 `cd` 해버리면 그 흐름을 깬다.
+ */
+export type TaskDropStartIn = 'current' | 'mapped'
+
 export interface WorkspaceSettings {
   branchTemplate: string
   defaultBaseBranch?: string
@@ -108,6 +117,18 @@ export interface WorkspaceSettings {
   transitionDoorayDefault: boolean
   commentBranchDefault: boolean
   lastStart?: WorkspaceLastStartOptions
+
+  /** 업무 드롭 — 시작 폴더 */
+  taskDropStartIn: TaskDropStartIn
+  /** 그 폴더에 이 업무의 세션이 있으면 `claude --resume` 으로 이어간다 */
+  taskDropResume: boolean
+  /**
+   * claude 에 보낼 첫 지시 템플릿. **비우면 지시를 보내지 않고** claude 만 띄운다.
+   * 치환자: `{title}` `{number}` `{project}` `{ref}` `{url}` `{body}`
+   */
+  taskDropPromptTemplate: string
+  /** `--dangerously-skip-permissions` 로 실행 — 도구 승인 프롬프트를 건너뛴다 */
+  taskDropSkipPermissions: boolean
 }
 
 /** `workspace:start-task` 요청 파라미터. 모달 필드(`docs/mockups/v2/start-work-modal.html`)의 근거. */

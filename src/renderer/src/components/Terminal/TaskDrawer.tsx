@@ -15,6 +15,9 @@ export interface TaskDragPayload {
   projectId: string
   taskId: string
   subject: string
+  /** 첫 지시 템플릿의 `{number}` `{project}` `{ref}` 치환용 */
+  number?: number
+  projectCode?: string
   linked: boolean
 }
 
@@ -164,6 +167,8 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
                 projectId: task.projectId,
                 taskId: task.id,
                 subject: task.subject,
+                number: task.number,
+                projectCode: task.projectCode,
                 linked: isLinked
               }
               return (

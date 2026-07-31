@@ -127,19 +127,37 @@ describe('TerminalView — 업무 드래그&드롭', () => {
     fireEvent.dragOver(pane, { dataTransfer: taskTransfer() })
     fireEvent.drop(pane, { dataTransfer: taskTransfer() })
 
-    // sessionCwd 를 모르면 undefined 로 넘어간다 — main 이 등록 저장소로 판단한다
-    await waitFor(() =>
-      expect(window.api.workspace.taskDrop.resolve).toHaveBeenCalledWith('p1', 't1', undefined)
-    )
-    // cd → claude 순서로 PTY 에 입력이 들어간다
+    // 드롭이 처리되면 PTY 에 claude 실행이 들어간다
     await waitFor(() => {
       const sent = vi.mocked(window.api.terminal.input).mock.calls.map((c) => c[1]).join('')
-      expect(sent).toContain('cd ')
+      expect(sent).toContain('claude')
     })
   })
 
-  it('드롭 대상 터미널의 실제 cwd 를 넘긴다 — 저장소를 등록하지 않아도 거기서 시작할 수 있게', async () => {
-    vi.mocked(window.api.terminal.sessionCwd).mockResolvedValue('/Users/me/Desktop/2NEON')
+  it('기본값은 지금 터미널이 있는 폴더에서 시작한다 — cd 로 옮기지 않는다', async () => {
+    // 1 업무 N 저장소가 현실이라 폴더는 사용자가 정한다. 미리 지정한 곳으로 cd 하면 그 선택을 덮는다.
+    vi.mocked(window.api.terminal.sessionCwd).mockResolvedValue('/Users/me/Desktop/neon-ai')
+    renderWithDs(<TerminalView active />)
+    await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+    const pane = await screen.findByTestId(/^term-pane-/)
+
+    fireEvent.drop(pane, { dataTransfer: taskTransfer() })
+
+    await waitFor(() => {
+      const sent = vi.mocked(window.api.terminal.input).mock.calls.map((c) => c[1]).join('')
+      expect(sent).toContain('claude')
+    })
+    const sent = vi.mocked(window.api.terminal.input).mock.calls.map((c) => c[1]).join('')
+    expect(sent).not.toContain('cd ')
+    // 매핑된 저장소를 찾는 경로는 타지 않는다
+    expect(window.api.workspace.taskDrop.resolve).not.toHaveBeenCalled()
+  })
+
+  it("'매핑된 저장소' 설정이면 지정 폴더로 이동한다", async () => {
+    vi.mocked(window.api.workspace.settings.get).mockResolvedValue({
+      taskDropStartIn: 'mapped'
+    } as never)
+    vi.mocked(window.api.terminal.sessionCwd).mockResolvedValue('/Users/me/Desktop/neon-ai')
     vi.mocked(window.api.workspace.taskDrop.resolve).mockResolvedValue({
       cwd: '/Users/me/Desktop/2NEON',
       repoName: '2NEON'
@@ -150,13 +168,10 @@ describe('TerminalView — 업무 드래그&드롭', () => {
 
     fireEvent.drop(pane, { dataTransfer: taskTransfer() })
 
-    await waitFor(() =>
-      expect(window.api.workspace.taskDrop.resolve).toHaveBeenCalledWith(
-        'p1',
-        't1',
-        '/Users/me/Desktop/2NEON'
-      )
-    )
+    await waitFor(() => {
+      const sent = vi.mocked(window.api.terminal.input).mock.calls.map((c) => c[1]).join('')
+      expect(sent).toContain("cd '/Users/me/Desktop/2NEON'")
+    })
   })
 })
 

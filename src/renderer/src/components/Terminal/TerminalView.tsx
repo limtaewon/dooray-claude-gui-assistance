@@ -49,6 +49,13 @@ import { useScmRepoSelection } from '../Git/scm/useScmRepoSelection'
 import RepoPicker from '../Git/scm/RepoPicker'
 import { resolveStoredDrawerWidth, DRAWER_DEFAULT_WIDTH } from './drawerWidth'
 import { buildTaskDropSteps } from './taskDrop'
+import {
+  DEFAULT_TASK_DROP_PROMPT,
+  renderTaskDropPrompt,
+  templateNeedsBody
+} from '@shared/workspace/taskDropPrompt'
+import { workspaceKey } from '@shared/workspace/workspaceKey'
+import type { TaskDropTarget, TaskSessionLink } from '@shared/types/workspace'
 import TerminalEmptyState from './TerminalEmptyState'
 import { tabNameFromCwd, tabNameFromTitle } from './tabAutoName'
 import type { DoorayTask } from '@shared/types/dooray'
@@ -314,6 +321,24 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     notifyLayoutChanged()
   }, [notifyLayoutChanged])
 
+  /**
+   * '지금 이 터미널에서' 모드의 타깃. 폴더는 이미 정해졌으니 그 폴더에 이 업무의 세션이
+   * 있으면 이어가고, 없으면 새로 시작한다.
+   */
+  const resolveCurrentFolderTarget = useCallback(async (
+    task: { projectId: string; taskId: string },
+    cwd: string,
+    resume: boolean
+  ): Promise<TaskDropTarget> => {
+    const name = cwd.split(/[/\\]/).filter(Boolean).pop() ?? cwd
+    if (!resume) return { cwd, repoName: name }
+    const links = await window.api.workspace.taskDrop
+      .linked()
+      .catch(() => ({}) as Record<string, TaskSessionLink[]>)
+    const link = (links[workspaceKey(task.projectId, task.taskId)] ?? []).find((l) => l.cwd === cwd)
+    return { cwd, repoName: name, claudeSessionId: link?.claudeSessionId }
+  }, [])
+
   // ===== v2.0 C-3.5: 업무 카드 드래그&드롭 =====
 
   const readTaskPayload = (e: React.DragEvent): TaskDragPayload | null => {
@@ -346,24 +371,28 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
    * 드래그&드롭과 상세의 "터미널에서 시작" 이 같은 경로를 쓴다.
    */
   const runTaskInPane = useCallback(async (
-    task: { projectId: string; taskId: string; subject: string },
+    task: { projectId: string; taskId: string; subject: string; number?: number; projectCode?: string },
     pane: PaneRuntime
   ): Promise<void> => {
     if (pane.exitInfo) {
-      setDropBusy('종료된 pane 에서는 실행할 수 없습니다')
-      setTimeout(() => setDropBusy(null), 2500)
+      toast.error('종료된 터미널에서는 실행할 수 없습니다')
       return
     }
+
     // pane.cwd 는 PTY 생성 시점 값이라 `cd` 이후를 못 따라간다 — 실측값을 우선 쓴다.
     const liveCwd =
-      (await window.api.terminal.sessionCwd?.(pane.sessionId).catch(() => null)) ?? pane.cwd
+      (await window.api.terminal.sessionCwd?.(pane.sessionId).catch(() => null)) ?? pane.cwd ?? undefined
 
-    // 드롭한 pane 이 이미 있는 폴더에 이 업무의 세션이 있으면 그걸 이어간다 —
-    // 업무 하나가 여러 저장소에 걸치므로 "지금 이 자리" 가 어느 세션인지를 가른다.
-    // 저장소를 등록하지 않았어도 이 폴더에서 시작할 수 있게 cwd 를 함께 넘긴다.
-    const target = await window.api.workspace.taskDrop
-      .resolve(task.projectId, task.taskId, liveCwd ?? undefined)
-      .catch(() => null)
+    const settings = await window.api.workspace.settings.get().catch(() => null)
+    // 기본은 '지금 이 터미널에서' — 1 업무 N 저장소가 현실이라 폴더는 사용자가 정한다.
+    const startInCurrent = (settings?.taskDropStartIn ?? 'current') === 'current'
+
+    const target = startInCurrent && liveCwd
+      ? await resolveCurrentFolderTarget(task, liveCwd, settings?.taskDropResume !== false)
+      : await window.api.workspace.taskDrop
+          .resolve(task.projectId, task.taskId, liveCwd)
+          .catch(() => null)
+
     if (!target) {
       toast.error(
         '이 업무를 시작할 폴더를 찾지 못했습니다',
@@ -372,15 +401,38 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       return
     }
 
+    const template = settings?.taskDropPromptTemplate ?? DEFAULT_TASK_DROP_PROMPT
+    let body: string | undefined
+    if (!target.claudeSessionId && templateNeedsBody(template)) {
+      body = await window.api.dooray.tasks
+        .detail(task.projectId, task.taskId)
+        .then((d) => d?.body?.content)
+        .catch(() => undefined)
+    }
+    const prompt = target.claudeSessionId
+      ? null
+      : renderTaskDropPrompt(template, {
+        title: task.subject,
+        number: task.number,
+        projectCode: task.projectCode,
+        url: `https://nhnent.dooray.com/project/posts/${task.taskId}`,
+        body
+      })
+
     const since = Date.now()
-    for (const step of buildTaskDropSteps({ target, subject: task.subject })) {
+    for (const step of buildTaskDropSteps({
+      target,
+      prompt,
+      currentCwd: liveCwd,
+      skipPermissions: settings?.taskDropSkipPermissions === true
+    })) {
       setDropBusy(step.label)
       window.api.terminal.input(pane.sessionId, step.data)
       if (step.delayMs > 0) await new Promise((r) => setTimeout(r, step.delayMs))
     }
     setDropBusy(null)
 
-    // 새 세션이면 방금 만들어진 것을 태스크에 연결한다 (resume 은 이미 연결돼 있음)
+    // 새 세션이면 방금 만들어진 것을 (업무, 폴더) 쌍에 연결한다 (resume 은 이미 연결돼 있음)
     if (!target.claudeSessionId) {
       setTimeout(() => {
         void window.api.workspace.taskDrop
@@ -406,7 +458,16 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     }
     const pane = tab?.panes[tab.focusedLeafId]
     if (!pane) return
-    await runTaskInPane({ projectId: task.projectId, taskId: task.id, subject: task.subject }, pane)
+    await runTaskInPane(
+      {
+        projectId: task.projectId,
+        taskId: task.id,
+        subject: task.subject,
+        number: task.number,
+        projectCode: task.projectCode
+      },
+      pane
+    )
   }, [runTaskInPane])
 
   const onTaskDrop = useCallback(async (e: React.DragEvent): Promise<void> => {
@@ -427,7 +488,16 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       toast.error('업무를 시작할 터미널이 없습니다')
       return
     }
-    await runTaskInPane({ projectId: payload.projectId, taskId: payload.taskId, subject: payload.subject }, pane)
+    await runTaskInPane(
+      {
+        projectId: payload.projectId,
+        taskId: payload.taskId,
+        subject: payload.subject,
+        number: payload.number,
+        projectCode: payload.projectCode
+      },
+      pane
+    )
   }, [runTaskInPane, toast])
 
   const setFocusedLeaf = useCallback((tabId: string, leafId: string) => {

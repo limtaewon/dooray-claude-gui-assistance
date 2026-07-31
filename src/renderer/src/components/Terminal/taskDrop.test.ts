@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildTaskDropSteps, foldPrompt, shellQuote } from './taskDrop'
+import { buildTaskDropSteps, shellQuote } from './taskDrop'
 
 const TARGET = { cwd: '/work/ios-dooray', repoName: 'ios-dooray' }
 const NO_WAIT = { boot: 0, ready: 0, submit: 0 }
@@ -10,46 +10,90 @@ describe('shellQuote', () => {
   })
 
   it('작은따옴표를 탈출한다', () => {
-    expect(shellQuote("/tmp/it's")).toBe("'/tmp/it'\\''s'")
-  })
-})
-
-describe('foldPrompt', () => {
-  it('개행을 공백으로 접는다 — TUI 입력창이 개행을 제출로 해석하기 때문', () => {
-    expect(foldPrompt('첫 줄\n  둘째 줄\n\n셋째')).toBe('첫 줄 둘째 줄 셋째')
+    expect(shellQuote("it's")).toBe("'it'\\''s'")
   })
 })
 
 describe('buildTaskDropSteps', () => {
   it('세션이 없으면 cd → claude → 프롬프트 → 제출 순으로 만든다', () => {
-    const steps = buildTaskDropSteps({ target: TARGET, subject: '메일 목록 개선', taskNumber: 2619, delays: NO_WAIT })
+    const steps = buildTaskDropSteps({ target: TARGET, prompt: '메일 목록 개선', delays: NO_WAIT })
 
     expect(steps.map((s) => s.data)).toEqual([
       "cd '/work/ios-dooray'\r",
       'claude\r',
-      '다음 두레이 업무를 진행합니다: #2619 메일 목록 개선',
+      '메일 목록 개선',
       '\r'
     ])
+  })
+
+  it('이미 그 폴더에 있으면 cd 를 넣지 않는다 — 사용자가 고른 위치를 덮어쓰지 않는다', () => {
+    const steps = buildTaskDropSteps({
+      target: TARGET,
+      prompt: '작업',
+      currentCwd: '/work/ios-dooray',
+      delays: NO_WAIT
+    })
+    expect(steps.map((s) => s.data)).toEqual(['claude\r', '작업', '\r'])
+  })
+
+  it('뒤 슬래시 차이는 같은 폴더로 본다', () => {
+    const steps = buildTaskDropSteps({
+      target: TARGET,
+      prompt: '작업',
+      currentCwd: '/work/ios-dooray/',
+      delays: NO_WAIT
+    })
+    expect(steps.some((s) => s.data.startsWith('cd '))).toBe(false)
+  })
+
+  it('다른 폴더에 있으면 cd 를 넣는다', () => {
+    const steps = buildTaskDropSteps({
+      target: TARGET,
+      prompt: '작업',
+      currentCwd: '/work/other',
+      delays: NO_WAIT
+    })
+    expect(steps[0].data).toBe("cd '/work/ios-dooray'\r")
   })
 
   it('세션이 있으면 --resume 으로 이어가고 프롬프트를 다시 넣지 않는다', () => {
     const steps = buildTaskDropSteps({
       target: { ...TARGET, claudeSessionId: 'sess-abc' },
-      subject: '메일 목록 개선',
+      prompt: '메일 목록 개선',
       delays: NO_WAIT
     })
 
-    expect(steps.map((s) => s.data)).toEqual(["cd '/work/ios-dooray'\r", 'claude --resume sess-abc\r'])
-    expect(steps.some((s) => s.data.includes('두레이 업무'))).toBe(false)
+    expect(steps.map((s) => s.data)).toEqual([
+      "cd '/work/ios-dooray'\r",
+      'claude --resume sess-abc\r'
+    ])
   })
 
-  it('태스크 번호가 없으면 제목만 넣는다', () => {
-    const steps = buildTaskDropSteps({ target: TARGET, subject: '제목만', delays: NO_WAIT })
-    expect(steps[2].data).toBe('다음 두레이 업무를 진행합니다: 제목만')
+  it('프롬프트가 null 이면 claude 만 띄우고 지시는 사용자에게 맡긴다', () => {
+    const steps = buildTaskDropSteps({ target: TARGET, prompt: null, delays: NO_WAIT })
+    expect(steps.map((s) => s.data)).toEqual(["cd '/work/ios-dooray'\r", 'claude\r'])
   })
 
-  it('제목의 개행은 접혀서 한 줄로 전달된다', () => {
-    const steps = buildTaskDropSteps({ target: TARGET, subject: '앞\n뒤', delays: NO_WAIT })
-    expect(steps[2].data).not.toContain('\n')
+  it('권한 확인 건너뛰기를 켜면 플래그가 붙는다', () => {
+    const steps = buildTaskDropSteps({
+      target: TARGET,
+      prompt: null,
+      skipPermissions: true,
+      delays: NO_WAIT
+    })
+    expect(steps.at(-1)?.data).toBe('claude --dangerously-skip-permissions\r')
+  })
+
+  it('resume 에도 권한 플래그가 붙는다', () => {
+    const steps = buildTaskDropSteps({
+      target: { ...TARGET, claudeSessionId: 's1' },
+      prompt: null,
+      skipPermissions: true,
+      currentCwd: TARGET.cwd,
+      delays: NO_WAIT
+    })
+    expect(steps.map((s) => s.data)).toEqual([
+      'claude --dangerously-skip-permissions --resume s1\r'
+    ])
   })
 })
