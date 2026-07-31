@@ -1344,7 +1344,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
           </div>
         )}
         {dropBusy && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-3.5 py-2 rounded-lg bg-bg-surface-raised border border-bg-border-strong shadow-xl">
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-3.5 py-2 rounded-lg bg-bg-surface-raised border border-bg-border-strong shadow-xl">
             <Loader2 size={13} className="animate-spin text-brand-terminal flex-none" />
             <span className="flex flex-col">
               <span className="text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-primary">
