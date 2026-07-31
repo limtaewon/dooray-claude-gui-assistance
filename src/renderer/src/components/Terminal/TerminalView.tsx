@@ -123,7 +123,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
   const [tabs, setTabs] = useState<TabEntry[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
   const [isDividerDragging, setIsDividerDragging] = useState(false)
-  /** v2.0 — 우측 사이드 패널(업무 / 변경사항 / 히스토리 / 브랜치). 탭·폭도 함께 영속화한다. */
+  /** v2.0 — 우측 작업 패널(업무 / 변경사항 / 히스토리 / 브랜치). 탭·폭도 함께 영속화한다. */
   const [drawerOpen, setDrawerOpen] = useState(true)
   const [drawerTab, setDrawerTab] = useState<DrawerTab>('tasks')
   const [drawerWidth, setDrawerWidth] = useState(DRAWER_DEFAULT_WIDTH)
@@ -576,7 +576,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     return () => window.removeEventListener('adopt-terminal', handler)
   }, [adoptSession])
 
-  // 사이드 패널 열림/탭/폭 영속화 — 기본은 열림 + 업무 탭(이 화면의 출발점이라서)
+  // 작업 패널 열림/탭/폭 영속화 — 기본은 열림 + 업무 탭(이 화면의 출발점이라서)
   useEffect(() => {
     void window.api.settings
       .get('terminalTaskDrawerOpen')
@@ -965,8 +965,8 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
                   ? 'text-text-primary bg-bg-active border-bg-border-light'
                   : 'text-text-secondary border-bg-border hover:text-text-primary hover:bg-bg-surface-hover'
               }`}
-              title="사이드 패널 (⌘⇧T)">
-              <PanelRight size={13} /> 패널
+              title="작업 패널 (⌘⇧T)">
+              <PanelRight size={13} /> 작업 패널
             </button>
             <RendererToggle setting={rendererSetting} fellBack={rendererFellBack} onChange={handleRendererChange} />
             {tabs.length >= 3 && (

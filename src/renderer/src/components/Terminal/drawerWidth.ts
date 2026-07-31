@@ -1,4 +1,4 @@
-/** 사이드 패널 폭 제약. 아래로는 파일 경로가 읽히는 최소, 위로는 터미널이 좁아지지 않는 선. */
+/** 작업 패널 폭 제약. 아래로는 파일 경로가 읽히는 최소, 위로는 터미널이 좁아지지 않는 선. */
 export const DRAWER_MIN_WIDTH = 260
 export const DRAWER_MAX_WIDTH = 720
 export const DRAWER_DEFAULT_WIDTH = 320

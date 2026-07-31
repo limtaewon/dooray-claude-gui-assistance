@@ -25,7 +25,7 @@ interface BranchesPanelProps {
 type Creating = 'none' | 'branch' | 'worktree' | 'stash'
 
 /**
- * 브랜치 · 워크트리 · 스태시 관리. 구 '브랜치 작업' 뷰를 터미널 드로어로 옮긴 것으로,
+ * 브랜치 · 워크트리 · 스태시 관리. 구 '브랜치 작업' 뷰를 터미널 작업 패널로 옮긴 것으로,
  * 그쪽이 따로 들고 있던 터미널 탭 시스템은 버리고 본체 터미널 탭을 재사용한다.
  */
 function BranchesPanel({ repoPath, onOpenInTerminal, onRepoChanged }: BranchesPanelProps): JSX.Element {
@@ -167,7 +167,7 @@ function BranchesPanel({ repoPath, onOpenInTerminal, onRepoChanged }: BranchesPa
         />
         {branches.map((branch) => (
           <div key={branch.name} className="group flex items-center gap-1.5 h-6 pl-5 pr-2 hover:bg-bg-surface-hover">
-            <GitBranch size={10} className={branch.isCurrent ? 'text-brand-claude flex-none' : 'text-text-tertiary flex-none'} />
+            <GitBranch size={10} className={branch.isCurrent ? 'text-brand-terminal flex-none' : 'text-text-tertiary flex-none'} />
             <button
               onClick={() =>
                 branch.isCurrent

@@ -95,7 +95,7 @@ function WorkspaceSettings(): JSX.Element {
           두레이 프로젝트
         </h3>
         <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mb-3">
-          터미널 사이드 패널의 '업무' 탭에 어떤 프로젝트의 내 업무를 띄울지 고릅니다. 고르지 않으면 비어 있습니다.
+          터미널 작업 패널의 '업무' 탭에 어떤 프로젝트의 내 업무를 띄울지 고릅니다. 고르지 않으면 비어 있습니다.
         </p>
         <ProjectFilter settingsKey={TASK_PROJECTS_KEY} />
       </section>

@@ -8,7 +8,8 @@ module.exports = {
         // 'clover-blue' / 'clover-orange' 였던 초기 브랜드 명을 Clauday 로 통일.
         brand: {
           claude: 'var(--brand-claude)',
-          dooray: 'var(--brand-dooray)'
+          dooray: 'var(--brand-dooray)',
+          terminal: 'var(--brand-terminal)'
         },
         // 소스 제어 — 파일 상태 색. 그래프 레인 색은 SVG 에서 var() 로 직접 읽는다.
         git: {

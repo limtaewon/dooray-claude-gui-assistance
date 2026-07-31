@@ -13,13 +13,14 @@ interface SidebarProps {
 }
 
 /** 도메인 식별색 — Claude 계열은 주황, 두레이 계열은 파랑. 나머지는 무채색. */
-export type NavAccent = 'claude' | 'dooray' | undefined
+export type NavAccent = 'claude' | 'dooray' | 'terminal'
 
 export interface SidebarNavItem { view: View; icon: typeof Server; label: string; accent?: NavAccent }
 
-const ACCENT_CLASS: Record<'claude' | 'dooray', string> = {
+const ACCENT_CLASS: Record<NavAccent, string> = {
   claude: 'text-brand-claude',
-  dooray: 'text-brand-dooray'
+  dooray: 'text-brand-dooray',
+  terminal: 'text-brand-terminal'
 }
 
 /** 사용자가 순서/노출을 커스텀할 수 있는 항목 전체 (settings/manual 은 standalone, 항상 노출/고정). */
@@ -27,7 +28,7 @@ export const CUSTOMIZABLE_NAV_ITEMS: SidebarNavItem[] = [
   { view: 'dooray', icon: Calendar, label: '두레이', accent: 'dooray' },
   { view: 'monitoring', icon: Radar, label: '모니터링', accent: 'dooray' },
   { view: 'agent', icon: Bot, label: '에이전트', accent: 'dooray' },
-  { view: 'terminal', icon: Terminal, label: '터미널' },
+  { view: 'terminal', icon: Terminal, label: '터미널', accent: 'terminal' },
   { view: 'harness', icon: Workflow, label: 'Harness Studio', accent: 'claude' },
   { view: 'community', icon: Users, label: '커뮤니티', accent: 'dooray' },
   { view: 'mcp', icon: Server, label: 'MCP 서버', accent: 'claude' },

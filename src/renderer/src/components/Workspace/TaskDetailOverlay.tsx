@@ -26,7 +26,7 @@ interface TaskDetailOverlayProps {
 
 /**
  * 업무 상세 오버레이 — 화면 오른쪽 절반을 덮고, 본문 옆에 액션 레일과 하단 댓글 입력을 둔다.
- * 좁은 사이드 패널로는 두레이 본문(체크리스트·표)이 읽히지 않아 오버레이로 띄운다.
+ * 좁은 작업 패널로는 두레이 본문(체크리스트·표)이 읽히지 않아 오버레이로 띄운다.
  */
 function TaskDetailOverlay({ task, onClose, onRunInTerminal, promptText }: TaskDetailOverlayProps): JSX.Element {
   const toast = useToast()

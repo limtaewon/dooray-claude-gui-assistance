@@ -24,6 +24,8 @@
      Claude 계열 기능은 주황, 두레이 계열 기능은 파랑. */
   --brand-claude:          #EA580C;
   --brand-dooray:          #2563EB;
+  /* 터미널 — 어느 도메인도 아닌 앱의 바닥 화면. 셸 프롬프트의 관습색을 쓴다. */
+  --brand-terminal:        #16A34A;
   --clauday-blue-light:    #3B82F6;
   --clauday-blue-soft:     #DCE6FB;
 
@@ -262,6 +264,7 @@
   /* 도메인 식별색 — 어두운 면 위에서 읽히도록 밝은 쪽으로 */
   --brand-claude:        #FB923C;
   --brand-dooray:        #60A5FA;
+  --brand-terminal:      #4ADE80;
   --accent-orange-soft:  rgba(251,146,60,0.18);
 
   /* Mode-aware semantic — DARK. 칩은 채도를 낮추고 텍스트를 밝게: 검정 위에서 '빛나는 알약'. */

@@ -11,7 +11,7 @@ const GUIDE_LABELS: Record<(typeof GUIDE_IDS)[number], string> = {
   splitRight: '오른쪽으로 분할',
   splitDown: '아래로 분할',
   closePane: 'pane 닫기',
-  toggleTaskDrawer: '사이드 패널 열기/닫기'
+  toggleTaskDrawer: '작업 패널 열기/닫기'
 }
 
 interface TerminalEmptyStateProps {
@@ -44,7 +44,7 @@ function TerminalEmptyState({ onCreateTab, onOpenTaskDrawer, drawerOpen }: Termi
       hint={copy.hint}
       actions={[
         { label: '새 터미널', variant: 'primary', icon: TerminalIcon, onClick: onCreateTab },
-        { label: '사이드 패널 열기', icon: PanelRight, onClick: onOpenTaskDrawer, disabled: drawerOpen }
+        { label: '작업 패널 열기', icon: PanelRight, onClick: onOpenTaskDrawer, disabled: drawerOpen }
       ]}
     />
   )

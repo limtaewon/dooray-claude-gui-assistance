@@ -105,7 +105,7 @@ export const TERMINAL_SHORTCUTS: TerminalShortcutBinding[] = [
     matchesWin: (e) => isPlainKey(e, 't', false, true, false, false)
   },
   {
-    // v2.0 — 사이드 패널 토글 (업무 / 변경사항 / 히스토리 / 브랜치)
+    // v2.0 — 작업 패널 토글 (업무 / 변경사항 / 히스토리 / 브랜치)
     id: 'toggleTaskDrawer',
     macLabel: '⌘⇧T',
     winLabel: 'Ctrl+Shift+T',
