@@ -947,7 +947,7 @@ function TerminalFontSection(): JSX.Element {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-2">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-2">
         {TERMINAL_FONT_FAMILIES.map((family) => {
           const on = family.id === font.familyId
           return (
@@ -969,11 +969,13 @@ function TerminalFontSection(): JSX.Element {
                 </span>
                 {on && <Check size={11} className="flex-none text-text-primary" />}
               </span>
+              {/* truncate 는 block 요소에만 먹는다 — inline span 에 걸면 카드 밖으로 넘친다.
+                  표본은 헷갈리는 글자(0/O, 1/l)와 한글만 남겨 짧게 둔다. */}
               <span
-                className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary truncate"
+                className="block w-full truncate text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary"
                 style={{ fontFamily: terminalFontFamily(family.id) }}
               >
-                git commit -m &quot;한글 Ag 0O1l&quot;
+                {'한글 Ag 0O1l {}'}
               </span>
             </button>
           )
