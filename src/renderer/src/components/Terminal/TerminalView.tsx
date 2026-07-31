@@ -100,6 +100,13 @@ const AUTOSAVE_INTERVAL_MS = 30000
 const RENDERER_SETTING_KEY = 'terminalRenderer'
 
 /** leaf(pane) 1개의 런타임 바인딩 — 트리에는 안 들어가는 휘발값(v2.0 B-4, ADR-v2-terminal-p2-02 §3). */
+/** 새로 만든 탭 — 상태 반영을 기다리지 않고 바로 그 pane 에 입력을 보낼 수 있게 돌려준다. */
+interface CreatedTab {
+  tabId: string
+  leafId: string
+  pane: PaneRuntime
+}
+
 interface PaneRuntime {
   sessionId: string
   cwd?: string
@@ -481,17 +488,26 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
   }, [toast, executeDropPlan])
 
   // createTab 은 아래에서 선언되므로 ref 로 우회한다 (선언 순서 의존 제거)
-  const createTabRef = useRef<((opts?: { cwd?: string; initialCommand?: string }) => Promise<void>) | null>(null)
+  const createTabRef = useRef<
+    ((opts?: { cwd?: string; initialCommand?: string }) => Promise<CreatedTab>) | null
+  >(null)
+
+  /**
+   * 업무를 시작할 pane 이 없을 때 하나 만든다.
+   *
+   * 갓 만든 PTY 는 셸 프롬프트가 뜨기 전이라 첫 입력이 씹힌다 — 부팅만큼 기다렸다 돌려준다.
+   */
+  const createPaneForTask = useCallback(async (): Promise<PaneRuntime | null> => {
+    const created = await createTabRef.current?.().catch(() => null)
+    if (!created) return null
+    await new Promise((r) => setTimeout(r, 400))
+    return created.pane
+  }, [])
 
   /** 상세 오버레이의 "터미널에서 시작" — 활성 탭의 포커스 pane 을 쓴다. 탭이 없으면 하나 만든다. */
   const runTaskInFocusedPane = useCallback(async (task: DoorayTask): Promise<void> => {
-    let tab = tabsRef.current.find((t) => t.tabId === activeTabIdRef.current)
-    if (!tab) {
-      await createTabRef.current?.()
-      await new Promise((r) => setTimeout(r, 400))
-      tab = tabsRef.current.find((t) => t.tabId === activeTabIdRef.current)
-    }
-    const pane = tab?.panes[tab.focusedLeafId]
+    const tab = tabsRef.current.find((t) => t.tabId === activeTabIdRef.current && t.kind !== 'diff')
+    const pane = tab?.panes[tab.focusedLeafId] ?? (await createPaneForTask())
     if (!pane) return
     await runTaskInPane(
       {
@@ -503,7 +519,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       },
       pane
     )
-  }, [runTaskInPane])
+  }, [runTaskInPane, createPaneForTask])
 
   const onTaskDrop = useCallback(async (e: React.DragEvent): Promise<void> => {
     const payload = readTaskPayload(e)
@@ -511,14 +527,9 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     if (!payload) return
     e.preventDefault()
 
-    // 터미널 탭이 하나도 없으면 만들어서 거기서 시작한다 — 드롭을 그냥 삼키지 않는다.
-    let tab = tabsRef.current.find((t) => t.tabId === activeTabIdRef.current && t.kind !== 'diff')
-    if (!tab) {
-      await createTabRef.current?.()
-      await new Promise((r) => setTimeout(r, 400))
-      tab = tabsRef.current.find((t) => t.tabId === activeTabIdRef.current && t.kind !== 'diff')
-    }
-    const pane = tab?.panes[tab.focusedLeafId]
+    // 터미널 탭이 하나도 없으면(또는 diff 탭만 열려 있으면) 만들어서 거기서 시작한다 — 드롭을 삼키지 않는다.
+    const tab = tabsRef.current.find((t) => t.tabId === activeTabIdRef.current && t.kind !== 'diff')
+    const pane = tab?.panes[tab.focusedLeafId] ?? (await createPaneForTask())
     if (!pane) {
       toast.error('업무를 시작할 터미널이 없습니다')
       return
@@ -533,7 +544,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       },
       pane
     )
-  }, [runTaskInPane, toast])
+  }, [runTaskInPane, toast, createPaneForTask])
 
   const setFocusedLeaf = useCallback((tabId: string, leafId: string) => {
     setTabs((prev) => prev.map((t) => (
@@ -629,7 +640,9 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     return off
   }, [])
 
-  const createTab = useCallback(async (opts?: { cwd?: string; initialCommand?: string }) => {
+  const createTab = useCallback(async (
+    opts?: { cwd?: string; initialCommand?: string }
+  ): Promise<CreatedTab> => {
     const cwd = opts?.cwd
     const createOpts: { cwd?: string; command?: string; args?: string[] } = {}
     if (cwd) createOpts.cwd = cwd
@@ -653,7 +666,13 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       }, 350)
     }
     notifyLayoutChanged()
+    return { tabId, leafId, pane: { sessionId: session.id, cwd, generation: 0 } }
   }, [activateTab, notifyLayoutChanged])
+
+  // 드롭 경로에서 쓰려면 createTab 이 여기보다 뒤에 선언돼 있어야 해서 ref 로 우회한다.
+  useEffect(() => {
+    createTabRef.current = createTab
+  }, [createTab])
 
   /**
    * 파일 diff 를 탭으로 연다. 같은 파일·같은 비교 대상이면 새로 만들지 않고 그 탭을 활성화한다 —
@@ -1190,15 +1209,16 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
                   onDragActiveChange={setIsDividerDragging}
                 />
               )}
-              {dropHint && tab.tabId === activeTabId && (
-                <div className="absolute inset-2 z-20 pointer-events-none rounded-lg border-2 border-dashed border-bg-border-strong bg-black/10 flex items-center justify-center">
-                  <span className="px-3 py-1.5 rounded-md bg-bg-surface border border-bg-border text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-primary shadow">
-                    {dropHint}
-                  </span>
-                </div>
-              )}
             </div>
           ))
+        )}
+        {/* 탭이 있든 없든 같은 자리에 뜬다 — 빈 화면에서도 놓을 수 있다는 걸 보여야 한다. */}
+        {dropHint && (
+          <div className="absolute inset-2 z-20 pointer-events-none rounded-lg border-2 border-dashed border-bg-border-strong bg-black/10 flex items-center justify-center">
+            <span className="px-3 py-1.5 rounded-md bg-bg-surface border border-bg-border text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-primary shadow">
+              {dropHint}
+            </span>
+          </div>
         )}
         {dropBusy && (
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-md bg-bg-surface border border-bg-border text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary shadow">

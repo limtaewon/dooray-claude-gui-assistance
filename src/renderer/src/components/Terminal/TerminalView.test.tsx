@@ -149,6 +149,24 @@ describe('TerminalView — 업무 드래그&드롭', () => {
     expect(window.api.workspace.taskDrop.resolve).not.toHaveBeenCalled()
   })
 
+  it('탭이 하나도 없는 안내 화면에 놓아도 터미널을 만들어 시작한다', async () => {
+    // 여기서 삼키면 '드롭이 안 된다' 로 보인다 — 처음 앱을 켠 사용자가 가장 먼저 만나는 화면이다.
+    vi.mocked(window.api.terminal.sessionCwd).mockResolvedValue('/Users/me/Desktop/neon-ai')
+    renderWithDs(<TerminalView active />)
+    await screen.findByText('터미널')
+
+    const zone = document.querySelector('.flex-1.relative') as HTMLElement
+    fireEvent.dragOver(zone, { dataTransfer: taskTransfer() })
+    expect(screen.getByText('여기에 놓으면 이 업무로 claude 를 시작합니다')).toBeInTheDocument()
+
+    fireEvent.drop(zone, { dataTransfer: taskTransfer() })
+
+    await waitFor(() => {
+      const sent = vi.mocked(window.api.terminal.input).mock.calls.map((c) => c[1]).join('')
+      expect(sent).toContain('claude')
+    }, { timeout: 4000 })
+  })
+
   it('매핑된 저장소가 하나면 묻지 않고 그리로 이동한다', async () => {
     vi.mocked(window.api.workspace.settings.get).mockResolvedValue({
       projectOverrides: { p1: { repoIds: ['r1'] } }
