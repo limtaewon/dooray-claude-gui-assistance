@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Settings, Check, FolderOpen, Search, X, Plus, Link, Trash2 } from 'lucide-react'
 import type { DoorayProject } from '../../../../shared/types/dooray'
+import { anchoredMenuPosition, type AnchoredMenuPosition } from './anchoredMenu'
 
 interface ProjectFilterProps {
   /** 설정 키 (기본: pinnedProjects) - 태스크/위키 분리용 */
@@ -18,6 +20,31 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const anchorRef = useRef<HTMLButtonElement>(null)
+  /** 메뉴를 body 포털로 띄운다 — 작업 패널(320px) 안에 두면 잘리고 레이아웃을 밀어 덜컹거린다. */
+  const [menuPos, setMenuPos] = useState<AnchoredMenuPosition | null>(null)
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuPos(null)
+      return
+    }
+    const place = (): void => {
+      const rect = anchorRef.current?.getBoundingClientRect()
+      if (!rect) return
+      setMenuPos(
+        anchoredMenuPosition(rect, { width: 288 }, { width: window.innerWidth, height: window.innerHeight })
+      )
+    }
+    place()
+    window.addEventListener('resize', place)
+    // 스크롤로 앵커가 움직이면 위치가 어긋난다 — 캡처 단계로 모든 스크롤 컨테이너를 잡는다.
+    window.addEventListener('scroll', place, true)
+    return () => {
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
+    }
+  }, [open])
 
   // 수동 추가 상태
   const [showAddForm, setShowAddForm] = useState(false)
@@ -127,7 +154,7 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
 
   return (
     <div className="relative">
-      <button onClick={() => setOpen(!open)}
+      <button ref={anchorRef} onClick={() => setOpen(!open)}
         className={`ds-btn icon sm relative ${pinnedCount > 0 ? 'text-text-primary' : ''}`}
         title="표시할 프로젝트 설정">
         <Settings size={14} />
@@ -138,10 +165,18 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
         )}
       </button>
 
-      {open && (
+      {open && menuPos && createPortal(
         <>
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full mt-1 w-72 bg-bg-surface border border-bg-border rounded-xl shadow-2xl z-40 overflow-hidden">
+          <div className="fixed inset-0 z-[70]" onClick={() => setOpen(false)} />
+          <div
+            className="fixed z-[71] bg-bg-surface border border-bg-border rounded-xl shadow-2xl overflow-hidden flex flex-col"
+            style={{
+              left: menuPos.left,
+              top: menuPos.top,
+              width: menuPos.width,
+              maxHeight: menuPos.maxHeight
+            }}
+          >
             <div className="px-3 py-2 border-b border-bg-border bg-bg-surface-hover">
               <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">표시할 프로젝트 선택</span>
               <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary ml-2">{pinnedCount > 0 ? `${pinnedCount}개 선택` : '전체 표시'}</span>
@@ -166,7 +201,7 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
               </div>
             </div>
             {/* 프로젝트 목록 */}
-            <div className="max-h-72 overflow-y-auto py-1">
+            <div className="flex-1 min-h-0 overflow-y-auto py-1">
               {loading ? (
                 <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">로딩...</div>
               ) : filtered.length === 0 ? (
@@ -232,7 +267,8 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
               )}
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   )

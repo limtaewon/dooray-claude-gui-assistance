@@ -33,10 +33,9 @@ import { resolveShortcutWithOverrides } from './terminalShortcuts'
 import type { PasteToken } from './pasteTargetState'
 import { TabPointerSensor, TAB_DRAG_ACTIVATION_DISTANCE_PX } from './tabDragSensor'
 import { moveTab, pickNextActiveTab, pushMru } from './tabOrder'
-import RendererToggle from './RendererToggle'
-import type { TerminalRendererSetting } from './RendererToggle'
-import { resetGlobalWebglFailure } from './webglPolicy'
+import { resetGlobalWebglFailure, type TerminalRendererSetting } from './webglPolicy'
 import { useKeybindingOverrides } from '../../hooks/useKeybindings'
+import { useToast } from '../common/ds'
 import { matchesBinding } from '@shared/keybindings/binding'
 import TaskDrawer, { TASK_DRAG_MIME, type TaskDragPayload } from './TaskDrawer'
 import SideDrawer, { type DrawerTab } from './SideDrawer'
@@ -241,6 +240,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
   // v2.0 B-6: 사용자 설정 렌더러(webgl|dom) — 기존 settings.get/set 재사용, 신규 IPC 0개(ADR-04 §4).
   const [rendererSetting, setRendererSetting] = useState<TerminalRendererSetting>('webgl')
   const [rendererFellBack, setRendererFellBack] = useState(false)
+  const toast = useToast()
   useEffect(() => {
     window.api.settings.get(RENDERER_SETTING_KEY).then((v) => {
       if (v === 'dom' || v === 'webgl') setRendererSetting(v)
@@ -255,7 +255,18 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       setRendererFellBack(false)
     }
   }, [])
-  const handleWebglUnavailable = useCallback(() => setRendererFellBack(true), [])
+  const handleWebglUnavailable = useCallback(() => {
+    setRendererFellBack((already) => {
+      // 탭바 상시 표시를 없앴으므로(설정으로 일원화) 폴백 사실은 1회 토스트로만 알린다.
+      if (!already) {
+        toast.warn(
+          'WebGL 을 쓸 수 없어 DOM 렌더러로 전환했습니다',
+          '설정 → 외관 & 동작 → 터미널 렌더러 에서 바꿀 수 있습니다'
+        )
+      }
+      return true
+    })
+  }, [toast])
 
   const getOrCreateHost = useCallback((leafId: string): HTMLDivElement => {
     let host = paneHostsRef.current.get(leafId)
@@ -968,7 +979,6 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
               title="작업 패널 (⌘⇧T)">
               <PanelRight size={13} /> 작업 패널
             </button>
-            <RendererToggle setting={rendererSetting} fellBack={rendererFellBack} onChange={handleRendererChange} />
             {tabs.length >= 3 && (
               <button onClick={closeAll}
                 className="flex items-center gap-1 px-2 py-0.5 rounded text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-red-400 hover:bg-red-500/10 transition-colors"

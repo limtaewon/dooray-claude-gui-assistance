@@ -3,6 +3,9 @@
  * 하나라도 어긋나면 false — 호출자는 false 일 때 반드시 dispose 를 호출해야 한다(캔버스에 마지막
  * 프레임이 남는 stale frame 을 막기 위해서다, ADR §대안 5).
  */
+/** 터미널 렌더러 사용자 설정. 실제 attach 판정은 `shouldAttachWebgl` 이 pane 별로 한다. */
+export type TerminalRendererSetting = 'webgl' | 'dom'
+
 export interface ShouldAttachWebglInput {
   /** 사용자 설정 — 'dom' 이면 항상 false. */
   setting: 'webgl' | 'dom'

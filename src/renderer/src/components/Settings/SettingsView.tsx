@@ -820,12 +820,13 @@ function AppBehaviorSettings(): JSX.Element {
         <SidebarPrefsSection />
       </div>
 
-      {/* v2.0 B-6: 터미널 렌더러 — 탭바 우측 드롭다운과 동일 설정(terminalRenderer), 두 곳 어디서나 바꿀 수 있다. */}
+      {/* v2.0 B-6: 터미널 렌더러. 탭바에도 드롭다운을 뒀었는데, 진단용 설정이 상시 노출돼
+          작업 패널을 줄이면 탭바 레이아웃을 밀어 덜컹거렸다 — 설정 한 곳으로 일원화했다. */}
       <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden mt-3">
         <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30">
           <span className="text-xs font-medium text-text-primary">터미널 렌더러</span>
           <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
-            터미널 탭바 우측에서도 바로 전환할 수 있습니다. GPU 문제로 화면이 깨지면 DOM 으로 전환하세요.
+GPU 문제로 화면이 깨지면 DOM 으로 전환하세요. WebGL 을 쓸 수 없으면 자동으로 DOM 으로 폴백하고 알려줍니다.
           </p>
         </div>
         <TerminalRendererSection />
@@ -854,7 +855,7 @@ const TERMINAL_RENDERER_OPTIONS: { value: TerminalRendererSetting; label: string
   { value: 'dom', label: 'DOM', description: '호환 모드 — GPU 드라이버 문제 시 폴백' }
 ]
 
-/** 터미널 렌더러 설정(webgl|dom) — TerminalView 탭바 드롭다운(RendererToggle)과 같은 settings 키를 공유. */
+/** 터미널 렌더러 설정(webgl|dom) — TerminalView 가 같은 settings 키를 읽어 pane 에 적용한다. */
 function TerminalRendererSection(): JSX.Element {
   const [value, setValue] = useState<TerminalRendererSetting>('webgl')
 

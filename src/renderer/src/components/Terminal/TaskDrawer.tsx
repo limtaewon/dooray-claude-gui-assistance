@@ -96,11 +96,14 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
           <div className="flex items-center gap-1">
             <ClipboardList size={13} className="text-brand-dooray flex-none" />
             <span className="text-[calc(11.5px_*_var(--app-font-scale,1))] font-semibold text-text-primary">두레이 업무</span>
-            <Button variant="ghost" size="xs" className="ml-auto" onClick={() => void load(true)} aria-label="업무 새로고침">
-              <RefreshCw size={12} />
-            </Button>
+            {/* 프로젝트 선택은 자기 줄을 차지할 만큼 자주 쓰지 않는다 — 헤더 아이콘으로 접어둔다. */}
+            <div className="ml-auto flex items-center gap-0.5 flex-none">
+              <ProjectFilter settingsKey={PROJECTS_SETTINGS_KEY} onChanged={() => void load(true)} />
+              <Button variant="ghost" size="xs" onClick={() => void load(true)} aria-label="업무 새로고침">
+                <RefreshCw size={12} />
+              </Button>
+            </div>
           </div>
-          <ProjectFilter settingsKey={PROJECTS_SETTINGS_KEY} onChanged={() => void load(true)} />
           <div className="relative">
             <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
             <Input
