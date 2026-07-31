@@ -925,61 +925,94 @@ function TerminalThemeSection(): JSX.Element {
     void saveTerminalTheme(next)
   }
 
+  const dark = TERMINAL_THEMES.filter((preset) => !preset.light)
+  const light = TERMINAL_THEMES.filter((preset) => preset.light)
+
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-2">
-      {TERMINAL_THEMES.map((preset) => {
-        const active = preset.id === id
-        return (
-          <button
-            key={preset.id}
-            onClick={() => pick(preset.id)}
-            aria-pressed={active}
-            className={`flex flex-col gap-2 p-2.5 rounded-lg border text-left transition-colors ${
-              active
-                ? 'bg-bg-active border-bg-border-strong'
-                : 'border-bg-border hover:bg-bg-surface-hover'
-            }`}
-          >
-            <div className="flex items-center gap-1.5">
-              <span
-                className={`flex-1 text-[calc(11.5px_*_var(--app-font-scale,1))] truncate ${
-                  active ? 'text-text-primary font-medium' : 'text-text-secondary'
-                }`}
-              >
-                {preset.label}
-              </span>
-              {preset.light && <span className="ds-chip neutral flex-none">밝음</span>}
-              {active && <Check size={11} className="flex-none text-text-primary" />}
-            </div>
-            {/* 미리보기 — 배경 위에 실제 팔레트를 얹어 보여준다. 이름만으로는 고를 수 없다. */}
-            <div
-              className="rounded-md px-2 py-1.5 border border-bg-border"
-              style={{ background: preset.colors.background }}
+    <div className="flex flex-col gap-3">
+      <ThemeGrid title="어두운" presets={dark} activeId={id} onPick={pick} />
+      <ThemeGrid title="밝은" presets={light} activeId={id} onPick={pick} />
+    </div>
+  )
+}
+
+/** 밝기별 묶음 — 19개를 한 덩어리로 늘어놓으면 고르기 어렵다. */
+function ThemeGrid({
+  title,
+  presets,
+  activeId,
+  onPick
+}: {
+  title: string
+  presets: typeof TERMINAL_THEMES
+  activeId: string
+  onPick: (id: string) => void
+}): JSX.Element {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-text-tertiary">
+        {title} {presets.length}
+      </span>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-2">
+        {presets.map((preset) => {
+          const active = preset.id === activeId
+          return (
+            <button
+              key={preset.id}
+              onClick={() => onPick(preset.id)}
+              aria-pressed={active}
+              className={`flex flex-col gap-2 p-2.5 rounded-lg border text-left transition-colors ${
+                active
+                  ? 'bg-bg-active border-bg-border-strong'
+                  : 'border-bg-border hover:bg-bg-surface-hover'
+              }`}
             >
-              <div className="flex items-center gap-1">
-                <span className="font-mono text-[calc(9.5px_*_var(--app-font-scale,1))]" style={{ color: preset.colors.green }}>
-                  ~/2NEON
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`flex-1 text-[calc(11.5px_*_var(--app-font-scale,1))] truncate ${
+                    active ? 'text-text-primary font-medium' : 'text-text-secondary'
+                  }`}
+                >
+                  {preset.label}
                 </span>
-                <span className="font-mono text-[calc(9.5px_*_var(--app-font-scale,1))]" style={{ color: preset.colors.foreground }}>
-                  $ git status
-                </span>
+                {active && <Check size={11} className="flex-none text-text-primary" />}
               </div>
-              <div className="flex items-center gap-1 mt-1">
-                {[
-                  preset.colors.red,
-                  preset.colors.green,
-                  preset.colors.yellow,
-                  preset.colors.blue,
-                  preset.colors.magenta,
-                  preset.colors.cyan
-                ].map((color) => (
-                  <span key={color} className="w-3 h-3 rounded-sm" style={{ background: color }} />
-                ))}
+              {/* 미리보기 — 배경 위에 실제 팔레트를 얹어 보여준다. 이름만으로는 고를 수 없다. */}
+              <div
+                className="rounded-md px-2 py-1.5 border border-bg-border"
+                style={{ background: preset.colors.background }}
+              >
+                <div className="flex items-center gap-1">
+                  <span
+                    className="font-mono text-[calc(9.5px_*_var(--app-font-scale,1))]"
+                    style={{ color: preset.colors.green }}
+                  >
+                    ~/2NEON
+                  </span>
+                  <span
+                    className="font-mono text-[calc(9.5px_*_var(--app-font-scale,1))]"
+                    style={{ color: preset.colors.foreground }}
+                  >
+                    $ git status
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 mt-1">
+                  {[
+                    preset.colors.red,
+                    preset.colors.green,
+                    preset.colors.yellow,
+                    preset.colors.blue,
+                    preset.colors.magenta,
+                    preset.colors.cyan
+                  ].map((color) => (
+                    <span key={color} className="w-3 h-3 rounded-sm" style={{ background: color }} />
+                  ))}
+                </div>
               </div>
-            </div>
-          </button>
-        )
-      })}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

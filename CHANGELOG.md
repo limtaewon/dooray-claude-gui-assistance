@@ -4,8 +4,10 @@
 
 ### 추가 — 터미널 색 테마
 
-- ⚙ 설정 → 외관 → **터미널 색** 에서 고릅니다: Clauday · One Dark · Dracula · Nord ·
-  Solarized Dark/Light · GitHub Light.
+- ⚙ 설정 → 외관 → **터미널 색** 에서 고릅니다 — **19종**. 어두운 것(Clauday · One Dark ·
+  Dracula · Nord · Tokyo Night · Catppuccin Mocha · Gruvbox Dark · Monokai · Ayu Dark ·
+  Night Owl · Rosé Pine · Everforest · VS Code Dark+ · Snazzy · Solarized Dark)과
+  밝은 것(GitHub Light · Solarized Light · Catppuccin Latte · Gruvbox Light)을 나눠 보여줍니다.
 - **앱 테마와 분리**돼 있습니다 — 밝은 앱에 어두운 터미널 같은 조합을 쓰기 위해서입니다.
 - 고르면 **열려 있는 터미널에 바로** 반영됩니다(새 탭부터가 아니라).
 

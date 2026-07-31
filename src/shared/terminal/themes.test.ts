@@ -30,8 +30,21 @@ describe('TERMINAL_THEMES', () => {
     }
   })
 
-  it('밝은 테마도 하나 이상 있다', () => {
-    expect(TERMINAL_THEMES.some((t) => t.light)).toBe(true)
+  it('밝은 테마도 충분히 있다 — 낮에 밝은 화면을 쓰는 사람도 고를 것이 있어야 한다', () => {
+    expect(TERMINAL_THEMES.filter((t) => t.light).length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('배경과 전경이 같은 테마는 없다 — 글자가 안 보이는 테마를 목록에 두면 안 된다', () => {
+    for (const theme of TERMINAL_THEMES) {
+      expect(theme.colors.background.toLowerCase(), theme.id).not.toBe(
+        theme.colors.foreground.toLowerCase()
+      )
+    }
+  })
+
+  it('라벨도 겹치지 않는다', () => {
+    const labels = TERMINAL_THEMES.map((t) => t.label)
+    expect(new Set(labels).size).toBe(labels.length)
   })
 })
 

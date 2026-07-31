@@ -66,7 +66,7 @@ export const TOURS: Record<TourViewId, TourStep[]> = {
     },
     {
       title: '터미널 색은 따로 고릅니다',
-      body: '설정 → 외관 → 터미널 색에서 Clauday · One Dark · Dracula · Nord · Solarized · GitHub Light 중에 고릅니다. 앱 테마와 분리돼 있어 밝은 앱에 어두운 터미널 같은 조합도 만들 수 있고, 고르면 열려 있는 터미널에 바로 반영됩니다.'
+      body: '설정 → 외관 → 터미널 색에서 19종 중에 고릅니다(Dracula · Tokyo Night · Catppuccin · Gruvbox · Nord · Solarized 등, 밝은 테마 4종 포함). 앱 테마와 분리돼 있어 밝은 앱에 어두운 터미널 같은 조합도 만들 수 있고, 고르면 열려 있는 터미널에 바로 반영됩니다.'
     },
     {
       title: 'claude 가 멈추면 알려줍니다',
