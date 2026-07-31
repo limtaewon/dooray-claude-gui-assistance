@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ClipboardList, RefreshCw, Search } from 'lucide-react'
+import { ClipboardList, RefreshCw, Search, X } from 'lucide-react'
 import type { DoorayTask } from '@shared/types/dooray'
 import type { TaskSessionLink } from '@shared/types/workspace'
 import { workspaceKey } from '@shared/workspace/workspaceKey'
@@ -7,6 +7,19 @@ import { Button, Input, LoadingView } from '../common/ds'
 import ProjectFilter from '../common/ProjectFilter'
 import TaskCard from '../Workspace/TaskCard'
 import TaskDetailOverlay from '../Workspace/TaskDetailOverlay'
+import TaskFilterMenu from './TaskFilterMenu'
+import {
+  EMPTY_TASK_FILTER,
+  TASK_FACET_LABELS,
+  activeFilterChips,
+  clearDetailFilters,
+  collectFacets,
+  filterTasks,
+  scopedTasks,
+  toggleFilterFacet,
+  type TaskFilterState,
+  type TaskScope
+} from './taskFilter'
 
 /** 드래그 페이로드 — pane 의 dragover/drop 이 이 타입으로 식별한다. */
 export const TASK_DRAG_MIME = 'application/x-clauday-task'
@@ -24,7 +37,11 @@ export interface TaskDragPayload {
 /** 이 패널이 보여줄 프로젝트 — 두레이 뷰의 핀과 분리해 별도 키로 관리한다. */
 const PROJECTS_SETTINGS_KEY = 'terminalTaskProjects'
 
-type WorkflowFilter = 'mine' | 'all' | 'done'
+const SCOPE_TABS: [TaskScope, string][] = [
+  ['mine', '내 업무'],
+  ['all', '전체'],
+  ['done', '완료']
+]
 
 interface TaskDrawerProps {
   /** 카드를 특정 pane 없이 "터미널에서 시작" 할 때 — 호스트가 활성 pane 에 실행한다 */
@@ -41,8 +58,7 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
   /** `projectId:taskId` → 폴더별 세션. 한 업무가 여러 저장소에 걸칠 수 있다. */
   const [links, setLinks] = useState<Record<string, TaskSessionLink[]>>({})
   const [loading, setLoading] = useState(true)
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<WorkflowFilter>('mine')
+  const [filter, setFilter] = useState<TaskFilterState>(EMPTY_TASK_FILTER)
   const [selected, setSelected] = useState<DoorayTask | null>(null)
 
   const load = useCallback(async (force = false): Promise<void> => {
@@ -80,16 +96,14 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
     }
   }, [load])
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return tasks.filter((t) => {
-      if (filter === 'done' && t.workflowClass !== 'closed') return false
-      if (filter === 'mine' && t.workflowClass === 'closed') return false
-      if (q && !t.subject.toLowerCase().includes(q) && !String(t.number ?? '').includes(q)) return false
-      return true
-    })
-  }, [tasks, query, filter])
+  const filtered = useMemo(() => filterTasks(tasks, filter), [tasks, filter])
 
+  // 고를 수 있는 값은 갈래·검색어까지 좁힌 목록에서 뽑는다 — 지금 화면에 없는 값을 권하지 않는다.
+  const facets = useMemo(
+    () => collectFacets(scopedTasks(tasks, filter), filter),
+    [tasks, filter]
+  )
+  const chips = activeFilterChips(filter)
 
   /** 저장소 배지 클릭 — 그 폴더의 세션을 새 터미널 탭에서 이어간다. */
   const resumeSession = (task: DoorayTask, link: TaskSessionLink): void => {
@@ -116,45 +130,73 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
               </Button>
             </div>
           </div>
-          <div className="relative">
-            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="업무 검색"
-              style={{ paddingLeft: 28 }}
-              aria-label="업무 검색"
-            />
+          <div className="flex items-center gap-1">
+            <div className="relative flex-1 min-w-0">
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
+              <Input
+                value={filter.query}
+                onChange={(e) => setFilter((f) => ({ ...f, query: e.target.value }))}
+                placeholder="업무 검색"
+                style={{ paddingLeft: 28 }}
+                aria-label="업무 검색"
+              />
+            </div>
+            <TaskFilterMenu facets={facets} state={filter} onChange={setFilter} />
           </div>
           <div className="flex items-center gap-1">
-            {(
-              [
-                ['mine', '내 업무'],
-                ['all', '전체'],
-                ['done', '완료']
-              ] as [WorkflowFilter, string][]
-            ).map(([key, label]) => (
+            {SCOPE_TABS.map(([key, label]) => (
               <button
                 key={key}
                 type="button"
-                onClick={() => setFilter(key)}
-                className={`ds-chip ${filter === key ? 'selected' : 'neutral'} cursor-pointer`}
+                onClick={() => setFilter((f) => ({ ...f, scope: key }))}
+                className={`ds-chip ${filter.scope === key ? 'selected' : 'neutral'} cursor-pointer`}
               >
                 {label}
               </button>
             ))}
           </div>
+          {/* 걸린 상세 필터는 밖에 내놓는다 — 접어두면 "왜 안 보이지" 가 된다. */}
+          {chips.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {chips.map((chip) => (
+                <button
+                  key={`${chip.key}:${chip.value}`}
+                  type="button"
+                  onClick={() => setFilter((f) => toggleFilterFacet(f, chip.key, chip.value))}
+                  title={`${TASK_FACET_LABELS[chip.key]} · ${chip.value} 빼기`}
+                  aria-label={`${TASK_FACET_LABELS[chip.key]} ${chip.value} 필터 빼기`}
+                  className="ds-chip selected cursor-pointer max-w-full"
+                >
+                  <span className="min-w-0 truncate">{chip.value}</span>
+                  <X size={9} className="flex-none" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto border-t border-bg-border">
           {loading ? (
             <LoadingView label="업무 불러오는 중" />
           ) : filtered.length === 0 ? (
-            <p className="p-4 text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-tertiary leading-relaxed">
-              {tasks.length === 0
-                ? '위의 프로젝트 선택에서 작업할 두레이 프로젝트를 고르면 내 업무가 여기 표시됩니다.'
-                : '조건에 맞는 업무가 없습니다.'}
-            </p>
+            <div className="p-4 flex flex-col items-start gap-2">
+              <p className="text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-tertiary leading-relaxed">
+                {tasks.length === 0
+                  ? '위의 프로젝트 선택에서 작업할 두레이 프로젝트를 고르면 내 업무가 여기 표시됩니다.'
+                  : chips.length > 0
+                    ? '상세 검색까지 걸린 조건에 맞는 업무가 없습니다.'
+                    : '조건에 맞는 업무가 없습니다.'}
+              </p>
+              {tasks.length > 0 && chips.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setFilter((f) => clearDetailFilters(f))}
+                  className="text-[calc(11px_*_var(--app-font-scale,1))] text-link hover:underline"
+                >
+                  상세 검색 지우기
+                </button>
+              )}
+            </div>
           ) : (
             filtered.map((task) => {
               const key = workspaceKey(task.projectId, task.id)
