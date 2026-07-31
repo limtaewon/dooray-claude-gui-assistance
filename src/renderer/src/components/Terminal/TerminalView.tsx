@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, X, Terminal, Trash2, Pencil, FileDiff } from 'lucide-react'
+import { Plus, X, Terminal, Trash2, Pencil, FileDiff, PanelRight } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -39,7 +39,7 @@ import { resetGlobalWebglFailure } from './webglPolicy'
 import { useKeybindingOverrides } from '../../hooks/useKeybindings'
 import { matchesBinding } from '@shared/keybindings/binding'
 import TaskDrawer, { TASK_DRAG_MIME, type TaskDragPayload } from './TaskDrawer'
-import SideDrawer, { DRAWER_TABS, type DrawerTab } from './SideDrawer'
+import SideDrawer, { type DrawerTab } from './SideDrawer'
 import SourceControlPanel from '../Git/scm/SourceControlPanel'
 import GitHistoryPanel from '../Git/scm/GitHistoryPanel'
 import BranchesPanel from '../Git/scm/BranchesPanel'
@@ -966,11 +966,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
                   : 'text-text-secondary border-bg-border hover:text-text-primary hover:bg-bg-surface-hover'
               }`}
               title="사이드 패널 (⌘⇧T)">
-              {(() => {
-                const current = DRAWER_TABS.find((t) => t.id === drawerTab) ?? DRAWER_TABS[0]
-                const Icon = current.icon
-                return <><Icon size={13} style={current.accent ? { color: current.accent } : undefined} /> {current.label}</>
-              })()}
+              <PanelRight size={13} /> 패널
             </button>
             <RendererToggle setting={rendererSetting} fellBack={rendererFellBack} onChange={handleRendererChange} />
             {tabs.length >= 3 && (
