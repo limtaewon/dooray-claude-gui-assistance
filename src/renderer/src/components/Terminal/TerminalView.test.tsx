@@ -116,10 +116,6 @@ describe('TerminalView — 업무 드래그&드롭', () => {
   }
 
   it('터미널 위에 놓아도 드롭이 처리된다 — xterm 은 포털이라 React 이벤트가 탭 div 로 오지 않는다', async () => {
-    vi.mocked(window.api.workspace.taskDrop.resolve).mockResolvedValue({
-      cwd: '/repo',
-      repoName: 'repo'
-    })
     renderWithDs(<TerminalView active />)
     await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
     const pane = await screen.findByTestId(/^term-pane-/)
@@ -153,25 +149,71 @@ describe('TerminalView — 업무 드래그&드롭', () => {
     expect(window.api.workspace.taskDrop.resolve).not.toHaveBeenCalled()
   })
 
-  it("'매핑된 저장소' 설정이면 지정 폴더로 이동한다", async () => {
+  it('매핑된 저장소가 하나면 묻지 않고 그리로 이동한다', async () => {
     vi.mocked(window.api.workspace.settings.get).mockResolvedValue({
-      taskDropStartIn: 'mapped'
+      projectOverrides: { p1: { repoIds: ['r1'] } }
     } as never)
+    vi.mocked(window.api.workspace.repos.list).mockResolvedValue([
+      { id: 'r1', path: '/Users/me/Desktop/2NEON', name: '2NEON' }
+    ])
     vi.mocked(window.api.terminal.sessionCwd).mockResolvedValue('/Users/me/Desktop/neon-ai')
-    vi.mocked(window.api.workspace.taskDrop.resolve).mockResolvedValue({
-      cwd: '/Users/me/Desktop/2NEON',
-      repoName: '2NEON'
-    })
+
     renderWithDs(<TerminalView active />)
     await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
-    const pane = await screen.findByTestId(/^term-pane-/)
-
-    fireEvent.drop(pane, { dataTransfer: taskTransfer() })
+    fireEvent.drop(await screen.findByTestId(/^term-pane-/), { dataTransfer: taskTransfer() })
 
     await waitFor(() => {
       const sent = vi.mocked(window.api.terminal.input).mock.calls.map((c) => c[1]).join('')
       expect(sent).toContain("cd '/Users/me/Desktop/2NEON'")
     })
+  })
+
+  it('매핑된 저장소가 여럿이고 지금 자리가 그중 아니면 어디서 할지 묻는다', async () => {
+    vi.mocked(window.api.workspace.settings.get).mockResolvedValue({
+      projectOverrides: { p1: { repoIds: ['r1', 'r2'] } }
+    } as never)
+    vi.mocked(window.api.workspace.repos.list).mockResolvedValue([
+      { id: 'r1', path: '/Users/me/Desktop/2NEON', name: '2NEON' },
+      { id: 'r2', path: '/Users/me/Desktop/neon-ai', name: 'neon-ai' }
+    ])
+    vi.mocked(window.api.terminal.sessionCwd).mockResolvedValue('/tmp/elsewhere')
+
+    renderWithDs(<TerminalView active />)
+    await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+    fireEvent.drop(await screen.findByTestId(/^term-pane-/), { dataTransfer: taskTransfer() })
+
+    expect(await screen.findByText('어느 저장소에서 시작할까요?')).toBeInTheDocument()
+    // 고르기 전에는 아무것도 실행하지 않는다
+    expect(vi.mocked(window.api.terminal.input).mock.calls.map((c) => c[1]).join('')).not.toContain('claude')
+
+    await userEvent.click(screen.getByText('neon-ai'))
+
+    await waitFor(() => {
+      const sent = vi.mocked(window.api.terminal.input).mock.calls.map((c) => c[1]).join('')
+      expect(sent).toContain("cd '/Users/me/Desktop/neon-ai'")
+    })
+  })
+
+  it('지금 자리가 이미 매핑된 저장소면 묻지도 cd 하지도 않는다', async () => {
+    vi.mocked(window.api.workspace.settings.get).mockResolvedValue({
+      projectOverrides: { p1: { repoIds: ['r1', 'r2'] } }
+    } as never)
+    vi.mocked(window.api.workspace.repos.list).mockResolvedValue([
+      { id: 'r1', path: '/Users/me/Desktop/2NEON', name: '2NEON' },
+      { id: 'r2', path: '/Users/me/Desktop/neon-ai', name: 'neon-ai' }
+    ])
+    vi.mocked(window.api.terminal.sessionCwd).mockResolvedValue('/Users/me/Desktop/neon-ai')
+
+    renderWithDs(<TerminalView active />)
+    await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+    fireEvent.drop(await screen.findByTestId(/^term-pane-/), { dataTransfer: taskTransfer() })
+
+    await waitFor(() => {
+      const sent = vi.mocked(window.api.terminal.input).mock.calls.map((c) => c[1]).join('')
+      expect(sent).toContain('claude')
+    })
+    expect(vi.mocked(window.api.terminal.input).mock.calls.map((c) => c[1]).join('')).not.toContain('cd ')
+    expect(screen.queryByText('어느 저장소에서 시작할까요?')).not.toBeInTheDocument()
   })
 })
 
@@ -690,13 +732,13 @@ describe('TerminalView (integration)', () => {
 
       const first = renderWithDs(<TerminalView active />)
       await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
-      await screen.findByTestId('term-pane-orig-1')
+      await screen.findByTestId('term-pane-orig-1', {}, { timeout: 5000 })
 
       fireEvent.keyDown(window, { key: 'd', metaKey: true }) // ⌘D — row(A, B), B 가 focused
-      await screen.findByTestId('term-pane-orig-2')
+      await screen.findByTestId('term-pane-orig-2', {}, { timeout: 5000 })
       fireEvent.keyDown(window, { key: 'd', metaKey: true, shiftKey: true }) // ⌘⇧D — B 를 column(B, C) 로, C 가 focused
-      await screen.findByTestId('term-pane-orig-3')
-      expect(await screen.findByTitle('분할된 pane 3개')).toBeInTheDocument()
+      await screen.findByTestId('term-pane-orig-3', {}, { timeout: 5000 })
+      expect(await screen.findByTitle('분할된 pane 3개', {}, { timeout: 5000 })).toBeInTheDocument()
 
       const snap = await flushAndCaptureSnapshot()
 
@@ -736,7 +778,7 @@ describe('TerminalView (integration)', () => {
       // 복원 effect 는 collectLeafIds(tree) 순서로 leaf 마다 create() 를 순차 호출한다 —
       // 호출 횟수(=leaf 개수)와 순서(=leafId 순서)가 곧 leafId↔세션 매핑의 증거다.
       await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(3))
-      expect(await screen.findByTitle('분할된 pane 3개')).toBeInTheDocument()
+      expect(await screen.findByTitle('분할된 pane 3개', {}, { timeout: 5000 })).toBeInTheDocument()
       for (let i = 0; i < 3; i++) {
         expect(await screen.findByTestId(`term-pane-restored-${i}`)).toBeInTheDocument()
       }

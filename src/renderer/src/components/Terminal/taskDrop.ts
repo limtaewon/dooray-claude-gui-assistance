@@ -46,7 +46,8 @@ export function buildTaskDropSteps(input: TaskDropCommandInput): TaskDropStep[] 
   const delays = input.delays ?? DEFAULT_DROP_DELAYS
   const steps: TaskDropStep[] = []
 
-  if (!samePath(currentCwd, target.cwd)) {
+  // cwd 를 모르면(= 실측 실패) 이동하지 않고 지금 자리에서 실행한다.
+  if (target.cwd && !samePath(currentCwd, target.cwd)) {
     steps.push({
       data: `cd ${shellQuote(target.cwd)}\r`,
       delayMs: delays.boot,

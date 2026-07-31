@@ -8,7 +8,7 @@ import ProjectRuleCard from './ProjectRuleCard'
 import { resolveProjectConfig, withProjectOverride } from '@shared/workspace/projectConfig'
 import { renderTaskDropPrompt } from '@shared/workspace/taskDropPrompt'
 import type { DoorayProject } from '@shared/types/dooray'
-import { SettingsRow, SettingsSegmentedControl, SettingsSwitchRow } from './controls'
+import { SettingsRow, SettingsSwitchRow } from './controls'
 import { TASK_DROP_PLACEHOLDERS } from '@shared/workspace/taskDropPrompt'
 
 /** 터미널 우측 두레이 패널이 보여줄 프로젝트 — TaskDrawer 와 같은 키를 쓴다. */
@@ -115,29 +115,10 @@ function WorkspaceSettings(): JSX.Element {
           업무 드롭
         </h3>
         <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mb-1">
-          업무 카드를 터미널에 끌어다 놓았을 때의 동작입니다.
+          업무 카드를 터미널에 끌어다 놓았을 때의 동작입니다. <strong>시작 폴더</strong>는 규칙으로 정해집니다 —
+          지금 터미널이 그 프로젝트의 저장소 안이면 거기서 바로, 아니면 매핑된 저장소가 하나면 그리로 이동하고,
+          여럿이면 어디서 할지 물어봅니다.
         </p>
-
-        <SettingsRow
-          label="시작 폴더"
-          description={
-            settings.taskDropStartIn === 'mapped'
-              ? '프로젝트에 매핑된 저장소로 이동한 뒤 시작합니다.'
-              : '지금 터미널이 있는 폴더에서 그대로 시작합니다 — 폴더 이동은 직접 하세요. 업무 하나가 여러 저장소에 걸치는 경우에 맞는 기본값입니다.'
-          }
-          searchKeywords={['drop', 'cd', '폴더', '드래그']}
-          control={
-            <SettingsSegmentedControl
-              value={settings.taskDropStartIn}
-              onChange={(v) => void patchSettings({ taskDropStartIn: v })}
-              ariaLabel="업무 드롭 시작 폴더"
-              options={[
-                { value: 'current' as const, label: '현재 터미널' },
-                { value: 'mapped' as const, label: '매핑된 저장소' }
-              ]}
-            />
-          }
-        />
 
         <SettingsSwitchRow
           label="이전 세션 이어가기"

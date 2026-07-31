@@ -27,10 +27,9 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   autoApproveDefault: false,
   transitionDoorayDefault: true,
   commentBranchDefault: false,
-  // 업무 드롭 기본값: 지금 터미널이 있는 폴더에서, 이전 세션이 있으면 이어가고, 제목만 전달.
-  // (미리 지정한 폴더로 cd 하지 않는다 — 1 업무 N 저장소가 현실이라 폴더는 사용자가 정한다)
+  // 업무 드롭 기본값 — 시작 폴더는 설정이 아니라 규칙으로 정한다(taskDropPlan.ts):
+  // 지금 자리가 그 프로젝트의 저장소면 거기서, 아니면 매핑된 저장소가 하나면 그리로, 여럿이면 물어본다.
   projectOverrides: {},
-  taskDropStartIn: 'current',
   taskDropResume: true,
   taskDropPromptTemplate: DEFAULT_TASK_DROP_PROMPT,
   taskDropSkipPermissions: false

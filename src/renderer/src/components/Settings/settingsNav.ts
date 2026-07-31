@@ -131,7 +131,7 @@ export const SETTINGS_SEARCH_TARGETS: SettingsSearchTarget[] = [
   { sectionId: 'dooray', title: 'Socket Mode 봇', description: '@clauday 멘션 수신', keywords: ['socket', 'bot', '멘션', 'mention', 'clauday'] },
   { sectionId: 'workspace', title: '두레이 프로젝트 선택', keywords: ['project', '핀', '고정'] },
   { sectionId: 'workspace', title: '저장소 등록', keywords: ['repo', 'repository', 'git', '폴더'] },
-  { sectionId: 'workspace', title: '업무 드롭 시작 폴더', description: '현재 터미널 / 매핑된 저장소', keywords: ['drop', 'drag', 'cd', '드래그', '드롭'] },
+  { sectionId: 'workspace', title: '프로젝트별 규칙', description: '두레이 프로젝트마다 저장소·브랜치 이름·첫 지시 문구', keywords: ['drop', 'drag', 'cd', 'repo', '드래그', '드롭', '저장소', '프로젝트'] },
   { sectionId: 'workspace', title: '첫 지시 문구', description: 'claude 에 자동으로 보낼 메시지 템플릿', keywords: ['prompt', '프롬프트', '지시', 'template'] },
   { sectionId: 'workspace', title: '권한 확인 건너뛰기', keywords: ['permission', '권한', 'dangerously', 'skip'] },
   { sectionId: 'keys', title: '단축키 변경', keywords: ['shortcut', 'keybinding', 'hotkey', '키'] },

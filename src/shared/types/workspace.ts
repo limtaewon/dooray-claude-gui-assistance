@@ -100,15 +100,6 @@ export interface WorkspaceLastStartOptions {
 }
 
 /** 워크스페이스 기능 전역 설정. 기본값은 `src/main/workspace/workspaceState.ts` 의 `DEFAULT_WORKSPACE_SETTINGS`. */
-/**
- * 업무를 터미널에 놓았을 때 어디서 시작할지.
- *
- * 기본이 `current` 인 이유: 업무 하나가 저장소 하나에 대응한다는 가정은 현실과 다르다.
- * 한 업무를 서버·AI 양쪽에서 고치는 일이 흔해서, **사용자가 터미널을 원하는 폴더로 옮겨두고
- * 거기에 놓는 것**이 실제 흐름이다. 미리 지정한 폴더로 `cd` 해버리면 그 흐름을 깬다.
- */
-export type TaskDropStartIn = 'current' | 'mapped'
-
 /** 두레이 프로젝트 하나에만 적용할 값. 비어 있는 항목은 전역 기본을 따른다. */
 export interface ProjectOverride {
   /** 이 프로젝트가 쓰는 저장소들 — 한 프로젝트가 여러 저장소에 걸친다 */
@@ -132,8 +123,6 @@ export interface WorkspaceSettings {
    */
   projectOverrides: Record<string, ProjectOverride>
 
-  /** 업무 드롭 — 시작 폴더 */
-  taskDropStartIn: TaskDropStartIn
   /** 그 폴더에 이 업무의 세션이 있으면 `claude --resume` 으로 이어간다 */
   taskDropResume: boolean
   /**

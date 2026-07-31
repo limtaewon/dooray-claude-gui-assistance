@@ -56,7 +56,27 @@ import {
 } from '@shared/workspace/taskDropPrompt'
 import { workspaceKey } from '@shared/workspace/workspaceKey'
 import { resolveProjectConfig } from '@shared/workspace/projectConfig'
-import type { TaskDropTarget, TaskSessionLink } from '@shared/types/workspace'
+import {
+  planFromCandidate,
+  resolveTaskDropPlan,
+  type TaskDropCandidate,
+  type TaskDropPlan
+} from '@shared/workspace/taskDropPlan'
+import RepoChoiceModal from '../Workspace/RepoChoiceModal'
+import type {
+  RepoRegistryEntry,
+  TaskSessionLink,
+  WorkspaceSettings as WorkspaceSettingsShape
+} from '@shared/types/workspace'
+
+/** 드롭으로 시작할 업무 — 첫 지시 템플릿 치환에 필요한 값까지 함께 받는다. */
+interface TaskDropRequest {
+  projectId: string
+  taskId: string
+  subject: string
+  number?: number
+  projectCode?: string
+}
 import TerminalEmptyState from './TerminalEmptyState'
 import { tabNameFromCwd, tabNameFromTitle } from './tabAutoName'
 import type { DoorayTask } from '@shared/types/dooray'
@@ -135,6 +155,14 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
   const [drawerTab, setDrawerTab] = useState<DrawerTab>('tasks')
   const [drawerWidth, setDrawerWidth] = useState(DRAWER_DEFAULT_WIDTH)
   const [dropHint, setDropHint] = useState<string | null>(null)
+  /** 저장소가 여럿 매핑됐고 지금 자리가 그중 어디도 아닐 때 — 어디서 시작할지 묻는다. */
+  const [repoChoice, setRepoChoice] = useState<{
+    task: TaskDropRequest
+    pane: PaneRuntime
+    candidates: TaskDropCandidate[]
+    currentCwd?: string
+    settings: WorkspaceSettingsShape | null
+  } | null>(null)
   const [dropBusy, setDropBusy] = useState<string | null>(null)
   // v2.0 D — 단축키 오버라이드. keydown 클로저가 최신 값을 보도록 ref 로 동기화한다.
   const keybindingOverrides = useKeybindingOverrides()
@@ -322,24 +350,6 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     notifyLayoutChanged()
   }, [notifyLayoutChanged])
 
-  /**
-   * '지금 이 터미널에서' 모드의 타깃. 폴더는 이미 정해졌으니 그 폴더에 이 업무의 세션이
-   * 있으면 이어가고, 없으면 새로 시작한다.
-   */
-  const resolveCurrentFolderTarget = useCallback(async (
-    task: { projectId: string; taskId: string },
-    cwd: string,
-    resume: boolean
-  ): Promise<TaskDropTarget> => {
-    const name = cwd.split(/[/\\]/).filter(Boolean).pop() ?? cwd
-    if (!resume) return { cwd, repoName: name }
-    const links = await window.api.workspace.taskDrop
-      .linked()
-      .catch(() => ({}) as Record<string, TaskSessionLink[]>)
-    const link = (links[workspaceKey(task.projectId, task.taskId)] ?? []).find((l) => l.cwd === cwd)
-    return { cwd, repoName: name, claudeSessionId: link?.claudeSessionId }
-  }, [])
-
   // ===== v2.0 C-3.5: 업무 카드 드래그&드롭 =====
 
   const readTaskPayload = (e: React.DragEvent): TaskDragPayload | null => {
@@ -366,54 +376,29 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     setDropHint(null)
   }, [])
 
-  /**
-   * 업무 하나를 지정한 pane 에서 시작한다: 매핑 저장소로 `cd` → claude 실행 → 업무 내용 전달.
-   * 세션이 이미 연결돼 있으면 `--resume` 으로 이어가고 프롬프트를 다시 넣지 않는다.
-   * 드래그&드롭과 상세의 "터미널에서 시작" 이 같은 경로를 쓴다.
-   */
-  const runTaskInPane = useCallback(async (
-    task: { projectId: string; taskId: string; subject: string; number?: number; projectCode?: string },
-    pane: PaneRuntime
+  /** 계획이 정해진 뒤의 실행 — cd(필요할 때만) → claude → 첫 지시. */
+  const executeDropPlan = useCallback(async (
+    task: TaskDropRequest,
+    pane: PaneRuntime,
+    plan: Extract<TaskDropPlan, { kind: 'start' }>,
+    settings: WorkspaceSettingsShape | null
   ): Promise<void> => {
-    if (pane.exitInfo) {
-      toast.error('종료된 터미널에서는 실행할 수 없습니다')
-      return
-    }
-
-    // pane.cwd 는 PTY 생성 시점 값이라 `cd` 이후를 못 따라간다 — 실측값을 우선 쓴다.
-    const liveCwd =
-      (await window.api.terminal.sessionCwd?.(pane.sessionId).catch(() => null)) ?? pane.cwd ?? undefined
-
-    const settings = await window.api.workspace.settings.get().catch(() => null)
-    // 기본은 '지금 이 터미널에서' — 1 업무 N 저장소가 현실이라 폴더는 사용자가 정한다.
-    const startInCurrent = (settings?.taskDropStartIn ?? 'current') === 'current'
-
-    const target = startInCurrent && liveCwd
-      ? await resolveCurrentFolderTarget(task, liveCwd, settings?.taskDropResume !== false)
-      : await window.api.workspace.taskDrop
-          .resolve(task.projectId, task.taskId, liveCwd)
-          .catch(() => null)
-
-    if (!target) {
-      toast.error(
-        '이 업무를 시작할 폴더를 찾지 못했습니다',
-        '터미널을 프로젝트 폴더로 옮기거나, 설정 → 워크스페이스에서 저장소를 등록하세요'
-      )
-      return
-    }
+    const resume = settings?.taskDropResume !== false
+    const sessionId = resume ? plan.sessionId : undefined
 
     // 프로젝트마다 지시 문구가 다를 수 있다 — 없으면 전역 기본으로 떨어진다.
     const template = settings
       ? resolveProjectConfig(settings, task.projectId).promptTemplate
       : DEFAULT_TASK_DROP_PROMPT
+
     let body: string | undefined
-    if (!target.claudeSessionId && templateNeedsBody(template)) {
+    if (!sessionId && templateNeedsBody(template)) {
       body = await window.api.dooray.tasks
         .detail(task.projectId, task.taskId)
         .then((d) => d?.body?.content)
         .catch(() => undefined)
     }
-    const prompt = target.claudeSessionId
+    const prompt = sessionId
       ? null
       : renderTaskDropPrompt(template, {
         title: task.subject,
@@ -425,9 +410,10 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
 
     const since = Date.now()
     for (const step of buildTaskDropSteps({
-      target,
+      target: { cwd: plan.cwd ?? '', repoName: plan.repoName ?? '', claudeSessionId: sessionId },
       prompt,
-      currentCwd: liveCwd,
+      // needsCd 가 false 면 이미 그 폴더다 — currentCwd 를 같게 넘겨 cd 를 생략시킨다.
+      currentCwd: plan.needsCd ? undefined : plan.cwd,
       skipPermissions: settings?.taskDropSkipPermissions === true
     })) {
       setDropBusy(step.label)
@@ -436,18 +422,63 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     }
     setDropBusy(null)
 
-    // 새 세션이면 방금 만들어진 것을 (업무, 폴더) 쌍에 연결한다 (resume 은 이미 연결돼 있음)
-    if (!target.claudeSessionId) {
+    // 새 세션이면 방금 만들어진 것을 (업무, 폴더) 쌍에 연결한다 (resume 은 이미 연결돼 있음).
+    // 폴더를 모르면 연결 키를 만들 수 없어 건너뛴다 — 실행 자체는 이미 끝났다.
+    const linkCwd = plan.cwd
+    if (!sessionId && linkCwd) {
       setTimeout(() => {
         void window.api.workspace.taskDrop
-          .link(task.projectId, task.taskId, target.cwd, since)
+          .link(task.projectId, task.taskId, linkCwd, since)
           .then((sid) => {
             if (sid) window.dispatchEvent(new CustomEvent('task-session-linked'))
           })
           .catch(() => undefined)
       }, 8000)
     }
-  }, [toast])
+  }, [])
+
+  /**
+   * 업무 하나를 지정한 pane 에서 시작한다.
+   *
+   * 지금 있는 자리가 이미 그 프로젝트의 저장소면 거기서 바로 한다 — 터미널을 그 폴더로 옮겨둔
+   * 것 자체가 선택이라 다른 데로 `cd` 하면 그 선택을 덮는다. 매핑되지 않은 자리에 놓았을 때만
+   * 어디로 갈지 정하는데, 후보가 하나면 그냥 가고 여럿이면 묻는다.
+   */
+  const runTaskInPane = useCallback(async (
+    task: TaskDropRequest,
+    pane: PaneRuntime
+  ): Promise<void> => {
+    if (pane.exitInfo) {
+      toast.error('종료된 터미널에서는 실행할 수 없습니다')
+      return
+    }
+
+    // pane.cwd 는 PTY 생성 시점 값이라 `cd` 이후를 못 따라간다 — 실측값을 우선 쓴다.
+    const liveCwd =
+      (await window.api.terminal.sessionCwd?.(pane.sessionId).catch(() => null)) ?? pane.cwd ?? undefined
+
+    const [settings, repos, linkMap] = await Promise.all([
+      window.api.workspace.settings.get().catch(() => null),
+      window.api.workspace.repos.list().catch(() => [] as RepoRegistryEntry[]),
+      window.api.workspace.taskDrop.linked().catch(() => ({}) as Record<string, TaskSessionLink[]>)
+    ])
+
+    const repoIds = settings ? resolveProjectConfig(settings, task.projectId).repoIds : []
+    const mappedRepos = repoIds
+      .map((id) => repos.find((r) => r.id === id))
+      .filter((r): r is RepoRegistryEntry => Boolean(r))
+    const links = linkMap[workspaceKey(task.projectId, task.taskId)] ?? []
+
+    const plan = resolveTaskDropPlan({ currentCwd: liveCwd, mappedRepos, links })
+
+    if (plan.kind === 'choose') {
+      // 사용자가 고르면 그 뒤를 이어서 실행한다.
+      setRepoChoice({ task, pane, candidates: plan.candidates, currentCwd: liveCwd, settings })
+      return
+    }
+
+    await executeDropPlan(task, pane, plan, settings)
+  }, [toast, executeDropPlan])
 
   // createTab 은 아래에서 선언되므로 ref 로 우회한다 (선언 순서 의존 제거)
   const createTabRef = useRef<((opts?: { cwd?: string; initialCommand?: string }) => Promise<void>) | null>(null)
@@ -1212,6 +1243,23 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
           />
         )}
       </SideDrawer>
+    )}
+    {repoChoice && (
+      <RepoChoiceModal
+        taskSubject={repoChoice.task.subject}
+        candidates={repoChoice.candidates}
+        onCancel={() => setRepoChoice(null)}
+        onChoose={(candidate) => {
+          const choice = repoChoice
+          setRepoChoice(null)
+          void executeDropPlan(
+            choice.task,
+            choice.pane,
+            planFromCandidate(candidate, choice.currentCwd),
+            choice.settings
+          )
+        }}
+      />
     )}
     </div>
   )
