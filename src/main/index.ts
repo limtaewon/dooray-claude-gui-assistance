@@ -1811,14 +1811,40 @@ ${data}`,
     return taskDropService.resolve(projectId, taskId, preferCwd)
   })
   workspaceHandle(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINK, (params) => {
-    const { projectId, taskId, cwd, since, label } = params as {
+    const { projectId, taskId, cwd, since, label, repoPath } = params as {
       projectId: string
       taskId: string
       cwd: string
       since: number
       label?: string
+      repoPath?: string
     }
-    return taskDropService.link(projectId, taskId, cwd, since, label)
+    return taskDropService.link(projectId, taskId, cwd, since, label, repoPath)
+  })
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_TASK_DROP_WATCH, (params) => {
+    const { projectId, taskId, cwd, since, label, repoPath } = params as {
+      projectId: string
+      taskId: string
+      cwd: string
+      since: number
+      label?: string
+      repoPath?: string
+    }
+    taskDropService.watchAndLink({
+      projectId,
+      taskId,
+      cwd,
+      since,
+      label,
+      repoPath,
+      onLinked: () => {
+        BrowserWindow.getAllWindows()[0]?.webContents.send(
+          IPC_CHANNELS.WORKSPACE_TASK_DROP_LINKED_PUSH,
+          { projectId, taskId, cwd }
+        )
+      }
+    })
+    return null
   })
   workspaceHandle(IPC_CHANNELS.WORKSPACE_TASK_DROP_UNLINK, (params) => {
     const { projectId, taskId, cwd } = params as { projectId: string; taskId: string; cwd?: string }

@@ -16,8 +16,10 @@ export interface TaskDropCandidate {
   path: string
   /** 새 브랜치를 딸 기준 브랜치 (repo.defaultBaseBranch) */
   baseBranch?: string
-  /** 그 폴더에서 이 업무로 쓰던 claude 세션 (있으면 이어간다) */
+  /** 그 저장소에서 이 업무로 쓰던 claude 세션 (있으면 이어간다) */
   sessionId?: string
+  /** 그 세션이 있던 폴더 — 워크트리에서 하던 것이면 저장소 경로와 다르다 */
+  sessionCwd?: string
 }
 
 export type TaskDropPlan =
@@ -59,6 +61,39 @@ function repoOf(repo: RepoRegistryEntry): { path: string; name: string; baseBran
 /** 그 폴더에서 이 업무로 쓰던 세션 — 세션은 (업무 × 폴더) 로 기억한다. */
 export function sessionForCwd(links: TaskSessionLink[], cwd: string): string | undefined {
   return links.find((link) => samePath(link.cwd, cwd))?.claudeSessionId
+}
+
+/**
+ * 그 **저장소** 에서 이 업무로 쓰던 세션 — 워크트리에서 돌린 것도 찾는다.
+ *
+ * 업무를 드롭하면 워크트리(`.<저장소>-worktrees/<브랜치>`)로 옮겨가므로 링크의 cwd 는 저장소
+ * 경로와 다르다. 저장소 경로만 비교하면 "이어가기" 가 영영 안 뜬다.
+ * 여러 개면 가장 최근 것.
+ */
+export function sessionForRepo(
+  links: TaskSessionLink[],
+  repoPath: string
+): { sessionId: string; cwd: string } | undefined {
+  const mine = links
+    .filter((link) => belongsToRepo(link, repoPath))
+    .sort((a, b) => b.lastUsedAt - a.lastUsedAt)[0]
+  return mine ? { sessionId: mine.claudeSessionId, cwd: mine.cwd } : undefined
+}
+
+function belongsToRepo(link: TaskSessionLink, repoPath: string): boolean {
+  if (link.repoPath) return samePath(link.repoPath, repoPath)
+  if (samePath(link.cwd, repoPath)) return true
+  // 옛 링크(repoPath 없음)는 워크트리 경로 규칙으로 되짚는다.
+  return normalize(link.cwd).startsWith(`${worktreeRootOf(repoPath)}/`)
+}
+
+/** `~/Desktop/2NEON` → `~/Desktop/.2NEON-worktrees` (GitService.createWorktree 와 같은 규칙) */
+function worktreeRootOf(repoPath: string): string {
+  const clean = normalize(repoPath)
+  const cut = clean.lastIndexOf('/')
+  const parent = cut === -1 ? '' : clean.slice(0, cut)
+  const name = cut === -1 ? clean : clean.slice(cut + 1)
+  return `${parent}/.${name}-worktrees`
 }
 
 const sessionFor = sessionForCwd
@@ -103,13 +138,18 @@ export function resolveTaskDropPlan(input: TaskDropPlanInput): TaskDropPlan {
   if (mappedRepos.length > 1) {
     return {
       kind: 'choose',
-      candidates: mappedRepos.map((repo) => ({
-        repoId: repo.id,
-        name: repo.name,
-        path: repo.path,
-        baseBranch: repo.defaultBaseBranch,
-        sessionId: sessionFor(links, repo.path)
-      }))
+      candidates: mappedRepos.map((repo) => {
+        // 워크트리에서 돌리던 세션도 이 저장소의 것으로 친다.
+        const previous = sessionForRepo(links, repo.path)
+        return {
+          repoId: repo.id,
+          name: repo.name,
+          path: repo.path,
+          baseBranch: repo.defaultBaseBranch,
+          sessionId: previous?.sessionId,
+          sessionCwd: previous?.cwd
+        }
+      })
     }
   }
 
@@ -134,12 +174,14 @@ export function planFromCandidate(
   candidate: TaskDropCandidate,
   currentCwd?: string
 ): Extract<TaskDropPlan, { kind: 'start' }> {
+  // 세션은 그것이 만들어진 폴더에서만 이어갈 수 있다 — 워크트리에서 하던 것이면 그 폴더로 간다.
+  const cwd = candidate.sessionCwd ?? candidate.path
   return {
     kind: 'start',
-    cwd: candidate.path,
+    cwd,
     repoName: candidate.name,
     sessionId: candidate.sessionId,
-    needsCd: !samePath(currentCwd, candidate.path),
+    needsCd: !samePath(currentCwd, cwd),
     repo: { path: candidate.path, name: candidate.name, baseBranch: candidate.baseBranch }
   }
 }

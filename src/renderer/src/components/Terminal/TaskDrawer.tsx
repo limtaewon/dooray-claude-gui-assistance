@@ -72,7 +72,12 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
         .catch(() => undefined)
     }
     window.addEventListener('task-session-linked', onLinked)
-    return () => window.removeEventListener('task-session-linked', onLinked)
+    // main 이 세션을 찾아 연결하면 그 즉시 배지를 붙인다.
+    const offPush = window.api.workspace.taskDrop.onLinked(onLinked)
+    return () => {
+      window.removeEventListener('task-session-linked', onLinked)
+      offPush()
+    }
   }, [load])
 
   const filtered = useMemo(() => {

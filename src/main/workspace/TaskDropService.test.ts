@@ -111,6 +111,66 @@ describe('TaskDropService', () => {
     })
   })
 
+  describe('watchAndLink', () => {
+    const since = Date.parse('2026-07-30T10:00:00Z')
+
+    it('세션이 늦게 생겨도 지켜보다 연결하고 알린다', async () => {
+      vi.useFakeTimers()
+      const listSessions = vi
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValue([{ sessionId: 'late', lastActivityAt: '2026-07-30T10:00:30Z' }])
+      const svc = new TaskDropService({ store, listSessions, pathExists: () => true })
+      const onLinked = vi.fn()
+
+      svc.watchAndLink({ projectId: 'proj-1', taskId: 'task-1', cwd: '/work/ios', since, onLinked })
+      await vi.advanceTimersByTimeAsync(10_000)
+
+      expect(onLinked).toHaveBeenCalledWith('late')
+      expect(store.listTaskSessionLinks('proj-1:task-1')[0].claudeSessionId).toBe('late')
+      vi.useRealTimers()
+    })
+
+    it('한도까지 못 찾으면 멈춘다 — 영원히 돌지 않는다', async () => {
+      vi.useFakeTimers()
+      const listSessions = vi.fn().mockResolvedValue([])
+      const svc = new TaskDropService({ store, listSessions, pathExists: () => true })
+
+      svc.watchAndLink({ projectId: 'proj-1', taskId: 'task-1', cwd: '/work/ios', since })
+      await vi.advanceTimersByTimeAsync(4 * 60 * 1000)
+      const calls = listSessions.mock.calls.length
+      await vi.advanceTimersByTimeAsync(60_000)
+
+      expect(listSessions.mock.calls.length).toBe(calls)
+      vi.useRealTimers()
+    })
+
+    it('워크트리에서 시작해도 저장소를 함께 남긴다 — 이어가기가 그걸로 붙는다', async () => {
+      vi.useFakeTimers()
+      const svc = new TaskDropService({
+        store,
+        listSessions: vi.fn().mockResolvedValue([{ sessionId: 's', lastActivityAt: '2026-07-30T10:00:30Z' }]),
+        pathExists: () => true
+      })
+
+      svc.watchAndLink({
+        projectId: 'proj-1',
+        taskId: 'task-1',
+        cwd: '/work/.ios-worktrees/feature-x',
+        since,
+        repoPath: '/work/ios'
+      })
+      await vi.advanceTimersByTimeAsync(3000)
+
+      expect(store.listTaskSessionLinks('proj-1:task-1')[0]).toMatchObject({
+        cwd: '/work/.ios-worktrees/feature-x',
+        repoPath: '/work/ios'
+      })
+      vi.useRealTimers()
+    })
+  })
+
   describe('link', () => {
     const since = Date.parse('2026-07-30T10:00:00Z')
 

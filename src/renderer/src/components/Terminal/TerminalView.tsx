@@ -62,6 +62,7 @@ import {
   resolveTaskDropPlan,
   samePath,
   sessionForCwd,
+  sessionForRepo,
   type TaskDropCandidate,
   type TaskDropPlan
 } from '@shared/workspace/taskDropPlan'
@@ -441,12 +442,21 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     setDropBusy(null)
     if (!info) return plan
 
+    if (info.isMainRepo) {
+      // git 은 같은 브랜치를 두 곳에 체크아웃하지 못한다 — 조용히 저장소에서 시작하면
+      // "왜 워크트리가 안 생겼지" 로 남는다.
+      toast.info(
+        '워크트리 대신 저장소에서 시작합니다',
+        `${repo.name} 이 이미 ${branch} 를 체크아웃 중입니다`
+      )
+    }
+
     return {
       ...plan,
       cwd: info.path,
       repoName: info.isMainRepo ? repo.name : `${repo.name} · ${branch}`,
-      // 세션은 (업무 × 폴더) 라 폴더가 워크트리로 바뀌면 그 폴더의 세션을 다시 찾아야 한다.
-      sessionId: sessionForCwd(links, info.path),
+      // 폴더가 바뀌었어도 **그 저장소에서** 하던 세션이면 이어간다(워크트리 포함).
+      sessionId: sessionForCwd(links, info.path) ?? sessionForRepo(links, repo.path)?.sessionId,
       needsCd: !samePath(currentCwd, info.path)
     }
   }, [toast])
@@ -506,23 +516,18 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     // 폴더를 모르면 연결 키를 만들 수 없어 건너뛴다 — 실행 자체는 이미 끝났다.
     const linkCwd = plan.cwd
     if (!sessionId && linkCwd) {
-      // claude 가 세션 파일을 언제 쓰는지는 우리가 정하지 못한다 — 한 번만 보고 포기하면
-      // 시작이 느린 날엔 배지가 영영 안 붙는다. 몇 번 더 확인한다.
-      const label = plan.repoName
-      const attempts = [8000, 20000, 45000]
-      void (async () => {
-        for (const delay of attempts) {
-          await new Promise((r) => setTimeout(r, delay))
-          const sid = await window.api.workspace.taskDrop
-            .link(task.projectId, task.taskId, linkCwd, since, label)
-            .catch(() => null)
-          if (sid) {
-            window.dispatchEvent(new CustomEvent('task-session-linked'))
-            return
-          }
-        }
-        console.warn(`[TaskDrop] 세션을 찾지 못해 연결하지 못했습니다 cwd=${linkCwd}`)
-      })()
+      // 세션이 언제 생기는지는 claude 가 정한다 — main 이 짧은 간격으로 지켜보다 연결한다.
+      // 뷰를 떠나거나 탭을 옮겨도 이어지도록 렌더러가 아니라 main 에서 돈다.
+      void window.api.workspace.taskDrop
+        .watch({
+          projectId: task.projectId,
+          taskId: task.taskId,
+          cwd: linkCwd,
+          since,
+          label: plan.repoName,
+          repoPath: plan.repo?.path
+        })
+        .catch(() => undefined)
     }
   }, [toast])
 

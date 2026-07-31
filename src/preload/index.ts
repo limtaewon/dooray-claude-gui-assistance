@@ -763,15 +763,38 @@ const api = {
       /** preferCwd 를 주면 그 폴더의 세션을 우선 이어간다 (드롭한 pane 이 이미 있는 폴더). */
       resolve: (projectId: string, taskId: string, preferCwd?: string): Promise<TaskDropTarget | null> =>
         ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_RESOLVE, { projectId, taskId, preferCwd }),
+      /** 드롭 직후 — 세션이 생길 때까지 main 이 지켜보다 연결한다. */
+      watch: (params: {
+        projectId: string
+        taskId: string
+        cwd: string
+        since: number
+        label?: string
+        repoPath?: string
+      }): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_WATCH, params),
+      /** 연결되면 알린다 — 배지를 새로 그리기 위한 신호. */
+      onLinked: (cb: () => void): (() => void) => {
+        const handler = (): void => cb()
+        ipcRenderer.on(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINKED_PUSH, handler)
+        return () => ipcRenderer.removeListener(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINKED_PUSH, handler)
+      },
       /** 드롭 직후 생긴 세션을 태스크에 연결. `since` 이후 활동한 세션만 후보다. */
       link: (
         projectId: string,
         taskId: string,
         cwd: string,
         since: number,
-        label?: string
+        label?: string,
+        repoPath?: string
       ): Promise<string | null> =>
-        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINK, { projectId, taskId, cwd, since, label }),
+        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINK, {
+          projectId,
+          taskId,
+          cwd,
+          since,
+          label,
+          repoPath
+        }),
       /** cwd 를 주면 그 폴더 링크만, 안 주면 이 업무의 링크 전부를 해제한다. */
       unlink: (projectId: string, taskId: string, cwd?: string): Promise<void> =>
         ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_UNLINK, { projectId, taskId, cwd }),

@@ -303,6 +303,8 @@ export function createMockWindowApi(): Record<string, unknown> {
       taskDrop: {
         resolve: vi.fn().mockResolvedValue(null),
         link: vi.fn().mockResolvedValue(null),
+        watch: vi.fn().mockResolvedValue(undefined),
+        onLinked: vi.fn().mockReturnValue(noopUnsub),
         unlink: vi.fn().mockResolvedValue(undefined),
         touch: vi.fn().mockResolvedValue(undefined),
         linked: vi.fn().mockResolvedValue({})

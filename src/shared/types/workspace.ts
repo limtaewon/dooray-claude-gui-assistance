@@ -76,6 +76,11 @@ export interface TaskWorkspace {
  * 업무 하나에 세션 하나만 매달면 폴더를 옮길 때마다 이전 대화가 끊긴다.
  */
 export interface TaskSessionLink {
+  /**
+   * 이 세션이 속한 **저장소** 경로. `cwd` 는 워크트리라 저장소 경로와 다르다 —
+   * 이게 없으면 "이 저장소에서 하던 세션" 을 찾지 못해 이어가기가 안 뜬다.
+   */
+  repoPath?: string
   cwd: string
   claudeSessionId: string
   lastUsedAt: number

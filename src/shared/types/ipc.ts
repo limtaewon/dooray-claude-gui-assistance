@@ -408,6 +408,10 @@ export const IPC_CHANNELS = {
   /** 터미널 태스크 드로어(C-3.5) — 드롭 대상 폴더/세션 해석과 세션 매핑 */
   WORKSPACE_TASK_DROP_RESOLVE: 'workspace:task-drop:resolve',
   WORKSPACE_TASK_DROP_LINK: 'workspace:task-drop:link',
+  /** 드롭 직후 — main 이 세션이 생길 때까지 지켜보다 연결한다 */
+  WORKSPACE_TASK_DROP_WATCH: 'workspace:task-drop:watch',
+  /** main → renderer: 연결됨 */
+  WORKSPACE_TASK_DROP_LINKED_PUSH: 'workspace:task-drop:linked-push',
   WORKSPACE_TASK_DROP_UNLINK: 'workspace:task-drop:unlink',
   WORKSPACE_TASK_DROP_LINKED: 'workspace:task-drop:linked',
   WORKSPACE_TASK_WORKTREE: 'workspace:task-worktree',
