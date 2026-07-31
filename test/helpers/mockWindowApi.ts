@@ -248,6 +248,7 @@ export function createMockWindowApi(): Record<string, unknown> {
         pull: vi.fn().mockResolvedValue({ ok: true, message: '' }),
         fetch: vi.fn().mockResolvedValue({ ok: true, message: '' }),
         remotes: vi.fn().mockResolvedValue([]),
+        authors: vi.fn().mockResolvedValue([]),
         stashList: vi.fn().mockResolvedValue([]),
         stashPush: vi.fn().mockResolvedValue(undefined),
         stashAction: vi.fn().mockResolvedValue(undefined),

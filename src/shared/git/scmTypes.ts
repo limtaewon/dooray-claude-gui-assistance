@@ -53,6 +53,14 @@ export interface GitStashEntry {
   timestamp?: number
 }
 
+/** 커밋 작성자 — 필터에서 목록으로 고를 수 있게 빈도순으로 준다. */
+export interface GitAuthorInfo {
+  name: string
+  email: string
+  /** 표본 안에서의 커밋 수 — 자주 쓰는 사람을 위로 올리는 데 쓴다 */
+  count: number
+}
+
 export interface GitRemoteInfo {
   name: string
   fetchUrl: string

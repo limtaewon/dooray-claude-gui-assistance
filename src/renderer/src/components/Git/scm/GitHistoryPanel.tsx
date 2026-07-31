@@ -186,6 +186,7 @@ function GitHistoryPanel({ repoPath, onOpenDiff }: GitHistoryPanelProps): JSX.El
       </div>
 
       <GitHistoryFilterBar
+        repoPath={repoPath}
         filter={draftFilter}
         onChange={setDraftFilter}
         branches={branches}

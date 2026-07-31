@@ -419,6 +419,8 @@ export const IPC_CHANNELS = {
   GIT_SCM_PULL: 'git:scm:pull',
   GIT_SCM_FETCH: 'git:scm:fetch',
   GIT_SCM_REMOTES: 'git:scm:remotes',
+  /** 커밋 작성자 목록(빈도순) — 히스토리 필터에서 고르게 한다 */
+  GIT_SCM_AUTHORS: 'git:scm:authors',
   GIT_SCM_STASH_LIST: 'git:scm:stash-list',
   GIT_SCM_STASH_PUSH: 'git:scm:stash-push',
   GIT_SCM_STASH_ACTION: 'git:scm:stash-action',

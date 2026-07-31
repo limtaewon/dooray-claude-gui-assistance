@@ -33,6 +33,7 @@ import type {
 } from '../../shared/git/statusTypes'
 import type { GitHistoryOptions, GitHistoryResult } from '../../shared/git/historyTypes'
 import type {
+  GitAuthorInfo,
   GitCommitDetail,
   GitCommitFileChange,
   GitCommitParams,
@@ -305,6 +306,31 @@ export class GitScmService {
     }
 
     return { commitOid, parentOid, files }
+  }
+
+  /**
+   * 최근 커밋들의 작성자 목록(빈도순). 필터 UI 가 자유 입력 대신 실제 목록에서 고르게 한다.
+   * 전체 히스토리를 훑으면 큰 저장소에서 느려서 최근 N 건만 표본으로 본다.
+   */
+  async authors(repoPath: string, sampleSize = 2000): Promise<GitAuthorInfo[]> {
+    const limit = Math.max(1, Math.min(20_000, Math.trunc(sampleSize)))
+    const { stdout } = await runGit(
+      ['log', '--format=%aN%x1f%aE', '-z', `-n${limit}`, '--branches', '--remotes'],
+      repoPath
+    )
+
+    const byKey = new Map<string, GitAuthorInfo>()
+    for (const record of iterateNulDelimitedFields(stdout)) {
+      // -z 레코드 사이에 개행이 끼는 경우가 있어 앞쪽을 털어낸다.
+      const [name, email] = record.replace(/^[\r\n]+/, '').split('\x1f')
+      if (!name?.trim() && !email?.trim()) continue
+      const key = `${name}\u0000${email}`
+      const existing = byKey.get(key)
+      if (existing) existing.count += 1
+      else byKey.set(key, { name: name?.trim() ?? '', email: email?.trim() ?? '', count: 1 })
+    }
+
+    return [...byKey.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
   }
 
   // ───────────────────────── diff ─────────────────────────

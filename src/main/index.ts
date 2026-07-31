@@ -1679,6 +1679,7 @@ ${data}`,
     return gitScmService.fetch(repoPath, remote)
   })
   gitHandle(IPC_CHANNELS.GIT_SCM_REMOTES, (repoPath) => gitScmService.remotes(repoPath as string))
+  gitHandle(IPC_CHANNELS.GIT_SCM_AUTHORS, (repoPath) => gitScmService.authors(repoPath as string))
   gitHandle(IPC_CHANNELS.GIT_SCM_STASH_LIST, (repoPath) =>
     gitScmService.stashList(repoPath as string)
   )

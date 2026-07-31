@@ -164,6 +164,7 @@ import type {
 import type { GitStatusResult } from '../shared/git/statusTypes'
 import type { GitHistoryOptions, GitHistoryResult } from '../shared/git/historyTypes'
 import type {
+  GitAuthorInfo,
   GitCommitDetail,
   GitCommitParams,
   GitCreateBranchParams,
@@ -668,6 +669,8 @@ const api = {
         ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_FETCH, { repoPath, remote }),
       remotes: (repoPath: string): Promise<GitRemoteInfo[]> =>
         ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_REMOTES, repoPath),
+      authors: (repoPath: string): Promise<GitAuthorInfo[]> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_AUTHORS, repoPath),
       stashList: (repoPath: string): Promise<GitStashEntry[]> =>
         ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_STASH_LIST, repoPath),
       stashPush: (
