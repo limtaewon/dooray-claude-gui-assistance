@@ -10,6 +10,8 @@ import { useFontSettings, FONT_FAMILY_LABELS, type FontFamily } from '../../hook
 import ThemePicker from './ThemePicker'
 import { Modal } from '../common/ds'
 import SettingsSection, { SettingsSectionProvider } from './SettingsSection'
+import { DEFAULT_TERMINAL_THEME_ID, TERMINAL_THEMES } from '@shared/terminal/themes'
+import { saveTerminalTheme } from '../../hooks/useTerminalTheme'
 import GitHubSettings from './GitHubSettings'
 import {
   SettingsDivider,
@@ -888,6 +890,13 @@ function AppearanceSettings(): JSX.Element {
       <SettingsSubsectionHeader title="글꼴 & 크기" description="앱 전체에 적용됩니다." />
       <FontSettingsSection />
     </div>,
+    <div key="terminal-theme" className="space-y-3">
+      <SettingsSubsectionHeader
+        title="터미널 색"
+        description="앱 테마와 따로 정합니다 — 밝은 앱에 어두운 터미널 같은 조합도 쓰기 위해서입니다."
+      />
+      <TerminalThemeSection />
+    </div>,
     <div key="sidebar" className="space-y-3">
       <SettingsSubsectionHeader
         title="사이드바 항목"
@@ -898,6 +907,81 @@ function AppearanceSettings(): JSX.Element {
   ].filter(Boolean)
 
   return <SettingsBlocks blocks={blocks} />
+}
+
+/** 터미널 색 테마 — 고르면 열려 있는 터미널에 바로 반영된다. */
+function TerminalThemeSection(): JSX.Element {
+  const [id, setId] = useState<string>(DEFAULT_TERMINAL_THEME_ID)
+
+  useEffect(() => {
+    void window.api.settings
+      .get('terminalTheme')
+      .then((saved) => { if (typeof saved === 'string') setId(saved) })
+      .catch(() => undefined)
+  }, [])
+
+  const pick = (next: string): void => {
+    setId(next)
+    void saveTerminalTheme(next)
+  }
+
+  return (
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-2">
+      {TERMINAL_THEMES.map((preset) => {
+        const active = preset.id === id
+        return (
+          <button
+            key={preset.id}
+            onClick={() => pick(preset.id)}
+            aria-pressed={active}
+            className={`flex flex-col gap-2 p-2.5 rounded-lg border text-left transition-colors ${
+              active
+                ? 'bg-bg-active border-bg-border-strong'
+                : 'border-bg-border hover:bg-bg-surface-hover'
+            }`}
+          >
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`flex-1 text-[calc(11.5px_*_var(--app-font-scale,1))] truncate ${
+                  active ? 'text-text-primary font-medium' : 'text-text-secondary'
+                }`}
+              >
+                {preset.label}
+              </span>
+              {preset.light && <span className="ds-chip neutral flex-none">밝음</span>}
+              {active && <Check size={11} className="flex-none text-text-primary" />}
+            </div>
+            {/* 미리보기 — 배경 위에 실제 팔레트를 얹어 보여준다. 이름만으로는 고를 수 없다. */}
+            <div
+              className="rounded-md px-2 py-1.5 border border-bg-border"
+              style={{ background: preset.colors.background }}
+            >
+              <div className="flex items-center gap-1">
+                <span className="font-mono text-[calc(9.5px_*_var(--app-font-scale,1))]" style={{ color: preset.colors.green }}>
+                  ~/2NEON
+                </span>
+                <span className="font-mono text-[calc(9.5px_*_var(--app-font-scale,1))]" style={{ color: preset.colors.foreground }}>
+                  $ git status
+                </span>
+              </div>
+              <div className="flex items-center gap-1 mt-1">
+                {[
+                  preset.colors.red,
+                  preset.colors.green,
+                  preset.colors.yellow,
+                  preset.colors.blue,
+                  preset.colors.magenta,
+                  preset.colors.cyan
+                ].map((color) => (
+                  <span key={color} className="w-3 h-3 rounded-sm" style={{ background: color }} />
+                ))}
+              </div>
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
 /** =========== 동작 =========== */

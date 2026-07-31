@@ -19,6 +19,7 @@ import { serializeWithAbsoluteCursor } from './serializeAbsoluteCursor'
 import { createReplayGuard, REPLAY_CLEAR, POST_REPLAY_MODE_RESET } from './replay'
 import { shouldAttachWebgl, getGlobalWebglFailure, setGlobalWebglFailure } from './webglPolicy'
 import { activateTerminalUnicodeProvider } from './terminalUnicodeProvider'
+import { useTerminalTheme } from '../../hooks/useTerminalTheme'
 import { installLinkProviderGuard } from './links/terminalLinkProviderGuard'
 import { createFilePathLinkProvider } from './links/filePathLinkProvider'
 import { createLinkTooltip } from './links/linkTooltip'
@@ -166,6 +167,15 @@ function TerminalPaneInner(
   // 콜백을 참조하도록 ref 로 동기화한다(onFocusRequestRef 와 동일 패턴).
   const onCwdChangeRef = useRef(onCwdChange)
   useEffect(() => { onCwdChangeRef.current = onCwdChange }, [onCwdChange])
+  const terminalTheme = useTerminalTheme()
+  const themeRef = useRef(terminalTheme)
+  themeRef.current = terminalTheme
+
+  // 설정에서 테마를 바꾸면 이미 떠 있는 pane 도 즉시 따라온다 — 새 탭부터만 바뀌면 헷갈린다.
+  useEffect(() => {
+    if (terminalRef.current) terminalRef.current.options.theme = { ...terminalTheme.colors }
+  }, [terminalTheme])
+
   const onTitleChangeRef = useRef(onTitleChange)
   useEffect(() => { onTitleChangeRef.current = onTitleChange }, [onTitleChange])
 
@@ -229,30 +239,8 @@ function TerminalPaneInner(
       : null
 
     const terminal = new Terminal({
-      theme: {
-        // v2.0: 터미널은 크롬·캔버스와 구분되는 자체 표면을 갖는다 (--terminal-bg 와 동일 값)
-        background: '#202429',
-        foreground: '#E8E8EA',
-        cursor: '#E8E8EA',
-        cursorAccent: '#202429',
-        selectionBackground: '#FFFFFF26',
-        black: '#202429',
-        red: '#EF4444',
-        green: '#22C55E',
-        yellow: '#FB923C',
-        blue: '#3B82F6',
-        magenta: '#A855F7',
-        cyan: '#06B6D4',
-        white: '#F9FAFB',
-        brightBlack: '#9CA3AF',
-        brightRed: '#FCA5A5',
-        brightGreen: '#86EFAC',
-        brightYellow: '#FDBA74',
-        brightBlue: '#93C5FD',
-        brightMagenta: '#D8B4FE',
-        brightCyan: '#67E8F9',
-        brightWhite: '#FFFFFF'
-      },
+      // 테마는 설정에서 고른다(기본 Clauday). 살아 있는 pane 은 아래 effect 가 갱신한다.
+      theme: { ...themeRef.current.colors },
       // CJK(한·중·일) 폰트 fallback. JetBrains Mono 에 한글 글리프가 없어 시스템 폰트로 떨어지면
       // 셀 폭이 어긋나 "테 스 트" 처럼 보이는 이슈 → 모노스페이스 한글 폰트를 우선 명시.
       fontFamily: 'JetBrains Mono, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans Mono CJK KR", monospace',
@@ -946,6 +934,8 @@ function TerminalPaneInner(
 
   return (
     <div
+      // 가장자리 여백까지 테마 배경으로 — 밝은 테마에서 검은 테두리가 남으면 안 된다.
+      style={{ background: terminalTheme.colors.background }}
       className={`absolute inset-0 ${visible ? 'z-10' : 'z-0 pointer-events-none invisible'}`}
       onPointerDownCapture={() => onFocusRequest?.()}
       onDragOver={(e) => {
