@@ -70,6 +70,9 @@ THE SOFTWARE.
 | `src/shared/git/largeDiffLimit.ts` | Orca | `src/shared/large-diff-render-limit.ts` | adapted (조기 종료 라인 카운트만 유지, 이미지/노트북 뷰어 분기 제거) |
 | `src/main/git/credentialEnv.ts` | Orca | `src/shared/git-credential-prompt-env.ts` + `src/main/git/runner.ts` 의 `nonInteractiveGitEnv` | adapted (WSL `WSLENV` 전파 제거, 출력 로케일 고정을 같은 함수로 흡수) |
 | `src/main/git/scmRunner.ts` | Orca | `src/main/git/runner.ts` (`DEFAULT_GIT_MAX_BUFFER`/`killSpawnedCommandTree`/`execFileCapture`/`gitStreamStdout`) + `src/main/git/max-buffer-overflow.ts` | adapted (WSL 라우팅·gh/glab 러너·사내 observability 제거, 로컬 git 실행만 유지) |
+| `src/renderer/src/components/Settings/controls.tsx` | Orca | `src/renderer/src/components/settings/SettingsFormControls.tsx` | adapted (2열 행 문법·토글·세그먼티드·숫자 입력만 이식. Tailwind 팔레트 직접 참조 → Clauday 토큰, 라벨/설명 이중 기재 구조를 하나로 합침) |
+| `src/renderer/src/components/Settings/SettingsSection.tsx` | Orca | `src/renderer/src/components/settings/SettingsSection.tsx` | adapted (섹션별 검색 카탈로그 등록 제거 — 카탈로그를 `settingsNav.ts` 로 분리) |
+| `src/renderer/src/components/Settings/settingsSearch.ts` | Orca | `src/renderer/src/components/settings/settings-search.ts` | adapted (i18n 별칭·커맨드 팔레트 연동 제거, 4계층 점수만 유지) |
 | `src/main/git/GitScmService.ts` | Orca | `src/main/git/status.ts` / `remote.ts` / `checkout.ts` — 커맨드 형태와 방어 패턴(`:(literal)` pathspec, `--end-of-options`, 충돌 판정, discard 2분기) | adapted (오케스트레이션은 Clauday 고유. diff 는 Orca 와 같은 content 방식이나 서브모듈/SSH/AI 커밋메시지 경로 없음) |
 
 > 표의 진실은 이 문서입니다. `feature/terminal/v2-terminal-p2/adr-06-third-party-notices.md` 의 표는

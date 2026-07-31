@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Check, Cpu, Key, Eye, EyeOff, ExternalLink, SlidersHorizontal, LogOut, BarChart2, Moon, Sun, Type, CalendarDays, Loader2, AlertCircle, Zap, X, ChevronUp, ChevronDown, GripVertical, RotateCcw, FolderGit2, Keyboard } from 'lucide-react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { Check, Cpu, Key, Eye, EyeOff, ExternalLink, LogOut, Moon, Sun, Loader2, AlertCircle, Zap, X, ChevronUp, ChevronDown, GripVertical, RotateCcw, Search } from 'lucide-react'
 import { CUSTOMIZABLE_NAV_ITEMS, DEFAULT_SIDEBAR_PREFS, type SidebarPrefs, type SidebarView } from '../Layout/Sidebar'
 import type { AIModelConfig, AIModelName } from '../../../../shared/types/ai'
 import UsageInsights from './UsageInsights'
@@ -9,52 +9,169 @@ import { useTheme } from '../../hooks/useTheme'
 import { useFontSettings, FONT_FAMILY_LABELS, type FontFamily } from '../../hooks/useFontSettings'
 import ThemePicker from './ThemePicker'
 import { Modal } from '../common/ds'
+import SettingsSection, { SettingsSectionProvider } from './SettingsSection'
+import {
+  SettingsDivider,
+  SettingsRow,
+  SettingsSegmentedControl,
+  SettingsSubsectionHeader
+} from './controls'
+import {
+  DEFAULT_SETTINGS_SECTION,
+  SETTINGS_NAV_GROUPS,
+  SETTINGS_SEARCH_TARGETS,
+  SETTINGS_SECTION_META,
+  type SettingsSectionId
+} from './settingsNav'
+import { SETTINGS_SEARCH_DEBOUNCE_MS, matchedSectionIds } from './settingsSearch'
 
-type SettingsTab = 'models' | 'dooray' | 'caldav' | 'app' | 'insights' | 'workspace' | 'keys'
-
+/**
+ * 설정 화면.
+ *
+ * 구조는 Orca 를 따랐다 — 좌측 그룹 네비 + 검색, 우측에 **한 번에 한 섹션만** 마운트.
+ * 전부 마운트하면 각 패널이 저마다 IPC 를 때려 설정 진입이 느려진다.
+ * 저장은 즉시 저장이고 "저장됨" 토스트를 따로 띄우지 않는다 — 컨트롤 자체가 상태를 보여준다.
+ */
 function SettingsView(): JSX.Element {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('models')
+  const [activeSection, setActiveSection] = useState<SettingsSectionId>(DEFAULT_SETTINGS_SECTION)
+  /** 입력값과 적용값을 나눈다 — 적용은 섹션을 갈아끼우므로 타이핑마다 하면 버벅인다. */
+  const [searchInput, setSearchInput] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const searchRef = useRef<HTMLInputElement>(null)
 
-  // 다른 화면에서 특정 탭을 지정해서 이동 요청 시 반영
+  useEffect(() => {
+    if (!searchInput.trim()) {
+      setSearchQuery('')
+      return
+    }
+    const timer = window.setTimeout(() => setSearchQuery(searchInput), SETTINGS_SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [searchInput])
+
+  // 다른 화면에서 특정 섹션을 지정해 이동 요청 시 반영 (구 탭 id 도 받아준다)
   useEffect(() => {
     const onJump = (e: Event): void => {
-      const tab = (e as CustomEvent<{ tab?: SettingsTab }>).detail?.tab
-      if (tab) setActiveTab(tab)
+      const tab = (e as CustomEvent<{ tab?: string }>).detail?.tab
+      if (!tab) return
+      const legacy: Record<string, SettingsSectionId> = { app: 'behavior' }
+      const target = (legacy[tab] ?? tab) as SettingsSectionId
+      if (SETTINGS_SECTION_META[target]) setActiveSection(target)
     }
     window.addEventListener('goto-settings', onJump as EventListener)
     return () => window.removeEventListener('goto-settings', onJump as EventListener)
   }, [])
 
-  const tabs: { id: SettingsTab; icon: typeof Cpu; label: string }[] = [
-    { id: 'models', icon: Cpu, label: 'AI 모델' },
-    { id: 'insights', icon: BarChart2, label: '사용 인사이트' },
-    { id: 'dooray', icon: Key, label: '두레이 연결' },
-    { id: 'caldav', icon: CalendarDays, label: '캘린더 연결' },
-    { id: 'workspace', icon: FolderGit2, label: '워크스페이스' },
-    { id: 'keys', icon: Keyboard, label: '단축키' },
-    { id: 'app', icon: SlidersHorizontal, label: '외관 & 동작' }
-  ]
+  const matched = useMemo(
+    () => matchedSectionIds(SETTINGS_SEARCH_TARGETS, searchQuery),
+    [searchQuery]
+  )
+  const searching = searchQuery.trim().length > 0
+
+  // 검색 결과에 지금 섹션이 없으면 첫 결과로 옮겨준다 — 빈 화면을 보여주지 않는다.
+  useEffect(() => {
+    if (!searching || matched.size === 0 || matched.has(activeSection)) return
+    const first = SETTINGS_NAV_GROUPS.flatMap((g) => g.items).find((i) => matched.has(i.id))
+    if (first) setActiveSection(first.id)
+  }, [searching, matched, activeSection])
+
+  const meta = SETTINGS_SECTION_META[activeSection]
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex items-center h-10 bg-bg-surface border-b border-bg-border px-4 gap-1 flex-shrink-0">
-        {tabs.map(({ id, icon: Icon, label }) => (
-          <button key={id} onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md transition-all ${
-              activeTab === id ? 'bg-clauday-blue/10 text-clauday-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
-            }`}>
-            <Icon size={13} /> {label}
-          </button>
-        ))}
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        {activeTab === 'models' && <ModelSettings />}
-        {activeTab === 'insights' && <UsageInsights />}
-        {activeTab === 'dooray' && <DoorayTokenSettings />}
-        {activeTab === 'caldav' && <CalDAVSettings />}
-        {activeTab === 'workspace' && <WorkspaceSettings />}
-        {activeTab === 'keys' && <KeybindingSettings />}
-        {activeTab === 'app' && <AppBehaviorSettings />}
+    <div className="h-full flex min-h-0">
+      <aside className="w-[220px] flex-none flex flex-col min-h-0 border-r border-bg-border bg-bg-sidebar">
+        <div className="p-2 flex-none">
+          <div className="relative">
+            <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary" />
+            <input
+              ref={searchRef}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Escape') { setSearchInput(''); searchRef.current?.blur() } }}
+              placeholder="설정 검색"
+              aria-label="설정 검색"
+              className="ds-input sm"
+              style={{ paddingLeft: 24, paddingRight: searchInput ? 22 : undefined }}
+            />
+            {searchInput && (
+              <button
+                onClick={() => setSearchInput('')}
+                aria-label="검색 지우기"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary"
+              >
+                <X size={11} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <nav className="flex-1 min-h-0 overflow-y-auto px-2 pb-3 space-y-4">
+          {SETTINGS_NAV_GROUPS.map((group) => {
+            const items = searching ? group.items.filter((i) => matched.has(i.id)) : group.items
+            if (items.length === 0) return null
+            return (
+              <div key={group.id} className="space-y-1">
+                <div className="px-2 text-[calc(9.5px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-[0.14em] text-text-tertiary">
+                  {group.label}
+                </div>
+                {items.map(({ id, label, icon: Icon }) => {
+                  const active = activeSection === id
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => setActiveSection(id)}
+                      aria-current={active ? 'page' : undefined}
+                      className={`w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[calc(12px_*_var(--app-font-scale,1))] transition-colors ${
+                        active
+                          ? 'bg-bg-active font-medium text-text-primary'
+                          : 'text-text-secondary hover:bg-bg-surface-hover hover:text-text-primary'
+                      }`}
+                    >
+                      <Icon size={13} className="flex-none" />
+                      <span className="truncate">{label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          })}
+
+          {searching && matched.size === 0 && (
+            <p className="px-2 py-6 text-center text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
+              검색 결과가 없습니다
+            </p>
+          )}
+        </nav>
+      </aside>
+
+      <div className="flex-1 min-w-0 overflow-y-auto">
+        <div className="mx-auto max-w-3xl px-8 pt-8 pb-20">
+          <SettingsSectionProvider activeSectionId={activeSection} query={searchQuery}>
+            <SettingsSection id="dooray" title={meta.title} description={meta.description} bare>
+              <DoorayTokenSettings />
+            </SettingsSection>
+            <SettingsSection id="caldav" title={meta.title} description={meta.description} bare>
+              <CalDAVSettings />
+            </SettingsSection>
+            <SettingsSection id="workspace" title={meta.title} description={meta.description} bare>
+              <WorkspaceSettings />
+            </SettingsSection>
+            <SettingsSection id="keys" title={meta.title} description={meta.description} bare>
+              <KeybindingSettings />
+            </SettingsSection>
+            <SettingsSection id="models" title={meta.title} description={meta.description} bare>
+              <ModelSettings />
+            </SettingsSection>
+            <SettingsSection id="insights" title={meta.title} description={meta.description} bare>
+              <UsageInsights />
+            </SettingsSection>
+            <SettingsSection id="appearance" title={meta.title} description={meta.description}>
+              <AppearanceSettings />
+            </SettingsSection>
+            <SettingsSection id="behavior" title={meta.title} description={meta.description}>
+              <BehaviorSettings />
+            </SettingsSection>
+          </SettingsSectionProvider>
+        </div>
       </div>
     </div>
   )
@@ -713,10 +830,53 @@ function CalDAVSettings(): JSX.Element {
 /** =========== 앱 동작 =========== */
 type StartupView = 'dooray' | 'terminal' | 'git' | 'last'
 
-function AppBehaviorSettings(): JSX.Element {
-  const [startupView, setStartupView] = useState<StartupView>('dooray')
-  const [saved, setSaved] = useState(false)
+/** =========== 외관 =========== */
+function AppearanceSettings(): JSX.Element {
   const { theme, setTheme } = useTheme()
+
+  const blocks = [
+    <SettingsRow
+      key="theme"
+      label="테마"
+      description="앱 전체의 밝기를 정합니다."
+      searchKeywords={['theme', 'dark', 'light', '다크', '라이트']}
+      control={
+        <SettingsSegmentedControl
+          value={theme}
+          onChange={setTheme}
+          ariaLabel="테마"
+          options={[
+            { value: 'dark' as const, label: <span className="flex items-center gap-1"><Moon size={10} /> 다크</span> },
+            { value: 'light' as const, label: <span className="flex items-center gap-1"><Sun size={10} /> 라이트</span> }
+          ]}
+        />
+      }
+    />,
+    theme === 'light' ? (
+      <div key="palette" className="space-y-3">
+        <SettingsSubsectionHeader title="색상 팔레트" description="라이트 테마의 색조를 고릅니다." />
+        <ThemePicker />
+      </div>
+    ) : null,
+    <div key="font" className="space-y-3">
+      <SettingsSubsectionHeader title="글꼴 & 크기" description="앱 전체에 적용됩니다." />
+      <FontSettingsSection />
+    </div>,
+    <div key="sidebar" className="space-y-3">
+      <SettingsSubsectionHeader
+        title="사이드바 항목"
+        description="순서를 바꾸거나 자주 안 쓰는 항목을 숨깁니다. 설정·매뉴얼은 항상 보입니다."
+      />
+      <SidebarPrefsSection />
+    </div>
+  ].filter(Boolean)
+
+  return <SettingsBlocks blocks={blocks} />
+}
+
+/** =========== 동작 =========== */
+function BehaviorSettings(): JSX.Element {
+  const [startupView, setStartupView] = useState<StartupView>('dooray')
 
   useEffect(() => {
     window.api.settings.get('startupView').then((v) => {
@@ -724,127 +884,59 @@ function AppBehaviorSettings(): JSX.Element {
     })
   }, [])
 
-  const save = async (v: StartupView): Promise<void> => {
+  const save = (v: StartupView): void => {
     setStartupView(v)
-    await window.api.settings.set('startupView', v)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 1500)
+    void window.api.settings.set('startupView', v)
   }
 
-  const STARTUP_OPTIONS: { value: StartupView; label: string; description: string }[] = [
-    { value: 'dooray', label: '두레이 (기본)', description: '태스크/브리핑/캘린더' },
-    { value: 'terminal', label: '터미널', description: 'Claude Code CLI 세션' },
-    { value: 'git', label: '브랜치 작업', description: 'Git worktree 관리' },
-    { value: 'last', label: '마지막 사용', description: '앱 종료 시 열려있던 화면' }
+  const blocks = [
+    <SettingsRow
+      key="startup"
+      label="시작 시 열 화면"
+      description="앱을 켰을 때 처음 보이는 화면입니다."
+      searchKeywords={['startup', '시작']}
+      control={
+        <SettingsSegmentedControl
+          value={startupView}
+          onChange={save}
+          ariaLabel="시작 시 열 화면"
+          options={[
+            { value: 'dooray' as const, label: '두레이' },
+            { value: 'terminal' as const, label: '터미널' },
+            { value: 'last' as const, label: '마지막' }
+          ]}
+        />
+      }
+    />,
+    <div key="renderer" className="space-y-3">
+      <SettingsSubsectionHeader
+        title="터미널 렌더러"
+        description="GPU 문제로 화면이 깨지면 DOM 으로 바꾸세요. WebGL 을 못 쓰면 자동으로 DOM 으로 폴백하고 알려줍니다."
+      />
+      <TerminalRendererSection />
+    </div>,
+    <div key="notify" className="space-y-3">
+      <SettingsSubsectionHeader title="알림" />
+      <AiRecommendNotifyToggle />
+    </div>
   ]
 
+  return <SettingsBlocks blocks={blocks} />
+}
+
+/**
+ * 블록 사이에만 구분선을 넣는다. **첫 블록 앞에는 넣지 않는다** —
+ * 검색으로 앞 블록이 사라져도 고아 구분선이 남으면 안 된다.
+ */
+function SettingsBlocks({ blocks }: { blocks: React.ReactNode[] }): JSX.Element {
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <div className="mb-4">
-        <h3 className="text-sm font-semibold text-text-primary">앱 동작</h3>
-        <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">앱 실행 시 동작을 설정합니다.</p>
-      </div>
-
-      {/* 테마 */}
-      <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden mb-3">
-        <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30">
-          <span className="text-xs font-medium text-text-primary">테마</span>
+    <div className="space-y-5">
+      {blocks.map((block, index) => (
+        <div key={index} className="space-y-5">
+          {index > 0 && <SettingsDivider />}
+          {block}
         </div>
-        <div className="p-2 grid grid-cols-2 gap-2">
-          {([
-            { value: 'dark' as const, label: '다크', icon: Moon, description: '어두운 배경' },
-            { value: 'light' as const, label: '라이트', icon: Sun, description: '밝은 배경' }
-          ]).map(({ value, label, icon: Icon, description }) => (
-            <button key={value} onClick={() => setTheme(value)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left ${
-                theme === value ? 'bg-clauday-blue/10 border border-clauday-blue/40' : 'hover:bg-bg-surface-hover border border-transparent'
-              }`}>
-              <Icon size={16} className={theme === value ? 'text-clauday-blue' : 'text-text-tertiary'} />
-              <div className="flex-1 min-w-0">
-                <p className={`text-xs ${theme === value ? 'text-clauday-blue font-medium' : 'text-text-primary'}`}>{label}</p>
-                <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">{description}</p>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 라이트 팔레트 목업 선택 */}
-      {theme === 'light' && (
-        <div className="bg-bg-surface border border-bg-border rounded-xl p-4 mb-3">
-          <ThemePicker />
-        </div>
-      )}
-
-      {/* 글꼴 & 크기 */}
-      <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden mb-3">
-        <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30 flex items-center gap-2">
-          <Type size={12} className="text-text-secondary" />
-          <span className="text-xs font-medium text-text-primary">글꼴 & 크기</span>
-        </div>
-        <FontSettingsSection />
-      </div>
-
-      {/* 시작 뷰 */}
-      <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden">
-        <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-text-primary">시작 시 열 화면</span>
-            {saved && <span className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-emerald-400"><Check size={10} /> 저장됨</span>}
-          </div>
-        </div>
-        <div className="p-2">
-          {STARTUP_OPTIONS.map((opt) => (
-            <label key={opt.value}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-                startupView === opt.value ? 'bg-clauday-blue/10' : 'hover:bg-bg-surface-hover'
-              }`}>
-              <input type="radio" name="startup" checked={startupView === opt.value}
-                onChange={() => save(opt.value)}
-                className="accent-clauday-blue" />
-              <div className="flex-1 min-w-0">
-                <p className={`text-xs ${startupView === opt.value ? 'text-clauday-blue font-medium' : 'text-text-primary'}`}>{opt.label}</p>
-                <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">{opt.description}</p>
-              </div>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {/* 사이드바 커스텀 */}
-      <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden mt-3">
-        <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30">
-          <span className="text-xs font-medium text-text-primary">사이드바 항목</span>
-          <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">순서를 바꾸거나 자주 안 쓰는 항목을 숨길 수 있습니다. 설정/매뉴얼은 항상 노출됩니다.</p>
-        </div>
-        <SidebarPrefsSection />
-      </div>
-
-      {/* v2.0 B-6: 터미널 렌더러. 탭바에도 드롭다운을 뒀었는데, 진단용 설정이 상시 노출돼
-          작업 패널을 줄이면 탭바 레이아웃을 밀어 덜컹거렸다 — 설정 한 곳으로 일원화했다. */}
-      <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden mt-3">
-        <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30">
-          <span className="text-xs font-medium text-text-primary">터미널 렌더러</span>
-          <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
-GPU 문제로 화면이 깨지면 DOM 으로 전환하세요. WebGL 을 쓸 수 없으면 자동으로 DOM 으로 폴백하고 알려줍니다.
-          </p>
-        </div>
-        <TerminalRendererSection />
-      </div>
-
-      {/* 알림 */}
-      <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden mt-3">
-        <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30">
-          <span className="text-xs font-medium text-text-primary">알림</span>
-        </div>
-        <div className="p-2">
-          <AiRecommendNotifyToggle />
-        </div>
-      </div>
-
-      <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-3">
-        💡 <strong className="text-text-secondary">AI 스킬 관리</strong>는 각 AI 기능 화면 우측의 <span className="text-amber-400 font-medium">스킬</span> 버튼에서 바로 할 수 있습니다.
-      </p>
+      ))}
     </div>
   )
 }
