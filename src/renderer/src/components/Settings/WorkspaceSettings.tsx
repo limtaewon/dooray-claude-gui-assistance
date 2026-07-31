@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { FolderPlus, Trash2 } from 'lucide-react'
 import type { RepoRegistryEntry, WorkspaceSettings as WorkspaceSettingsShape } from '@shared/types/workspace'
-import { Button, FieldLabel, Input, LoadingView, useToast } from '../common/ds'
+import { Button, Input, LoadingView, useToast } from '../common/ds'
 import ProjectFilter from '../common/ProjectFilter'
 import ProjectRuleCard from './ProjectRuleCard'
 import { resolveProjectConfig, withProjectOverride } from '@shared/workspace/projectConfig'
@@ -182,7 +182,8 @@ function WorkspaceSettings(): JSX.Element {
                     size="sm"
                     defaultValue={repo.defaultBaseBranch ?? ''}
                     placeholder="기본 base (예: origin/develop)"
-                    className="font-mono w-56"
+                    style={{ width: 220 }}
+                    className="font-mono flex-none"
                     aria-label={`${repo.name} 기본 base 브랜치`}
                     onBlur={(e) => void updateRepo(repo.id, { defaultBaseBranch: e.target.value.trim() || undefined })}
                   />
@@ -190,7 +191,8 @@ function WorkspaceSettings(): JSX.Element {
                     size="sm"
                     defaultValue={repo.branchPrefix ?? ''}
                     placeholder="프리픽스 (선택)"
-                    className="font-mono w-40"
+                    style={{ width: 150 }}
+                    className="font-mono flex-none"
                     aria-label={`${repo.name} 브랜치 프리픽스`}
                     onBlur={(e) => void updateRepo(repo.id, { branchPrefix: e.target.value.trim() || undefined })}
                   />
@@ -241,8 +243,16 @@ function WorkspaceSettings(): JSX.Element {
             />
             브랜치명 댓글 남기기
           </label>
-          <div className="flex items-center gap-2 mt-1">
-            <FieldLabel className="mb-0 whitespace-nowrap">동시 실행 상한</FieldLabel>
+          <div className="flex items-center gap-3 mt-2 pt-2 border-t border-bg-border">
+            <div className="flex-1 min-w-0">
+              <div className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary">
+                동시 실행 상한
+              </div>
+              <p className="text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
+                한 번에 돌릴 작업 수입니다. 초과분은 순차 대기합니다.
+              </p>
+            </div>
+            {/* ds-input 은 width:100% 라 Tailwind 폭 클래스가 밀린다 — 고정 폭은 인라인으로 준다. */}
             <Input
               type="number"
               size="sm"
@@ -250,10 +260,10 @@ function WorkspaceSettings(): JSX.Element {
               max={8}
               value={settings.maxConcurrentRuns}
               onChange={(e) => void patchSettings({ maxConcurrentRuns: Number(e.target.value) || 1 })}
-              className="w-20 flex-none"
+              style={{ width: 64 }}
+              className="flex-none text-center"
               aria-label="동시 실행 상한"
             />
-            <span className="text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-tertiary whitespace-nowrap">초과분은 순차 대기</span>
           </div>
         </div>
       </section>

@@ -25,7 +25,7 @@ export const TOURS: Record<TourViewId, TourStep[]> = {
     },
     {
       title: '한 탭을 나눠서 씁니다',
-      body: '⌘D 오른쪽 분할, ⌘⇧D 아래 분할. ⌥⌘화살표로 pane 을 옮겨 다니고 ⌘W 로 닫습니다(마지막 pane 이면 탭이 닫힙니다). 경계를 끌면 비율이 바뀌고 더블클릭하면 50/50 으로 돌아옵니다.'
+      body: '탭바 오른쪽의 분할 버튼, 또는 ⌘D 오른쪽 분할·⌘⇧D 아래 분할. ⌥⌘화살표로 pane 을 옮겨 다니고 ⌘W 로 닫습니다(마지막 pane 이면 탭이 닫힙니다). 경계를 끌면 비율이 바뀌고 더블클릭하면 50/50 으로 돌아옵니다.'
     },
     {
       title: '경로를 눌러서 엽니다',
@@ -51,8 +51,8 @@ export const TOURS: Record<TourViewId, TourStep[]> = {
     },
     {
       anchor: 'drawer-tab-changes',
-      title: '변경사항 — 스테이징부터 푸시까지',
-      body: '파일을 누르면 diff 가 탭으로 열리고, 행에 마우스를 올리면 올리기/내리기/되돌리기가 나옵니다. 커밋 후 푸시는 upstream 이 없으면 자동으로 -u 를 붙입니다.'
+      title: '변경사항 — 체크한 파일만 커밋합니다',
+      body: '각 파일의 체크박스가 곧 커밋 대상입니다. 추적되지 않은 새 파일도 체크하면 그대로 들어갑니다. 섹션 헤더 체크박스로 한 번에 넣고 뺍니다. 파일을 누르면 diff 가 탭으로 열리고, 푸시는 upstream 이 없으면 자동으로 -u 를 붙입니다.'
     },
     {
       anchor: 'drawer-tab-branchDiff',

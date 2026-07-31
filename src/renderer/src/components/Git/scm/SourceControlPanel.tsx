@@ -124,6 +124,20 @@ function SourceControlPanel({ repoPath, onOpenDiff, onRepoChanged }: SourceContr
     [refresh, onRepoChanged, toast]
   )
 
+  /**
+   * 체크 = 커밋에 포함. git 에는 '커밋 대상' 이라는 별도 상태가 없으므로 스테이징을 그대로 쓴다 —
+   * 추적되지 않은 파일도 체크하면 `git add` 되어 그대로 커밋에 들어간다.
+   */
+  const toggleStaged = useCallback(
+    (paths: string[], next: boolean): void => {
+      if (paths.length === 0) return
+      void run(next ? '커밋에 포함' : '커밋에서 빼기', () =>
+        next ? window.api.git.scm.stage(repoPath, paths) : window.api.git.scm.unstage(repoPath, paths)
+      )
+    },
+    [repoPath, run]
+  )
+
   const commit = async (): Promise<void> => {
     const result = await window.api.git.scm.commit({ repoPath, message, amend })
     if (!result.ok) {
@@ -292,24 +306,13 @@ function SourceControlPanel({ repoPath, onOpenDiff, onRepoChanged }: SourceContr
         />
         <Section
           id="staged"
-          title="스테이징된 변경"
+          title="커밋에 포함"
           entries={sections.staged}
           collapsed={collapsed}
           onToggle={setCollapsed}
           onOpenDiff={openDiff}
+          onToggleStaged={toggleStaged}
           busy={busy !== null}
-          onBulk={
-            sections.staged.length > 0
-              ? {
-                  label: '전체 내리기',
-                  icon: <Minus size={11} />,
-                  run: () =>
-                    void run('언스테이지', () =>
-                      window.api.git.scm.unstage(repoPath, sections.staged.map((e) => e.path))
-                    )
-                }
-              : undefined
-          }
           onStage={(paths) => void run('스테이지', () => window.api.git.scm.stage(repoPath, paths))}
           onUnstage={(paths) => void run('언스테이지', () => window.api.git.scm.unstage(repoPath, paths))}
           onDiscard={(paths) => void run('되돌리기', () => window.api.git.scm.discard(repoPath, paths))}
@@ -321,19 +324,8 @@ function SourceControlPanel({ repoPath, onOpenDiff, onRepoChanged }: SourceContr
           collapsed={collapsed}
           onToggle={setCollapsed}
           onOpenDiff={openDiff}
+          onToggleStaged={toggleStaged}
           busy={busy !== null}
-          onBulk={
-            sections.changes.length > 0
-              ? {
-                  label: '전체 올리기',
-                  icon: <Plus size={11} />,
-                  run: () =>
-                    void run('스테이지', () =>
-                      window.api.git.scm.stage(repoPath, sections.changes.map((e) => e.path))
-                    )
-                }
-              : undefined
-          }
           onStage={(paths) => void run('스테이지', () => window.api.git.scm.stage(repoPath, paths))}
           onUnstage={(paths) => void run('언스테이지', () => window.api.git.scm.unstage(repoPath, paths))}
           onDiscard={(paths) => void run('되돌리기', () => window.api.git.scm.discard(repoPath, paths))}
@@ -345,19 +337,8 @@ function SourceControlPanel({ repoPath, onOpenDiff, onRepoChanged }: SourceContr
           collapsed={collapsed}
           onToggle={setCollapsed}
           onOpenDiff={openDiff}
+          onToggleStaged={toggleStaged}
           busy={busy !== null}
-          onBulk={
-            sections.untracked.length > 0
-              ? {
-                  label: '전체 올리기',
-                  icon: <Plus size={11} />,
-                  run: () =>
-                    void run('스테이지', () =>
-                      window.api.git.scm.stage(repoPath, sections.untracked.map((e) => e.path))
-                    )
-                }
-              : undefined
-          }
           onStage={(paths) => void run('스테이지', () => window.api.git.scm.stage(repoPath, paths))}
           onUnstage={(paths) => void run('언스테이지', () => window.api.git.scm.unstage(repoPath, paths))}
           onDiscard={(paths) => void run('되돌리기', () => window.api.git.scm.discard(repoPath, paths))}
@@ -375,7 +356,8 @@ interface SectionProps {
   onToggle: (updater: (prev: Record<string, boolean>) => Record<string, boolean>) => void
   onOpenDiff: (entry: GitStatusEntry) => void
   busy: boolean
-  onBulk?: { label: string; icon: JSX.Element; run: () => void }
+  /** 커밋에 포함할지 = 스테이징 여부. 체크하면 stage, 풀면 unstage. */
+  onToggleStaged?: (paths: string[], next: boolean) => void
   onStage?: (paths: string[]) => void
   onUnstage?: (paths: string[]) => void
   onDiscard?: (paths: string[]) => void
@@ -389,17 +371,34 @@ function Section({
   onToggle,
   onOpenDiff,
   busy,
-  onBulk,
+  onToggleStaged,
   onStage,
   onUnstage,
   onDiscard
 }: SectionProps): JSX.Element | null {
   if (entries.length === 0) return null
   const isCollapsed = collapsed[id] === true
+  const stageable = entries.filter((entry) => !entry.conflictKind)
+  const stagedCount = stageable.filter((entry) => entry.area === 'staged').length
+  const allStaged = stageable.length > 0 && stagedCount === stageable.length
 
   return (
     <div className="mb-0.5">
       <div className="group flex items-center gap-1 px-2 h-6 hover:bg-bg-surface-hover">
+        {onToggleStaged && stageable.length > 0 && (
+          <input
+            type="checkbox"
+            checked={allStaged}
+            ref={(el) => {
+              // 일부만 골랐을 때는 중간 상태로 — 전부/일부/없음이 눈에 바로 들어와야 한다.
+              if (el) el.indeterminate = stagedCount > 0 && !allStaged
+            }}
+            disabled={busy}
+            onChange={() => onToggleStaged(stageable.map((entry) => entry.path), !allStaged)}
+            aria-label={`${title} 전체 ${allStaged ? '빼기' : '커밋에 포함'}`}
+            className="flex-none"
+          />
+        )}
         <button
           onClick={() => onToggle((prev) => ({ ...prev, [id]: !prev[id] }))}
           className="flex items-center gap-1 flex-1 min-w-0 text-left"
@@ -411,17 +410,6 @@ function Section({
           </span>
           <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">{entries.length}</span>
         </button>
-        {onBulk && (
-          <button
-            onClick={onBulk.run}
-            disabled={busy}
-            className="ds-btn ghost icon opacity-0 group-hover:opacity-100 focus:opacity-100 flex-none"
-            title={onBulk.label}
-            aria-label={onBulk.label}
-          >
-            {onBulk.icon}
-          </button>
-        )}
       </div>
 
       {!isCollapsed &&
@@ -431,6 +419,7 @@ function Section({
             entry={entry}
             busy={busy}
             onOpenDiff={() => onOpenDiff(entry)}
+            onToggleStaged={onToggleStaged && ((next) => onToggleStaged([entry.path], next))}
             onStage={onStage && (() => onStage([entry.path]))}
             onUnstage={onUnstage && (() => onUnstage([entry.path]))}
             onDiscard={onDiscard && (() => onDiscard([entry.path]))}
@@ -444,16 +433,38 @@ interface EntryRowProps {
   entry: GitStatusEntry
   busy: boolean
   onOpenDiff: () => void
+  /** 체크 = 이 파일을 커밋에 포함(스테이징) */
+  onToggleStaged?: (next: boolean) => void
   onStage?: () => void
   onUnstage?: () => void
   onDiscard?: () => void
 }
 
-function EntryRow({ entry, busy, onOpenDiff, onStage, onUnstage, onDiscard }: EntryRowProps): JSX.Element {
+function EntryRow({
+  entry,
+  busy,
+  onOpenDiff,
+  onToggleStaged,
+  onStage,
+  onUnstage,
+  onDiscard
+}: EntryRowProps): JSX.Element {
   const { dir, name } = splitPath(entry.path)
+  const staged = entry.area === 'staged'
 
   return (
-    <div className="group/row flex items-center gap-1 h-6 pl-5 pr-2 hover:bg-bg-surface-hover">
+    <div className="group/row flex items-center gap-1 h-6 pl-2 pr-2 hover:bg-bg-surface-hover">
+      {onToggleStaged && !entry.conflictKind && (
+        <input
+          type="checkbox"
+          checked={staged}
+          disabled={busy}
+          onChange={() => onToggleStaged(!staged)}
+          title={staged ? '커밋에서 빼기' : '커밋에 포함'}
+          aria-label={`${entry.path} ${staged ? '커밋에서 빼기' : '커밋에 포함'}`}
+          className="flex-none"
+        />
+      )}
       <button onClick={onOpenDiff} className="flex-1 min-w-0 flex items-baseline gap-1 text-left" title={entry.path}>
         <span className="text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-primary truncate">{name}</span>
         {dir && (

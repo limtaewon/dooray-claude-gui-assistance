@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, X, Terminal, Trash2, Pencil, FileDiff, PanelRight, Loader2 } from 'lucide-react'
+import { Plus, X, Terminal, Trash2, Pencil, FileDiff, PanelRight, Loader2, Columns2, Rows2 } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -985,6 +985,9 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     if (drawerOpen && drawerTab !== 'tasks') refreshRepoRoot()
   }, [drawerOpen, drawerTab, activeTabId, refreshRepoRoot])
 
+  /** 지금 분할할 수 있는 탭인지 — diff 탭에는 PTY 가 없다. */
+  const activeTerminalTab = tabs.find((t) => t.tabId === activeTabId && !isDiffTab(t)) ?? null
+
   /** v2.0 B-4: split 은 항상 새 PTY — 현재 focused pane 의 cwd 를 상속한다(ADR-02 §7). */
   const splitFocusedPane = useCallback(async (direction: SplitDirection) => {
     const tabId = activeTabIdRef.current
@@ -1285,6 +1288,27 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
             <Plus size={14} />
           </button>
           <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+            {/* 분할은 자주 쓰는데 단축키를 모르면 길이 없다 — 탭바에 버튼으로 둔다. */}
+            <div className="flex items-center">
+              <button
+                onClick={() => void splitFocusedPane('row')}
+                disabled={!activeTerminalTab}
+                className="w-7 h-7 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover disabled:opacity-40 disabled:hover:bg-transparent"
+                title="오른쪽으로 분할 (⌘D)"
+                aria-label="오른쪽으로 분할"
+              >
+                <Columns2 size={13} />
+              </button>
+              <button
+                onClick={() => void splitFocusedPane('column')}
+                disabled={!activeTerminalTab}
+                className="w-7 h-7 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover disabled:opacity-40 disabled:hover:bg-transparent"
+                title="아래로 분할 (⌘⇧D)"
+                aria-label="아래로 분할"
+              >
+                <Rows2 size={13} />
+              </button>
+            </div>
             <button onClick={toggleDrawer}
               data-tour="terminal-drawer-toggle"
               aria-pressed={drawerOpen}
