@@ -23,8 +23,11 @@ export function reattachPaneHost(
 ): void {
   if (host.parentElement === slot) return
   const scroll = handle?.captureScrollState() ?? null
+  // DOM 에서 떼어내면 그 안에 있던 포커스는 사라진다 — 옮기기 전에 기억했다가 되돌린다.
+  const hadFocus = host.contains(document.activeElement)
   hooks.disposeWebgl?.()
   slot.appendChild(host)
+  if (hadFocus) handle?.focus()
   requestAnimationFrame(() => {
     hooks.attachWebgl?.()
     handle?.fit()

@@ -53,6 +53,8 @@ let registeredOscHandlers: Array<[number, (data: string) => boolean]> = []
 // v2.0 B-5: true 면 terminal.write() 콜백을 microtask 로 미룬다 — replay guard 활성 구간을
 // 테스트가 관찰할 수 있게 하는 스위치(기본은 기존 동작과 동일한 동기 호출).
 let deferWriteCallback = false
+// term.focus() 호출 횟수 — 새 pane 이 DOM 에 붙은 뒤 다시 포커스를 잡는지 확인용.
+let focusCallCount = 0
 // v2.0 B-5: serialize() 결과를 테스트별로 조절.
 let fakeSerializeResult = 'FAKE_SERIALIZED'
 let fakeSerializeShouldThrow = false
@@ -102,7 +104,7 @@ vi.mock('@xterm/xterm', () => {
     }
     reset(): void {}
     dispose(): void {}
-    focus(): void {}
+    focus(): void { focusCallCount++ }
     clear(): void {}
     selectAll(): void {}
     select(): void {}
@@ -220,6 +222,7 @@ describe('TerminalPane — v2.0 B-1 종료 오버레이 / 입력 차단', () => 
     registeredLinkProviders = []
     registeredOscHandlers = []
     deferWriteCallback = false
+    focusCallCount = 0
     fakeSerializeResult = 'FAKE_SERIALIZED'
     fakeSerializeShouldThrow = false
     webglConstructorShouldThrow = false
@@ -440,6 +443,25 @@ describe('TerminalPane — v2.0 B-1 종료 오버레이 / 입력 차단', () => 
       renderWithDs(<TerminalPane ref={ref} sessionId="s1" isVisible isFocused />)
       expect(() => ref.current?.focus()).not.toThrow()
       expect(() => ref.current?.fit()).not.toThrow()
+    })
+
+    /**
+     * 새로 만든 pane 의 host 는 마운트 시점에 아직 트리 밖(detached)이라 그때의 focus() 는
+     * 브라우저가 무시한다 — host 를 붙이는 PaneSlot effect 가 portal 자식인 이 effect 보다 뒤에
+     * 돌기 때문. 다음 프레임에 한 번 더 부르지 않으면 ⌘T 로 연 탭에 바로 타이핑되지 않는다.
+     */
+    it('focused 로 마운트되면 다음 프레임에 focus() 를 한 번 더 부른다', async () => {
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused />)
+
+      expect(focusCallCount).toBe(1)
+      await waitFor(() => expect(focusCallCount).toBe(2))
+    })
+
+    it('focused 가 아니면 프레임이 지나도 포커스를 가져가지 않는다', async () => {
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused={false} />)
+
+      await new Promise((r) => setTimeout(r, 50))
+      expect(focusCallCount).toBe(0)
     })
   })
 

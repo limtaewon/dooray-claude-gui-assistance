@@ -890,8 +890,15 @@ function TerminalPaneInner(
 
   // v2.0 B-3: term.focus() 는 focused 전환에서만 — split 에서 "보이지만 포커스는 아닌 pane" 의
   // 포커스를 fit 타이밍에 뺏지 않기 위해 가시성 effect 와 분리했다 (ADR-01 §2/§5).
+  //
+  // 새로 만든 pane 은 이 시점에 host 가 아직 트리 밖(detached)이라 focus() 가 그냥 무시된다 —
+  // host 를 slot 에 붙이는 건 PaneSlot 의 effect 이고, 그건 portal 자식인 이 effect 보다 뒤에
+  // 돈다. 붙은 다음 프레임에 한 번 더 부른다(⌘T 로 연 탭에 바로 타이핑되도록).
   useEffect(() => {
-    if (focused) terminalRef.current?.focus()
+    if (!focused) return
+    terminalRef.current?.focus()
+    const rafId = requestAnimationFrame(() => terminalRef.current?.focus())
+    return () => cancelAnimationFrame(rafId)
   }, [focused])
 
   // v2.0 B-6: 윈도우 wake(document.visibilitychange → visible) 도 reveal 과 같은 리셋 경계다
