@@ -1,0 +1,101 @@
+import { describe, it, expect, vi } from 'vitest'
+import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { renderWithDs } from '../../../../../test/helpers/renderWithDs'
+import ProjectRuleCard from './ProjectRuleCard'
+import type { DoorayProject } from '@shared/types/dooray'
+import type { RepoRegistryEntry } from '@shared/types/workspace'
+import type { ResolvedProjectConfig } from '@shared/workspace/projectConfig'
+
+const PROJECT = { id: 'p1', code: 'NEON', description: '네온' } as DoorayProject
+
+const REPOS: RepoRegistryEntry[] = [
+  { id: 'r1', path: '/Users/me/Desktop/2NEON', name: '2NEON' },
+  { id: 'r2', path: '/Users/me/Desktop/neon-ai', name: 'neon-ai' },
+  { id: 'r3', path: '/Users/me/work/other', name: 'other' }
+]
+
+function config(repoIds: string[]): ResolvedProjectConfig {
+  return {
+    repoIds,
+    branchTemplate: 'feature/{projectCode}-{taskNumber}',
+    promptTemplate: '다음 두레이 업무를 진행합니다: {ref} {title}',
+    source: { branchTemplate: 'global', promptTemplate: 'global' }
+  }
+}
+
+describe('ProjectRuleCard — 저장소', () => {
+  it('넣은 저장소만 목록에 나오고 경로가 함께 보인다 — 이름만으로는 어느 폴더인지 갈리지 않는다', () => {
+    renderWithDs(
+      <ProjectRuleCard project={PROJECT} repos={REPOS} config={config(['r1'])} onChange={() => {}} />
+    )
+
+    expect(screen.getByText('2NEON')).toBeInTheDocument()
+    expect(screen.getByText('/Users/me/Desktop/2NEON')).toBeInTheDocument()
+    // 안 넣은 저장소는 목록에 없다 (등록된 전부를 늘어놓지 않는다)
+    expect(screen.queryByText('neon-ai')).not.toBeInTheDocument()
+  })
+
+  it('추가 버튼은 아직 안 넣은 저장소만 보여준다', async () => {
+    renderWithDs(
+      <ProjectRuleCard project={PROJECT} repos={REPOS} config={config(['r1'])} onChange={() => {}} />
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'NEON 저장소 추가' }))
+
+    expect(screen.getByText('neon-ai')).toBeInTheDocument()
+    expect(screen.getByText('other')).toBeInTheDocument()
+    // 이미 넣은 것은 후보에 없다 — 목록의 행 하나뿐
+    expect(screen.getAllByText('2NEON')).toHaveLength(1)
+  })
+
+  it('고르면 기존 목록에 더해진다', async () => {
+    const onChange = vi.fn()
+    renderWithDs(
+      <ProjectRuleCard project={PROJECT} repos={REPOS} config={config(['r1'])} onChange={onChange} />
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'NEON 저장소 추가' }))
+    await userEvent.click(screen.getByText('neon-ai'))
+
+    expect(onChange).toHaveBeenCalledWith({ repoIds: ['r1', 'r2'] })
+  })
+
+  it('× 로 그 저장소만 뺀다', async () => {
+    const onChange = vi.fn()
+    renderWithDs(
+      <ProjectRuleCard
+        project={PROJECT}
+        repos={REPOS}
+        config={config(['r1', 'r2'])}
+        onChange={onChange}
+      />
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: '2NEON 빼기' }))
+
+    expect(onChange).toHaveBeenCalledWith({ repoIds: ['r2'] })
+  })
+
+  it('다 넣었으면 추가 버튼 대신 그 사실을 알린다', () => {
+    renderWithDs(
+      <ProjectRuleCard
+        project={PROJECT}
+        repos={REPOS}
+        config={config(['r1', 'r2', 'r3'])}
+        onChange={() => {}}
+      />
+    )
+
+    expect(screen.queryByRole('button', { name: 'NEON 저장소 추가' })).not.toBeInTheDocument()
+    expect(screen.getByText('등록된 저장소를 모두 넣었습니다.')).toBeInTheDocument()
+  })
+
+  it('등록된 저장소가 없으면 먼저 등록하라고 안내한다', () => {
+    renderWithDs(
+      <ProjectRuleCard project={PROJECT} repos={[]} config={config([])} onChange={() => {}} />
+    )
+
+    expect(screen.getByText(/폴더를 먼저 등록하세요/)).toBeInTheDocument()
+  })
+})
