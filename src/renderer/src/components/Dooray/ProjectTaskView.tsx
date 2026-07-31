@@ -386,7 +386,7 @@ function ProjectTaskView(): JSX.Element {
               ) : error ? (
                 <div className="text-center py-8">
                   <p className="text-xs text-red-400">{error}</p>
-                  <button onClick={() => loadTasks(selectedProject.id)} className="text-xs text-clauday-blue hover:underline mt-2">다시 시도</button>
+                  <button onClick={() => loadTasks(selectedProject.id)} className="text-xs text-link hover:underline mt-2">다시 시도</button>
                 </div>
               ) : filteredTasks.length === 0 ? (
                 <div className="text-text-secondary text-sm text-center py-12">

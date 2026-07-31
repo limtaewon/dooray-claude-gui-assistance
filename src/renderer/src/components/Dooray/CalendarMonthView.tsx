@@ -1041,7 +1041,7 @@ function EventDetailBody({ event, calendarName, colorBg }: {
         {event.webUrl && (
           <DetailRow icon={<ExternalLink size={14} />}>
             <a href={event.webUrl} target="_blank" rel="noreferrer"
-              className="text-clauday-blue hover:underline truncate inline-block max-w-full">{event.webUrl}</a>
+              className="text-link hover:underline truncate inline-block max-w-full">{event.webUrl}</a>
           </DetailRow>
         )}
       </div>
@@ -1214,7 +1214,7 @@ function NewEventModal({ range, calendars, onClose, onCreate }: {
           </select>
         </Field>
         <label className="flex items-center gap-1.5 text-text-secondary">
-          <input type="checkbox" className="accent-[var(--text-secondary)]" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />종일
+          <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />종일
         </label>
         {!allDay && (
           <div className="grid grid-cols-2 gap-2">

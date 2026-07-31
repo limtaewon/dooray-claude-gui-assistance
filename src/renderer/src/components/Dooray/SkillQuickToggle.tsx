@@ -417,7 +417,7 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
 {skills.filter((s) => s.enabled).map((s) => `\n### ${s.name}\n${s.content}`).join('\n\n')}
                   </pre>
                 )}
-                <button onClick={() => setMode('list')} className="mt-3 text-[calc(10px_*_var(--app-font-scale,1))] text-clauday-blue hover:underline">← 목록으로</button>
+                <button onClick={() => setMode('list')} className="mt-3 text-[calc(10px_*_var(--app-font-scale,1))] text-link hover:underline">← 목록으로</button>
               </div>
             )}
 
@@ -507,7 +507,7 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
                   className="w-full px-2.5 py-1.5 bg-bg-primary border border-bg-border rounded-md text-xs text-text-secondary placeholder-text-tertiary font-mono focus:outline-none focus:border-clauday-blue resize-y mb-2" />
                 <div className="flex items-center justify-between">
                   <label className="flex items-center gap-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">
-                    <input type="checkbox" checked={editing.autoApply} onChange={(e) => setEditing({ ...editing, autoApply: e.target.checked })} className="accent-[var(--text-secondary)]" />
+                    <input type="checkbox" checked={editing.autoApply} onChange={(e) => setEditing({ ...editing, autoApply: e.target.checked })} />
                     자동 적용
                   </label>
                   <div className="flex gap-1.5">

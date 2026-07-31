@@ -62,7 +62,7 @@ function QuickStatCard({ label, count, icon, onNavigate, navigateLabel }: QuickS
       </span>
       {onNavigate && (
         <button
-          className="text-xs text-[color:var(--clauday-blue)] hover:underline text-left flex items-center gap-0.5 mt-0.5"
+          className="text-xs text-link hover:underline text-left flex items-center gap-0.5 mt-0.5"
           onClick={onNavigate}
         >
           {navigateLabel ?? '자세히 보기'}
@@ -311,7 +311,7 @@ export function OverviewPanel({ model, sourcePath, onNavigate }: OverviewPanelPr
 
         {onNavigate && (
           <button
-            className="mt-2 text-xs text-[color:var(--clauday-blue)] hover:underline flex items-center gap-0.5"
+            className="mt-2 text-xs text-link hover:underline flex items-center gap-0.5"
             onClick={() => onNavigate('flow')}
           >
             흐름 캔버스에서 그래프로 보기 <ArrowRight size={9} />

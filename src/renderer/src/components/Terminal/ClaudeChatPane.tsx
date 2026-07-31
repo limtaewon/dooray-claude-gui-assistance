@@ -575,7 +575,7 @@ function LinkChip({ target }: { target: string }): JSX.Element {
           e.preventDefault()
           handleOpen()
         }}
-        className="text-clauday-blue underline decoration-clauday-blue/40 hover:decoration-clauday-blue cursor-pointer"
+        className="text-link underline decoration-link cursor-pointer"
       >
         {target}
       </a>

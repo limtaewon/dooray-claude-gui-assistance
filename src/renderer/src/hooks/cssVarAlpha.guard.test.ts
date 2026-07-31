@@ -42,10 +42,12 @@ const CSS_VAR_COLOR_PREFIXES = [
   'bg-hover',
   'text-primary',
   'text-secondary',
-  'text-tertiary'
+  'text-tertiary',
+  'link'
 ]
 
-const UTILITY_PREFIXES = ['bg', 'text', 'border', 'ring', 'from', 'to', 'via', 'fill', 'stroke', 'divide', 'outline']
+// decoration(밑줄색)도 같은 함정에 걸린다 — 링크 밑줄이 통째로 사라진다.
+const UTILITY_PREFIXES = ['bg', 'text', 'border', 'ring', 'from', 'to', 'via', 'fill', 'stroke', 'divide', 'outline', 'decoration']
 
 /** `hover:bg-clauday-blue/10` 같은 조합을 찾는다. 변형(hover:, dark: …)도 함께 잡는다. */
 const OFFENDER_RE = new RegExp(

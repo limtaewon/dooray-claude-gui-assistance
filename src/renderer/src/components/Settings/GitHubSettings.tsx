@@ -6,10 +6,11 @@ import { Button, Input, useToast } from '../common/ds'
 const TOKEN_HELP_URL = 'https://github.com/settings/tokens'
 
 /**
- * GitHub 계정 연결 — 개인 액세스 토큰(PAT) 하나만 받는다.
+ * GitHub 계정 연결.
  *
- * 토큰은 OS 키체인에만 두고 화면에는 다시 내려주지 않는다. 저장된 토큰이 거절당하면(만료·회수)
- * 조용히 지우지 않고 그 사실을 보여준다 — 사용자가 왜 안 되는지 알아야 한다.
+ * **이미 `gh` 로 로그인돼 있으면 그것을 그대로 쓴다** — CLI 로 로그인한 사람에게 토큰을 또 만들라고
+ * 하는 건 같은 일을 두 번 시키는 것이다. `gh` 가 없을 때만 개인 액세스 토큰을 받는다.
+ * 토큰은 OS 키체인에만 두고 화면에는 다시 내려주지 않는다.
  */
 function GitHubSettings(): JSX.Element {
   const [status, setStatus] = useState<GitHubStatus | null>(null)
@@ -74,7 +75,7 @@ function GitHubSettings(): JSX.Element {
                   {account.login}
                 </span>
                 <span className="ds-chip emerald flex-none">
-                  <Check size={8} /> 연결됨
+                  <Check size={8} /> {status?.source === 'gh' ? 'gh 로그인' : '토큰 연결됨'}
                 </span>
               </div>
               {account.name && (
@@ -91,9 +92,15 @@ function GitHubSettings(): JSX.Element {
             >
               프로필 <ExternalLink size={10} />
             </a>
-            <Button variant="ghost" size="sm" disabled={busy} onClick={() => void disconnect()}>
-              연결 해제
-            </Button>
+            {status?.source === 'gh' ? (
+              <Button variant="ghost" size="sm" onClick={() => void load(true)}>
+                다시 확인
+              </Button>
+            ) : (
+              <Button variant="ghost" size="sm" disabled={busy} onClick={() => void disconnect()}>
+                연결 해제
+              </Button>
+            )}
           </div>
         ) : (
           <>
@@ -128,6 +135,13 @@ function GitHubSettings(): JSX.Element {
               </Button>
             </div>
             <p className="text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-tertiary">
+              터미널에서 <code>gh auth login</code> 으로 로그인해 두면 토큰 없이 그대로 잡힙니다.{' '}
+              <button onClick={() => void load(true)} className="text-link">
+                다시 확인
+              </button>
+            </p>
+            <p className="text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-tertiary">
+              직접 넣으려면{' '}
               <a href={TOKEN_HELP_URL} target="_blank" rel="noreferrer" className="text-link">
                 GitHub → Settings → Developer settings → Personal access tokens
               </a>{' '}
@@ -138,8 +152,10 @@ function GitHubSettings(): JSX.Element {
       </section>
 
       <p className="text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-tertiary">
-        토큰은 OS 키체인에만 저장되고 앱 밖으로 나가지 않습니다. 터미널의 <code>git</code> 은 이 토큰이
-        아니라 각자의 자격증명(SSH 키·credential helper)을 그대로 씁니다.
+        {status?.source === 'gh'
+          ? 'GitHub CLI(gh)의 로그인을 그대로 씁니다 — 앱이 토큰을 따로 보관하지 않습니다.'
+          : '토큰은 OS 키체인에만 저장되고 앱 밖으로 나가지 않습니다.'}{' '}
+        터미널의 <code>git</code> 은 이 값이 아니라 각자의 자격증명(SSH 키·credential helper)을 그대로 씁니다.
       </p>
     </div>
   )

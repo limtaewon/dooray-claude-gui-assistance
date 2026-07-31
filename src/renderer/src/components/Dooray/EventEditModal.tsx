@@ -241,7 +241,7 @@ function EventEditModal({ event, calendars, onClose, onSaved }: Props): JSX.Elem
           <label className="flex items-center gap-1.5 text-text-secondary cursor-pointer select-none">
             <input
               type="checkbox"
-              className="accent-[var(--text-secondary)]"
+             
               checked={allDay}
               onChange={(e) => {
                 const next = e.target.checked

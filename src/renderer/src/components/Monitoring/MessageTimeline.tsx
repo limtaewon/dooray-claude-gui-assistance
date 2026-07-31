@@ -80,7 +80,7 @@ function renderContent(text: string, terms: string[]): JSX.Element {
           URL_RE.lastIndex = 0
           return (
             <a key={i} href={p} target="_blank" rel="noreferrer"
-              className="text-clauday-blue hover:underline break-all inline-flex items-center gap-0.5">
+              className="text-link hover:underline break-all inline-flex items-center gap-0.5">
               {p}<ExternalLink size={9} className="opacity-60 flex-shrink-0" />
             </a>
           )

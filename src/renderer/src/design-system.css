@@ -131,6 +131,13 @@
 .ds-card.flat   { background: transparent; border-color: var(--bg-border); }
 
 /* ---------- Inputs ---------- */
+/* 체크박스·라디오는 앱 전체에서 한 가지 색으로 — 여기저기 회색·기본색이 섞이면
+   "켜진 것"과 "꺼진 것"을 눈으로 가를 수 없다. 체크 상태는 장식이 아니라 정보다. */
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--c-blue-solid);
+}
+
 .ds-input {
   width: 100%;
   height: 28px;

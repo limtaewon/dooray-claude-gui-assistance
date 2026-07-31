@@ -427,7 +427,7 @@ function DoorayTokenSettings(): JSX.Element {
           <li>발급된 토큰을 아래 입력란에 붙여넣기</li>
         </ol>
         <a href="https://nhnent.dooray.com/setting/api/token" target="_blank" rel="noreferrer"
-          className="inline-flex items-center gap-1 mt-2 text-[calc(10px_*_var(--app-font-scale,1))] text-clauday-blue hover:underline">
+          className="inline-flex items-center gap-1 mt-2 text-[calc(10px_*_var(--app-font-scale,1))] text-link hover:underline">
           <ExternalLink size={10} /> API 토큰 발급 페이지 열기
         </a>
       </div>
@@ -732,7 +732,7 @@ function CalDAVSettings(): JSX.Element {
           <li>아이디(이메일)와 복사한 비밀번호를 아래에 입력</li>
         </ol>
         <a href="https://nhnent.dooray.com/setting/calendar/caldav" target="_blank" rel="noreferrer"
-          className="inline-flex items-center gap-1 mt-2 text-[calc(10px_*_var(--app-font-scale,1))] text-clauday-blue hover:underline">
+          className="inline-flex items-center gap-1 mt-2 text-[calc(10px_*_var(--app-font-scale,1))] text-link hover:underline">
           <ExternalLink size={10} /> 두레이 CalDAV 설정 페이지 열기
         </a>
         <p className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary mt-2">서버: <code className="font-mono text-text-secondary">caldav.dooray.com</code> (고정)</p>
@@ -1093,7 +1093,7 @@ function SidebarPrefsSection(): JSX.Element {
               </button>
               <label className="flex items-center gap-1 cursor-pointer ml-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-secondary">
                 <input type="checkbox" checked={!isHidden} onChange={() => toggleHidden(item.view)}
-                  className="accent-[var(--text-secondary)]" />
+                  />
                 <span>{isHidden ? '숨김' : '표시'}</span>
               </label>
             </div>
@@ -1330,7 +1330,7 @@ function FontSettingsSection(): JSX.Element {
           step={5}
           value={pct}
           onChange={(e) => setScale(Number(e.target.value) / 100)}
-          className="w-full accent-[var(--text-secondary)]"
+          className="w-full"
         />
         <div className="flex flex-wrap gap-1.5 mt-2">
           {SCALE_PRESETS.map((p) => (

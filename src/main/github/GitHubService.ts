@@ -1,6 +1,8 @@
+import { execFile } from 'child_process'
 import { net } from 'electron'
 import keytar from 'keytar'
 import type { GitHubAccount, GitHubStatus } from '../../shared/types/github'
+import { claudeExtraPaths, mergePathIntoEnv } from '../utils/env'
 
 const SERVICE_NAME = 'clauday'
 const ACCOUNT_NAME = 'github-token'
@@ -11,6 +13,8 @@ export interface GitHubServiceOptions {
   apiBaseUrl?: string
   /** 테스트 주입용 — 기본은 electron net */
   fetchJson?: (url: string, token: string) => Promise<{ status: number; body: unknown }>
+  /** 테스트 주입용 — `gh auth token` 결과. null 이면 gh 로그인이 없다는 뜻 */
+  readGhToken?: () => Promise<string | null>
 }
 
 /**
@@ -22,6 +26,7 @@ export interface GitHubServiceOptions {
 export class GitHubService {
   private token: string | null = null
   private cachedAccount: GitHubAccount | null = null
+  private cachedSource: 'gh' | 'token' | null = null
 
   constructor(private options: GitHubServiceOptions = {}) {}
 
@@ -50,7 +55,8 @@ export class GitHubService {
     await keytar.setPassword(SERVICE_NAME, ACCOUNT_NAME, trimmed)
     this.token = trimmed
     this.cachedAccount = result.account
-    return { connected: true, account: result.account }
+    this.cachedSource = 'token'
+    return { connected: true, account: result.account, source: 'token' }
   }
 
   async disconnect(): Promise<void> {
@@ -61,21 +67,60 @@ export class GitHubService {
     }
     this.token = null
     this.cachedAccount = null
+    this.cachedSource = null
   }
 
-  /** 지금 연결 상태. `refresh` 면 캐시를 무시하고 다시 물어본다. */
+  /**
+   * 지금 연결 상태.
+   *
+   * **`gh` 로그인이 있으면 그것을 먼저 쓴다** — 이미 CLI 로 로그인한 사람에게 토큰을 또 만들라고
+   * 하는 건 같은 일을 두 번 시키는 것이다. `gh` 가 없을 때만 앱에 저장한 PAT 로 떨어진다.
+   */
   async status(refresh = false): Promise<GitHubStatus> {
+    if (!refresh && this.cachedAccount && this.cachedSource) {
+      return { connected: true, account: this.cachedAccount, source: this.cachedSource }
+    }
+
+    const ghToken = await this.readGhToken()
+    if (ghToken) {
+      const result = await this.fetchAccount(ghToken)
+      if (result.account) {
+        this.cachedAccount = result.account
+        this.cachedSource = 'gh'
+        return { connected: true, account: result.account, source: 'gh', ghAvailable: true }
+      }
+      // gh 토큰이 거절당했으면(스코프 부족 등) 저장된 PAT 로 넘어간다.
+    }
+
     const token = await this.getToken()
-    if (!token) return { connected: false }
-    if (!refresh && this.cachedAccount) return { connected: true, account: this.cachedAccount }
+    if (!token) return { connected: false, ghAvailable: ghToken !== null }
 
     const result = await this.fetchAccount(token)
     if (!result.account) {
       // 토큰은 있는데 거절당했다 — 만료·회수됐을 수 있으니 그대로 알린다(조용히 지우지 않는다).
-      return { connected: false, error: result.error, hasStoredToken: true }
+      return { connected: false, error: result.error, hasStoredToken: true, ghAvailable: ghToken !== null }
     }
     this.cachedAccount = result.account
-    return { connected: true, account: result.account }
+    this.cachedSource = 'token'
+    return { connected: true, account: result.account, source: 'token' }
+  }
+
+  /**
+   * `gh auth token` — GitHub CLI 로그인이 있으면 그 토큰.
+   *
+   * Electron 은 로그인 셸 PATH 를 물려받지 못해 `gh` 를 못 찾는 일이 흔하다. claude CLI 와 같은
+   * 후보 경로를 얹어서 찾는다. 로그인이 없으면 gh 가 1로 끝나므로 null.
+   */
+  private readGhToken(): Promise<string | null> {
+    if (this.options.readGhToken) return this.options.readGhToken()
+    return new Promise((resolve) => {
+      const env = mergePathIntoEnv(process.env, claudeExtraPaths())
+      execFile('gh', ['auth', 'token'], { env, timeout: 5000 }, (err, stdout) => {
+        if (err) return resolve(null)
+        const token = String(stdout).trim()
+        resolve(token || null)
+      })
+    })
   }
 
   private async fetchAccount(token: string): Promise<{ account?: GitHubAccount; error?: string }> {
