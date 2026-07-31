@@ -73,6 +73,16 @@ describe('TerminalManager.create', () => {
     expect(meta.cwd).toBeTruthy()
   })
 
+  it('사라진 폴더를 주면 홈에서 시작한다 — 워크트리를 지운 뒤 그 세션을 다시 열 때 실제로 일어난다', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const m = new TerminalManager()
+    const meta = m.create({ cwd: '/tmp/clauday-없는-폴더-xyz' })
+    expect(meta.cwd).not.toBe('/tmp/clauday-없는-폴더-xyz')
+    expect(meta.cwd).toBeTruthy()
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
   it('command 지정 시 name 에 반영', () => {
     const m = new TerminalManager()
     const meta = m.create({ command: 'python' })

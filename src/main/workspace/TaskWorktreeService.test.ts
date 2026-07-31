@@ -25,6 +25,7 @@ function makeDeps(overrides?: Partial<TaskWorktreeDeps['git']>): {
       isMain: false,
       isBare: false
     })),
+    getDefaultRemoteBranch: vi.fn().mockResolvedValue('origin/develop'),
     addToInfoExclude: vi.fn().mockResolvedValue(true),
     ...overrides
   } as TaskWorktreeDeps['git']
@@ -54,6 +55,31 @@ describe('TaskWorktreeService.ensure', () => {
       newBranch: true,
       baseBranch: 'develop'
     })
+    // 저장소에 정해둔 base 가 있으면 원격을 들여다볼 필요가 없다
+    expect(git.getDefaultRemoteBranch).not.toHaveBeenCalled()
+  })
+
+  it('base 를 안 정해뒀으면 원격 기본 브랜치에서 갈라낸다 — 지금 HEAD 는 다른 업무의 브랜치다', async () => {
+    const { deps, git } = makeDeps()
+
+    await new TaskWorktreeService(deps).ensure({ repoPath: MAIN.path, branch: 'feature/neon-6711' })
+
+    expect(git.createWorktree).toHaveBeenCalledWith(
+      expect.objectContaining({ newBranch: true, baseBranch: 'origin/develop' })
+    )
+  })
+
+  it('원격 기본 브랜치도 모르면 현재 HEAD 에서 갈라내고 경고를 남긴다', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { deps, git } = makeDeps({ getDefaultRemoteBranch: vi.fn().mockResolvedValue(null) })
+
+    await new TaskWorktreeService(deps).ensure({ repoPath: MAIN.path, branch: 'feature/neon-6711' })
+
+    expect(git.createWorktree).toHaveBeenCalledWith(
+      expect.objectContaining({ newBranch: true, baseBranch: undefined })
+    )
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
   })
 
   it('그 브랜치가 이미 본 저장소에 체크아웃돼 있으면 거기서 한다', async () => {

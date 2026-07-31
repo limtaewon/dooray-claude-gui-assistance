@@ -80,6 +80,23 @@ export class GitService {
     }
   }
 
+  /**
+   * 원격의 기본 브랜치(`origin/main` 등). 새 브랜치를 어디서 갈라낼지의 기본값이다.
+   *
+   * `origin/HEAD` 는 clone 이 심어준다 — 없으면 흔한 이름을 확인해 보고, 그것도 없으면 null.
+   * 네트워크를 타지 않는다(`remote show` 금지) — 드롭 흐름에서 몇 초씩 멈추면 안 된다.
+   */
+  async getDefaultRemoteBranch(repoPath: string, remote = 'origin'): Promise<string | null> {
+    if (!isSafeGitRef(remote)) return null
+    const head = await git(['symbolic-ref', '--short', `refs/remotes/${remote}/HEAD`], repoPath).catch(() => '')
+    if (head.trim()) return head.trim()
+    for (const candidate of [`${remote}/main`, `${remote}/master`]) {
+      const found = await git(['rev-parse', '--verify', '--quiet', candidate], repoPath).catch(() => '')
+      if (found.trim()) return candidate
+    }
+    return null
+  }
+
   /** 브랜치 목록 (로컬 + 리모트) */
   async listBranches(repoPath: string): Promise<GitBranch[]> {
     const [localRaw, remoteRaw, currentRaw] = await Promise.all([

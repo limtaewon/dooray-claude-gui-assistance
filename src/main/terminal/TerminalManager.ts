@@ -1,6 +1,7 @@
 import * as pty from 'node-pty'
 import { BrowserWindow } from 'electron'
 import { randomUUID } from 'crypto'
+import { existsSync } from 'fs'
 import { homedir } from 'os'
 import { IPC_CHANNELS } from '../../shared/types/ipc'
 import type {
@@ -129,7 +130,13 @@ export class TerminalManager {
   create(options: TerminalCreateOptions = {}): TerminalSession {
     const id = randomUUID()
     const isWindows = process.platform === 'win32'
-    const cwd = options.cwd || homedir()
+    // 사라진 폴더로 spawn 하면 node-pty 가 그대로 죽는다 — 워크트리를 지우고 나서 그 세션을
+    // 다시 열 때 실제로 일어난다. 홈으로 떨어뜨리고 로그를 남겨 터미널 자체는 열리게 한다.
+    const requestedCwd = options.cwd
+    const cwd = requestedCwd && existsSync(requestedCwd) ? requestedCwd : homedir()
+    if (requestedCwd && cwd !== requestedCwd) {
+      console.warn(`[Terminal] 폴더가 없어 홈에서 시작합니다 cwd=${requestedCwd}`)
+    }
     const env = buildPtyEnv(isWindows)
 
     let ptyProcess: pty.IPty

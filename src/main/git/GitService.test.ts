@@ -123,6 +123,26 @@ describe('GitService.isGitRepo / getRepoRoot', () => {
   })
 })
 
+describe('GitService.getDefaultRemoteBranch', () => {
+  it('origin/HEAD 가 가리키는 브랜치', async () => {
+    mockGit('symbolic-ref --short refs/remotes/origin/HEAD', 'origin/develop')
+    expect(await new GitService().getDefaultRemoteBranch('/x')).toBe('origin/develop')
+  })
+
+  it('origin/HEAD 가 없으면 흔한 이름을 확인한다', async () => {
+    mockGitError('symbolic-ref', 'fatal: ref refs/remotes/origin/HEAD is not a symbolic ref')
+    mockGitError('rev-parse --verify --quiet origin/main', '')
+    mockGit('rev-parse --verify --quiet origin/master', 'abc123')
+    expect(await new GitService().getDefaultRemoteBranch('/x')).toBe('origin/master')
+  })
+
+  it('아무것도 못 찾으면 null — 호출부가 현재 HEAD 로 떨어진다', async () => {
+    mockGitError('symbolic-ref', 'fatal')
+    mockGitError('rev-parse', '')
+    expect(await new GitService().getDefaultRemoteBranch('/x')).toBeNull()
+  })
+})
+
 describe('GitService.listBranches', () => {
   it('로컬 + 원격 브랜치 + 현재 표시', async () => {
     mockGit('branch --format', 'main|abc123|2026-05-13\nfeature|def456|2026-05-12')
