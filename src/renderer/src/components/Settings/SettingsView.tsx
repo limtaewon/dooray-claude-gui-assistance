@@ -1113,19 +1113,20 @@ interface ClaudeDoneSettingsShape {
   enabled: boolean
   onlyWhenUnfocused: boolean
   idleSeconds: number
+  idleFallback: boolean
 }
 
 const CLAUDE_DONE_DEFAULTS: ClaudeDoneSettingsShape = {
   enabled: true,
   onlyWhenUnfocused: true,
-  idleSeconds: 12
+  idleSeconds: 20,
+  idleFallback: true
 }
 
 /**
  * 터미널의 claude 가 내 차례를 넘겼을 때의 알림.
  *
- * 판정은 "출력이 멎었는가" 로 한다 — 다 끝났든 뭘 물어보려고 멈췄든, 사용자에겐 둘 다
- * '돌아가서 봐야 하는 순간' 이라 굳이 가르지 않는다.
+ * 판정은 터미널 타이틀의 working→idle 전이가 1순위다. 타이틀을 주지 않는 도구만 무출력 폴백을 쓴다.
  */
 function ClaudeDoneNotifySection(): JSX.Element {
   const [value, setValue] = useState<ClaudeDoneSettingsShape>(CLAUDE_DONE_DEFAULTS)
@@ -1155,7 +1156,7 @@ function ClaudeDoneNotifySection(): JSX.Element {
     <>
       <SettingsSwitchRow
         label="claude 작업 완료 알림"
-        description="터미널에서 돌던 claude 가 멈추면(끝났거나 물어볼 때) 데스크톱 알림을 띄웁니다. 알림을 누르면 그 터미널 탭으로 갑니다."
+        description="터미널에서 돌던 claude 가 작업을 마치거나 물어보려고 멈추면 데스크톱 알림을 띄웁니다. 알림을 누르면 그 터미널 탭으로 갑니다."
         searchKeywords={['notification', '알림', 'claude', '완료', 'terminal']}
         checked={value.enabled}
         disabled={loading}
@@ -1169,9 +1170,17 @@ function ClaudeDoneNotifySection(): JSX.Element {
         disabled={loading || !value.enabled}
         onChange={() => patch({ onlyWhenUnfocused: !value.onlyWhenUnfocused })}
       />
+      <SettingsSwitchRow
+        label="출력이 멎는 것도 신호로 쓰기"
+        description="터미널 타이틀로 상태를 알려주지 않는 도구를 위한 폴백입니다. 도구가 오래 도는 중의 정적을 완료로 오해할 수 있어, 타이틀 신호가 있는 세션에서는 쓰지 않습니다."
+        searchKeywords={['idle', 'fallback', '폴백']}
+        checked={value.idleFallback}
+        disabled={loading || !value.enabled}
+        onChange={() => patch({ idleFallback: !value.idleFallback })}
+      />
       <SettingsNumberRow
         label="멈춘 것으로 볼 시간"
-        description="출력이 이만큼 없으면 끝난 것으로 봅니다. 짧게 두면 생각하는 중에도 알림이 올 수 있습니다."
+        description="위 폴백에서만 씁니다. 출력이 이만큼 없으면 끝난 것으로 봅니다."
         searchKeywords={['idle', '대기', '초']}
         value={value.idleSeconds}
         min={3}
