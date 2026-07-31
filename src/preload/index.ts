@@ -533,6 +533,12 @@ const api = {
     /** 세션 즐겨찾기 토글 */
     sessionStar: (sessionId: string, starred: boolean): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_SESSION_STAR, { sessionId, starred }),
+    /** 세션 보관 기간 조회 — claude 가 이 기간이 지난 기록을 지운다 */
+    retentionGet: (): Promise<import('../shared/types/claude-retention').ClaudeRetentionState> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_RETENTION_GET),
+    /** 세션 보관 기간 저장. null 이면 claude 기본값(30일)을 따른다 */
+    retentionSet: (days: number | null): Promise<import('../shared/types/claude-retention').ClaudeRetentionState> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_RETENTION_SET, days),
     /** 채팅 첨부 파일 저장 → 절대 경로 반환 (drag-drop 시 path 가 이미 있으면 호출 불필요, paste 이미지에 사용) */
     saveAttachment: (name: string, data: ArrayBuffer | Uint8Array): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_ATTACHMENT_SAVE, { name, data })

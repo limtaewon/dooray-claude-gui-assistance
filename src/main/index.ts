@@ -71,6 +71,7 @@ import { probePtyCwd } from './terminal/ptyCwd'
 import { buildStartTaskSpawn } from './terminal/startTaskSpawn'
 import { ClaudeChatService } from './claude/ClaudeChatService'
 import { ClaudeSessionService } from './claude/ClaudeSessionService'
+import { ClaudeRetentionService } from './claude/ClaudeRetentionService'
 import { AttachmentService } from './claude/AttachmentService'
 import Store from 'electron-store'
 import { TerminalManager } from './terminal/TerminalManager'
@@ -220,6 +221,7 @@ const watcherService = new WatcherService(messengerService)
 const aiService = new AIService()
 const claudeChat = new ClaudeChatService(getClaudeBin())
 const claudeSessions = new ClaudeSessionService()
+const claudeRetention = new ClaudeRetentionService()
 const claudeAttachments = new AttachmentService()
 const store = new Store({ name: 'clauday-data' })
 const githubService = new GitHubService()
@@ -1123,6 +1125,10 @@ function registerIpcHandlers(): void {
     async (_, { sessionId, starred }: { sessionId: string; starred: boolean }) => {
       claudeSessions.setStarred(sessionId, starred)
     }
+  )
+  ipcMain.handle(IPC_CHANNELS.CLAUDE_RETENTION_GET, () => claudeRetention.get())
+  ipcMain.handle(IPC_CHANNELS.CLAUDE_RETENTION_SET, (_, days: number | null) =>
+    claudeRetention.set(days)
   )
   ipcMain.handle(
     IPC_CHANNELS.CLAUDE_ATTACHMENT_SAVE,

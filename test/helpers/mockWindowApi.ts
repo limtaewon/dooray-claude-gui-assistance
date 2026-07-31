@@ -169,6 +169,16 @@ export function createMockWindowApi(): Record<string, unknown> {
       sessionLoad: vi.fn().mockResolvedValue([]),
       sessionRename: vi.fn().mockResolvedValue(undefined),
       sessionStar: vi.fn().mockResolvedValue(undefined),
+      retentionGet: vi.fn().mockResolvedValue({
+        days: 30,
+        source: 'default',
+        settingsPath: '/home/test/.claude/settings.json'
+      }),
+      retentionSet: vi.fn().mockResolvedValue({
+        days: 30,
+        source: 'default',
+        settingsPath: '/home/test/.claude/settings.json'
+      }),
       saveAttachment: vi.fn().mockResolvedValue('')
     },
     ai: {

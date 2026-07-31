@@ -206,6 +206,11 @@ export const TOURS: Record<TourViewId, TourStep[]> = {
     {
       title: '파일을 끌어다 놓아 첨부합니다',
       body: '이미지·텍스트 파일을 대화창에 그대로 놓으면 첨부됩니다. 화면 캡처를 붙여 넣어도 됩니다.'
+    },
+    {
+      anchor: 'session-retention',
+      title: '오래된 세션은 claude 가 지웁니다',
+      body: 'Claude Code 는 기본 30일이 지난 세션 기록을 삭제합니다 — 즐겨찾기해둔 세션도 파일이 사라지면 목록에서 없어집니다. ⚙ 에서 보관 기간을 늘려두세요. ~/.claude/settings.json 의 cleanupPeriodDays 를 고치는 것이라 터미널에서 쓰는 claude 에도 그대로 적용됩니다.'
     }
   ],
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus, Sparkles, History, PanelLeftClose, PanelLeftOpen, Edit3, Check, X, FolderOpen, RotateCcw, Star, Search } from 'lucide-react'
 import { ViewOnboarding } from '../common/onboarding/viewOnboarding'
 import ClaudeChatPane from '../Terminal/ClaudeChatPane'
+import SessionRetentionMenu from './SessionRetentionMenu'
 
 interface SessionMeta {
   sessionId: string
@@ -180,6 +181,7 @@ export default function ClaudeCodeSessionsView({ active = true }: { active?: boo
             <History size={10} />
             이전 세션 {sessions.length > 0 && (q ? `(${filteredSessions.length}/${sessions.length})` : `(${sessions.length})`)}
             <div className="flex-1" />
+            <SessionRetentionMenu />
             <button onClick={loadSessions} title="새로고침"
               className="hover:text-text-secondary">
               <RotateCcw size={10} className={loading ? 'animate-spin' : ''} />

@@ -190,6 +190,10 @@ export const IPC_CHANNELS = {
   CLAUDE_SESSION_RENAME: 'claude:session:rename',
   /** 세션 즐겨찾기 토글 */
   CLAUDE_SESSION_STAR: 'claude:session:star',
+  /** ~/.claude/settings.json 의 세션 보관 기간(cleanupPeriodDays) 조회 */
+  CLAUDE_RETENTION_GET: 'claude:retention:get',
+  /** 세션 보관 기간 저장 — null 이면 키를 지워 claude 기본값을 따른다 */
+  CLAUDE_RETENTION_SET: 'claude:retention:set',
   /** 채팅 첨부 파일 저장 (clipboard 이미지/임시 파일 등) → 절대 경로 반환 */
   CLAUDE_ATTACHMENT_SAVE: 'claude:attachment:save',
 
