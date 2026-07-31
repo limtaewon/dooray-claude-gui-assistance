@@ -11,7 +11,7 @@ const FEATURE_LABELS: Record<string, string> = {
   'view.skills': 'Claude 스킬',
   'view.sessions': '세션',
   'view.usage': '사용량',
-  'view.manual': '매뉴얼',
+  'view.onboarding': '온보딩',
   'view.settings': '설정',
   'ai.briefing': 'AI 브리핑',
   'ai.report': '보고서',
@@ -79,7 +79,7 @@ function UsageInsights(): JSX.Element {
 
   if (loading || !summary) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
+      <div>
         <div className="flex items-center gap-2 text-text-secondary text-sm py-10 justify-center">
           <RefreshCw size={14} className="animate-spin" /> 인사이트 집계 중...
         </div>
@@ -109,15 +109,12 @@ function UsageInsights(): JSX.Element {
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-4">
+    <div className="space-y-4">
       {/* 헤더 */}
       <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-text-primary">내 사용 인사이트</h3>
-          <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5 flex items-center gap-1">
-            <Shield size={10} /> 로컬에만 저장 · 외부 전송 없음
-          </p>
-        </div>
+        <p className="text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-tertiary flex items-center gap-1">
+          <Shield size={10} /> 로컬에만 저장 · 외부 전송 없음
+        </p>
         <div className="flex items-center gap-1.5">
           <select value={days} onChange={(e) => setDays(Number(e.target.value))}
             className="px-2 py-1 bg-bg-surface border border-bg-border rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary focus:outline-none">
@@ -141,7 +138,7 @@ function UsageInsights(): JSX.Element {
 
       {/* 개인화 제안 */}
       {suggestions.length > 0 && (
-        <section className="p-4 rounded-xl bg-gradient-to-r from-clauday-orange/5 to-clauday-blue/5 border border-clauday-orange/20">
+        <section className="p-4 rounded-xl bg-bg-surface-raised border border-bg-border-light">
           <h4 className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-clauday-orange flex items-center gap-1.5 mb-2">
             <Lightbulb size={11} /> 개선 제안
           </h4>
@@ -166,7 +163,7 @@ function UsageInsights(): JSX.Element {
               const max = summary.topFeatures[0]?.count || 1
               const pct = (item.count / max) * 100
               return (
-                <div key={item.feature} className={`flex items-center gap-3 px-4 py-2.5 ${i > 0 ? 'border-t border-bg-border/50' : ''}`}>
+                <div key={item.feature} className={`flex items-center gap-3 px-4 py-2.5 ${i > 0 ? 'border-t border-bg-border' : ''}`}>
                   <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary font-mono w-5">#{i + 1}</span>
                   <span className="text-xs text-text-primary w-28 flex-shrink-0">{label(item.feature)}</span>
                   <div className="flex-1 h-2 bg-bg-primary rounded-full overflow-hidden">
@@ -203,14 +200,14 @@ function UsageInsights(): JSX.Element {
         <section>
           <h4 className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-secondary mb-2">AI 기능별 성과</h4>
           <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden">
-            <div className="grid grid-cols-[1fr_60px_80px_60px] gap-2 px-4 py-2 bg-bg-primary/30 border-b border-bg-border/50 text-[calc(9px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary uppercase">
+            <div className="grid grid-cols-[1fr_60px_80px_60px] gap-2 px-4 py-2 bg-bg-primary border-b border-bg-border text-[calc(9px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary uppercase">
               <span>기능</span>
               <span className="text-right">호출</span>
               <span className="text-right">평균 시간</span>
               <span className="text-right">성공률</span>
             </div>
             {Object.entries(summary.aiUsage).map(([key, v]) => (
-              <div key={key} className="grid grid-cols-[1fr_60px_80px_60px] gap-2 px-4 py-2 border-b border-bg-border/30 last:border-0 items-center">
+              <div key={key} className="grid grid-cols-[1fr_60px_80px_60px] gap-2 px-4 py-2 border-b border-bg-border last:border-0 items-center">
                 <span className="text-xs text-text-primary">{label(`ai.${key}`)}</span>
                 <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary font-mono text-right">{v.count}</span>
                 <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary font-mono text-right">
@@ -243,7 +240,7 @@ function UsageInsights(): JSX.Element {
       )}
 
       {/* 데이터 관리 */}
-      <section className="pt-3 border-t border-bg-border/50">
+      <section className="pt-3 border-t border-bg-border">
         <div className="flex items-center justify-between gap-3">
           <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
             데이터는 <code className="text-text-secondary">~/Library/Application Support/Clauday/analytics/</code>에만 저장됩니다.

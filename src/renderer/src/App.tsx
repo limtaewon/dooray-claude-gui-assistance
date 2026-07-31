@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   Calendar as CalendarIcon, Terminal as TerminalIcon, GitBranch, Users, Server, Sparkles,
-  MessageSquare, BarChart3, BookOpen, Settings as SettingsIcon, Radar, Moon, Sun, Lightbulb, Bot,
+  MessageSquare, BarChart3, BookOpen, Compass, Settings as SettingsIcon, Radar, Moon, Sun, Lightbulb, Bot,
   LayoutDashboard, ListTodo, MessageCircle, FileText, CheckSquare, Workflow
 } from 'lucide-react'
 import Sidebar from './components/Layout/Sidebar'
@@ -14,9 +14,11 @@ import DooraySetup from './components/Dooray/DooraySetup'
 import DoorayAssistant from './components/Dooray/DoorayAssistant'
 import TerminalView from './components/Terminal/TerminalView'
 import MentionAgentView from './components/MentionAgent/MentionAgentView'
-import ClaudeManual from './components/ClaudeManual/ClaudeManual'
+import OnboardingHub from './components/Onboarding/OnboardingHub'
+import SetupWizard from './components/Onboarding/SetupWizard'
+import TourOverlay from './components/common/onboarding/TourOverlay'
+import { TOURS, type TourViewId } from './components/common/onboarding/tours'
 import ClaudeCodeSessionsView from './components/Sessions/ClaudeCodeSessionsView'
-import BranchWorkspace from './components/Git/BranchWorkspace'
 import SettingsView from './components/Settings/SettingsView'
 import ImageLightbox from './components/common/ImageLightbox'
 import CommunityView from './components/Community/CommunityView'
@@ -28,8 +30,9 @@ import { ToastHost, CommandPalette, type CommandGroup, type CommandItem } from '
 import ErrorReportProvider from './components/ErrorReport/ErrorReportProvider'
 import FeedbackProvider from './components/Feedback/FeedbackProvider'
 import { useTheme } from './hooks/useTheme'
+import { useShortcut } from './hooks/useKeybindings'
 
-type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent' | 'harness'
+type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'onboarding' | 'sessions' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent' | 'harness' | 'workspace'
 
 /** Cmd+E 최근 뷰 LRU 항목 — sub 가 있으면 같은 view 안의 sub-tab 별로 별개 entry */
 interface RecentViewItem {
@@ -50,9 +53,92 @@ const DOORAY_SUBTAB_LABELS: Record<string, string> = {
 
 function App(): JSX.Element {
   const [activeView, setActiveView] = useState<View>('dooray')
+  /** 설정에서 '앱으로 돌아가기' 를 눌렀을 때 되돌아갈 화면 — 설정 직전에 보던 곳. */
+  const previousViewRef = useRef<View>('dooray')
+  useEffect(() => {
+    if (activeView !== 'settings') previousViewRef.current = activeView
+  }, [activeView])
+  // ── 온보딩 투어 ─────────────────────────────────────────────
+  // 시작하면 그 메뉴로 옮겨간 뒤 오버레이가 뜬다. 화면이 그려질 틈을 주지 않으면 앵커를 못 찾는다.
+  const [tour, setTour] = useState<{ view: TourViewId; step: number } | null>(null)
+  const [tourCompleted, setTourCompleted] = useState<TourViewId[]>([])
+
+  useEffect(() => {
+    void window.api.settings
+      .get('onboardingCompleted')
+      .then((v) => { if (Array.isArray(v)) setTourCompleted(v as TourViewId[]) })
+      .catch(() => undefined)
+  }, [])
+
+  const startTour = useCallback((view: TourViewId) => {
+    setActiveView(view as View)
+    window.setTimeout(() => setTour({ view, step: 0 }), 220)
+  }, [])
+
+  const finishTour = useCallback(() => {
+    setTour((current) => {
+      if (current) {
+        setTourCompleted((prev) => {
+          if (prev.includes(current.view)) return prev
+          const next = [...prev, current.view]
+          void window.api.settings.set('onboardingCompleted', next).catch(() => undefined)
+          return next
+        })
+      }
+      return null
+    })
+  }, [])
+
+  const resetTourProgress = useCallback(() => {
+    setTourCompleted([])
+    void window.api.settings.set('onboardingCompleted', []).catch(() => undefined)
+  }, [])
+
+  // 처음 켠 사람에게 무엇부터 해야 하는지 보여준다 — 한 번 닫으면 다시 뜨지 않는다.
+  const [setupOpen, setSetupOpen] = useState(false)
+  useEffect(() => {
+    void window.api.settings
+      .get('setupCompleted')
+      .then((done) => { if (!done) setSetupOpen(true) })
+      .catch(() => undefined)
+  }, [])
+
+  /** 실험실 기능 — 켜지 않으면 사이드바·팔레트·화면 어디에도 나오지 않는다. */
+  const [experimentalViews, setExperimentalViews] = useState<View[]>([])
+  useEffect(() => {
+    const load = (): void => {
+      void window.api.settings
+        .get('experimentalViews')
+        .then((saved) => setExperimentalViews(Array.isArray(saved) ? (saved as View[]) : []))
+        .catch(() => setExperimentalViews([]))
+    }
+    load()
+    window.addEventListener('experimental-views-changed', load)
+    return () => window.removeEventListener('experimental-views-changed', load)
+  }, [])
+  const harnessEnabled = experimentalViews.includes('harness')
+  useEffect(() => {
+    if (!harnessEnabled && activeView === 'harness') setActiveView('dooray')
+  }, [harnessEnabled, activeView])
+
   const [doorayConfigured, setDoorayConfigured] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
   const [quickTodoOpen, setQuickTodoOpen] = useState(false)
+  /** 사이드바 아이콘/이름 토글 — 타이틀바 버튼이 제어하고 설정에 저장한다. */
+  const [sidebarExpanded, setSidebarExpanded] = useState(true)
+  useEffect(() => {
+    void window.api.settings
+      .get('sidebarExpanded')
+      .then((v) => { if (v === false) setSidebarExpanded(false) })
+      .catch(() => undefined)
+  }, [])
+  const toggleSidebar = useCallback(() => {
+    setSidebarExpanded((v) => {
+      const next = !v
+      void window.api.settings.set('sidebarExpanded', next)
+      return next
+    })
+  }, [])
   const { theme, toggle: toggleTheme } = useTheme()
 
   // 앱 시작 시 startupView 설정 적용
@@ -62,7 +148,10 @@ function App(): JSX.Element {
       if (v === 'last') {
         const last = await window.api.settings.get('lastView') as View | null
         if (last) setActiveView(last)
-      } else if (v && ['dooray', 'terminal', 'git'].includes(v)) {
+      } else if (v === 'git') {
+        // v2.0: '브랜치 작업' 뷰가 터미널 우측 패널로 흡수됐다 — 기존 설정값을 터미널로 넘긴다.
+        setActiveView('terminal')
+      } else if (v && ['dooray', 'terminal'].includes(v)) {
         setActiveView(v as View)
       }
     })()
@@ -83,32 +172,29 @@ function App(): JSX.Element {
     dwellStartRef.current = { view: activeView, at: Date.now() }
   }, [activeView])
 
-  // ⌘K 글로벌 단축키 + Shift 2회 (IntelliJ "Search Everywhere" 식) 단축키
+  // v2.0 D — 전역 단축키는 레지스트리 경유. ⚙ 설정 → 단축키 에서 리바인딩된다.
+  useShortcut('global.commandPalette', (e) => {
+    e.preventDefault()
+    setCmdOpen((o) => !o)
+  }, { allowInEditable: true })
+  useShortcut('global.quickTodo', (e) => {
+    e.preventDefault()
+    setQuickTodoOpen(true)
+  }, { allowInEditable: true })
+  useShortcut('global.feedback', (e) => {
+    e.preventDefault()
+    window.dispatchEvent(new CustomEvent('open-feedback-modal'))
+  }, { allowInEditable: true })
+
+  // Shift 2회 (IntelliJ "Search Everywhere" 식) — 조합이 아닌 시퀀스라 레지스트리로 표현하지 않는다
   useEffect(() => {
     const DOUBLE_SHIFT_MS = 400
     let lastShiftAt = 0
     let shiftCorrupted = false // Shift 누른 동안 다른 키 같이 눌렀으면 "쉬프트만 두 번" 패턴 아님
 
     const onKeyDown = (e: KeyboardEvent): void => {
-      const meta = e.metaKey || e.ctrlKey
-      if (meta && e.key.toLowerCase() === 'k') {
-        e.preventDefault()
-        setCmdOpen((o) => !o)
-        return
-      }
-      // ⌘/Ctrl+/ — 어디서든 오늘 할 일 빠른 추가
-      if (meta && !e.shiftKey && (e.key === '/' || e.code === 'Slash')) {
-        e.preventDefault()
-        setQuickTodoOpen(true)
-        return
-      }
-      // ⌘/Ctrl+Shift+B — 어디서든 피드백 모달
-      if (meta && e.shiftKey && e.key.toLowerCase() === 'b') {
-        e.preventDefault()
-        window.dispatchEvent(new CustomEvent('open-feedback-modal'))
-        return
-      }
-      // Shift 외 다른 키가 같이 눌렸으면 더블 Shift 후보 무효화
+      // ⌘K/⌘//⌘⇧B 는 단축키 레지스트리(useShortcut)가 처리한다 — 설정에서 리바인딩 가능.
+      // 이 핸들러는 조합으로 표현할 수 없는 "Shift 두 번" 시퀀스만 남는다.
       if (e.shiftKey && e.key !== 'Shift') {
         shiftCorrupted = true
       }
@@ -254,15 +340,17 @@ function App(): JSX.Element {
         { id: 'go-monitoring', label: '모니터링', icon: <Radar size={13} />, hint: '⌘2' },
         { id: 'go-agent', label: '에이전트', icon: <Bot size={13} /> },
         { id: 'go-terminal', label: '터미널', icon: <TerminalIcon size={13} />, hint: '⌘3' },
-        { id: 'go-git', label: '브랜치 작업', icon: <GitBranch size={13} />, hint: '⌘4' },
-        { id: 'go-harness', label: 'Harness Studio', icon: <Workflow size={13} /> },
+        { id: 'go-git', label: '브랜치 · 소스 제어', icon: <GitBranch size={13} />, hint: '터미널 우측 패널' },
+        ...(harnessEnabled
+          ? [{ id: 'go-harness', label: 'Harness Studio', icon: <Workflow size={13} /> }]
+          : []),
         { id: 'go-community', label: '커뮤니티', icon: <Users size={13} /> },
         { id: 'go-mcp', label: 'MCP 서버', icon: <Server size={13} /> },
         { id: 'go-skills', label: 'Claude 스킬', icon: <Sparkles size={13} /> },
         { id: 'go-ai-recommend', label: 'AI 추천', icon: <Lightbulb size={13} /> },
         { id: 'go-sessions', label: '세션', icon: <MessageSquare size={13} /> },
         { id: 'go-usage', label: '사용량', icon: <BarChart3 size={13} /> },
-        { id: 'go-manual', label: '매뉴얼', icon: <BookOpen size={13} /> },
+        { id: 'go-onboarding', label: '온보딩', icon: <Compass size={13} /> },
         { id: 'go-settings', label: '설정', icon: <SettingsIcon size={13} /> }
       ]
     },
@@ -286,6 +374,14 @@ function App(): JSX.Element {
   ], [theme])
 
   const runCommand = (item: CommandItem): void => {
+    if (item.id === 'go-git') {
+      // v2.0: 브랜치/소스 제어는 터미널 우측 패널로 흡수됐다.
+      setActiveView('terminal')
+      Promise.resolve().then(() => {
+        window.dispatchEvent(new CustomEvent('open-terminal-drawer', { detail: { tab: 'branches' } }))
+      })
+      return
+    }
     if (item.id.startsWith('go-')) {
       const target = item.id.slice(3) // e.g. "dooray:tasks" or "monitoring"
       const [view, subTab] = target.split(':') as [View, string | undefined]
@@ -311,9 +407,17 @@ function App(): JSX.Element {
       <ErrorReportProvider>
       <FeedbackProvider>
       <div className="flex flex-col h-full bg-bg-primary">
-        <TitleBar onOpenCommandPalette={() => setCmdOpen(true)} />
+        <TitleBar
+          onOpenCommandPalette={() => setCmdOpen(true)}
+          sidebarExpanded={sidebarExpanded}
+          onToggleSidebar={toggleSidebar}
+        />
         <div className="flex flex-1 overflow-hidden">
-          <Sidebar activeView={activeView} onViewChange={setActiveView} />
+          {/* 설정에 들어가면 사이드바를 감춘다 — 설정 중에 다른 메뉴가 같이 보이면 지금 어디에
+              있는지가 흐려진다. 복귀는 설정 안의 '앱으로 돌아가기' 로만 한다. */}
+          {activeView !== 'settings' && (
+            <Sidebar activeView={activeView} onViewChange={setActiveView} expanded={sidebarExpanded} />
+          )}
           <main className="flex-1 overflow-hidden relative">
             <div className={`absolute inset-0 ${vis('dooray')}`}>
               {doorayConfigured ? (
@@ -327,13 +431,10 @@ function App(): JSX.Element {
               )}
             </div>
             <div className={`absolute inset-0 ${vis('terminal')}`}>
-              <TerminalView />
+              <TerminalView active={activeView === 'terminal'} />
             </div>
             <div className={`absolute inset-0 ${vis('agent')}`}>
               <MentionAgentView />
-            </div>
-            <div className={`absolute inset-0 ${vis('git')}`}>
-              <BranchWorkspace onOpenTerminal={() => setActiveView('terminal')} />
             </div>
             <div className={`absolute inset-0 ${vis('mcp')}`}><MCPManager /></div>
             <div className={`absolute inset-0 ${vis('skills')}`}>
@@ -353,16 +454,39 @@ function App(): JSX.Element {
                 <ClaudeCodeSessionsView active={activeView === 'sessions'} />
               </ErrorBoundary>
             </div>
-            <div className={`absolute inset-0 ${vis('harness')}`}>
-              <ErrorBoundary label="Harness Studio">
-                <HarnessStudioView active={activeView === 'harness'} />
-              </ErrorBoundary>
-            </div>
+            {/* 실험실: 켜기 전에는 마운트조차 하지 않는다 — 안 쓰는 기능이 백그라운드로 돌지 않게. */}
+            {harnessEnabled && (
+              <div className={`absolute inset-0 ${vis('harness')}`}>
+                <ErrorBoundary label="Harness Studio">
+                  <HarnessStudioView active={activeView === 'harness'} />
+                </ErrorBoundary>
+              </div>
+            )}
             <div className={`absolute inset-0 ${vis('usage')}`}><UsageDashboard /></div>
-            <div className={`absolute inset-0 ${vis('manual')}`}><ClaudeManual /></div>
-            <div className={`absolute inset-0 ${vis('settings')}`}><SettingsView /></div>
+            <div className={`absolute inset-0 ${vis('onboarding')}`}>
+              <OnboardingHub
+                onStartTour={startTour}
+                completed={tourCompleted}
+                onResetCompleted={resetTourProgress}
+              />
+            </div>
+            <div className={`absolute inset-0 ${vis('settings')}`}>
+              <SettingsView onExit={() => setActiveView(previousViewRef.current)} />
+            </div>
           </main>
         </div>
+
+        {setupOpen && <SetupWizard onClose={() => setSetupOpen(false)} />}
+
+        {tour && (
+          <TourOverlay
+            steps={TOURS[tour.view] ?? []}
+            index={tour.step}
+            onIndexChange={(step) => setTour((current) => (current ? { ...current, step } : current))}
+            onClose={() => setTour(null)}
+            onFinish={finishTour}
+          />
+        )}
         <ImageLightbox />
         <CommandPalette
           open={cmdOpen}
@@ -408,14 +532,13 @@ function RecentViewsPalette({ open, items, index, onHover, onPick, onClose }: {
         case 'dooray': return { label: '두레이', icon: <CalendarIcon size={13} /> }
         case 'monitoring': return { label: '모니터링', icon: <Radar size={13} /> }
         case 'terminal': return { label: '터미널', icon: <TerminalIcon size={13} /> }
-        case 'git': return { label: '브랜치 작업', icon: <GitBranch size={13} /> }
         case 'community': return { label: '커뮤니티', icon: <Users size={13} /> }
         case 'mcp': return { label: 'MCP 서버', icon: <Server size={13} /> }
         case 'skills': return { label: 'Claude 스킬', icon: <Sparkles size={13} /> }
         case 'ai-recommend': return { label: 'AI 추천', icon: <Lightbulb size={13} /> }
         case 'sessions': return { label: '세션', icon: <MessageSquare size={13} /> }
         case 'usage': return { label: '사용량', icon: <BarChart3 size={13} /> }
-        case 'manual': return { label: '매뉴얼', icon: <BookOpen size={13} /> }
+        case 'onboarding': return { label: '온보딩', icon: <Compass size={13} /> }
         case 'settings': return { label: '설정', icon: <SettingsIcon size={13} /> }
         case 'agent': return { label: '에이전트', icon: <Bot size={13} /> }
         case 'harness': return { label: 'Harness Studio', icon: <Workflow size={13} /> }
@@ -456,10 +579,10 @@ function RecentViewsPalette({ open, items, index, onHover, onPick, onClose }: {
                 onMouseEnter={() => onHover(i)}
                 onClick={() => onPick(i)}
                 className={`w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors ${
-                  hi ? 'bg-clauday-blue/15' : 'hover:bg-bg-surface-hover'
+                  hi ? 'bg-bg-active' : 'hover:bg-bg-surface-hover'
                 }`}
               >
-                <span className={hi ? 'text-clauday-blue' : isCurrent ? 'text-text-tertiary' : 'text-text-secondary'}>
+                <span className={hi ? 'text-text-primary' : isCurrent ? 'text-text-tertiary' : 'text-text-secondary'}>
                   {icon}
                 </span>
                 <span className={`text-[calc(12px_*_var(--app-font-scale,1))] flex-1 truncate ${hi ? 'text-text-primary font-medium' : isCurrent ? 'text-text-tertiary' : 'text-text-primary'}`}>

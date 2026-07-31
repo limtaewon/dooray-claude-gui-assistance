@@ -1,7 +1,8 @@
-import { execFile, execFileSync, spawn } from 'child_process'
+import { execFileSync, spawn } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { join, delimiter as pathDelimiter } from 'path'
+import { join } from 'path'
 import { homedir } from 'os'
+import { StringDecoder } from 'string_decoder'
 import { BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '../../shared/types/ipc'
 import type { DoorayTask, DoorayCalendarEvent } from '../../shared/types/dooray'
@@ -10,6 +11,8 @@ import type { HarnessModel, HarnessTriage, DryRunResult } from '../../shared/typ
 import { buildNormalizeSystemPrompt, buildNormalizeUserPrompt, buildEstimateSystemPrompt, buildEstimateUserPrompt } from '../harness/normalizePrompt'
 import { buildEditSystemPrompt, buildEditUserPrompt } from './harnessEditPrompt'
 import type { AIEditProposal } from '../../shared/types/harness-edit'
+import { getClaudeBin as resolveClaudeBinCached, claudeSpawnCommand } from '../utils/claudeBin'
+import { mergePathIntoEnv, claudeExtraPaths } from '../utils/env'
 
 interface ClaudeCliResult {
   type: string
@@ -88,61 +91,8 @@ const BRIEFING_SYSTEM_PROMPT = `두레이 업무 브리핑을 생성하세요. 3
   "recommendations": ["구체적 행동 제안 1 (도구로 확인한 실제 데이터 인용)", "구체적 행동 제안 2", "..."]
 }`
 
-/**
- * 패키징된 앱에서도 claude CLI 를 찾을 수 있도록 PATH 보강.
- *
- * Why **절대경로** 우선?
- *   사용자 머신에 claude 바이너리가 여러 개 깔려있는 경우 (예: brew + npm-global + .local/bin),
- *   spawn 시 PATH 에서 동적 검색되면 우리가 prepend 한 PATH 의 영향으로 사용자가 의도한 것과
- *   다른(보통 더 오래된) 바이너리가 잡힌다. 그러면 신규 옵션(--include-hook-events 등)이
- *   "unknown option" 으로 실패. 사용자 셸 PATH 에서 정확히 어떤 claude 가 잡히는지를
- *   `which`/`where` 로 확정해 절대경로로 spawn 한다.
- */
-function resolveClaudePath(): string {
-  if (process.env.CLAUDE_CLI_PATH) return process.env.CLAUDE_CLI_PATH
-
-  const isWindows = process.platform === 'win32'
-  const home = homedir()
-
-  // 1) 사용자 셸의 which/where — 사용자가 터미널에서 `claude` 입력 시 실행되는 그 바이너리.
-  //    spawn 시점에서 우리 PATH 보강과 무관하게 항상 같은 바이너리를 쓰게 됨.
-  if (isWindows) {
-    try {
-      const out = execFileSync('where', ['claude'], { timeout: 5000 }).toString().trim().split('\n')[0].trim()
-      if (out && existsSync(out)) return out
-    } catch { /* fall-through */ }
-  } else {
-    try {
-      const shell = process.env.SHELL || '/bin/zsh'
-      const out = execFileSync(shell, ['-l', '-c', 'command -v claude'], { timeout: 5000 }).toString().trim()
-      if (out && existsSync(out)) return out
-    } catch { /* fall-through */ }
-  }
-
-  // 2) 알려진 설치 경로 — 절대경로만 반환 (단순 'claude' 는 안 씀).
-  const candidates = isWindows ? [
-    join(home, '.claude', 'local', 'claude.cmd'),
-    join(home, '.claude', 'bin', 'claude.cmd'),
-    join(home, 'AppData', 'Roaming', 'npm', 'claude.cmd'),
-    join(home, 'AppData', 'Local', 'npm', 'claude.cmd'),
-    join(home, 'AppData', 'Roaming', 'npm', 'claude'),
-  ] : [
-    join(home, '.claude', 'local', 'claude'),
-    join(home, '.claude', 'bin', 'claude'),
-    '/usr/local/bin/claude',
-    '/opt/homebrew/bin/claude',
-    join(home, '.local', 'bin', 'claude'),
-    join(home, '.npm-global', 'bin', 'claude')
-  ]
-  for (const p of candidates) {
-    if (existsSync(p)) return p
-  }
-
-  // 3) 최후 폴백 — PATH 에서 검색되도록 단순 명령어. 이 단계 도달 시 아래 spawn PATH 보강이 의미 가짐.
-  return isWindows ? 'claude.cmd' : 'claude'
-}
-
-const CLAUDE_CLI = resolveClaudePath()
+/** claude 바이너리 경로 해석은 claudeBin 유틸에 위임한다. 평가 시점은 기존과 동일하게 모듈 로드 시 1회 (근거: ADR-v2-utils-04 §5). */
+const CLAUDE_CLI = resolveClaudeBinCached()
 
 export function getClaudeBin(): string { return CLAUDE_CLI }
 
@@ -156,10 +106,12 @@ import { startCliCall, setClaudeVersion } from '../utils/cliLogger'
  */
 function captureClaudeVersion(): void {
   try {
-    const out = execFileSync(CLAUDE_CLI, ['--version'], {
+    // command/shell 은 claudeSpawnCommand 단일 계약에서만 나온다 (ADR-v2-windows-fix-02 §2) — 인용된 bin 사용.
+    const { command, shell } = claudeSpawnCommand({ bin: CLAUDE_CLI })
+    const out = execFileSync(command, ['--version'], {
       timeout: 5000,
       env: { ...process.env, DISABLE_OMC: '1' },
-      shell: process.platform === 'win32',
+      shell,
       encoding: 'utf-8'
     })
     setClaudeVersion(out.toString().trim() || undefined)
@@ -292,25 +244,12 @@ export function setUserAnthropicApiKey(key: string | null): void {
 
 /** 패키징 앱에서도 동작하도록 PATH 보강 + OMC/플러그인 훅 비활성화 (속도 최적화) */
 function enrichedEnv(): Record<string, string> {
-  const home = homedir()
-  const isWindows = process.platform === 'win32'
-  const extraPaths = isWindows ? [
-    join(home, '.claude', 'local'),
-    join(home, '.claude', 'bin'),
-    join(home, 'AppData', 'Roaming', 'npm'),
-    join(home, 'AppData', 'Local', 'npm'),
-  ] : [
-    join(home, '.claude', 'local'),
-    join(home, '.claude', 'bin'),
-    '/usr/local/bin',
-    '/opt/homebrew/bin',
-    join(home, '.local', 'bin'),
-    join(home, '.npm-global', 'bin')
-  ]
-  const currentPath = process.env.PATH || (isWindows ? '' : '/usr/bin:/bin')
+  // AIService 는 resolveClaudeBin() 이 준 절대경로로 spawn 하므로 PATH 검색이 바이너리 선택에
+  // 관여하지 않는다 — 다른 3곳(append)과 달리 prepend 여도 "구버전 claude 를 잡는" 회귀가 없다
+  // (ADR-v2-utils-03 §컨텍스트, 4곳 중 유일한 prepend 예외).
+  const merged = mergePathIntoEnv(process.env, claudeExtraPaths(), { position: 'prepend' })
   const env: Record<string, string> = {
-    ...(process.env as Record<string, string>),
-    PATH: [...extraPaths, currentPath].join(pathDelimiter),
+    ...(merged as Record<string, string>),
     // OMC ultrawork 세션 복원 훅 비활성화 (매번 75k 토큰 로드 방지)
     DISABLE_OMC: '1'
   }
@@ -392,49 +331,6 @@ ${skillBlock}`
     this.mainWindow.webContents.send(IPC_CHANNELS.AI_PROGRESS, event)
   }
 
-  /** 기본(non-streaming) claude 실행 */
-  private runClaude(args: string[]): Promise<ClaudeCliResult> {
-    return new Promise((resolve, reject) => {
-      execFile(
-        CLAUDE_CLI,
-        args,
-        {
-          maxBuffer: 1024 * 1024 * 5,
-          timeout: 120000,
-          env: enrichedEnv(),
-          // Windows cp949 mojibake 방지 — raw Buffer 로 받아 decodeProcessText 가
-          // utf-8/euc-kr 자동 판별 후 디코드.
-          encoding: 'buffer'
-        },
-        (error, stdoutBuf, stderrBuf) => {
-          const stdout = decodeProcessText(stdoutBuf as Buffer)
-          const stderr = decodeProcessText(stderrBuf as Buffer)
-          if (error && !stdout) {
-            reject(wrapClaudeError(error.message, stderr))
-            return
-          }
-          try {
-            const result = JSON.parse(stdout) as ClaudeCliResult
-            if (result.is_error) {
-              reject(wrapClaudeError(result.result, stderr))
-              return
-            }
-            resolve(result)
-          } catch {
-            resolve({
-              type: 'result',
-              result: stdout || stderr || '응답을 받지 못했습니다.',
-              duration_ms: 0,
-              session_id: '',
-              is_error: false,
-              total_cost_usd: 0
-            })
-          }
-        }
-      )
-    })
-  }
-
   /**
    * 스트리밍 claude 실행 (stream-json)
    * 각 텍스트 청크를 onChunk로 전달하고, 최종 결과 반환
@@ -498,12 +394,13 @@ ${stdinPrompt ?? ''}`
         }
       }
 
-      // Windows 호환 (Issue #11): claude 가 .cmd 면 Node 의 spawn 이 자동 추론 못함 → shell:true.
-      // windowsVerbatimArguments 로 cmd codepage 변환 차단 (한글 prompt 깨짐 방지).
-      const proc = spawn(CLAUDE_CLI, cleaned, {
+      // command/shell/windowsVerbatimArguments 는 claudeSpawnCommand 단일 계약에서만 나온다
+      // (ADR-v2-windows-fix-02 §2) — win32 인용 포함. argv(cleaned)는 위 블록 그대로 전달.
+      const { command, shell, windowsVerbatimArguments } = claudeSpawnCommand({ bin: CLAUDE_CLI })
+      const proc = spawn(command, cleaned, {
         env: enrichedEnv(),
-        shell: isWindows,
-        windowsVerbatimArguments: isWindows
+        shell,
+        windowsVerbatimArguments
       })
 
       if (stdinPrompt !== null && proc.stdin) {
@@ -514,6 +411,9 @@ ${stdinPrompt ?? ''}`
       let buffer = ''
       let finalResult: ClaudeCliResult | null = null
       let accumulated = ''
+      // stdout 은 프로세스(=호출)당 디코더 1개 — chunk 경계에서 멀티바이트가 쪼개져도
+      // U+FFFD 로 깨지지 않게 경계를 보존한다 (ADR-v2-windows-fix-02 §5). 모듈 전역 공유 금지.
+      const stdoutDecoder = new StringDecoder('utf8')
       // Windows cp949 mojibake 방지를 위해 raw Buffer 누적 — 사용 시점에서 디코드.
       const stderrChunks: Buffer[] = []
       const readStderr = (): string => decodeProcessText(Buffer.concat(stderrChunks))
@@ -552,7 +452,7 @@ ${stdinPrompt ?? ''}`
       const RAW_STDOUT_CAP = 200 * 1024  // 200KB — 평문 응답이라도 보통 이 안쪽
 
       proc.stdout.on('data', (data: Buffer) => {
-        const chunk = data.toString('utf-8')
+        const chunk = stdoutDecoder.write(data)
         diag.appendStdout(chunk)
         if (rawStdout.length < RAW_STDOUT_CAP) rawStdout += chunk
         buffer += chunk
@@ -656,6 +556,11 @@ ${stdinPrompt ?? ''}`
 
       proc.on('close', (code) => {
         if (timeout) clearTimeout(timeout)
+        // 불완전한 멀티바이트 시퀀스로 close 시점까지 남아있던 잔여 — 버리되 조용히 버리지 않는다.
+        const decoderTail = stdoutDecoder.end()
+        if (decoderTail) {
+          console.warn(`[AIService] stdout 디코더 잔여 바이트 폐기 len=${decoderTail.length}`)
+        }
         if (finalResult) {
           if (!finalResult.result && accumulated) finalResult.result = accumulated
           diag.complete({ exitCode: code })
@@ -721,11 +626,13 @@ ${stdinPrompt ?? ''}`
 
   isAvailable(): boolean {
     try {
-      // Windows: .cmd 추론을 위해 shell:true. `--version` 만 받으므로 codepage 변환 영향 없음.
-      execFileSync(CLAUDE_CLI, ['--version'], {
+      // command/shell 은 claudeSpawnCommand 단일 계약에서만 나온다 (ADR-v2-windows-fix-02 §2).
+      // `--version` 만 받으므로 codepage 변환 영향 없음.
+      const { command, shell } = claudeSpawnCommand({ bin: CLAUDE_CLI })
+      execFileSync(command, ['--version'], {
         timeout: 5000,
         env: enrichedEnv(),
-        shell: process.platform === 'win32'
+        shell
       })
       return true
     } catch {

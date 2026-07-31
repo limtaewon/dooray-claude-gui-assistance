@@ -32,7 +32,7 @@ export function createMockWindowApi(): Record<string, unknown> {
       read: vi.fn().mockResolvedValue(''),
       save: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn().mockResolvedValue(undefined),
-      deleteMany: vi.fn().mockResolvedValue({ deleted: 0 }),
+      deleteMany: vi.fn().mockResolvedValue({ deleted: 0, failed: 0 }),
       importFromFiles: vi.fn().mockResolvedValue({ imported: 0, cancelled: false }),
       exportToFolder: vi.fn().mockResolvedValue({ exported: 0, cancelled: false })
     },
@@ -89,7 +89,8 @@ export function createMockWindowApi(): Record<string, unknown> {
       calendar: {
         list: vi.fn().mockResolvedValue([]),
         events: vi.fn().mockResolvedValue([])
-      }
+      },
+      projectWorkflows: vi.fn().mockResolvedValue([])
     },
     caldav: {
       testConnect: vi.fn().mockResolvedValue({ ok: false }),
@@ -142,9 +143,20 @@ export function createMockWindowApi(): Record<string, unknown> {
       kill: vi.fn().mockResolvedValue(undefined),
       list: vi.fn().mockResolvedValue([]),
       getOutput: vi.fn().mockResolvedValue(''),
-      restoreSaved: vi.fn().mockResolvedValue([]),
       rename: vi.fn().mockResolvedValue(true),
       onOutput: vi.fn().mockReturnValue(noopUnsub),
+      // v2.0 B-1: 테스트에서 마지막으로 등록된 콜백은 `mock.calls.at(-1)?.[0]` 로 꺼내 직접 발화시킬 수 있음
+      onExit: vi.fn().mockReturnValue(noopUnsub),
+      // v2.0 M-A: 영속화 v2
+      saveState: vi.fn().mockResolvedValue({ ok: true, bytes: 0 }),
+      restoreState: vi.fn().mockResolvedValue(null),
+      onRequestState: vi.fn().mockReturnValue(noopUnsub),
+      // v2.0 M-B: 링크 존재 검증
+      resolvePath: vi.fn().mockResolvedValue([]),
+      sessionCwd: vi.fn().mockResolvedValue(null),
+      foreground: vi.fn().mockResolvedValue(null),
+      onClaudeDone: vi.fn().mockReturnValue(noopUnsub),
+      onFocusSession: vi.fn().mockReturnValue(noopUnsub),
       onMentionOpened: vi.fn().mockReturnValue(noopUnsub),
       onMentionFocus: vi.fn().mockReturnValue(noopUnsub)
     },
@@ -205,18 +217,97 @@ export function createMockWindowApi(): Record<string, unknown> {
     claudeCli: {
       info: vi.fn().mockResolvedValue({ version: '', mainHelp: '', mcpHelp: '', authHelp: '', agentsHelp: '', pluginHelp: '' })
     },
+    github: {
+      status: vi.fn().mockResolvedValue({ state: 'not-installed', accounts: [] })
+    },
     git: {
       isRepo: vi.fn().mockResolvedValue(false),
       repoRoot: vi.fn().mockResolvedValue(''),
+      mainRepoRoot: vi.fn().mockResolvedValue(null),
       branches: vi.fn().mockResolvedValue([]),
       worktrees: vi.fn().mockResolvedValue([]),
+      worktreeUsage: vi.fn().mockResolvedValue([]),
       createWorktree: vi.fn().mockResolvedValue(null),
       removeWorktree: vi.fn().mockResolvedValue(undefined),
       worktreeStatus: vi.fn().mockResolvedValue({ ahead: 0, behind: 0, dirty: false }),
       diff: vi.fn().mockResolvedValue({ files: [] }),
       compareBranches: vi.fn().mockResolvedValue({ files: [] }),
       compareFile: vi.fn().mockResolvedValue(null),
-      prune: vi.fn().mockResolvedValue(undefined)
+      prune: vi.fn().mockResolvedValue(undefined),
+      deleteBranch: vi.fn().mockResolvedValue(undefined),
+      // v2.0: 소스 제어 (터미널 우측 드로어)
+      scm: {
+        status: vi.fn().mockResolvedValue({ entries: [], conflictOperation: 'none' }),
+        history: vi.fn().mockResolvedValue({ items: [], hasMore: false, limit: 50, skip: 0 }),
+        branchDiff: vi.fn().mockResolvedValue({
+          baseRef: 'origin/main',
+          baseOid: 'a'.repeat(40),
+          headRef: 'feature/neon-6774',
+          ahead: 0,
+          files: []
+        }),
+        commitDetail: vi.fn().mockResolvedValue({ commitOid: '', files: [] }),
+        fileDiff: vi.fn().mockResolvedValue({
+          path: '',
+          original: '',
+          modified: '',
+          originalBinary: false,
+          modifiedBinary: false
+        }),
+        stage: vi.fn().mockResolvedValue(undefined),
+        unstage: vi.fn().mockResolvedValue(undefined),
+        discard: vi.fn().mockResolvedValue(undefined),
+        commit: vi.fn().mockResolvedValue({ ok: true, message: '' }),
+        lastCommitMessage: vi.fn().mockResolvedValue(''),
+        push: vi.fn().mockResolvedValue({ ok: true, message: '' }),
+        pull: vi.fn().mockResolvedValue({ ok: true, message: '' }),
+        fetch: vi.fn().mockResolvedValue({ ok: true, message: '' }),
+        remotes: vi.fn().mockResolvedValue([]),
+        authors: vi.fn().mockResolvedValue([]),
+        stashList: vi.fn().mockResolvedValue([]),
+        stashPush: vi.fn().mockResolvedValue(undefined),
+        stashAction: vi.fn().mockResolvedValue(undefined),
+        createBranch: vi.fn().mockResolvedValue(undefined),
+        checkout: vi.fn().mockResolvedValue(undefined),
+        abort: vi.fn().mockResolvedValue(undefined)
+      }
+    },
+    // v2.0 C-2: 워크스페이스(태스크 ↔ 워크트리 ↔ 에이전트 run). renderer 뷰는 C-3 이후에 붙는다.
+    workspace: {
+      repos: {
+        list: vi.fn().mockResolvedValue([]),
+        add: vi.fn().mockResolvedValue(null),
+        update: vi.fn().mockResolvedValue(null),
+        remove: vi.fn().mockResolvedValue(undefined)
+      },
+      settings: {
+        get: vi.fn().mockResolvedValue(null),
+        set: vi.fn().mockResolvedValue(null)
+      },
+      setProjectRepo: vi.fn().mockResolvedValue(undefined),
+      list: vi.fn().mockResolvedValue([]),
+      get: vi.fn().mockResolvedValue(null),
+      startTask: vi.fn().mockResolvedValue(null),
+      run: {
+        resume: vi.fn().mockResolvedValue(null),
+        adopt: vi.fn().mockResolvedValue(null),
+        cleanup: vi.fn().mockResolvedValue(null)
+      },
+      reconcile: vi.fn().mockResolvedValue({ detached: 0, discarded: 0 }),
+      taskWorktree: vi.fn().mockImplementation(async (params: { repoPath: string; branch: string }) => ({
+        path: `${params.repoPath}-worktrees/${params.branch.replace(/\//g, '-')}`,
+        branch: params.branch,
+        created: true,
+        isMainRepo: false
+      })),
+      taskDrop: {
+        resolve: vi.fn().mockResolvedValue(null),
+        link: vi.fn().mockResolvedValue(null),
+        unlink: vi.fn().mockResolvedValue(undefined),
+        touch: vi.fn().mockResolvedValue(undefined),
+        linked: vi.fn().mockResolvedValue({})
+      },
+      onRunUpdated: vi.fn().mockReturnValue(noopUnsub)
     },
     analytics: {
       track: vi.fn(),
@@ -260,7 +351,9 @@ export function createMockWindowApi(): Record<string, unknown> {
     dialog: {
       selectFolder: vi.fn().mockResolvedValue(null)
     },
-    onConfigChanged: vi.fn().mockReturnValue(noopUnsub)
+    onConfigChanged: vi.fn().mockReturnValue(noopUnsub),
+    // v2.0 windows-fix ADR-v2-windows-fix-03 §4: 정적 값 — 함수가 아니라 그대로 덮어써서 테스트한다.
+    system: { platform: 'darwin', osRelease: '23.0.0' }
   }
 }
 

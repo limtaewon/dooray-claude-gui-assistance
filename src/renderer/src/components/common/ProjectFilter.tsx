@@ -1,16 +1,32 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { Settings, Check, FolderOpen, Search, X, Plus, Link, Trash2 } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
+import { Settings, Check, ChevronRight, FolderOpen, Search, X, Plus, Link, Trash2 } from 'lucide-react'
 import type { DoorayProject } from '../../../../shared/types/dooray'
+import { anchoredMenuPosition, type AnchoredMenuPosition } from './anchoredMenu'
 
 interface ProjectFilterProps {
   /** 설정 키 (기본: pinnedProjects) - 태스크/위키 분리용 */
   settingsKey?: string
+  /** 하단에 '설정에서 프로젝트별 규칙 정하기' 링크를 보일지 (업무 목록에서만 의미가 있다) */
+  showSettingsLink?: boolean
+  /**
+   * 고르지 못하게 하고 **지금 뭐가 켜져 있는지만** 보여준다.
+   * 프로젝트를 고른 뒤 정할 것들(저장소·브랜치·첫 지시)이 설정에만 있어서, 두 군데서 고르게 하면
+   * 여기서 고른 프로젝트가 규칙 없이 남는다.
+   */
+  readOnly?: boolean
   /** 프로젝트 목록 대신 위키 도메인 목록을 사용할지 */
   useWikiDomains?: boolean
   onChanged?: () => void
 }
 
-function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false, onChanged }: ProjectFilterProps): JSX.Element {
+function ProjectFilter({
+  settingsKey = 'pinnedProjects',
+  useWikiDomains = false,
+  showSettingsLink = false,
+  readOnly = false,
+  onChanged
+}: ProjectFilterProps): JSX.Element {
   const [open, setOpen] = useState(false)
   const [allProjects, setAllProjects] = useState<DoorayProject[]>([])
   const [customProjects, setCustomProjects] = useState<DoorayProject[]>([])
@@ -18,6 +34,31 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const anchorRef = useRef<HTMLButtonElement>(null)
+  /** 메뉴를 body 포털로 띄운다 — 작업 패널(320px) 안에 두면 잘리고 레이아웃을 밀어 덜컹거린다. */
+  const [menuPos, setMenuPos] = useState<AnchoredMenuPosition | null>(null)
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuPos(null)
+      return
+    }
+    const place = (): void => {
+      const rect = anchorRef.current?.getBoundingClientRect()
+      if (!rect) return
+      setMenuPos(
+        anchoredMenuPosition(rect, { width: 288 }, { width: window.innerWidth, height: window.innerHeight })
+      )
+    }
+    place()
+    window.addEventListener('resize', place)
+    // 스크롤로 앵커가 움직이면 위치가 어긋난다 — 캡처 단계로 모든 스크롤 컨테이너를 잡는다.
+    window.addEventListener('scroll', place, true)
+    return () => {
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
+    }
+  }, [open])
 
   // 수동 추가 상태
   const [showAddForm, setShowAddForm] = useState(false)
@@ -48,6 +89,11 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
     } catch { /* ok */ }
     finally { setLoading(false) }
   }, [settingsKey, useWikiDomains, customKey])
+
+  // 배지는 열어보기 전에도 보여야 한다 — 몇 개를 고른 상태인지가 버튼의 정보다.
+  useEffect(() => {
+    void load()
+  }, [load])
 
   useEffect(() => {
     if (open) {
@@ -121,32 +167,48 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
   for (const cp of customProjects) {
     if (!allProjects.some((p) => p.id === cp.id)) mergedProjects.push(cp)
   }
-  const filtered = mergedProjects.filter((p) =>
+  const visibleProjects = readOnly
+    ? mergedProjects.filter((p) => pinnedIds.includes(p.id))
+    : mergedProjects
+  const filtered = visibleProjects.filter((p) =>
     !searchQuery || p.code.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   return (
     <div className="relative">
-      <button onClick={() => setOpen(!open)}
-        className={`ds-btn icon sm relative ${pinnedCount > 0 ? 'text-clauday-blue' : ''}`}
-        title="표시할 프로젝트 설정">
-        <Settings size={14} />
+      <button
+      data-tour="dooray-project-filter" ref={anchorRef} onClick={() => setOpen(!open)}
+        className="ds-btn secondary sm"
+        title="표시할 프로젝트 선택">
+        <Settings size={13} />
+        {readOnly ? '표시 중인 프로젝트' : '프로젝트 선택'}
         {pinnedCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-clauday-blue text-[calc(8px_*_var(--app-font-scale,1))] text-white flex items-center justify-center font-bold">
+          <span className="ml-0.5 px-1.5 rounded-full bg-brand-dooray text-white text-[calc(9px_*_var(--app-font-scale,1))] font-semibold">
             {pinnedCount}
           </span>
         )}
       </button>
 
-      {open && (
+      {open && menuPos && createPortal(
         <>
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full mt-1 w-72 bg-bg-surface border border-bg-border rounded-xl shadow-2xl z-40 overflow-hidden">
+          <div className="fixed inset-0 z-[70]" onClick={() => setOpen(false)} />
+          <div
+            className="fixed z-[71] bg-bg-surface border border-bg-border rounded-xl shadow-2xl overflow-hidden flex flex-col"
+            style={{
+              left: menuPos.left,
+              top: menuPos.top,
+              width: menuPos.width,
+              maxHeight: menuPos.maxHeight
+            }}
+          >
             <div className="px-3 py-2 border-b border-bg-border bg-bg-surface-hover">
-              <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">표시할 프로젝트 선택</span>
+              <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">
+                {readOnly ? '표시 중인 프로젝트' : '표시할 프로젝트 선택'}
+              </span>
               <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary ml-2">{pinnedCount > 0 ? `${pinnedCount}개 선택` : '전체 표시'}</span>
             </div>
-            {/* 검색 */}
+            {/* 검색 — 조회 전용일 때는 목록이 짧아 필요 없다 */}
+            {!readOnly && (
             <div className="px-2 py-1.5 border-b border-bg-border">
               <div className="relative">
                 <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary" />
@@ -156,7 +218,7 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="프로젝트 검색..."
-                  className="w-full pl-6 pr-6 py-1 bg-bg-primary border border-bg-border rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
+                  className="w-full pl-6 pr-6 py-1 bg-bg-primary border border-bg-border rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-bg-border-strong"
                 />
                 {searchQuery && (
                   <button onClick={() => setSearchQuery('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary">
@@ -165,34 +227,44 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
                 )}
               </div>
             </div>
+            )}
             {/* 프로젝트 목록 */}
-            <div className="max-h-72 overflow-y-auto py-1">
+            <div className="flex-1 min-h-0 overflow-y-auto py-1">
               {loading ? (
                 <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">로딩...</div>
               ) : filtered.length === 0 ? (
-                <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">검색 결과 없음</div>
+                <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">
+                  {readOnly ? '아직 고른 프로젝트가 없습니다' : '검색 결과 없음'}
+                </div>
               ) : filtered.map((p) => {
                 const checked = pinnedIds.includes(p.id)
                 const isCustom = customIds.has(p.id)
                 return (
                   <div key={p.id} className="flex items-center group">
-                    <button onClick={() => toggle(p.id)}
-                      className="flex-1 flex items-center gap-2 px-3 py-1.5 hover:bg-bg-surface-hover transition-colors text-left">
+                    <button
+                      onClick={() => { if (!readOnly) void toggle(p.id) }}
+                      disabled={readOnly}
+                      className={`flex-1 flex items-center gap-2 px-3 py-1.5 transition-colors text-left ${
+                        readOnly ? 'cursor-default' : 'hover:bg-bg-surface-hover'
+                      }`}
+                    >
                       <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 ${
-                        checked ? 'bg-clauday-blue border-clauday-blue' : 'border-bg-border-light'
+                        checked
+                          ? 'bg-brand-dooray border-brand-dooray'
+                          : 'border-bg-border-strong'
                       }`}>
-                        {checked && <Check size={9} className="text-white" />}
+                        {checked && <Check size={9} className="text-white" strokeWidth={3} />}
                       </div>
                       {isCustom ? (
-                        <Link size={11} className={`flex-shrink-0 ${checked ? 'text-clauday-orange' : 'text-text-tertiary'}`} />
+                        <Link size={11} className={`flex-shrink-0 ${checked ? 'text-brand-dooray' : 'text-text-tertiary'}`} />
                       ) : (
-                        <FolderOpen size={11} className={`flex-shrink-0 ${checked ? 'text-clauday-blue' : 'text-text-tertiary'}`} />
+                        <FolderOpen size={11} className={`flex-shrink-0 ${checked ? 'text-text-primary' : 'text-text-tertiary'}`} />
                       )}
                       <span className={`text-[calc(11px_*_var(--app-font-scale,1))] truncate min-w-0 ${checked ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>{p.code}</span>
                     </button>
                     {isCustom && (
                       <button onClick={() => removeCustomProject(p.id)}
-                        className="px-1.5 opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all"
+                        className="px-1.5 opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-red-400 transition-all"
                         title="수동 추가 프로젝트 제거">
                         <Trash2 size={10} />
                       </button>
@@ -202,6 +274,7 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
               })}
             </div>
             {/* 수동 추가 */}
+            {!readOnly && (
             <div className="border-t border-bg-border">
               {showAddForm ? (
                 <div className="px-2 py-2 space-y-1.5">
@@ -212,16 +285,16 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
                       onChange={(e) => { setAddInput(e.target.value); setAddError('') }}
                       onKeyDown={(e) => e.key === 'Enter' && handleAddProject()}
                       placeholder="프로젝트 ID 또는 URL"
-                      className="flex-1 px-2 py-1 bg-bg-primary border border-bg-border rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
+                      className="flex-1 px-2 py-1 bg-bg-primary border border-bg-border rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-bg-border-strong"
                       autoFocus
                     />
                     <button onClick={handleAddProject} disabled={adding || !addInput.trim()}
-                      className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-text-tertiary rounded text-[calc(10px_*_var(--app-font-scale,1))] text-white transition-colors">
+                      className="ds-btn primary xs">
                       {adding ? '...' : '추가'}
                     </button>
                   </div>
                   {addError && <div className="text-[calc(9px_*_var(--app-font-scale,1))] text-red-400 px-1">{addError}</div>}
-                  <div className="text-[calc(9px_*_var(--app-font-scale,1))] text-gray-600 px-1">예: 3787724725029315943 또는 Dooray URL</div>
+                  <div className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary px-1">예: 3787724725029315943 또는 Dooray URL</div>
                 </div>
               ) : (
                 <button onClick={() => setShowAddForm(true)}
@@ -231,8 +304,30 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
                 </button>
               )}
             </div>
+            )}
+
+            {/* 고른 뒤에 정할 것들(저장소·브랜치 이름·첫 지시 문구)은 이 좁은 팝오버에서 다룰 수 없다.
+                여기서 어설프게 흉내 내지 말고 제대로 된 화면으로 보낸다. */}
+            {showSettingsLink && (
+              <button
+                onClick={() => {
+                  setOpen(false)
+                  window.dispatchEvent(
+                    new CustomEvent('goto-settings', { detail: { tab: 'workspace' } })
+                  )
+                }}
+                className="flex items-center gap-1.5 w-full px-3 py-2 border-t border-bg-border text-left text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover transition-colors"
+              >
+                <Settings size={11} className="flex-none" />
+                <span className="flex-1 min-w-0">
+                  설정에서 프로젝트 고르기 — 저장소 · 브랜치 이름 · 첫 지시 문구
+                </span>
+                <ChevronRight size={11} className="flex-none text-text-tertiary" />
+              </button>
+            )}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   )

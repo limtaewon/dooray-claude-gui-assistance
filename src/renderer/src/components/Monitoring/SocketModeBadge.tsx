@@ -78,11 +78,11 @@ export default function SocketModeBadge(): JSX.Element {
   const tone = isActive
     ? { dot: 'bg-emerald-400', text: 'text-emerald-400', label: 'ACTIVE', desc: '실시간 push 수신 중' }
     : isConnecting
-      ? { dot: 'bg-clauday-blue animate-pulse', text: 'text-clauday-blue', label: 'CONNECTING', desc: '연결 중...' }
+      ? { dot: 'bg-[color:var(--c-blue-solid)] animate-pulse', text: 'text-[color:var(--c-blue-fg)]', label: 'CONNECTING', desc: '연결 중… (끊기면 자동 재시도)' }
       : isStandby
         ? { dot: 'bg-amber-400', text: 'text-amber-400', label: 'STANDBY', desc: '다른 세션 활성 — 대기 중' }
         : !domain
-          ? { dot: 'bg-text-tertiary/40', text: 'text-text-tertiary', label: '폴링만', desc: '도메인 설정 시 실시간 모드' }
+          ? { dot: 'bg-text-tertiary', text: 'text-text-tertiary', label: '수집 안 함', desc: '도메인을 설정해야 메시지를 받습니다' }
           : { dot: 'bg-red-400', text: 'text-red-400', label: '연결 안 됨', desc: status?.lastError || '에러' }
 
   return (
@@ -124,8 +124,9 @@ export default function SocketModeBadge(): JSX.Element {
             </div>
 
             <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary leading-relaxed mb-2">
-              두레이 도메인을 입력하면 WebSocket으로 메시지를 실시간 수신합니다 (폴링 누락 0).
-              두레이 API 토큰을 그대로 재사용해요.
+              메시지는 WebSocket 으로만 받습니다 — 도메인을 설정해야 수집이 시작됩니다.
+              연결이 끊기면 자동으로 다시 붙고(최대 30초 간격), 붙는 순간 끊겨 있던 동안의 메시지를 한 번 메웁니다.
+              두레이 API 토큰을 그대로 재사용합니다.
             </p>
 
             {hasApiToken === false && (
@@ -140,10 +141,10 @@ export default function SocketModeBadge(): JSX.Element {
             <div className="px-2 py-1.5 mb-2 rounded text-[calc(10px_*_var(--app-font-scale,1))] flex items-center gap-1.5"
               style={{ background: 'var(--bg-primary)', border: '1px solid var(--bg-border)' }}>
               {isActive && <><Check size={10} className="text-emerald-400" /><span className="text-emerald-400 font-semibold">ACTIVE</span></>}
-              {isConnecting && <><Loader2 size={10} className="text-clauday-blue animate-spin" /><span className="text-clauday-blue font-semibold">CONNECTING</span></>}
+              {isConnecting && <><Loader2 size={10} className="text-[color:var(--c-blue-fg)] animate-spin" /><span className="text-[color:var(--c-blue-fg)] font-semibold">CONNECTING</span></>}
               {isStandby && <><AlertCircle size={10} className="text-amber-400" /><span className="text-amber-400 font-semibold">STANDBY</span></>}
               {!isActive && !isConnecting && !isStandby && (
-                <><span className="w-1.5 h-1.5 rounded-full bg-text-tertiary/40" /><span className="text-text-tertiary">DISCONNECTED</span></>
+                <><span className="w-1.5 h-1.5 rounded-full bg-text-tertiary" /><span className="text-text-tertiary">DISCONNECTED</span></>
               )}
               <span className="text-text-tertiary ml-auto">{tone.desc}</span>
             </div>
@@ -174,7 +175,7 @@ export default function SocketModeBadge(): JSX.Element {
 
             <div className="flex items-center gap-1.5 mt-2">
               <button onClick={save} disabled={saving || !hasApiToken}
-                className="flex-1 px-2 py-1 rounded text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-white bg-clauday-orange hover:bg-clauday-orange/80 disabled:opacity-40">
+                className="flex-1 px-2 py-1 rounded text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-white bg-clauday-orange hover:opacity-90 disabled:opacity-40">
                 {saving ? '연결 중...' : domain ? '재연결' : '연결'}
               </button>
               {domain && (

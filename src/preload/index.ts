@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import { release } from 'os'
 
 // IpcRenderer 리스너 한도 상향 (기본 10, 다중 터미널 탭 + 각종 IPC 구독 때문에 넉넉히)
 ipcRenderer.setMaxListeners(100)
@@ -20,6 +21,38 @@ function subscribeTerminalOutput(cb: (payload: TerminalOutputPayload) => void): 
   return () => { terminalOutputHandlers.delete(cb) }
 }
 import { IPC_CHANNELS } from '../shared/types/ipc'
+// 터미널 종료 구독: TERMINAL_OUTPUT 과 동일한 단일 리스너 공유 패턴 (ADR-v2-terminal-p1-01)
+const terminalExitHandlers = new Set<(payload: TerminalExitPayload) => void>()
+let terminalExitSubscribed = false
+function subscribeTerminalExit(cb: (payload: TerminalExitPayload) => void): () => void {
+  terminalExitHandlers.add(cb)
+  if (!terminalExitSubscribed) {
+    terminalExitSubscribed = true
+    ipcRenderer.on(IPC_CHANNELS.TERMINAL_EXIT, (_: IpcRendererEvent, payload: TerminalExitPayload) => {
+      for (const h of terminalExitHandlers) {
+        try { h(payload) } catch { /* ignore */ }
+      }
+    })
+  }
+  return () => { terminalExitHandlers.delete(cb) }
+}
+
+// v2.0 M-A: main → renderer flush 요청 구독 — TERMINAL_OUTPUT/TERMINAL_EXIT 와 동일한 단일 리스너 공유 패턴.
+// payload 없음(push 전용, ADR-v2-terminal-p2-03 §2).
+const terminalRequestStateHandlers = new Set<() => void>()
+let terminalRequestStateSubscribed = false
+function subscribeTerminalRequestState(cb: () => void): () => void {
+  terminalRequestStateHandlers.add(cb)
+  if (!terminalRequestStateSubscribed) {
+    terminalRequestStateSubscribed = true
+    ipcRenderer.on(IPC_CHANNELS.TERMINAL_REQUEST_STATE, () => {
+      for (const h of terminalRequestStateHandlers) {
+        try { h() } catch { /* ignore */ }
+      }
+    })
+  }
+  return () => { terminalRequestStateHandlers.delete(cb) }
+}
 
 // CalDAV 데이터 변경 알림 (sync 결과 → main → 여기 → renderer 구독자)
 // #7 OS 알림 클릭 → renderer 가 subscribe 한 콜백으로 라우팅 (contextIsolation 이라 dispatchEvent 불가)
@@ -75,7 +108,7 @@ import type {
   BackupEntry,
   AgentSourceMap
 } from '../shared/types/harness-edit'
-import type { Skill, SkillSaveRequest } from '../shared/types/skills'
+import type { Skill, SkillSaveRequest, SkillDeleteManyResult } from '../shared/types/skills'
 import type { UsageQueryParams, UsageSummary } from '../shared/types/usage'
 import type {
   DoorayProject,
@@ -85,7 +118,8 @@ import type {
   DoorayWikiPage,
   DoorayWikiUpdateParams,
   DoorayCalendarEvent,
-  DoorayCalendarQueryParams
+  DoorayCalendarQueryParams,
+  DoorayWorkflow
 } from '../shared/types/dooray'
 import type {
   CalDAVCalendar,
@@ -108,9 +142,20 @@ import type {
   LocalCalendarUpdate
 } from '../shared/types/calendar'
 import type { AIBriefing, AIReport, AIProgressEvent, AIModelConfig, AIModelName } from '../shared/types/ai'
-import type { TerminalSession, TerminalCreateOptions, TerminalResizeOptions } from '../shared/types/terminal'
+import type {
+  TerminalSession,
+  TerminalCreateOptions,
+  TerminalResizeOptions,
+  TerminalExitPayload,
+  TerminalWorkspaceSnapshotV2,
+  TerminalSaveStateResult,
+  TerminalResolvePathRequest,
+  TerminalResolvedPath
+} from '../shared/types/terminal'
+import type { GitHubStatus } from '../shared/types/github'
 import type {
   GitWorktree,
+  GitWorktreeUsage,
   GitWorktreeStatus,
   GitBranch,
   GitDiffResult,
@@ -118,6 +163,41 @@ import type {
   GitWorktreeRemoveParams,
   GitFileCompare
 } from '../shared/types/git'
+import type { GitStatusResult } from '../shared/git/statusTypes'
+import type { GitHistoryOptions, GitHistoryResult } from '../shared/git/historyTypes'
+import type {
+  GitAuthorInfo,
+  GitBranchDiff,
+  GitCommitDetail,
+  GitCommitParams,
+  GitCreateBranchParams,
+  GitFileDiffContent,
+  GitFileDiffParams,
+  GitPullParams,
+  GitPushParams,
+  GitRemoteInfo,
+  GitRemoteOpResult,
+  GitStashEntry
+} from '../shared/git/scmTypes'
+import type {
+  RepoRegistryEntry,
+  AddRepoParams,
+  WorkspaceSettings,
+  TaskWorkspace,
+  StartTaskParams,
+  StartTaskResult,
+  ResumeRunParams,
+  ResumeRunResult,
+  AdoptRunResult,
+  CleanupRunParams,
+  CleanupRunResult,
+  ReconcileResult,
+  TaskDropTarget,
+  TaskSessionLink,
+  EnsureTaskWorktreeParams,
+  TaskWorktreeInfo,
+  WorkspaceRunUpdatedPayload
+} from '../shared/types/workspace'
 
 const api = {
   // MCP
@@ -142,7 +222,7 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.SKILLS_SAVE, req),
     delete: (filename: string): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.SKILLS_DELETE, filename),
-    deleteMany: (filenames: string[]): Promise<{ deleted: number }> =>
+    deleteMany: (filenames: string[]): Promise<SkillDeleteManyResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.SKILLS_DELETE_MANY, filenames),
     importFromFiles: (): Promise<{ imported: number; cancelled: boolean }> =>
       ipcRenderer.invoke(IPC_CHANNELS.SKILLS_IMPORT),
@@ -274,7 +354,10 @@ const api = {
         ipcRenderer.invoke(IPC_CHANNELS.DOORAY_CALENDAR_LIST),
       events: (params: DoorayCalendarQueryParams): Promise<DoorayCalendarEvent[]> =>
         ipcRenderer.invoke(IPC_CHANNELS.DOORAY_CALENDAR_EVENTS, params)
-    }
+    },
+    /** v2.0 C-2: 프로젝트 워크플로우(상태) 목록 — startTask 의 두레이 상태 전환 대상 선택에 사용 */
+    projectWorkflows: (projectId: string): Promise<DoorayWorkflow[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.DOORAY_PROJECT_WORKFLOWS, projectId)
   },
 
   // CalDAV (v1.5)
@@ -375,12 +458,42 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_LIST),
     getOutput: (id: string): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_SAVE_OUTPUT, id),
-    restoreSaved: (): Promise<Array<{ meta: { id: string; name: string; cwd: string }; output: string }>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_RESTORE),
     rename: (id: string, name: string): Promise<boolean> =>
       ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_RENAME, { id, name }),
     onOutput: (callback: (payload: { id: string; data: string }) => void): (() => void) =>
       subscribeTerminalOutput(callback),
+    /** v2.0 B-1: PTY 종료 통지 구독. suppression·at-most-once 판정은 main 이 수행. */
+    onExit: (callback: (payload: TerminalExitPayload) => void): (() => void) =>
+      subscribeTerminalExit(callback),
+    /** v2.0 M-A: 렌더러 스냅샷 저장 (invoke). main 이 store 쓰기 + 메모리 캐시 갱신 */
+    saveState: (snapshot: TerminalWorkspaceSnapshotV2 | null): Promise<TerminalSaveStateResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_SAVE_STATE, snapshot),
+    /** v2.0 M-A: 스냅샷 복원 — 없으면 null (main 이 legacy 마이그레이션까지 수행 후 반환) */
+    restoreState: (): Promise<TerminalWorkspaceSnapshotV2 | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_RESTORE_STATE),
+    /** v2.0 M-A: main → renderer flush 요청 구독 (before-quit 핸드셰이크) */
+    onRequestState: (callback: () => void): (() => void) => subscribeTerminalRequestState(callback),
+    /** v2.0 M-B: 링크 후보 배치 존재 검증 */
+    resolvePath: (req: TerminalResolvePathRequest): Promise<TerminalResolvedPath[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_RESOLVE_PATH, req),
+    /** v2.0: 세션의 현재 cwd (pid 실측 → spawn cwd 폴백). `cd` 이후를 따라가야 하는 곳에서 쓴다. */
+    sessionCwd: (sessionId: string): Promise<string | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_SESSION_CWD, sessionId),
+    /** v2.0: 지금 그 pane 에서 돌고 있는 프로그램 이름 — 셸이면 프롬프트가 비어 있다는 뜻. */
+    foreground: (sessionId: string): Promise<string | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_FOREGROUND, sessionId),
+    /** v2.0: 터미널의 claude 가 내 차례를 넘겼을 때 (탭 배지용) */
+    onClaudeDone: (callback: (payload: { sessionId: string }) => void): (() => void) => {
+      const handler = (_: IpcRendererEvent, payload: { sessionId: string }): void => callback(payload)
+      ipcRenderer.on(IPC_CHANNELS.TERMINAL_CLAUDE_DONE, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.TERMINAL_CLAUDE_DONE, handler)
+    },
+    /** v2.0: 알림 클릭 — 그 세션 탭으로 이동 */
+    onFocusSession: (callback: (payload: { sessionId: string }) => void): (() => void) => {
+      const handler = (_: IpcRendererEvent, payload: { sessionId: string }): void => callback(payload)
+      ipcRenderer.on(IPC_CHANNELS.TERMINAL_FOCUS_SESSION, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.TERMINAL_FOCUS_SESSION, handler)
+    },
     /** v1.4: 두레이 멘션이 main에서 새 터미널을 열었을 때 렌더러로 푸시되는 메타 */
     onMentionOpened: (callback: (meta: TerminalSession) => void): (() => void) => {
       const handler = (_: unknown, meta: TerminalSession): void => callback(meta)
@@ -521,16 +634,28 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_CLI_INFO)
   },
 
+  /** GitHub 연동 — 앱은 토큰을 받지 않는다. `gh` CLI 상태를 그대로 본다. */
+  github: {
+    status: (refresh?: boolean): Promise<GitHubStatus> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GITHUB_STATUS, refresh)
+  },
+
   // Git Worktree
   git: {
     isRepo: (path: string): Promise<boolean> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_IS_REPO, path),
-    repoRoot: (path: string): Promise<string> =>
+    repoRoot: (path: string): Promise<string | null> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_REPO_ROOT, path),
+    /** 워크트리 안이면 그 워크트리가 딸린 본 저장소 경로 (저장소가 아니면 null) */
+    mainRepoRoot: (path: string): Promise<string | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_MAIN_REPO_ROOT, path),
     branches: (repoPath: string): Promise<GitBranch[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_BRANCHES, repoPath),
     worktrees: (repoPath: string): Promise<GitWorktree[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_WORKTREES, repoPath),
+    /** 워크트리별 용량·변경 파일 수 — 정리 화면용. du 를 돌리므로 필요할 때만 부른다. */
+    worktreeUsage: (repoPath: string): Promise<GitWorktreeUsage[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_WORKTREE_USAGE, repoPath),
     createWorktree: (params: GitWorktreeCreateParams): Promise<GitWorktree> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_WORKTREE_CREATE, params),
     removeWorktree: (params: GitWorktreeRemoveParams): Promise<void> =>
@@ -544,7 +669,122 @@ const api = {
     compareFile: (repoPath: string, filePath: string, branch1: string, branch2: string): Promise<GitFileCompare> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_COMPARE_FILE, { repoPath, filePath, branch1, branch2 }),
     prune: (repoPath: string): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.GIT_PRUNE, repoPath)
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_PRUNE, repoPath),
+    /** v2.0 C-2: 로컬 브랜치 삭제. force 없으면 안전 삭제(-d), force 면 -D. */
+    deleteBranch: (repoPath: string, branch: string, opts?: { force?: boolean }): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_DELETE_BRANCH, { repoPath, branch, opts }),
+
+    /** v2.0: 소스 제어 — 워크트리 오케스트레이션(위 API)과 달리 한 저장소 안의 변경을 다룬다. */
+    scm: {
+      status: (repoPath: string, limit?: number): Promise<GitStatusResult> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_STATUS, { repoPath, limit }),
+      history: (repoPath: string, options?: GitHistoryOptions): Promise<GitHistoryResult> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_HISTORY, { repoPath, options }),
+      commitDetail: (repoPath: string, commitOid: string): Promise<GitCommitDetail> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_COMMIT_DETAIL, { repoPath, commitOid }),
+      /** 이 브랜치가 기준(base) 대비 바꾼 파일들 — 커밋 + 아직 커밋 안 한 변경 */
+      branchDiff: (repoPath: string, baseRef?: string): Promise<GitBranchDiff> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_BRANCH_DIFF, { repoPath, baseRef }),
+      fileDiff: (params: GitFileDiffParams): Promise<GitFileDiffContent> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_FILE_DIFF, params),
+      stage: (repoPath: string, paths: string[]): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_STAGE, { repoPath, paths }),
+      unstage: (repoPath: string, paths: string[]): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_UNSTAGE, { repoPath, paths }),
+      discard: (repoPath: string, paths: string[]): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_DISCARD, { repoPath, paths }),
+      commit: (params: GitCommitParams): Promise<{ ok: boolean; message: string }> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_COMMIT, params),
+      lastCommitMessage: (repoPath: string): Promise<string> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_LAST_COMMIT_MESSAGE, repoPath),
+      push: (params: GitPushParams): Promise<GitRemoteOpResult> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_PUSH, params),
+      pull: (params: GitPullParams): Promise<GitRemoteOpResult> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_PULL, params),
+      fetch: (repoPath: string, remote?: string): Promise<GitRemoteOpResult> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_FETCH, { repoPath, remote }),
+      remotes: (repoPath: string): Promise<GitRemoteInfo[]> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_REMOTES, repoPath),
+      authors: (repoPath: string): Promise<GitAuthorInfo[]> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_AUTHORS, repoPath),
+      stashList: (repoPath: string): Promise<GitStashEntry[]> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_STASH_LIST, repoPath),
+      stashPush: (
+        repoPath: string,
+        options?: { message?: string; includeUntracked?: boolean }
+      ): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_STASH_PUSH, { repoPath, ...options }),
+      stashAction: (
+        repoPath: string,
+        action: 'apply' | 'pop' | 'drop',
+        ref: string
+      ): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_STASH_ACTION, { repoPath, action, ref }),
+      createBranch: (params: GitCreateBranchParams): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_CREATE_BRANCH, params),
+      checkout: (repoPath: string, branch: string): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_CHECKOUT, { repoPath, branch }),
+      abort: (repoPath: string, operation: 'merge' | 'rebase'): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_ABORT, { repoPath, operation })
+    }
+  },
+
+  // Workspace (v2.0 C-2) — 두레이 태스크 ↔ 워크트리 ↔ 에이전트 run. renderer 뷰는 C-3, 여기서는 표면만 완성.
+  workspace: {
+    repos: {
+      list: (): Promise<RepoRegistryEntry[]> => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_REPOS_LIST),
+      add: (params: AddRepoParams): Promise<RepoRegistryEntry> =>
+        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_REPOS_ADD, params),
+      update: (id: string, patch: Partial<RepoRegistryEntry>): Promise<RepoRegistryEntry | null> =>
+        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_REPOS_UPDATE, { id, patch }),
+      remove: (id: string): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_REPOS_REMOVE, id)
+    },
+    settings: {
+      get: (): Promise<WorkspaceSettings> => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_SETTINGS_GET),
+      set: (patch: Partial<WorkspaceSettings>): Promise<WorkspaceSettings> =>
+        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_SETTINGS_SET, patch)
+    },
+    setProjectRepo: (projectId: string, repoId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_PROJECT_REPO_SET, { projectId, repoId }),
+    list: (): Promise<TaskWorkspace[]> => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_LIST),
+    get: (key: string): Promise<TaskWorkspace | null> => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_GET, key),
+    startTask: (params: StartTaskParams): Promise<StartTaskResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_START_TASK, params),
+    run: {
+      resume: (params: ResumeRunParams): Promise<ResumeRunResult> =>
+        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_RUN_RESUME, params),
+      adopt: (runId: string): Promise<AdoptRunResult> => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_RUN_ADOPT, runId),
+      cleanup: (params: CleanupRunParams): Promise<CleanupRunResult> =>
+        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_RUN_CLEANUP, params)
+    },
+    reconcile: (): Promise<ReconcileResult> => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_RECONCILE),
+    /** 터미널 태스크 드로어(C-3.5) — 드래그&드롭으로 태스크를 pane 에 떨어뜨릴 때 쓴다. */
+    taskDrop: {
+      /** preferCwd 를 주면 그 폴더의 세션을 우선 이어간다 (드롭한 pane 이 이미 있는 폴더). */
+      resolve: (projectId: string, taskId: string, preferCwd?: string): Promise<TaskDropTarget | null> =>
+        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_RESOLVE, { projectId, taskId, preferCwd }),
+      /** 드롭 직후 생긴 세션을 태스크에 연결. `since` 이후 활동한 세션만 후보다. */
+      link: (projectId: string, taskId: string, cwd: string, since: number): Promise<string | null> =>
+        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINK, { projectId, taskId, cwd, since }),
+      /** cwd 를 주면 그 폴더 링크만, 안 주면 이 업무의 링크 전부를 해제한다. */
+      unlink: (projectId: string, taskId: string, cwd?: string): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_UNLINK, { projectId, taskId, cwd }),
+      /** 세션을 다시 열었음을 알려 최근 사용순 정렬을 실제 사용과 맞춘다. */
+      touch: (projectId: string, taskId: string, cwd: string): Promise<void> =>
+        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_TOUCH, { projectId, taskId, cwd }),
+      /** `projectId:taskId` → 폴더별 세션 링크. 카드의 저장소 배지에 그대로 쓴다. */
+      linked: (): Promise<Record<string, TaskSessionLink[]>> =>
+        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINKED)
+    },
+    /** 업무용 워크트리 보장 — 이미 그 브랜치가 체크아웃돼 있으면 그 폴더를 그대로 준다. */
+    taskWorktree: (params: EnsureTaskWorktreeParams): Promise<TaskWorktreeInfo> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_WORKTREE, params),
+    /** run 변경 push 구독. unsubscribe 함수 반환. */
+    onRunUpdated: (callback: (payload: WorkspaceRunUpdatedPayload) => void): (() => void) => {
+      const handler = (_: IpcRendererEvent, payload: WorkspaceRunUpdatedPayload): void => callback(payload)
+      ipcRenderer.on(IPC_CHANNELS.WORKSPACE_RUN_UPDATED, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.WORKSPACE_RUN_UPDATED, handler)
+    }
   },
 
   // Analytics (로컬 전용)
@@ -842,6 +1082,14 @@ const api = {
       restore: (path: string, backupDir: string): Promise<{ restored: string[]; model: HarnessModel }> =>
         ipcRenderer.invoke(IPC_CHANNELS.HARNESS_RESTORE_BACKUP, { path, backupDir })
     }
+  },
+
+  // v2.0 windows-fix ADR-v2-windows-fix-03 §4: windowsPty 게이트(빌드번호 판정)에 쓰는 정적 값.
+  // IPC 채널이 아니다 — sandbox:false 라 preload 에서 동기로 읽어 노출한다. 값이 없어도(구버전 mock 등)
+  // 호출부는 optional chaining 으로 안전하게 undefined 처리한다.
+  system: {
+    platform: process.platform,
+    osRelease: release()
   }
 }
 

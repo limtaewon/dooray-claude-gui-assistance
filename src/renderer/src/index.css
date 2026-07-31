@@ -20,6 +20,17 @@
   --clauday-orange-light:  #FB923C;
   --clauday-orange-soft:   #FBE4D5;
   --clauday-blue:          #2563EB;   /* Claude */
+  /* 도메인 식별색 — 크롬 무채색화(--accent-*)와 무관하게 항상 유색으로 남는다.
+     Claude 계열 기능은 주황, 두레이 계열 기능은 파랑. */
+  --brand-claude:          #EA580C;
+  --brand-dooray:          #2563EB;
+  /* 터미널 — 어느 도메인도 아닌 앱의 바닥 화면. 셸 프롬프트의 관습색을 쓴다. */
+  --brand-terminal:        #16A34A;
+  /* 도메인색의 배경 tint 짝. **반드시 이 짝을 쓸 것** — CSS 변수 색에 `/10` 같은 불투명도
+     수정자를 붙이면 Tailwind 가 규칙을 통째로 드롭해 색이 아예 사라진다. */
+  --brand-dooray-bg:       #E1EBFC;
+  --brand-claude-bg:       #FCEADA;
+  --brand-terminal-bg:     #DCFCE7;
   --clauday-blue-light:    #3B82F6;
   --clauday-blue-soft:     #DCE6FB;
 
@@ -127,6 +138,10 @@
   --c-neutral-fg:    #525A6B;
   --c-neutral-solid: #8A91A0;
 
+  /* 알림 배지 (사이드바 unread 등) — 라이트는 브랜드 오렌지 유지 */
+  --badge-bg:            var(--clauday-orange);
+  --badge-fg:            #FFFFFF;
+
   /* 기타 */
   --link:                var(--c-blue-fg);
   --code-bg:             #EDEFF4;
@@ -172,6 +187,23 @@
   --wf-closed-bg:     #E5E7EB;             --wf-closed-fg:     #6B7280;              --wf-closed-dot:     #9CA3AF;
   --wf-overdue-bg:    var(--c-red-bg);     --wf-overdue-fg:    var(--c-red-fg);      --wf-overdue-dot:    #DC2626;
 
+  /* 커밋 그래프 레인 — 무채색 크롬(--accent-*)과 무관한 도메인 식별색.
+     색맹 안전(IBM) 팔레트 계열이라 5개 레인이 인접해도 구분된다. */
+  --git-graph-ref:        #007ACC;
+  --git-graph-remote-ref: #9A5CD0;
+  --git-graph-base-ref:   #EA5C00;
+  --git-graph-lane-1:     #C9A100;
+  --git-graph-lane-2:     #DC267F;
+  --git-graph-lane-3:     #994F00;
+  --git-graph-lane-4:     #2E8B84;
+  --git-graph-lane-5:     #7C5CD0;
+
+  /* diff 상태 — 추가/삭제/수정 */
+  --git-added:     #16A34A;
+  --git-deleted:   #DC2626;
+  --git-modified:  #D97706;
+  --git-untracked: #6B7280;
+
   /* Chart — series & chrome */
   --chart-1: #2563EB;
   --chart-2: #EA580C;
@@ -199,67 +231,92 @@
 }
 
 /* ============================================================
-   THEME — dark (warmer neutral, 덜 푸르게)
+   THEME — dark (v2.0)
+   거의 순검정 캔버스 + 표면 간 대비 최소화 + 무채색 지배.
+   컬러는 상태 칩과 AI 액션에만 쓰고, 나머지는 회색조 위계로만 표현한다.
    ============================================================ */
 [data-theme='dark'] {
-  --bg-sidebar:        #0F1115;
-  --bg-base:           #15181E;
-  --bg-surface:        #1C2027;
-  --bg-surface-raised: #232831;
+  /* 캔버스(터미널/에디터)만 가장 어둡고, 크롬(사이드바·패널·카드)은 한 톤 밝게 떠 있다.
+     전부 같은 검정으로 눌러버리면 영역 구분이 사라진다 — Orca 대조 후 교정(2026-07-30). */
+  --bg-base:           #131313;   /* 앱 캔버스(빈 화면 등) — 가장 어두움 */
+  /* 터미널은 자체 표면을 갖는다 — 크롬(#1A1A1A)·캔버스(#131313)와 구분되게 한 톤 위 (Orca 참고) */
+  --terminal-bg:       #202429;
+  --terminal-fg:       #E8E8EA;
   --bg-primary:        var(--bg-base);
-  --bg-surface-hover:  #262C36;
-  --bg-subtle:         #1A1D24;
-  --bg-hover:          #262C36;
-  --bg-active:         #2E343F;
-  --bg-border:         #2E343F;
-  --bg-border-light:   #3A4150;
-  --bg-border-strong:  #4A5160;
+  --bg-sidebar:        #1C1C1C;   /* 크롬 — 캔버스보다 한 톤 밝게 떠 있다 */
+  --bg-surface:        #1A1A1A;   /* 패널·카드 */
+  --bg-surface-raised: #242424;   /* 모달·팝오버 */
+  --bg-surface-hover:  #242424;
+  --bg-subtle:         #171717;
+  --bg-hover:          #212121;
+  --bg-active:         #2C2C2C;
+  --bg-border:         #2B2B2B;
+  --bg-border-light:   #383838;
+  --bg-border-strong:  #484848;
 
-  /* 순백 대신 한 단계 낮춰 눈 피로 감소 */
-  --text-primary:      #ECEEF2;
-  --text-secondary:    #A9AEBA;
-  --text-tertiary:     #6B7180;
+  --text-primary:      #F2F2F2;
+  --text-secondary:    #A0A0A0;
+  --text-tertiary:     #6E6E6E;
 
-  --accent-blue:         #3B82F6;
-  --accent-blue-light:   #60A5FA;
-  --accent-blue-soft:    rgba(59,130,246,0.18);
-  --accent-blue-fg:      #93C5FD;
+  /* v2.0 무채색 크롬 — 다크에서 clauday-blue 계열 유틸(내비·탭·버튼·테두리)은 전부 회색조가 된다.
+     상태 칩(--c-*)·워크플로(--wf-*)·링크(--link)·AI 그라디언트(--clauday-*)는 그대로 유색. */
+  --accent-blue:         #76767C;
+  --accent-blue-light:   #8E8E95;
+  --accent-blue-soft:    rgba(255,255,255,0.08);
+  --accent-blue-fg:      #C9C9CF;
   --accent-orange:       #FB923C;
   --accent-orange-light: #FDBA74;
+  /* 도메인 식별색 — 어두운 면 위에서 읽히도록 밝은 쪽으로 */
+  --brand-claude:        #FB923C;
+  --brand-dooray:        #60A5FA;
+  --brand-terminal:      #4ADE80;
+  --brand-dooray-bg:     rgba(96,165,250,0.16);
+  --brand-claude-bg:     rgba(251,146,60,0.16);
+  --brand-terminal-bg:   rgba(74,222,128,0.16);
   --accent-orange-soft:  rgba(251,146,60,0.18);
 
-  /* Mode-aware semantic — DARK (밝은 fg on dark tint bg) */
-  --c-blue-bg:       rgba(59,130,246,0.16);
-  --c-blue-fg:       #93C5FD;
+  /* Mode-aware semantic — DARK. 칩은 채도를 낮추고 텍스트를 밝게: 검정 위에서 '빛나는 알약'. */
+  --c-blue-bg:       rgba(59,130,246,0.22);
+  --c-blue-fg:       #A9C9FF;
   --c-blue-solid:    #3B82F6;
-  --c-orange-bg:     rgba(251,146,60,0.16);
+  --c-orange-bg:     rgba(251,146,60,0.18);
   --c-orange-fg:     #FDBA74;
   --c-orange-solid:  #FB923C;
-  --c-red-bg:        rgba(248,113,113,0.16);
+  --c-red-bg:        rgba(248,113,113,0.18);
   --c-red-fg:        #FCA5A5;
   --c-red-solid:     #F87171;
-  --c-emerald-bg:    rgba(34,197,94,0.16);
-  --c-emerald-fg:    #86EFAC;
-  --c-emerald-solid: #22C55E;
-  --c-violet-bg:     rgba(167,139,250,0.16);
+  --c-emerald-bg:    rgba(52,211,153,0.18);
+  --c-emerald-fg:    #7EE2B8;
+  --c-emerald-solid: #34D399;
+  --c-violet-bg:     rgba(167,139,250,0.18);
   --c-violet-fg:     #C4B5FD;
   --c-violet-solid:  #A78BFA;
   --c-yellow-bg:     rgba(250,204,21,0.16);
   --c-yellow-fg:     #FDE68A;
   --c-yellow-solid:  #EAB308;
-  --c-neutral-bg:    rgba(148,163,184,0.14);
-  --c-neutral-fg:    #CBD5E1;
-  --c-neutral-solid: #94A3B8;
+  --c-neutral-bg:    rgba(255,255,255,0.07);
+  --c-neutral-fg:    #A8A8B0;
+  --c-neutral-solid: #66666E;
+
+  /* v2.0 — 밝은 주 버튼(Orca 식). 검정 캔버스에서 유일하게 '튀는' 면. */
+  --btn-primary-bg:       #E9E9EC;
+  --btn-primary-bg-hover: #F6F6F8;
+  --btn-primary-fg:       #101012;
+
+  /* 알림 배지 — "읽지 않은 것이 있다" 는 정보다. 무채색으로 두면 다른 크롬에 묻혀
+     한눈에 안 들어와서 노랑을 쓴다(위험은 빨강, 주의·대기는 노랑). */
+  --badge-bg:             var(--c-yellow-solid);
+  --badge-fg:             #1A1400;
 
   --link:              var(--c-blue-fg);
-  --code-bg:           #1C2027;
+  --code-bg:           #1A1A1A;
   --code-text:         #FDBA74;
   --mark-bg:           rgba(251,146,60,0.25);
   --mark-text:         #FDBA74;
   --scrollbar-track:   transparent;
   --scrollbar-thumb:   rgba(148,148,155,0.28);
   --scrollbar-thumb-hover: rgba(148,148,155,0.5);
-  --overlay-bg:        rgba(0,0,0,0.6);
+  --overlay-bg:        rgba(0,0,0,0.68);
 
   --shadow-sm:      0 1px 2px rgba(0,0,0,0.30);
   --shadow-md:      0 4px 14px rgba(0,0,0,0.36);
@@ -272,16 +329,16 @@
   --elev-2: var(--shadow-md);
   --elev-3: var(--shadow-lg);
 
-  --ring-focus-color:    rgba(96,165,250,0.40);
+  --ring-focus-color:    rgba(255,255,255,0.22);
   --ring-focus:          0 0 0 3px var(--ring-focus-color);
   --ring-error-color:    rgba(248,113,113,0.35);
   --ring-error:          0 0 0 3px var(--ring-error-color);
   --ring-selected-color: rgba(251,146,60,0.75);
   --ring-selected:       0 0 0 2px var(--ring-selected-color);
 
-  --bg-disabled:     #1A1D24;
-  --text-disabled:   #4A5160;
-  --border-disabled: #2E343F;
+  --bg-disabled:     #1A1A1A;
+  --text-disabled:   #545454;
+  --border-disabled: #2B2B2B;
 
   --wf-backlog-bg:    var(--c-neutral-bg);      --wf-backlog-fg:    var(--c-neutral-fg);  --wf-backlog-dot:    #94A3B8;
   --wf-registered-bg: var(--c-orange-bg);       --wf-registered-fg: var(--c-orange-fg);   --wf-registered-dot: #FB923C;
@@ -289,6 +346,20 @@
   --wf-resolved-bg:   var(--c-emerald-bg);      --wf-resolved-fg:   var(--c-emerald-fg);  --wf-resolved-dot:   #4ADE80;
   --wf-closed-bg:     rgba(148,163,184,0.10);   --wf-closed-fg:     #6B7180;              --wf-closed-dot:     #6B7180;
   --wf-overdue-bg:    var(--c-red-bg);          --wf-overdue-fg:    var(--c-red-fg);      --wf-overdue-dot:    #F87171;
+
+  --git-graph-ref:        #3794FF;
+  --git-graph-remote-ref: #B66DFF;
+  --git-graph-base-ref:   #EA5C00;
+  --git-graph-lane-1:     #FFB000;
+  --git-graph-lane-2:     #FF6FA5;
+  --git-graph-lane-3:     #CE9178;
+  --git-graph-lane-4:     #40B0A6;
+  --git-graph-lane-5:     #B66DFF;
+
+  --git-added:     #4ADE80;
+  --git-deleted:   #F87171;
+  --git-modified:  #FBBF24;
+  --git-untracked: #94A3B8;
 
   --chart-1: #60A5FA;
   --chart-2: #FB923C;

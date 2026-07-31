@@ -132,7 +132,7 @@ function WikiStoragePicker({
     <div className="relative inline-flex">
       <button
         onClick={() => setMode(mode === 'closed' ? 'switcher' : 'closed')}
-        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-bg-border bg-bg-surface hover:border-clauday-blue/40 text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary"
+        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-bg-border bg-bg-surface hover:border-bg-border-strong text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary"
         type="button"
         title="위키 저장소 전환"
       >
@@ -177,12 +177,12 @@ function WikiStoragePicker({
                       onClick={() => handleSelectActive(w.wikiId)}
                       className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[calc(11px_*_var(--app-font-scale,1))] transition-colors ${
                         isActive
-                          ? 'bg-clauday-blue/15 text-text-primary font-medium'
+                          ? 'bg-bg-active text-text-primary font-medium'
                           : 'text-text-secondary hover:bg-bg-surface-hover'
                       }`}
                       type="button"
                     >
-                      <FolderOpen size={11} className={isActive ? 'text-clauday-blue' : 'text-text-tertiary'} />
+                      <FolderOpen size={11} className={isActive ? 'text-text-primary' : 'text-text-tertiary'} />
                       <span className="truncate flex-1">{w.wikiName || w.wikiId}</span>
                       {isLocked && <Lock size={9} className="text-text-tertiary" />}
                     </button>
@@ -251,7 +251,7 @@ function WikiStoragePicker({
                         {w.isCustom ? (
                           <Link size={11} className={`flex-shrink-0 ${checked ? 'text-clauday-orange' : 'text-text-tertiary'}`} />
                         ) : (
-                          <FolderOpen size={11} className={`flex-shrink-0 ${checked ? 'text-clauday-blue' : 'text-text-tertiary'}`} />
+                          <FolderOpen size={11} className={`flex-shrink-0 ${checked ? 'text-text-primary' : 'text-text-tertiary'}`} />
                         )}
                         <span className={`text-[calc(11px_*_var(--app-font-scale,1))] truncate min-w-0 flex-1 ${checked ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>
                           {w.wikiName || w.wikiId}
@@ -292,7 +292,7 @@ function WikiStoragePicker({
                       <button
                         onClick={handleManualAdd}
                         disabled={adding || !addInput.trim()}
-                        className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-text-tertiary rounded text-[calc(10px_*_var(--app-font-scale,1))] text-white transition-colors flex items-center gap-1"
+                        className="ds-btn primary xs"
                         type="button"
                       >
                         {adding ? <Loader2 size={10} className="animate-spin" /> : null}

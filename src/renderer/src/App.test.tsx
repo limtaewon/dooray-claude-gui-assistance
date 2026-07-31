@@ -1,7 +1,7 @@
 /**
  * App.tsx 통합 테스트 — view 라우팅(activeView) 검증.
  *
- * App 은 너무 많은 무거운 컴포넌트(BranchWorkspace, DoorayAssistant, TerminalView,
+ * App 은 너무 많은 무거운 컴포넌트(DoorayAssistant, TerminalView,
  * Monaco/xterm 의존)를 끌어들이므로 각 view 컴포넌트는 가벼운 stub 으로 교체한다.
  * App 자체의 책임은:
  *  - settings('startupView') → 초기 activeView 결정
@@ -40,14 +40,11 @@ vi.mock('./components/Terminal/TerminalView', () => ({
 vi.mock('./components/MentionAgent/MentionAgentView', () => ({
   default: (): JSX.Element => <div data-testid="view-agent">agent</div>
 }))
-vi.mock('./components/ClaudeManual/ClaudeManual', () => ({
-  default: (): JSX.Element => <div data-testid="view-manual">manual</div>
+vi.mock('./components/Onboarding/OnboardingHub', () => ({
+  default: (): JSX.Element => <div data-testid="view-onboarding">onboarding</div>
 }))
 vi.mock('./components/Sessions/ClaudeCodeSessionsView', () => ({
   default: (): JSX.Element => <div data-testid="view-sessions">sessions</div>
-}))
-vi.mock('./components/Git/BranchWorkspace', () => ({
-  default: (): JSX.Element => <div data-testid="view-git">git</div>
 }))
 vi.mock('./components/Settings/SettingsView', () => ({
   default: (): JSX.Element => <div data-testid="view-settings">settings</div>

@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clauday v2.0 — 작업 시작 모달 목업</title>
+<style>
+  :root{
+    --bg:#0e1014; --panel:#161a22; --panel2:#1c212b; --border:#272d3a; --border2:#333b4a;
+    --tx:#e7ebf2; --tx2:#9aa4b6; --tx3:#6b7484;
+    --orange:#ff7a1a; --blue:#4a9eff;
+    --ok:#34d399; --warn:#fbbf24; --bad:#f87171;
+    --radius:10px;
+    font-synthesis:none;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--tx);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    font-size:13px; line-height:1.5; overflow:hidden;
+  }
+  code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+  /* ===== App shell (배경 워크스페이스) ===== */
+  .app{display:flex; flex-direction:column; height:100vh}
+  .titlebar{height:38px; background:#0b0d11; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:10px; padding:0 14px; flex:none; -webkit-user-select:none}
+  .lights{display:flex; gap:7px}
+  .lights i{width:11px;height:11px;border-radius:50%}
+  .lights i:nth-child(1){background:#ff5f57}.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}
+  .title{font-weight:600; font-size:12.5px; letter-spacing:.2px}
+  .title b{background:linear-gradient(90deg,var(--orange),var(--blue));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .titlebar .spacer{flex:1}
+  .cmdk{font-size:11px; color:var(--tx3); border:1px solid var(--border2); padding:3px 8px; border-radius:6px}
+  .body{display:flex; flex:1; min-height:0}
+  .sidebar{width:56px; background:#0b0d11; border-right:1px solid var(--border); flex:none;
+    display:flex; flex-direction:column; align-items:center; padding-top:10px; gap:5px}
+  .nav{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    color:var(--tx3); cursor:pointer; font-size:17px; position:relative}
+  .nav:hover{background:#181c24;color:var(--tx2)}
+  .nav.active{background:linear-gradient(135deg,rgba(255,122,26,.22),rgba(74,158,255,.22));color:var(--tx)}
+  .nav.active::before{content:"";position:absolute;left:-10px;top:8px;bottom:8px;width:3px;border-radius:3px;background:linear-gradient(var(--orange),var(--blue))}
+  .main{flex:1; display:flex; flex-direction:column; min-width:0}
+
+  /* 배경 스켈레톤 (blur 아래 깔리는 워크스페이스 대충 뷰) */
+  .wsbar{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+  .wsbar .crumb{color:var(--tx2);font-size:12px}
+  .wsbar .crumb b{color:var(--tx)}
+  .wsbody{flex:1;display:flex;gap:14px;padding:16px 18px;min-height:0}
+  .wscol{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px}
+  .wscol.l{width:270px;flex:none}
+  .wscol.r{flex:1}
+  .sk{background:var(--panel2);border-radius:6px;height:11px;margin:9px 0}
+  .sk.w40{width:40%}.sk.w60{width:60%}.sk.w75{width:75%}.sk.w90{width:90%}
+  .sk.head{height:15px;background:#232a37}
+  .skcard{border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:10px 0;background:var(--panel2)}
+  .skcard .sk{background:#242b39}
+
+  /* ===== Backdrop + Modal ===== */
+  .backdrop{position:fixed;inset:0;background:rgba(8,10,14,.55);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);
+    display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;overflow:auto}
+  .modal{width:520px;max-width:100%;background:var(--panel);border:1px solid var(--border2);border-radius:14px;
+    box-shadow:0 24px 70px rgba(0,0,0,.6);display:flex;flex-direction:column;max-height:calc(100vh - 60px)}
+  .m-head{padding:16px 18px 13px;border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg,rgba(74,158,255,.06),transparent);border-radius:14px 14px 0 0;
+    display:flex;align-items:flex-start;gap:10px}
+  .m-head .tno{color:var(--tx3);font-weight:800}
+  .m-head .tt{font-size:14.5px;font-weight:800;line-height:1.35}
+  .m-head .sub{margin-top:5px;display:flex;align-items:center;gap:6px}
+  .chip{font-size:10.5px;padding:2px 9px;border-radius:20px;border:1px solid var(--border2);color:var(--tx2);white-space:nowrap}
+  .chip.proj{border-color:rgba(74,158,255,.45);color:#9ec9ff;background:rgba(74,158,255,.08)}
+  .m-close{margin-left:auto;flex:none;width:26px;height:26px;border-radius:7px;border:none;background:transparent;color:var(--tx3);
+    font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .m-close:hover{background:var(--panel2);color:var(--tx)}
+  .m-body{padding:15px 18px;overflow-y:auto;display:flex;flex-direction:column;gap:15px}
+  .field .lbl{font-size:10.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--tx3);font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+  .field .cap{font-size:11px;color:var(--tx3);margin-top:5px}
+  .lbl .hintcap{font-weight:500;letter-spacing:0;text-transform:none;color:var(--tx3);opacity:.85}
+  .xsbtn{margin-left:auto;font-size:10.5px;padding:2px 9px;border-radius:6px;border:1px solid var(--border2);
+    background:transparent;color:var(--tx2);cursor:pointer;font-weight:600}
+  .xsbtn:hover{border-color:var(--blue);color:var(--tx)}
+  .strip{display:none;margin-top:7px;align-items:flex-start;gap:7px;font-size:11px;border-radius:9px;padding:7px 10px;line-height:1.5}
+  .strip.show{display:flex}
+  .strip.info{border:1px solid rgba(74,158,255,.35);background:rgba(74,158,255,.07);color:#9ec9ff}
+  .row{display:flex;gap:10px;align-items:center}
+
+  /* 커스텀 셀렉트 */
+  .sel{position:relative;flex:1;min-width:0}
+  .sel-btn{width:100%;display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border2);
+    border-radius:9px;padding:8px 11px;color:var(--tx);cursor:pointer;font-size:12.5px;text-align:left}
+  .sel-btn:hover{border-color:var(--blue)}
+  .sel-btn .path{color:var(--tx3);font-size:11px}
+  .sel-btn .car{margin-left:auto;color:var(--tx3);font-size:10px}
+  .sel-menu{position:absolute;top:calc(100% + 5px);left:0;right:0;background:var(--panel2);border:1px solid var(--border2);
+    border-radius:10px;box-shadow:0 12px 34px rgba(0,0,0,.55);z-index:10;display:none;overflow:hidden;padding:5px}
+  .sel.open .sel-menu{display:block}
+  .sel.open .sel-btn{border-color:var(--blue)}
+  .opt{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:12.5px;color:var(--tx)}
+  .opt:hover{background:rgba(74,158,255,.10)}
+  .opt .path{color:var(--tx3);font-size:11px}
+  .opt .ck{width:14px;flex:none;color:var(--blue);font-weight:800}
+  .opt.add{color:var(--blue);border-top:1px solid var(--border);border-radius:0 0 7px 7px;margin-top:4px;padding-top:9px}
+  .sel-search{display:flex;align-items:center;gap:7px;margin:2px 3px 6px;background:var(--bg);border:1px solid var(--border);
+    border-radius:7px;padding:5px 9px;color:var(--tx3);font-size:11.5px}
+  .sel-search input{flex:1;border:none;background:transparent;color:var(--tx);font-size:11.5px;outline:none;font-family:inherit}
+
+  /* 체크박스 */
+  .ckbx{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--tx2);cursor:pointer;white-space:nowrap;user-select:none}
+  .ckbx .box{width:15px;height:15px;border-radius:4px;border:1px solid var(--border2);background:var(--bg);flex:none;
+    display:flex;align-items:center;justify-content:center;font-size:10px;color:#0b0d11;font-weight:900}
+  .ckbx.on .box{background:var(--blue);border-color:var(--blue)}
+  .ckbx.on .box::after{content:"✓"}
+
+  /* 인풋 */
+  .inp{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:9px;color:var(--tx);
+    padding:8px 11px;font-size:12.5px;outline:none}
+  .inp:focus{border-color:var(--blue)}
+  .inp.mono{font-size:12.5px;letter-spacing:.1px}
+  .brrow{position:relative}
+  .brrow .inp{padding-right:104px}
+  .brcheck{position:absolute;right:9px;top:50%;transform:translateY(-50%);font-size:10.5px;font-weight:700;
+    display:flex;align-items:center;gap:5px;padding:2px 8px;border-radius:14px}
+  .brcheck.ok{color:var(--ok);background:rgba(52,211,153,.12)}
+  .brcheck.bad{color:var(--bad);background:rgba(248,113,113,.12)}
+  .brcheck.busy{color:var(--tx3);background:var(--panel2)}
+  textarea.inp{resize:vertical;line-height:1.55;font-family:inherit}
+
+  /* 토글 스위치 */
+  .tgl-row{display:flex;align-items:flex-start;gap:11px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--panel2)}
+  .tgl-row.warn{border-color:rgba(255,122,26,.4);background:rgba(255,122,26,.05)}
+  .tgl-row .tinfo{flex:1;min-width:0}
+  .tgl-row .tname{font-size:12.5px;font-weight:600}
+  .tgl-row .tname code{font-size:10.5px;color:var(--tx3);background:var(--bg);padding:1px 5px;border-radius:5px}
+  .tgl-row.warn .tname{color:#ffc194}
+  .tgl-row .tcap{font-size:11px;color:var(--tx3);margin-top:2px}
+  .sw{flex:none;width:36px;height:20px;border-radius:20px;background:var(--border2);position:relative;cursor:pointer;transition:background .15s;margin-top:2px}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#cbd3e0;transition:left .15s}
+  .sw.on{background:var(--blue)}
+  .sw.on::after{left:18px;background:#fff}
+  .tgl-row.warn .sw.on{background:var(--orange)}
+  .subck{margin-top:7px}
+
+  /* 푸터 */
+  .m-foot{padding:13px 18px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px}
+  .foot-note{font-size:11px;color:var(--tx3);flex:1;min-width:0}
+  .foot-note b{color:var(--tx2)}
+  .btn{font-size:12.5px;padding:8px 15px;border-radius:9px;border:1px solid var(--border2);background:var(--panel2);
+    color:var(--tx);cursor:pointer;display:inline-flex;align-items:center;gap:7px;font-weight:600}
+  .btn:hover{border-color:var(--blue)}
+  .btn.ghost{background:transparent}
+  .btn.primary{background:linear-gradient(135deg,var(--orange),var(--blue));border:none;color:#fff;
+    font-weight:700;box-shadow:0 4px 16px rgba(255,122,26,.25)}
+  .btn.primary:hover{filter:brightness(1.08)}
+</style>
+</head>
+<body>
+
+<!-- ===== 배경: 워크스페이스 스켈레톤 (blur 아래) ===== -->
+<div class="app" aria-hidden="true">
+  <div class="titlebar">
+    <div class="lights"><i></i><i></i><i></i></div>
+    <div class="title"><b>Clauday</b> · 워크스페이스</div>
+    <div class="spacer"></div>
+    <div class="cmdk">⌘K</div>
+  </div>
+  <div class="body">
+    <div class="sidebar">
+      <div class="nav">🏠</div>
+      <div class="nav active">🗂️</div>
+      <div class="nav">💬</div>
+      <div class="nav">🖥️</div>
+      <div class="nav">📅</div>
+      <div class="nav">🧩</div>
+      <div class="nav">⚙️</div>
+    </div>
+    <div class="main">
+      <div class="wsbar">
+        <div class="crumb">두레이 › <b>dooray-D-TF</b> › 업무 목록</div>
+      </div>
+      <div class="wsbody">
+        <div class="wscol l">
+          <div class="sk head w60"></div>
+          <div class="sk w90"></div><div class="sk w75"></div><div class="sk w90"></div>
+          <div class="sk w60"></div><div class="sk w75"></div><div class="sk w90"></div>
+          <div class="sk w40"></div><div class="sk w75"></div>
+        </div>
+        <div class="wscol r">
+          <div class="sk head w40"></div>
+          <div class="skcard"><div class="sk w75"></div><div class="sk w60"></div></div>
+          <div class="skcard"><div class="sk w90"></div><div class="sk w40"></div></div>
+          <div class="skcard"><div class="sk w60"></div><div class="sk w75"></div></div>
+          <div class="sk w90"></div><div class="sk w75"></div><div class="sk w60"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 작업 시작 모달 ===== -->
+<div class="backdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+
+    <!-- 헤더 -->
+    <div class="m-head">
+      <div style="min-width:0">
+        <div class="tt" id="mTitle"><span class="tno">#2619</span> [iOS] 메일 목록 디자인 개선</div>
+        <div class="sub">
+          <span class="chip proj">dooray-D-TF</span>
+          <span class="chip">담당 taewon.lim</span>
+        </div>
+      </div>
+      <button class="m-close" title="닫기">✕</button>
+    </div>
+
+    <div class="m-body">
+
+      <!-- 저장소 -->
+      <div class="field">
+        <div class="lbl">저장소</div>
+        <div class="row">
+          <div class="sel" id="repoSel">
+            <button class="sel-btn" onclick="toggleSel('repoSel')">
+              <span class="mono" id="repoName">ios-dooray</span>
+              <span class="path mono" id="repoPath">~/work/ios-dooray</span>
+              <span class="car">▾</span>
+            </button>
+            <div class="sel-menu">
+              <div class="opt" onclick="pickRepo(this,'ios-dooray','~/work/ios-dooray')">
+                <span class="ck">✓</span><span class="mono">ios-dooray</span><span class="path mono">~/work/ios-dooray</span>
+              </div>
+              <div class="opt" onclick="pickRepo(this,'dooray-mail-kit','~/work/dooray-mail-kit')">
+                <span class="ck"></span><span class="mono">dooray-mail-kit</span><span class="path mono">~/work/dooray-mail-kit</span>
+              </div>
+              <div class="opt add" onclick="toggleSel('repoSel')">
+                <span class="ck"></span>＋ 저장소 추가…
+              </div>
+            </div>
+          </div>
+          <label class="ckbx on" onclick="toggleCk(this)"><span class="box"></span>이 프로젝트에 기억</label>
+        </div>
+      </div>
+
+      <!-- Base 브랜치 -->
+      <div class="field">
+        <div class="lbl">Base 브랜치</div>
+        <div class="row">
+          <div class="sel" id="baseSel">
+            <button class="sel-btn" onclick="toggleSel('baseSel')">
+              <span class="mono" id="baseName">origin/develop</span>
+              <span class="car">▾</span>
+            </button>
+            <div class="sel-menu">
+              <div class="sel-search">🔍 <input type="text" placeholder="브랜치 검색…" onclick="event.stopPropagation()"></div>
+              <div class="opt" onclick="pickBase(this,'origin/develop')"><span class="ck">✓</span><span class="mono">origin/develop</span></div>
+              <div class="opt" onclick="pickBase(this,'origin/main')"><span class="ck"></span><span class="mono">origin/main</span></div>
+              <div class="opt" onclick="pickBase(this,'origin/release/26.8')"><span class="ck"></span><span class="mono">origin/release/26.8</span></div>
+            </div>
+          </div>
+          <label class="ckbx on" onclick="toggleCk(this)"><span class="box"></span>생성 전에 fetch (최신에서 시작)</label>
+        </div>
+      </div>
+
+      <!-- 브랜치 이름 -->
+      <div class="field">
+        <div class="lbl">브랜치 이름</div>
+        <div class="brrow">
+          <input class="inp mono" id="branchInput" value="feature/D-TF-2619" spellcheck="false"
+                 oninput="onBranchInput()">
+          <span class="brcheck ok" id="brCheck">✓ 사용 가능</span>
+        </div>
+        <div class="cap">템플릿 <code>feature/{projectCode}-{taskNumber}</code> — 수정 가능</div>
+      </div>
+
+      <!-- 에이전트 프롬프트 -->
+      <div class="field">
+        <div class="lbl">에이전트 프롬프트
+          <span class="hintcap">(비워두면 자동 입력 없이 터미널에서 직접 지시)</span>
+          <button class="xsbtn" onclick="clearPrompt()">비우기</button>
+        </div>
+        <textarea class="inp" id="promptTa" rows="5" spellcheck="false" oninput="syncPrompt()">다음 두레이 태스크를 구현해줘: [iOS] 메일 목록 디자인 개선 — 메일 목록 셀 사이 구분선 추가, 발신자/제목 타이포 계층 정리, 읽음/안읽음 상태의 시각 대비 강화. 완료 기준은 태스크 본문의 체크리스트를 따르고, 스냅샷 테스트를 함께 갱신해줘.</textarea>
+        <div class="strip info" id="promptInfo">ℹ️ 워크트리 생성 후 <span class="mono">claude</span> 만 실행됩니다 — 첫 지시는 터미널에서 직접 입력하세요</div>
+      </div>
+
+      <!-- 토글: 권한 자동 승인 -->
+      <div class="tgl-row warn">
+        <div class="tinfo">
+          <div class="tname">권한 자동 승인</div>
+          <div class="tcap">켜면 <code>--dangerously-skip-permissions</code> 로 실행됩니다 · 끄면 터미널에서 직접 승인하며 개입</div>
+        </div>
+        <div class="sw" onclick="this.classList.toggle('on')"></div>
+      </div>
+
+      <!-- 토글: 두레이 상태 변경 -->
+      <div class="tgl-row">
+        <div class="tinfo">
+          <div class="tname">두레이 상태를 &lsquo;진행중&rsquo;으로 변경</div>
+          <div class="tcap">작업 시작과 동시에 태스크 워크플로우를 업데이트합니다</div>
+          <label class="ckbx on subck" onclick="toggleCk(this)"><span class="box"></span>브랜치명 댓글 남기기</label>
+        </div>
+        <div class="sw on" onclick="this.classList.toggle('on')"></div>
+      </div>
+
+    </div>
+
+    <!-- 푸터 -->
+    <div class="m-foot">
+      <div class="foot-note" id="footNote"><b>워크트리 1개</b>가 생성됩니다 · <span class="mono">.ios-dooray-worktrees/</span></div>
+      <button class="btn ghost">취소</button>
+      <button class="btn primary">▶ 작업 시작</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  var repo = { name: 'ios-dooray', path: '~/work/ios-dooray' };
+  var EXISTING = ['develop','main','feature/D-TF-2601']; // 충돌 검사 시뮬레이션용 기존 브랜치
+
+  // ── 푸터 안내: 선택 저장소 기준 워크트리 1개 고정 ────────────
+  function renderFoot(){
+    document.getElementById('footNote').innerHTML =
+      '<b>워크트리 1개</b>가 생성됩니다 · <span class="mono">.' + repo.name + '-worktrees/</span>';
+  }
+
+  // ── 브랜치 이름 입력 → 충돌 검사(시뮬레이션) + 미리보기 갱신 ──
+  var checkTimer = null;
+  function onBranchInput(){
+    var el = document.getElementById('brCheck');
+    el.className = 'brcheck busy';
+    el.textContent = '⋯ 검사 중';
+    clearTimeout(checkTimer);
+    checkTimer = setTimeout(function(){
+      var v = document.getElementById('branchInput').value.trim();
+      if (!v){ el.className = 'brcheck bad'; el.textContent = '✗ 이름 필요'; return; }
+      if (EXISTING.indexOf(v) >= 0){ el.className = 'brcheck bad'; el.textContent = '✗ 이미 존재'; return; }
+      el.className = 'brcheck ok';
+      el.textContent = '✓ 사용 가능';
+    }, 450);
+  }
+
+  // ── 커스텀 셀렉트 ─────────────────────────────────────────────
+  function toggleSel(id){
+    var el = document.getElementById(id);
+    var open = el.classList.contains('open');
+    closeSels();
+    if (!open) el.classList.add('open');
+    event.stopPropagation();
+  }
+  function closeSels(){
+    document.querySelectorAll('.sel.open').forEach(function(s){ s.classList.remove('open'); });
+  }
+  document.addEventListener('click', closeSels);
+
+  function pickRepo(opt, name, path){
+    repo = { name: name, path: path };
+    document.getElementById('repoName').textContent = name;
+    document.getElementById('repoPath').textContent = path;
+    markPicked(opt);
+    renderFoot();
+  }
+  function pickBase(opt, name){
+    document.getElementById('baseName').textContent = name;
+    markPicked(opt);
+  }
+  function markPicked(opt){
+    opt.parentElement.querySelectorAll('.opt .ck').forEach(function(c){ c.textContent = ''; });
+    opt.querySelector('.ck').textContent = '✓';
+  }
+
+  // ── 체크박스 ─────────────────────────────────────────────────
+  function toggleCk(el){ el.classList.toggle('on'); }
+
+  // ── 에이전트 프롬프트: 비우기 + 빈값 안내 연동 ───────────────
+  function clearPrompt(){
+    var ta = document.getElementById('promptTa');
+    ta.value = '';
+    ta.focus();
+    syncPrompt();
+  }
+  function syncPrompt(){
+    // 비어 있으면 터미널 직접 지시 안내 스트립 표시
+    var empty = !document.getElementById('promptTa').value.trim();
+    document.getElementById('promptInfo').classList.toggle('show', empty);
+  }
+
+  // 초기 렌더
+  renderFoot();
+  syncPrompt();
+</script>
+
+<!--
+════════════════════════════════════════════════════════════════════
+구현 매핑 노트 (v2.0)
+════════════════════════════════════════════════════════════════════
+· 컴포넌트: src/renderer/src/components/Workspace/StartWorkModal.tsx
+  - 이 목업의 모달 전체가 StartWorkModal 1개. 두레이 태스크 카드의
+    "작업 시작" 버튼에서 task(projectCode, taskNumber, subject, body 요약)를
+    props 로 받아 오픈.
+· 브랜치 이름 미리보기: src/shared/workspace/branchName.ts
+  - buildBranchName(template, {projectCode, taskNumber}) 순수 함수.
+  - renderer 가 이 모듈을 *직접 import* 해서 입력 즉시 미리보기 — IPC 왕복 없음.
+  - main 프로세스의 워크트리 생성부(git/WorktreeService)도 같은 함수를
+    사용해 미리보기 = 실제 생성 브랜치명 보장. vitest 단위 테스트 대상.
+· 충돌 검사(✓ 사용 가능): IPC window.api.workspace.checkBranch(repo, name)
+  → main 에서 git show-ref 조회. debounce 450ms (목업의 시뮬레이션과 동일 UX).
+· 저장소 기억 체크: electron-store 에 projectId → repoPath 매핑 저장.
+· 워크트리: .{repo}-worktrees/ 밑에 git worktree add — 태스크당 1개.
+  권한 자동 승인(--dangerously-skip-permissions) 토글은 기본 OFF,
+  UI 상태일 뿐 저장하지 않음.
+· 에이전트 프롬프트는 선택 — 비우면 워크트리 생성 후 claude 만 실행하고
+  첫 지시는 터미널에서 직접 입력(터미널 직접 운전 패턴).
+· 두레이 상태 변경/댓글: 기존 DoorayTaskService (workflow 변경 + 댓글 API) 재사용.
+════════════════════════════════════════════════════════════════════
+-->
+</body>
+</html>

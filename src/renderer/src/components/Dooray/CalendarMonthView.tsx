@@ -687,7 +687,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
         {WEEKDAYS.map((w, i) => (
           <div key={w}
             className={`px-2 py-1.5 text-[calc(10px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-right ${
-              i === 0 ? 'text-rose-400' : i === 6 ? 'text-clauday-blue' : 'text-text-secondary'
+              i === 0 ? 'text-rose-400' : i === 6 ? 'text-[color:var(--c-blue-fg)]' : 'text-text-secondary'
             }`}>{w}</div>
         ))}
       </div>
@@ -713,7 +713,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                       onMouseDown={onCellMouseDown(day)}
                       onClick={() => setNewRange({ start: day, end: day })}
                       className={`relative text-left border-r border-bg-border last:border-r-0 transition-colors group cursor-pointer ${
-                        inMonth ? 'hover:bg-bg-surface-hover/60' : 'bg-bg-surface/30 hover:bg-bg-surface-hover/40'
+                        inMonth ? 'hover:bg-bg-surface-hover/60' : 'bg-bg-surface hover:bg-bg-surface-hover/40'
                       }`}>
                       <div className="absolute top-1 right-1.5 z-[1] flex items-center gap-0.5 pointer-events-none">
                         {isToday ? (
@@ -726,8 +726,8 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                             di === 0
                               ? inMonth ? 'text-rose-400' : 'text-rose-400/45'
                               : di === 6
-                                ? inMonth ? 'text-clauday-blue' : 'text-clauday-blue/45'
-                                : inMonth ? 'text-text-secondary' : 'text-text-tertiary/40'
+                                ? inMonth ? 'text-[color:var(--c-blue-fg)]' : 'text-[color:var(--c-blue-fg)] opacity-45'
+                                : inMonth ? 'text-text-secondary' : 'text-text-tertiary'
                           }`}>{day.getDate()}일</span>
                         )}
                       </div>
@@ -755,7 +755,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                   return (
                     <div className="pointer-events-none absolute inset-0 grid grid-cols-7 z-20">
                       <div style={{ gridColumn: `${ds.col + 1} / span ${ds.span}` }}
-                        className={`m-0.5 ring-2 ring-clauday-blue bg-clauday-blue/5 ${rL} ${rR}`} />
+                        className={`m-0.5 ring-2 ring-clauday-blue bg-bg-active ${rL} ${rR}`} />
                     </div>
                   )
                 })()}
@@ -877,7 +877,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
           <div className="flex items-center gap-1">
             <button
               onClick={() => { setEditingEvent(selected); setSelected(null) }}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[calc(11px_*_var(--app-font-scale,1))] text-clauday-blue hover:bg-clauday-blue/10 transition-colors">
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[calc(11px_*_var(--app-font-scale,1))] text-clauday-blue hover:bg-bg-surface-hover transition-colors">
               <Edit2 size={12} />
               편집
             </button>
@@ -964,7 +964,7 @@ function EventDetailBody({ event, calendarName, colorBg }: {
           <span className="truncate max-w-[140px]">{calendarName}</span>
           <span className={`px-1.5 py-0.5 rounded text-[calc(9px_*_var(--app-font-scale,1))] font-medium ${
             event.source === 'local' ? 'bg-emerald-500/15 text-emerald-400'
-              : event.source === 'caldav' ? 'bg-clauday-blue/15 text-clauday-blue'
+              : event.source === 'caldav' ? 'bg-bg-active text-text-primary'
               : 'bg-rose-500/15 text-rose-400'
           }`}>{event.source === 'local' ? '내 일정' : event.source === 'caldav' ? '두레이' : '공휴일'}</span>
         </div>
@@ -1029,7 +1029,7 @@ function EventDetailBody({ event, calendarName, colorBg }: {
           <DetailRow icon={<Bell size={14} />}>
             <div className="flex flex-wrap gap-1.5">
               {event.alarms.map((a, i) => (
-                <span key={i} className="px-2 py-0.5 rounded-md bg-clauday-orange/10 text-clauday-orange text-[calc(11px_*_var(--app-font-scale,1))] font-medium">
+                <span key={i} className="px-2 py-0.5 rounded-md bg-bg-active text-clauday-orange text-[calc(11px_*_var(--app-font-scale,1))] font-medium">
                   {fmtTrigger(a.trigger)}
                 </span>
               ))}
@@ -1041,7 +1041,7 @@ function EventDetailBody({ event, calendarName, colorBg }: {
         {event.webUrl && (
           <DetailRow icon={<ExternalLink size={14} />}>
             <a href={event.webUrl} target="_blank" rel="noreferrer"
-              className="text-clauday-blue hover:underline truncate inline-block max-w-full">{event.webUrl}</a>
+              className="text-link hover:underline truncate inline-block max-w-full">{event.webUrl}</a>
           </DetailRow>
         )}
       </div>
@@ -1050,7 +1050,7 @@ function EventDetailBody({ event, calendarName, colorBg }: {
       {event.description && (
         <div className="flex items-start gap-3">
           <Edit2 size={14} className="text-text-tertiary mt-1.5 flex-shrink-0" />
-          <div className="flex-1 min-w-0 rounded-lg border border-bg-border bg-bg-surface/30 p-3 markdown-body text-[calc(12px_*_var(--app-font-scale,1))] leading-relaxed">
+          <div className="flex-1 min-w-0 rounded-lg border border-bg-border bg-bg-surface p-3 markdown-body text-[calc(12px_*_var(--app-font-scale,1))] leading-relaxed">
             <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
               {event.description}
             </ReactMarkdown>
@@ -1101,7 +1101,7 @@ function statusBadgeOf(status?: string): { label: string; cls: string } | null {
   if (!status) return null
   switch (status.toUpperCase()) {
     case 'CONFIRMED': return { label: '확정', cls: 'bg-emerald-500/15 text-emerald-400' }
-    case 'TENTATIVE': return { label: '임시', cls: 'bg-clauday-orange/15 text-clauday-orange' }
+    case 'TENTATIVE': return { label: '임시', cls: 'bg-bg-active text-clauday-orange' }
     case 'CANCELLED': return { label: '취소됨', cls: 'bg-rose-500/15 text-rose-400 line-through' }
     default: return null
   }
@@ -1214,7 +1214,7 @@ function NewEventModal({ range, calendars, onClose, onCreate }: {
           </select>
         </Field>
         <label className="flex items-center gap-1.5 text-text-secondary">
-          <input type="checkbox" className="accent-clauday-blue" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />종일
+          <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />종일
         </label>
         {!allDay && (
           <div className="grid grid-cols-2 gap-2">

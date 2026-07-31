@@ -1,10 +1,11 @@
 /**
  * SettingsView 통합 테스트.
  *
- * - 탭 전환 (AI 모델 / 두레이 / CalDAV / 앱 동작)
+ * - 좌측 네비 전환 (두레이 / 캘린더 / 모델 / 동작)
  * - AI 모델: getModelConfig 호출 + 저장 시 setModelConfig 호출
  * - 두레이 토큰: getToken/validateToken 호출 → 상태 표시
- * - 앱 동작: startupView 라디오 변경 → settings.set("startupView", ...) 호출
+ * - 동작: 시작 화면 세그먼트 변경 → settings.set("startupView", ...) 호출
+ * - 설정 검색: 질의에 맞는 섹션만 네비에 남는다
  *
  * UsageInsights / ThemePicker 같은 자식 컴포넌트는 그대로 렌더해도 무방
  * (window.api 만 모킹되면 됨).
@@ -39,16 +40,22 @@ describe('SettingsView (integration)', () => {
     vi.clearAllMocks()
   })
 
-  it('renders AI 모델 tab by default and calls getModelConfig', async () => {
+  it('두레이 연결을 기본으로 열고, 모델 섹션으로 이동하면 getModelConfig 를 부른다', async () => {
     vi.mocked(window.api.ai.getModelConfig).mockResolvedValue({})
 
     renderWithDs(<SettingsView />)
 
-    expect(screen.getByRole('button', { name: /AI 모델/ })).toBeInTheDocument()
+    // 기본 섹션은 '두레이 연결' — 연결부터 하는 것이 첫 사용 흐름이라서
+    expect(await screen.findByRole('heading', { name: '두레이 연결' })).toBeInTheDocument()
+    // 한 번에 한 섹션만 마운트한다 — 안 보이는 섹션은 IPC 를 때리지 않는다
+    expect(window.api.ai.getModelConfig).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole('button', { name: /^모델$/ }))
+
     await waitFor(() => {
       expect(window.api.ai.getModelConfig).toHaveBeenCalled()
     })
-    expect(screen.getByText('기능별 AI 모델')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'AI 모델' })).toBeInTheDocument()
   })
 
   it('saves AI model config when 저장 button is clicked', async () => {
@@ -56,6 +63,7 @@ describe('SettingsView (integration)', () => {
     const setSpy = vi.mocked(window.api.ai.setModelConfig)
 
     renderWithDs(<SettingsView />)
+    await userEvent.click(screen.getByRole('button', { name: /^모델$/ }))
 
     await waitFor(() => expect(window.api.ai.getModelConfig).toHaveBeenCalled())
 
@@ -72,7 +80,7 @@ describe('SettingsView (integration)', () => {
     vi.mocked(window.api.dooray.validateToken).mockResolvedValue({ valid: true, name: 'Test User' })
 
     renderWithDs(<SettingsView />)
-    await userEvent.click(screen.getByRole('button', { name: /두레이 연결/ }))
+    await userEvent.click(screen.getByRole('button', { name: /^두레이$/ }))
 
     await waitFor(() => {
       expect(window.api.dooray.getToken).toHaveBeenCalled()
@@ -83,7 +91,7 @@ describe('SettingsView (integration)', () => {
     expect(await screen.findByText(/Test User/)).toBeInTheDocument()
   })
 
-  it('switches to 외관 & 동작 tab and persists startupView change', async () => {
+  it('동작 섹션에서 시작 화면을 바꾸면 즉시 저장한다 (저장 버튼 없음)', async () => {
     vi.mocked(window.api.settings.get).mockImplementation(async (key: string) => {
       if (key === 'startupView') return 'dooray'
       return null
@@ -91,24 +99,40 @@ describe('SettingsView (integration)', () => {
     const setSpy = vi.mocked(window.api.settings.set)
 
     renderWithDs(<SettingsView />)
-    await userEvent.click(screen.getByRole('button', { name: /외관 & 동작/ }))
+    await userEvent.click(screen.getByRole('button', { name: /^동작$/ }))
 
-    // 라디오: "터미널" 옵션 클릭
-    const radio = await screen.findByLabelText(/터미널/, { selector: 'input[type="radio"]' }).catch(() =>
-      screen.getByRole('radio', { name: /터미널/ })
-    )
-    await userEvent.click(radio)
+    await userEvent.click(await screen.findByRole('radio', { name: '터미널' }))
 
     await waitFor(() => {
       expect(setSpy).toHaveBeenCalledWith('startupView', 'terminal')
     })
   })
 
+  it('설정 검색은 걸리는 섹션만 네비에 남긴다', async () => {
+    renderWithDs(<SettingsView />)
+
+    await userEvent.type(screen.getByLabelText('설정 검색'), '글꼴')
+
+    // 디바운스 후 적용
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^외관$/ })).toBeInTheDocument()
+    })
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /^단축키$/ })).not.toBeInTheDocument()
+    })
+  })
+
+  it('검색 결과가 없으면 안내를 보여준다', async () => {
+    renderWithDs(<SettingsView />)
+    await userEvent.type(screen.getByLabelText('설정 검색'), 'zzzz없는설정zzzz')
+    expect(await screen.findByText('검색 결과가 없습니다')).toBeInTheDocument()
+  })
+
   it('switches to 캘린더 연결 tab and queries caldav status', async () => {
     vi.mocked(window.api.caldav.status).mockResolvedValue({ connected: false, username: null })
 
     renderWithDs(<SettingsView />)
-    await userEvent.click(screen.getByRole('button', { name: /캘린더 연결/ }))
+    await userEvent.click(screen.getByRole('button', { name: /^캘린더$/ }))
 
     await waitFor(() => {
       expect(window.api.caldav.status).toHaveBeenCalled()

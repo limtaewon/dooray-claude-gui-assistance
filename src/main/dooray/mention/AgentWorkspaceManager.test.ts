@@ -1,10 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
 import { tmpdir, homedir } from 'os'
 import { join } from 'path'
-import { AgentWorkspaceManager } from './AgentWorkspaceManager'
+import { AgentWorkspaceManager, type ClaudeDirSetupDeps } from './AgentWorkspaceManager'
+import { writeHookSettings, type TrustResult } from '../../claude/claudeDirSetup'
 
 let root: string
+
+// preApproveTrust 는 실제 ~/.claude.json 을 읽고 쓰므로 테스트에서는 항상 스텁으로 대체한다.
+// writeHookSettings 는 홈을 건드리지 않으므로(tmp root 하위에만 기록) 실물을 그대로 주입해
+// 기존 단언(파일 내용/멱등)을 유지한다.
+const testDeps: ClaudeDirSetupDeps = {
+  preApproveTrust: vi.fn((): TrustResult => 'no-config'),
+  writeHookSettings
+}
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'ws-test-'))
@@ -15,7 +24,7 @@ afterEach(() => {
 
 describe('AgentWorkspaceManager.ensureChannel', () => {
   it('채널 디렉토리 + tasks/ + CLAUDE.md 생성', () => {
-    const m = new AgentWorkspaceManager(root)
+    const m = new AgentWorkspaceManager(root, testDeps)
     const ws = m.ensureChannel('123', '채널A')
     expect(existsSync(ws.channelDir)).toBe(true)
     expect(existsSync(ws.tasksDir)).toBe(true)
@@ -26,7 +35,7 @@ describe('AgentWorkspaceManager.ensureChannel', () => {
   })
 
   it('이미 있으면 CLAUDE.md 덮어쓰지 않는다', () => {
-    const m = new AgentWorkspaceManager(root)
+    const m = new AgentWorkspaceManager(root, testDeps)
     const ws = m.ensureChannel('123')
     writeFileSync(ws.claudeMdPath, '## 메모\n- 기억해둔 내용', 'utf8')
     m.ensureChannel('123')
@@ -34,7 +43,7 @@ describe('AgentWorkspaceManager.ensureChannel', () => {
   })
 
   it('channelId 의 OS 금지문자(슬래시 등)를 sanitize 한다', () => {
-    const m = new AgentWorkspaceManager(root)
+    const m = new AgentWorkspaceManager(root, testDeps)
     const ws = m.ensureChannel('abc/xyz')
     // 슬래시는 _ 로 치환 — 경로 traversal 방지
     expect(ws.channelDir).not.toContain('abc/xyz')
@@ -61,7 +70,7 @@ describe('AgentWorkspaceManager.ensureChannel', () => {
 
 describe('AgentWorkspaceManager.writeTaskPrompt', () => {
   it('tasks/{logId}.md 저장 후 상대경로 반환', () => {
-    const m = new AgentWorkspaceManager(root)
+    const m = new AgentWorkspaceManager(root, testDeps)
     const rel = m.writeTaskPrompt('ch1', 'log-42', '# 프롬프트\n본문')
     expect(rel).toBe(join('tasks', 'log-42.md'))
     const fullPath = join(root, 'agent', 'ch1', 'tasks', 'log-42.md')
@@ -72,7 +81,7 @@ describe('AgentWorkspaceManager.writeTaskPrompt', () => {
 
 describe('AgentWorkspaceManager.setHookConfig', () => {
   it('hookConfig 설정 후 ensureChannel 시 .claude/settings.local.json 작성', () => {
-    const m = new AgentWorkspaceManager(root)
+    const m = new AgentWorkspaceManager(root, testDeps)
     m.setHookConfig({ port: 5678, secret: 'sec' })
     const ws = m.ensureChannel('ch1')
     const settingsPath = join(ws.channelDir, '.claude', 'settings.local.json')
@@ -84,7 +93,7 @@ describe('AgentWorkspaceManager.setHookConfig', () => {
   })
 
   it('동일 settings 라면 다시 쓰지 않는다 (멱등)', () => {
-    const m = new AgentWorkspaceManager(root)
+    const m = new AgentWorkspaceManager(root, testDeps)
     m.setHookConfig({ port: 1234, secret: 's' })
     m.ensureChannel('ch1')
     const path = join(root, 'agent', 'ch1', '.claude', 'settings.local.json')
@@ -95,13 +104,13 @@ describe('AgentWorkspaceManager.setHookConfig', () => {
   })
 
   it('hookConfig 없으면 settings 안 만든다', () => {
-    const m = new AgentWorkspaceManager(root)
+    const m = new AgentWorkspaceManager(root, testDeps)
     const ws = m.ensureChannel('ch1')
     expect(existsSync(join(ws.channelDir, '.claude', 'settings.local.json'))).toBe(false)
   })
 
   it('null 로 hookConfig 해제 가능', () => {
-    const m = new AgentWorkspaceManager(root)
+    const m = new AgentWorkspaceManager(root, testDeps)
     m.setHookConfig({ port: 1, secret: 's' })
     m.setHookConfig(null)
     const ws = m.ensureChannel('ch1')

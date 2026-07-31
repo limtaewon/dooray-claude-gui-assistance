@@ -8,6 +8,7 @@ import WatcherEditModal from './WatcherEditModal'
 import MessageTimeline from './MessageTimeline'
 import SocketModeBadge from './SocketModeBadge'
 import { Button } from '../common/ds'
+import { ViewOnboarding } from '../common/onboarding/viewOnboarding'
 
 function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Element {
   const [watchers, setWatchers] = useState<Watcher[]>([])
@@ -208,7 +209,7 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
       <div className="w-72 flex-shrink-0 border-r border-bg-border flex flex-col">
         <div className="px-4 pt-4 pb-3 border-b border-bg-border flex-shrink-0">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-clauday-orange/10 border border-clauday-orange/30">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-bg-active border border-bg-border-light">
               <Radar size={14} className="text-clauday-orange" />
             </div>
             <div className="flex-1 min-w-0">
@@ -259,7 +260,7 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
                 return (
                   <div key={w.id}
                     className={`group flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors border-l-2 ${
-                      active ? 'bg-clauday-orange/10 border-clauday-orange' : 'hover:bg-bg-surface border-transparent'
+                      active ? 'bg-bg-active border-clauday-orange' : 'hover:bg-bg-surface border-transparent'
                     }`}
                     onClick={() => setSelectedId(w.id)}>
                     <button onClick={(e) => { e.stopPropagation(); handleToggle(w) }}
@@ -306,7 +307,14 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
       {/* 타임라인 */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {!selected ? (
-          <EmptyView icon={Radar} title="와처를 선택하세요" description="왼쪽에서 와처를 선택하거나 새로 만드세요" />
+          watchers.length === 0 ? (
+            <ViewOnboarding
+              view="monitoring"
+              actions={[{ label: '새 와처 만들기', variant: 'primary', onClick: () => setEditing('new') }]}
+            />
+          ) : (
+            <EmptyView icon={Radar} title="와처를 선택하세요" description="왼쪽에서 와처를 선택하거나 새로 만드세요" />
+          )
         ) : (
           <>
             <div className="px-5 py-2.5 border-b border-bg-border flex items-center gap-2 flex-shrink-0">

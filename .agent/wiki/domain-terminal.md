@@ -70,9 +70,10 @@ PTY 의 raw 출력에는:
 
 이건 *복원 시점* 에만 적용. 실시간 스트림은 그대로 xterm 에 보냄.
 
-## 외부 output listener
+## 외부 output / exit listener
 
-`TerminalManager.addOutputListener(cb)` — 멘션 작업 종료 마커 감지에 사용 (`src/main/dooray/mention/MentionTerminalSpawner.ts` 가 등록). PTY 출력의 매 청크가 cb 에 전달됨. unsubscribe 함수 반환.
+`TerminalManager.addOutputListener(cb)` — v2.0 B-1 이전엔 등록 인터페이스만 있고 `onData` 에서 실제로 호출되지 않는 죽은 훅이었다(문서-구현 불일치 상태로 방치돼 있었음). B-1 에서 실제 fan-out 으로 수리: PTY 출력의 매 청크가 `(id, data)` 로 콜백에 전달되고, 콜백이 throw 해도 개별 `try/catch` 로 격리되어 `TERMINAL_OUTPUT` IPC 송신과 다른 콜백에 영향 없음. unsubscribe 함수 반환. 대칭 API `addExitListener(cb)` 도 같은 사이클에 추가 — PTY 종료 시 `TerminalExitPayload` 를 받는다(`TERMINAL_EXIT` IPC 와 별개로 main 내부 구독자용).
+**현재 소비자는 0** (테스트 제외). 후속 트랙(B-5 스크롤백 스냅샷 트리거, C-2 `AgentRunSpawner`)이 이 훅을 전제로 설계돼 있다 — `MentionTerminalSpawner.ts` 는 아직 등록하지 않는다(예전 문서가 "등록한다"고 잘못 기술했던 부분을 정정).
 
 ## 함정
 

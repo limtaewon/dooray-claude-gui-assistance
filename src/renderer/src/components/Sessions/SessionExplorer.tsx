@@ -177,7 +177,7 @@ function SessionExplorer(): JSX.Element {
                 </div>
                 <div className="flex gap-1.5">
                   <button onClick={summarizeSession} disabled={summarizing || !messages.length}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-clauday-orange/20 to-clauday-blue/20 border border-clauday-orange/30 text-[calc(10px_*_var(--app-font-scale,1))] font-medium text-text-primary disabled:opacity-40">
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-bg-surface-raised border border-bg-border-light text-[calc(10px_*_var(--app-font-scale,1))] font-medium text-text-primary disabled:opacity-40">
                     {summarizing ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} className="text-clauday-orange" />}
                     AI 요약
                   </button>
@@ -193,7 +193,7 @@ function SessionExplorer(): JSX.Element {
                   <button onClick={async () => {
                     await navigator.clipboard.writeText(`claude -r ${selectedSession.id} --dangerously-skip-permissions`)
                     setCopied(true); setTimeout(() => setCopied(false), 2000)
-                  }} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-clauday-orange/10 border border-clauday-orange/40 text-[calc(10px_*_var(--app-font-scale,1))] text-clauday-orange hover:bg-clauday-orange/15"
+                  }} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-bg-active border border-bg-border-light text-[calc(10px_*_var(--app-font-scale,1))] text-clauday-orange hover:bg-bg-surface-hover"
                     title="claude -r <id> --dangerously-skip-permissions — 권한 확인 건너뜀 (조심)">
                     {copied ? <Check size={10} /> : <Copy size={10} />}
                     bypass 복사
@@ -201,7 +201,7 @@ function SessionExplorer(): JSX.Element {
                 </div>
               </div>
               {summary && (
-                <div className="mt-2 p-2.5 rounded-lg bg-gradient-to-r from-clauday-orange/5 to-clauday-blue/5 border border-clauday-orange/20">
+                <div className="mt-2 p-2.5 rounded-lg bg-bg-surface-raised border border-bg-border-light">
                   <div className="flex items-center gap-1 mb-1">
                     <Sparkles size={10} className="text-clauday-orange" />
                     <span className="text-[calc(9px_*_var(--app-font-scale,1))] font-semibold text-clauday-orange">AI 요약</span>
@@ -252,8 +252,8 @@ const SessionRow = memo(function SessionRow({ session, isSelected, onSelect, for
     <div
       onClick={() => onSelect(session)}
       style={{ contentVisibility: 'auto', containIntrinsicSize: '0 60px' }}
-      className={`px-4 py-2.5 border-b border-bg-border/50 cursor-pointer transition-colors ${
-        isSelected ? 'bg-clauday-blue/5' : 'hover:bg-bg-surface-hover'
+      className={`px-4 py-2.5 border-b border-bg-border cursor-pointer transition-colors ${
+        isSelected ? 'bg-bg-active' : 'hover:bg-bg-surface-hover'
       }`}
     >
       <div className="flex items-start justify-between gap-2">

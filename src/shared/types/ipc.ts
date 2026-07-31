@@ -36,6 +36,8 @@ export const IPC_CHANNELS = {
   AI_RECOMMEND_NOTIFY_SET_ENABLED: 'ai-recommend:notify:set-enabled',
 
   // Dooray
+  GITHUB_STATUS: 'github:status',
+
   DOORAY_TOKEN_SET: 'dooray:token:set',
   DOORAY_TOKEN_GET: 'dooray:token:get',
   DOORAY_TOKEN_DELETE: 'dooray:token:delete',
@@ -147,9 +149,25 @@ export const IPC_CHANNELS = {
   TERMINAL_KILL: 'terminal:kill',
   TERMINAL_LIST: 'terminal:list',
   TERMINAL_OUTPUT: 'terminal:output',
+  /** v2.0 B-1: PTY 종료 push (main → renderer). handle 등록 대상 아님 */
+  TERMINAL_EXIT: 'terminal:exit',
   TERMINAL_SAVE_OUTPUT: 'terminal:save-output',
-  TERMINAL_RESTORE: 'terminal:restore',
   TERMINAL_RENAME: 'terminal:rename',
+  /** v2.0 B-5: 렌더러 스냅샷 저장 (invoke). main 이 store 쓰기 + 메모리 캐시 갱신 */
+  TERMINAL_SAVE_STATE: 'terminal:save-state',
+  /** v2.0 B-5: 스냅샷 복원 (invoke). 최초 1회 legacy terminalSessions 마이그레이션 포함 */
+  TERMINAL_RESTORE_STATE: 'terminal:restore-state',
+  /** v2.0 B-5: main → renderer flush 요청 (push 전용). handle 등록 금지 */
+  TERMINAL_REQUEST_STATE: 'terminal:request-state',
+  /** v2.0 B-7: 링크 후보 존재 검증 배치 (invoke) */
+  TERMINAL_RESOLVE_PATH: 'terminal:resolve-path',
+  /** 세션의 **현재** cwd. 셸이 OSC7 을 안 쏘는 환경에서 `cd` 를 따라가려면 이 실측이 필요하다. */
+  TERMINAL_SESSION_CWD: 'terminal:session-cwd',
+  TERMINAL_FOREGROUND: 'terminal:foreground',
+  /** main → renderer: 그 세션의 claude 가 내 차례를 넘겼다 */
+  TERMINAL_CLAUDE_DONE: 'terminal:claude-done',
+  /** main → renderer: 알림 클릭 — 이 세션 탭으로 데려간다 */
+  TERMINAL_FOCUS_SESSION: 'terminal:focus-session',
   /** v1.4: 두레이 멘션이 새 터미널을 열었음을 렌더러에 알림 (entries 추가/활성화 요청) */
   MENTION_TERMINAL_OPENED: 'mention:terminal:opened',
   /** v1.4: 기존 채널 탭을 재사용 — 렌더러에 활성화만 요청 (id 페이로드) */
@@ -238,6 +256,9 @@ export const IPC_CHANNELS = {
   // Git Worktree
   GIT_IS_REPO: 'git:is-repo',
   GIT_REPO_ROOT: 'git:repo-root',
+  GIT_MAIN_REPO_ROOT: 'git:main-repo-root',
+  GIT_WORKTREE_USAGE: 'git:worktree-usage',
+  GIT_SCM_BRANCH_DIFF: 'git:scm:branch-diff',
   GIT_BRANCHES: 'git:branches',
   GIT_WORKTREES: 'git:worktrees',
   GIT_WORKTREE_CREATE: 'git:worktree-create',
@@ -367,7 +388,58 @@ export const IPC_CHANNELS = {
    *   - model: 재정규화 후 최신 HarnessModel
    * 제약: backupDir 은 <userData>/harness-backups/ 하위여야 한다 (경로 주입 방어).
    */
-  HARNESS_RESTORE_BACKUP: 'harness:edit:restore'
+  HARNESS_RESTORE_BACKUP: 'harness:edit:restore',
+
+  // Workspace (v2.0 C-2) — 두레이 태스크 ↔ 워크트리 ↔ 에이전트 run. 타입: src/shared/types/workspace.ts
+  WORKSPACE_REPOS_LIST: 'workspace:repos:list',
+  WORKSPACE_REPOS_ADD: 'workspace:repos:add',
+  WORKSPACE_REPOS_UPDATE: 'workspace:repos:update',
+  WORKSPACE_REPOS_REMOVE: 'workspace:repos:remove',
+  WORKSPACE_SETTINGS_GET: 'workspace:settings:get',
+  WORKSPACE_SETTINGS_SET: 'workspace:settings:set',
+  WORKSPACE_PROJECT_REPO_SET: 'workspace:project-repo:set',
+  WORKSPACE_LIST: 'workspace:list',
+  WORKSPACE_GET: 'workspace:get',
+  WORKSPACE_START_TASK: 'workspace:start-task',
+  WORKSPACE_RUN_RESUME: 'workspace:run:resume',
+  WORKSPACE_RUN_ADOPT: 'workspace:run:adopt',
+  WORKSPACE_RUN_CLEANUP: 'workspace:run:cleanup',
+  WORKSPACE_RECONCILE: 'workspace:reconcile',
+  /** 터미널 태스크 드로어(C-3.5) — 드롭 대상 폴더/세션 해석과 세션 매핑 */
+  WORKSPACE_TASK_DROP_RESOLVE: 'workspace:task-drop:resolve',
+  WORKSPACE_TASK_DROP_LINK: 'workspace:task-drop:link',
+  WORKSPACE_TASK_DROP_UNLINK: 'workspace:task-drop:unlink',
+  WORKSPACE_TASK_DROP_LINKED: 'workspace:task-drop:linked',
+  WORKSPACE_TASK_WORKTREE: 'workspace:task-worktree',
+  /** 세션을 다시 열었을 때 최근 사용 시각 갱신 */
+  WORKSPACE_TASK_DROP_TOUCH: 'workspace:task-drop:touch',
+  /** main → renderer push 전용. ipcMain.handle 등록 금지. */
+  WORKSPACE_RUN_UPDATED: 'workspace:run:updated',
+  DOORAY_PROJECT_WORKFLOWS: 'dooray:project:workflows',
+  GIT_DELETE_BRANCH: 'git:delete-branch',
+
+  // 소스 제어 (v2.0 — 터미널 우측 드로어의 '변경사항'/'히스토리' 탭)
+  GIT_SCM_STATUS: 'git:scm:status',
+  GIT_SCM_HISTORY: 'git:scm:history',
+  GIT_SCM_COMMIT_DETAIL: 'git:scm:commit-detail',
+  GIT_SCM_FILE_DIFF: 'git:scm:file-diff',
+  GIT_SCM_STAGE: 'git:scm:stage',
+  GIT_SCM_UNSTAGE: 'git:scm:unstage',
+  GIT_SCM_DISCARD: 'git:scm:discard',
+  GIT_SCM_COMMIT: 'git:scm:commit',
+  GIT_SCM_LAST_COMMIT_MESSAGE: 'git:scm:last-commit-message',
+  GIT_SCM_PUSH: 'git:scm:push',
+  GIT_SCM_PULL: 'git:scm:pull',
+  GIT_SCM_FETCH: 'git:scm:fetch',
+  GIT_SCM_REMOTES: 'git:scm:remotes',
+  /** 커밋 작성자 목록(빈도순) — 히스토리 필터에서 고르게 한다 */
+  GIT_SCM_AUTHORS: 'git:scm:authors',
+  GIT_SCM_STASH_LIST: 'git:scm:stash-list',
+  GIT_SCM_STASH_PUSH: 'git:scm:stash-push',
+  GIT_SCM_STASH_ACTION: 'git:scm:stash-action',
+  GIT_SCM_CREATE_BRANCH: 'git:scm:create-branch',
+  GIT_SCM_CHECKOUT: 'git:scm:checkout',
+  GIT_SCM_ABORT: 'git:scm:abort'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]

@@ -1,0 +1,2 @@
+Reading /Users/dev/projects/dooray-claude-gui-
+assistance/src/main/index.ts

@@ -9,7 +9,7 @@ interface LoadingViewProps {
 export function LoadingView({ message = '불러오는 중...', className = '' }: LoadingViewProps): JSX.Element {
   return (
     <div className={`flex flex-col items-center justify-center gap-2 py-10 ${className}`}>
-      <Loader2 size={20} className="animate-spin text-clauday-blue" />
+      <Loader2 size={20} className="animate-spin text-text-secondary" />
       <p className="text-xs text-text-secondary">{message}</p>
     </div>
   )
@@ -27,13 +27,13 @@ interface ErrorViewProps {
 export function ErrorView({ message, onRetry, onReport, className = '' }: ErrorViewProps): JSX.Element {
   return (
     <div className={`flex flex-col items-center justify-center gap-2 py-10 ${className}`}>
-      <AlertCircle size={24} className="text-red-400" />
-      <p className="text-xs text-red-400 text-center max-w-md px-4 whitespace-pre-wrap">{message}</p>
+      <AlertCircle size={24} className="text-c-red-fg" />
+      <p className="text-xs text-c-red-fg text-center max-w-md px-4 whitespace-pre-wrap">{message}</p>
       <div className="flex items-center gap-2 mt-1">
         {onRetry && (
           <button
             onClick={onRetry}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-surface border border-bg-border text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary hover:border-clauday-blue/50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-surface border border-bg-border text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary hover:border-bg-border-strong transition-colors"
           >
             <RefreshCw size={11} /> 다시 시도
           </button>
@@ -41,7 +41,7 @@ export function ErrorView({ message, onRetry, onReport, className = '' }: ErrorV
         {onReport && (
           <button
             onClick={onReport}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-surface border border-bg-border text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary hover:border-clauday-blue/50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-surface border border-bg-border text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary hover:border-bg-border-strong transition-colors"
             title="진단 정보와 함께 오류를 제보합니다"
           >
             <Bug size={11} /> 오류 리포트
@@ -85,7 +85,7 @@ export function EmptyView({
       {actionLabel && onAction && (
         <button
           onClick={onAction}
-          className="mt-1 flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-xs font-medium hover:bg-clauday-blue/80 transition-colors"
+          className="ds-btn primary mt-1"
         >
           {actionLabel}
         </button>

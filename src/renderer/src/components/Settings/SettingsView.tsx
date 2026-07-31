@@ -1,54 +1,210 @@
-import { useState, useEffect } from 'react'
-import { Check, Cpu, Key, Eye, EyeOff, ExternalLink, SlidersHorizontal, LogOut, BarChart2, Moon, Sun, Type, CalendarDays, Loader2, AlertCircle, Zap, X, ChevronUp, ChevronDown, GripVertical, RotateCcw } from 'lucide-react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { ArrowLeft, Check, Cpu, Key, Eye, EyeOff, ExternalLink, LogOut, Moon, Sun, Loader2, AlertCircle, Zap, X, ChevronUp, ChevronDown, GripVertical, RotateCcw, Search } from 'lucide-react'
 import { CUSTOMIZABLE_NAV_ITEMS, DEFAULT_SIDEBAR_PREFS, type SidebarPrefs, type SidebarView } from '../Layout/Sidebar'
 import type { AIModelConfig, AIModelName } from '../../../../shared/types/ai'
 import UsageInsights from './UsageInsights'
+import WorkspaceSettings from './WorkspaceSettings'
+import KeybindingSettings from './KeybindingSettings'
 import { useTheme } from '../../hooks/useTheme'
 import { useFontSettings, FONT_FAMILY_LABELS, type FontFamily } from '../../hooks/useFontSettings'
 import ThemePicker from './ThemePicker'
 import { Modal } from '../common/ds'
+import SettingsSection, { SettingsSectionProvider } from './SettingsSection'
+import GitHubSettings from './GitHubSettings'
+import {
+  SettingsDivider,
+  SettingsNumberRow,
+  SettingsRow,
+  SettingsSegmentedControl,
+  SettingsSubsectionHeader,
+  SettingsSwitchRow
+} from './controls'
+import {
+  DEFAULT_SETTINGS_SECTION,
+  SETTINGS_NAV_GROUPS,
+  SETTINGS_SEARCH_TARGETS,
+  SETTINGS_SECTION_META,
+  type SettingsSectionId
+} from './settingsNav'
+import { SETTINGS_SEARCH_DEBOUNCE_MS, matchedSectionIds } from './settingsSearch'
 
-type SettingsTab = 'models' | 'dooray' | 'caldav' | 'app' | 'insights'
+/**
+ * 설정 화면.
+ *
+ * 구조는 Orca 를 따랐다 — 좌측 그룹 네비 + 검색, 우측에 **한 번에 한 섹션만** 마운트.
+ * 전부 마운트하면 각 패널이 저마다 IPC 를 때려 설정 진입이 느려진다.
+ * 저장은 즉시 저장이고 "저장됨" 토스트를 따로 띄우지 않는다 — 컨트롤 자체가 상태를 보여준다.
+ */
+function SettingsView({ onExit }: { onExit?: () => void }): JSX.Element {
+  const [activeSection, setActiveSection] = useState<SettingsSectionId>(DEFAULT_SETTINGS_SECTION)
+  /** 입력값과 적용값을 나눈다 — 적용은 섹션을 갈아끼우므로 타이핑마다 하면 버벅인다. */
+  const [searchInput, setSearchInput] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const searchRef = useRef<HTMLInputElement>(null)
 
-function SettingsView(): JSX.Element {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('models')
+  useEffect(() => {
+    if (!searchInput.trim()) {
+      setSearchQuery('')
+      return
+    }
+    const timer = window.setTimeout(() => setSearchQuery(searchInput), SETTINGS_SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [searchInput])
 
-  // 다른 화면에서 특정 탭을 지정해서 이동 요청 시 반영
+  // 다른 화면에서 특정 섹션을 지정해 이동 요청 시 반영 (구 탭 id 도 받아준다)
   useEffect(() => {
     const onJump = (e: Event): void => {
-      const tab = (e as CustomEvent<{ tab?: SettingsTab }>).detail?.tab
-      if (tab) setActiveTab(tab)
+      const tab = (e as CustomEvent<{ tab?: string }>).detail?.tab
+      if (!tab) return
+      const legacy: Record<string, SettingsSectionId> = { app: 'behavior' }
+      const target = (legacy[tab] ?? tab) as SettingsSectionId
+      if (SETTINGS_SECTION_META[target]) setActiveSection(target)
     }
     window.addEventListener('goto-settings', onJump as EventListener)
     return () => window.removeEventListener('goto-settings', onJump as EventListener)
   }, [])
 
-  const tabs: { id: SettingsTab; icon: typeof Cpu; label: string }[] = [
-    { id: 'models', icon: Cpu, label: 'AI 모델' },
-    { id: 'insights', icon: BarChart2, label: '사용 인사이트' },
-    { id: 'dooray', icon: Key, label: '두레이 연결' },
-    { id: 'caldav', icon: CalendarDays, label: '캘린더 연결' },
-    { id: 'app', icon: SlidersHorizontal, label: '외관 & 동작' }
-  ]
+  const matched = useMemo(
+    () => matchedSectionIds(SETTINGS_SEARCH_TARGETS, searchQuery),
+    [searchQuery]
+  )
+  const searching = searchQuery.trim().length > 0
+
+  // 검색 결과에 지금 섹션이 없으면 첫 결과로 옮겨준다 — 빈 화면을 보여주지 않는다.
+  useEffect(() => {
+    if (!searching || matched.size === 0 || matched.has(activeSection)) return
+    const first = SETTINGS_NAV_GROUPS.flatMap((g) => g.items).find((i) => matched.has(i.id))
+    if (first) setActiveSection(first.id)
+  }, [searching, matched, activeSection])
+
+  // Escape 로 나가되, 입력 중이면 그쪽이 우선이다 — 편집을 취소하려다 설정이 닫히면 안 된다.
+  useEffect(() => {
+    if (!onExit) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      const el = e.target as HTMLElement | null
+      const tag = el?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || el?.isContentEditable) return
+      onExit()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onExit])
+
+  const meta = SETTINGS_SECTION_META[activeSection]
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex items-center h-10 bg-bg-surface border-b border-bg-border px-4 gap-1 flex-shrink-0">
-        {tabs.map(({ id, icon: Icon, label }) => (
-          <button key={id} onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md transition-all ${
-              activeTab === id ? 'bg-clauday-blue/10 text-clauday-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
-            }`}>
-            <Icon size={13} /> {label}
-          </button>
-        ))}
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        {activeTab === 'models' && <ModelSettings />}
-        {activeTab === 'insights' && <UsageInsights />}
-        {activeTab === 'dooray' && <DoorayTokenSettings />}
-        {activeTab === 'caldav' && <CalDAVSettings />}
-        {activeTab === 'app' && <AppBehaviorSettings />}
+    <div className="h-full flex min-h-0">
+      <aside className="w-[240px] flex-none flex flex-col min-h-0 border-r border-bg-border bg-bg-sidebar">
+        {onExit && (
+          <div className="p-2 pb-0 flex-none">
+            <button
+              onClick={onExit}
+              data-tour="settings-back"
+              className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary hover:bg-bg-surface-hover hover:text-text-primary"
+            >
+              <ArrowLeft size={13} className="flex-none" />
+              앱으로 돌아가기
+            </button>
+          </div>
+        )}
+        <div className="p-2 flex-none">
+          <div className="relative">
+            <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary" />
+            <input
+              ref={searchRef}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Escape') { setSearchInput(''); searchRef.current?.blur() } }}
+              data-tour="settings-search"
+              placeholder="설정 검색"
+              aria-label="설정 검색"
+              className="ds-input sm"
+              style={{ paddingLeft: 24, paddingRight: searchInput ? 22 : undefined }}
+            />
+            {searchInput && (
+              <button
+                onClick={() => setSearchInput('')}
+                aria-label="검색 지우기"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary"
+              >
+                <X size={11} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <nav className="flex-1 min-h-0 overflow-y-auto px-2 pb-3 space-y-4">
+          {SETTINGS_NAV_GROUPS.map((group) => {
+            const items = searching ? group.items.filter((i) => matched.has(i.id)) : group.items
+            if (items.length === 0) return null
+            return (
+              <div key={group.id} className="space-y-1">
+                <div className="px-2 text-[calc(9.5px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-[0.14em] text-text-tertiary">
+                  {group.label}
+                </div>
+                {items.map(({ id, label, icon: Icon }) => {
+                  const active = activeSection === id
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => setActiveSection(id)}
+                      aria-current={active ? 'page' : undefined}
+                      className={`w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[calc(12px_*_var(--app-font-scale,1))] transition-colors ${
+                        active
+                          ? 'bg-bg-active font-medium text-text-primary'
+                          : 'text-text-secondary hover:bg-bg-surface-hover hover:text-text-primary'
+                      }`}
+                    >
+                      <Icon size={13} className="flex-none" />
+                      <span className="truncate">{label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          })}
+
+          {searching && matched.size === 0 && (
+            <p className="px-2 py-6 text-center text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
+              검색 결과가 없습니다
+            </p>
+          )}
+        </nav>
+      </aside>
+
+      <div className="flex-1 min-w-0 overflow-y-auto">
+        <div className="mx-auto w-full max-w-3xl xl:max-w-4xl 2xl:max-w-5xl px-8 pt-8 pb-20">
+          <SettingsSectionProvider activeSectionId={activeSection} query={searchQuery}>
+            <SettingsSection id="dooray" title={meta.title} description={meta.description} bare>
+              <DoorayTokenSettings />
+            </SettingsSection>
+            <SettingsSection id="github" title={meta.title} description={meta.description} bare>
+              <GitHubSettings />
+            </SettingsSection>
+            <SettingsSection id="caldav" title={meta.title} description={meta.description} bare>
+              <CalDAVSettings />
+            </SettingsSection>
+            <SettingsSection id="workspace" title={meta.title} description={meta.description} bare>
+              <WorkspaceSettings />
+            </SettingsSection>
+            <SettingsSection id="keys" title={meta.title} description={meta.description} bare>
+              <KeybindingSettings />
+            </SettingsSection>
+            <SettingsSection id="models" title={meta.title} description={meta.description} bare>
+              <ModelSettings />
+            </SettingsSection>
+            <SettingsSection id="insights" title={meta.title} description={meta.description} bare>
+              <UsageInsights />
+            </SettingsSection>
+            <SettingsSection id="appearance" title={meta.title} description={meta.description}>
+              <AppearanceSettings />
+            </SettingsSection>
+            <SettingsSection id="behavior" title={meta.title} description={meta.description}>
+              <BehaviorSettings />
+            </SettingsSection>
+          </SettingsSectionProvider>
+        </div>
       </div>
     </div>
   )
@@ -79,8 +235,8 @@ const MODEL_FEATURES: ModelFeatureDef[] = [
 
 const MODEL_INFO: Record<AIModelName, { label: string; speed: string; quality: string; cost: string; color: string }> = {
   haiku: { label: 'Haiku', speed: '매우 빠름', quality: '기본', cost: '$', color: 'text-emerald-400 bg-emerald-400/10' },
-  sonnet: { label: 'Sonnet', speed: '빠름', quality: '좋음', cost: '$$', color: 'text-clauday-blue bg-clauday-blue/10' },
-  opus: { label: 'Opus', speed: '느림', quality: '최상', cost: '$$$', color: 'text-clauday-orange bg-clauday-orange/10' }
+  sonnet: { label: 'Sonnet', speed: '빠름', quality: '좋음', cost: '$$', color: 'text-text-primary bg-bg-active' },
+  opus: { label: 'Opus', speed: '느림', quality: '최상', cost: '$$$', color: 'text-clauday-orange bg-bg-active' }
 }
 
 function ModelSettings(): JSX.Element {
@@ -113,14 +269,7 @@ function ModelSettings(): JSX.Element {
   const resetAll = (): void => { setConfig({}); setSaved(false) }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <div className="mb-4">
-        <h3 className="text-sm font-semibold text-text-primary">기능별 AI 모델</h3>
-        <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
-          각 기능마다 원하는 모델을 선택하세요. Haiku는 빠르고 저렴, Opus는 품질 최상.
-        </p>
-      </div>
-
+    <div>
       <div className="grid grid-cols-3 gap-2 mb-4">
         {(Object.keys(MODEL_INFO) as AIModelName[]).map((m) => {
           const info = MODEL_INFO[m]
@@ -141,7 +290,7 @@ function ModelSettings(): JSX.Element {
           const current = config[feat.key]
           return (
             <div key={feat.key}
-              className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? 'border-t border-bg-border/50' : ''}`}>
+              className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? 'border-t border-bg-border' : ''}`}>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-text-primary">{feat.label}</span>
@@ -181,7 +330,7 @@ function ModelSettings(): JSX.Element {
         <div className="flex items-center gap-3">
           {saved && <span className="flex items-center gap-1 text-xs text-emerald-400"><Check size={12} /> 저장됨</span>}
           <button onClick={handleSave} disabled={saving}
-            className="px-5 py-2 rounded-lg bg-clauday-blue text-white text-sm font-medium hover:bg-clauday-blue/80 disabled:opacity-50">
+            className="px-5 py-2 rounded-lg bg-clauday-blue text-white text-sm font-medium hover:opacity-90 disabled:opacity-50">
             {saving ? '저장 중...' : '저장'}
           </button>
         </div>
@@ -230,7 +379,7 @@ function DoorayTokenSettings(): JSX.Element {
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
+    <div>
       <div className="mb-4">
         <h3 className="text-sm font-semibold text-text-primary">두레이 API 토큰</h3>
         <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
@@ -267,7 +416,7 @@ function DoorayTokenSettings(): JSX.Element {
       </div>
 
       {/* 토큰 발급 안내 */}
-      <div className="p-3 rounded-xl bg-clauday-blue/5 border border-clauday-blue/20 mb-3">
+      <div className="p-3 rounded-xl bg-bg-active border border-bg-border-light mb-3">
         <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary mb-2">
           <strong className="text-text-primary">토큰 발급 방법:</strong>
         </p>
@@ -278,7 +427,7 @@ function DoorayTokenSettings(): JSX.Element {
           <li>발급된 토큰을 아래 입력란에 붙여넣기</li>
         </ol>
         <a href="https://nhnent.dooray.com/setting/api/token" target="_blank" rel="noreferrer"
-          className="inline-flex items-center gap-1 mt-2 text-[calc(10px_*_var(--app-font-scale,1))] text-clauday-blue hover:underline">
+          className="inline-flex items-center gap-1 mt-2 text-[calc(10px_*_var(--app-font-scale,1))] text-link hover:underline">
           <ExternalLink size={10} /> API 토큰 발급 페이지 열기
         </a>
       </div>
@@ -302,7 +451,7 @@ function DoorayTokenSettings(): JSX.Element {
           </button>
         </div>
         <button onClick={handleSave} disabled={saving || !newToken.trim()}
-          className="mt-2 px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-xs font-medium hover:bg-clauday-blue/80 disabled:opacity-50">
+          className="mt-2 px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-xs font-medium hover:opacity-90 disabled:opacity-50">
           {saving ? '검증 중...' : '저장 및 검증'}
         </button>
       </div>
@@ -402,7 +551,7 @@ function SocketModeSettings({ hasApiToken }: { hasApiToken: boolean }): JSX.Elem
             <p className="text-xs text-text-primary font-medium">현재 상태</p>
             <p className={`text-[calc(10px_*_var(--app-font-scale,1))] mt-0.5 flex items-center gap-1.5 ${
               isActive ? 'text-emerald-400'
-                : isConnecting ? 'text-clauday-blue'
+                : isConnecting ? 'text-text-primary'
                 : isStandby ? 'text-amber-400'
                 : !domain ? 'text-text-tertiary'
                 : 'text-red-400'
@@ -443,7 +592,7 @@ function SocketModeSettings({ hasApiToken }: { hasApiToken: boolean }): JSX.Elem
           className="w-full px-3 py-2 bg-bg-surface border border-bg-border rounded-lg text-xs font-mono text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-orange"
         />
         <button onClick={save} disabled={saving || !hasApiToken || !domainDraft.trim()}
-          className="mt-2 px-4 py-1.5 rounded-lg bg-clauday-orange text-white text-xs font-medium hover:bg-clauday-orange/80 disabled:opacity-50">
+          className="mt-2 px-4 py-1.5 rounded-lg bg-clauday-orange text-white text-xs font-medium hover:opacity-90 disabled:opacity-50">
           {saving ? '연결 중...' : domain ? '재연결' : '연결'}
         </button>
       </div>
@@ -540,7 +689,7 @@ function CalDAVSettings(): JSX.Element {
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
+    <div>
       <div className="mb-4">
         <h3 className="text-sm font-semibold text-text-primary">두레이 캘린더 (CalDAV)</h3>
         <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
@@ -573,7 +722,7 @@ function CalDAVSettings(): JSX.Element {
       </div>
 
       {/* 비번 발급 안내 */}
-      <div className="p-3 rounded-xl bg-clauday-blue/5 border border-clauday-blue/20 mb-3">
+      <div className="p-3 rounded-xl bg-bg-active border border-bg-border-light mb-3">
         <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary mb-2">
           <strong className="text-text-primary">CalDAV 비밀번호 발급:</strong>
         </p>
@@ -583,7 +732,7 @@ function CalDAVSettings(): JSX.Element {
           <li>아이디(이메일)와 복사한 비밀번호를 아래에 입력</li>
         </ol>
         <a href="https://nhnent.dooray.com/setting/calendar/caldav" target="_blank" rel="noreferrer"
-          className="inline-flex items-center gap-1 mt-2 text-[calc(10px_*_var(--app-font-scale,1))] text-clauday-blue hover:underline">
+          className="inline-flex items-center gap-1 mt-2 text-[calc(10px_*_var(--app-font-scale,1))] text-link hover:underline">
           <ExternalLink size={10} /> 두레이 CalDAV 설정 페이지 열기
         </a>
         <p className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary mt-2">서버: <code className="font-mono text-text-secondary">caldav.dooray.com</code> (고정)</p>
@@ -635,7 +784,7 @@ function CalDAVSettings(): JSX.Element {
             연결 테스트
           </button>
           <button onClick={handleSave} disabled={saving || testing || !username.trim() || !password}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-xs font-medium hover:bg-clauday-blue/80 disabled:opacity-50">
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-xs font-medium hover:opacity-90 disabled:opacity-50">
             {saving && <Loader2 size={12} className="animate-spin" />}
             저장 및 연결
           </button>
@@ -682,7 +831,7 @@ function CalDAVSettings(): JSX.Element {
             <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">이후엔 45초 주기로 변경분만 자동 동기화됩니다.</p>
             <div className="flex justify-end">
               <button onClick={() => setSyncProgress({ stage: 'idle' })}
-                className="px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-[calc(11px_*_var(--app-font-scale,1))] font-medium hover:bg-clauday-blue/80">
+                className="px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-[calc(11px_*_var(--app-font-scale,1))] font-medium hover:opacity-90">
                 확인
               </button>
             </div>
@@ -693,7 +842,7 @@ function CalDAVSettings(): JSX.Element {
             <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-rose-400">{syncProgress.message}</p>
             <div className="flex justify-end">
               <button onClick={() => setSyncProgress({ stage: 'idle' })}
-                className="px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-[calc(11px_*_var(--app-font-scale,1))] font-medium hover:bg-clauday-blue/80">
+                className="px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-[calc(11px_*_var(--app-font-scale,1))] font-medium hover:opacity-90">
                 닫기
               </button>
             </div>
@@ -707,10 +856,53 @@ function CalDAVSettings(): JSX.Element {
 /** =========== 앱 동작 =========== */
 type StartupView = 'dooray' | 'terminal' | 'git' | 'last'
 
-function AppBehaviorSettings(): JSX.Element {
-  const [startupView, setStartupView] = useState<StartupView>('dooray')
-  const [saved, setSaved] = useState(false)
+/** =========== 외관 =========== */
+function AppearanceSettings(): JSX.Element {
   const { theme, setTheme } = useTheme()
+
+  const blocks = [
+    <SettingsRow
+      key="theme"
+      label="테마"
+      description="앱 전체의 밝기를 정합니다."
+      searchKeywords={['theme', 'dark', 'light', '다크', '라이트']}
+      control={
+        <SettingsSegmentedControl
+          value={theme}
+          onChange={setTheme}
+          ariaLabel="테마"
+          options={[
+            { value: 'dark' as const, label: <span className="flex items-center gap-1"><Moon size={10} /> 다크</span> },
+            { value: 'light' as const, label: <span className="flex items-center gap-1"><Sun size={10} /> 라이트</span> }
+          ]}
+        />
+      }
+    />,
+    theme === 'light' ? (
+      <div key="palette" className="space-y-3">
+        <SettingsSubsectionHeader title="색상 팔레트" description="라이트 테마의 색조를 고릅니다." />
+        <ThemePicker />
+      </div>
+    ) : null,
+    <div key="font" className="space-y-3">
+      <SettingsSubsectionHeader title="글꼴 & 크기" description="앱 전체에 적용됩니다." />
+      <FontSettingsSection />
+    </div>,
+    <div key="sidebar" className="space-y-3">
+      <SettingsSubsectionHeader
+        title="사이드바 항목"
+        description="순서를 바꾸거나 자주 안 쓰는 항목을 숨깁니다. 설정·매뉴얼은 항상 보입니다."
+      />
+      <SidebarPrefsSection />
+    </div>
+  ].filter(Boolean)
+
+  return <SettingsBlocks blocks={blocks} />
+}
+
+/** =========== 동작 =========== */
+function BehaviorSettings(): JSX.Element {
+  const [startupView, setStartupView] = useState<StartupView>('dooray')
 
   useEffect(() => {
     window.api.settings.get('startupView').then((v) => {
@@ -718,116 +910,97 @@ function AppBehaviorSettings(): JSX.Element {
     })
   }, [])
 
-  const save = async (v: StartupView): Promise<void> => {
+  const save = (v: StartupView): void => {
     setStartupView(v)
-    await window.api.settings.set('startupView', v)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 1500)
+    void window.api.settings.set('startupView', v)
   }
 
-  const STARTUP_OPTIONS: { value: StartupView; label: string; description: string }[] = [
-    { value: 'dooray', label: '두레이 (기본)', description: '태스크/브리핑/캘린더' },
-    { value: 'terminal', label: '터미널', description: 'Claude Code CLI 세션' },
-    { value: 'git', label: '브랜치 작업', description: 'Git worktree 관리' },
-    { value: 'last', label: '마지막 사용', description: '앱 종료 시 열려있던 화면' }
+  const blocks = [
+    <SettingsRow
+      key="startup"
+      label="시작 시 열 화면"
+      description="앱을 켰을 때 처음 보이는 화면입니다."
+      searchKeywords={['startup', '시작']}
+      control={
+        <SettingsSegmentedControl
+          value={startupView}
+          onChange={save}
+          ariaLabel="시작 시 열 화면"
+          options={[
+            { value: 'dooray' as const, label: '두레이' },
+            { value: 'terminal' as const, label: '터미널' },
+            { value: 'last' as const, label: '마지막' }
+          ]}
+        />
+      }
+    />,
+    <TerminalRendererSection key="renderer" />,
+    <ExperimentalSection key="experimental" />,
+    <ClaudeDoneNotifySection key="claude-done" />,
+    <AiRecommendNotifyToggle key="notify" />
   ]
 
+  return <SettingsBlocks blocks={blocks} />
+}
+
+/**
+ * 블록 사이에만 구분선을 넣는다. **첫 블록 앞에는 넣지 않는다** —
+ * 검색으로 앞 블록이 사라져도 고아 구분선이 남으면 안 된다.
+ */
+function SettingsBlocks({ blocks }: { blocks: React.ReactNode[] }): JSX.Element {
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <div className="mb-4">
-        <h3 className="text-sm font-semibold text-text-primary">앱 동작</h3>
-        <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">앱 실행 시 동작을 설정합니다.</p>
-      </div>
-
-      {/* 테마 */}
-      <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden mb-3">
-        <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30">
-          <span className="text-xs font-medium text-text-primary">테마</span>
+    <div className="space-y-5">
+      {blocks.map((block, index) => (
+        <div key={index} className="space-y-5">
+          {index > 0 && <SettingsDivider />}
+          {block}
         </div>
-        <div className="p-2 grid grid-cols-2 gap-2">
-          {([
-            { value: 'dark' as const, label: '다크', icon: Moon, description: '어두운 배경' },
-            { value: 'light' as const, label: '라이트', icon: Sun, description: '밝은 배경' }
-          ]).map(({ value, label, icon: Icon, description }) => (
-            <button key={value} onClick={() => setTheme(value)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left ${
-                theme === value ? 'bg-clauday-blue/10 border border-clauday-blue/40' : 'hover:bg-bg-surface-hover border border-transparent'
-              }`}>
-              <Icon size={16} className={theme === value ? 'text-clauday-blue' : 'text-text-tertiary'} />
-              <div className="flex-1 min-w-0">
-                <p className={`text-xs ${theme === value ? 'text-clauday-blue font-medium' : 'text-text-primary'}`}>{label}</p>
-                <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">{description}</p>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 라이트 팔레트 목업 선택 */}
-      {theme === 'light' && (
-        <div className="bg-bg-surface border border-bg-border rounded-xl p-4 mb-3">
-          <ThemePicker />
-        </div>
-      )}
-
-      {/* 글꼴 & 크기 */}
-      <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden mb-3">
-        <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30 flex items-center gap-2">
-          <Type size={12} className="text-text-secondary" />
-          <span className="text-xs font-medium text-text-primary">글꼴 & 크기</span>
-        </div>
-        <FontSettingsSection />
-      </div>
-
-      {/* 시작 뷰 */}
-      <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden">
-        <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-text-primary">시작 시 열 화면</span>
-            {saved && <span className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-emerald-400"><Check size={10} /> 저장됨</span>}
-          </div>
-        </div>
-        <div className="p-2">
-          {STARTUP_OPTIONS.map((opt) => (
-            <label key={opt.value}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-                startupView === opt.value ? 'bg-clauday-blue/10' : 'hover:bg-bg-surface-hover'
-              }`}>
-              <input type="radio" name="startup" checked={startupView === opt.value}
-                onChange={() => save(opt.value)}
-                className="accent-clauday-blue" />
-              <div className="flex-1 min-w-0">
-                <p className={`text-xs ${startupView === opt.value ? 'text-clauday-blue font-medium' : 'text-text-primary'}`}>{opt.label}</p>
-                <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">{opt.description}</p>
-              </div>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {/* 사이드바 커스텀 */}
-      <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden mt-3">
-        <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30">
-          <span className="text-xs font-medium text-text-primary">사이드바 항목</span>
-          <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">순서를 바꾸거나 자주 안 쓰는 항목을 숨길 수 있습니다. 설정/매뉴얼은 항상 노출됩니다.</p>
-        </div>
-        <SidebarPrefsSection />
-      </div>
-
-      {/* 알림 */}
-      <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden mt-3">
-        <div className="px-4 py-2.5 border-b border-bg-border bg-bg-primary/30">
-          <span className="text-xs font-medium text-text-primary">알림</span>
-        </div>
-        <div className="p-2">
-          <AiRecommendNotifyToggle />
-        </div>
-      </div>
-
-      <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-3">
-        💡 <strong className="text-text-secondary">AI 스킬 관리</strong>는 각 AI 기능 화면 우측의 <span className="text-amber-400 font-medium">스킬</span> 버튼에서 바로 할 수 있습니다.
-      </p>
+      ))}
     </div>
+  )
+}
+
+type TerminalRendererSetting = 'webgl' | 'dom'
+const TERMINAL_RENDERER_OPTIONS: { value: TerminalRendererSetting; label: string; description: string }[] = [
+  { value: 'webgl', label: 'WebGL', description: 'GPU 가속(기본값) — 긴 로그·TUI 재그리기에 유리' },
+  { value: 'dom', label: 'DOM', description: '호환 모드 — GPU 드라이버 문제 시 폴백' }
+]
+
+/** 터미널 렌더러 설정(webgl|dom) — TerminalView 가 같은 settings 키를 읽어 pane 에 적용한다. */
+function TerminalRendererSection(): JSX.Element {
+  const [value, setValue] = useState<TerminalRendererSetting>('webgl')
+
+  useEffect(() => {
+    window.api.settings.get('terminalRenderer').then((v) => {
+      if (v === 'dom' || v === 'webgl') setValue(v)
+    })
+  }, [])
+
+  const save = async (v: TerminalRendererSetting): Promise<void> => {
+    setValue(v)
+    await window.api.settings.set('terminalRenderer', v)
+  }
+
+  const current = TERMINAL_RENDERER_OPTIONS.find((o) => o.value === value)
+
+  return (
+    <SettingsRow
+      label="터미널 렌더러"
+      description={`GPU 문제로 화면이 깨지면 DOM 으로 바꾸세요. WebGL 을 못 쓰면 자동으로 폴백하고 알려줍니다. — ${current?.description ?? ''}`}
+      searchKeywords={['renderer', 'webgl', 'dom', 'gpu']}
+      control={
+        <SettingsSegmentedControl
+          value={value}
+          onChange={(next) => void save(next)}
+          ariaLabel="터미널 렌더러"
+          options={TERMINAL_RENDERER_OPTIONS.map((opt) => ({
+            value: opt.value,
+            label: opt.label,
+            title: opt.description
+          }))}
+        />
+      }
+    />
   )
 }
 
@@ -910,24 +1083,24 @@ function SidebarPrefsSection(): JSX.Element {
               </span>
               <button onClick={() => move(item.view, -1)} disabled={isFirst}
                 aria-label="위로"
-                className="p-1 rounded hover:bg-bg-primary/50 text-text-tertiary hover:text-text-primary disabled:opacity-30 disabled:hover:bg-transparent">
+                className="p-1 rounded hover:bg-bg-primary text-text-tertiary hover:text-text-primary disabled:opacity-30 disabled:hover:bg-transparent">
                 <ChevronUp size={12} />
               </button>
               <button onClick={() => move(item.view, 1)} disabled={isLast}
                 aria-label="아래로"
-                className="p-1 rounded hover:bg-bg-primary/50 text-text-tertiary hover:text-text-primary disabled:opacity-30 disabled:hover:bg-transparent">
+                className="p-1 rounded hover:bg-bg-primary text-text-tertiary hover:text-text-primary disabled:opacity-30 disabled:hover:bg-transparent">
                 <ChevronDown size={12} />
               </button>
               <label className="flex items-center gap-1 cursor-pointer ml-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-secondary">
                 <input type="checkbox" checked={!isHidden} onChange={() => toggleHidden(item.view)}
-                  className="accent-clauday-blue" />
+                  />
                 <span>{isHidden ? '숨김' : '표시'}</span>
               </label>
             </div>
           )
         })}
       </div>
-      <div className="mt-2 pt-2 border-t border-bg-border/50 flex justify-end">
+      <div className="mt-2 pt-2 border-t border-bg-border flex justify-end">
         <button onClick={resetAll}
           className="flex items-center gap-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-primary px-2 py-1 rounded hover:bg-bg-surface-hover">
           <RotateCcw size={10} /> 기본값으로 초기화
@@ -941,6 +1114,135 @@ function SidebarPrefsSection(): JSX.Element {
  * AI 추천 새 글 OS 알림 토글 — 1시간 폴링 + 22~9시 silent.
  * 사용자 설정은 main 측 electron-store 에 저장. UI 는 단순 boolean.
  */
+/** 실험실 — 아직 다듬는 중인 기능. 켜기 전에는 사이드바·팔레트에 나오지 않는다. */
+const EXPERIMENTAL_ITEMS: { view: string; label: string; description: string }[] = [
+  {
+    view: 'harness',
+    label: 'Harness Studio',
+    description: '작업 방법론을 캔버스로 그리고 실행 전에 흐름을 확인합니다. 아직 다듬는 중입니다.'
+  }
+]
+
+function ExperimentalSection(): JSX.Element {
+  const [enabled, setEnabled] = useState<string[]>([])
+
+  useEffect(() => {
+    void window.api.settings
+      .get('experimentalViews')
+      .then((saved) => setEnabled(Array.isArray(saved) ? (saved as string[]) : []))
+      .catch(() => undefined)
+  }, [])
+
+  const toggle = (view: string): void => {
+    const next = enabled.includes(view) ? enabled.filter((v) => v !== view) : [...enabled, view]
+    setEnabled(next)
+    void window.api.settings.set('experimentalViews', next)
+    // 사이드바·팔레트가 즉시 반영하도록 알린다.
+    window.dispatchEvent(new CustomEvent('experimental-views-changed'))
+  }
+
+  return (
+    <>
+      <SettingsSubsectionHeader title="실험실" />
+      {EXPERIMENTAL_ITEMS.map((item) => (
+        <SettingsSwitchRow
+          key={item.view}
+          label={item.label}
+          description={item.description}
+          searchKeywords={['experimental', '실험', 'lab', item.view]}
+          checked={enabled.includes(item.view)}
+          onChange={() => toggle(item.view)}
+        />
+      ))}
+    </>
+  )
+}
+
+interface ClaudeDoneSettingsShape {
+  enabled: boolean
+  onlyWhenUnfocused: boolean
+  idleSeconds: number
+  idleFallback: boolean
+}
+
+const CLAUDE_DONE_DEFAULTS: ClaudeDoneSettingsShape = {
+  enabled: true,
+  onlyWhenUnfocused: true,
+  idleSeconds: 20,
+  idleFallback: true
+}
+
+/**
+ * 터미널의 claude 가 내 차례를 넘겼을 때의 알림.
+ *
+ * 판정은 터미널 타이틀의 working→idle 전이가 1순위다. 타이틀을 주지 않는 도구만 무출력 폴백을 쓴다.
+ */
+function ClaudeDoneNotifySection(): JSX.Element {
+  const [value, setValue] = useState<ClaudeDoneSettingsShape>(CLAUDE_DONE_DEFAULTS)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    window.api.settings
+      .get('claudeDoneNotify')
+      .then((v) => {
+        if (!cancelled && v && typeof v === 'object') {
+          setValue({ ...CLAUDE_DONE_DEFAULTS, ...(v as Partial<ClaudeDoneSettingsShape>) })
+        }
+      })
+      .catch(() => { /* 기본값 유지 */ })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  const patch = (next: Partial<ClaudeDoneSettingsShape>): void => {
+    const merged = { ...value, ...next }
+    setValue(merged)
+    void window.api.settings.set('claudeDoneNotify', merged)
+  }
+
+  return (
+    <>
+      <SettingsSwitchRow
+        label="claude 작업 완료 알림"
+        description="터미널에서 돌던 claude 가 작업을 마치거나 물어보려고 멈추면 데스크톱 알림을 띄웁니다. 알림을 누르면 그 터미널 탭으로 갑니다."
+        searchKeywords={['notification', '알림', 'claude', '완료', 'terminal']}
+        checked={value.enabled}
+        disabled={loading}
+        onChange={() => patch({ enabled: !value.enabled })}
+      />
+      <SettingsSwitchRow
+        label="앱을 보고 있지 않을 때만"
+        description="창이 앞에 있으면 알리지 않습니다. 화면을 보고 있는데 알림이 뜨면 방해만 됩니다."
+        searchKeywords={['notification', '알림', 'focus']}
+        checked={value.onlyWhenUnfocused}
+        disabled={loading || !value.enabled}
+        onChange={() => patch({ onlyWhenUnfocused: !value.onlyWhenUnfocused })}
+      />
+      <SettingsSwitchRow
+        label="출력이 멎는 것도 신호로 쓰기"
+        description="터미널 타이틀로 상태를 알려주지 않는 도구를 위한 폴백입니다. 도구가 오래 도는 중의 정적을 완료로 오해할 수 있어, 타이틀 신호가 있는 세션에서는 쓰지 않습니다."
+        searchKeywords={['idle', 'fallback', '폴백']}
+        checked={value.idleFallback}
+        disabled={loading || !value.enabled}
+        onChange={() => patch({ idleFallback: !value.idleFallback })}
+      />
+      <SettingsNumberRow
+        label="멈춘 것으로 볼 시간"
+        description="위 폴백에서만 씁니다. 출력이 이만큼 없으면 끝난 것으로 봅니다."
+        searchKeywords={['idle', '대기', '초']}
+        value={value.idleSeconds}
+        min={3}
+        max={120}
+        step={1}
+        suffix="초"
+        defaultValue={CLAUDE_DONE_DEFAULTS.idleSeconds}
+        onChange={(next) => patch({ idleSeconds: next })}
+      />
+    </>
+  )
+}
+
 function AiRecommendNotifyToggle(): JSX.Element {
   const [enabled, setEnabled] = useState<boolean>(true)
   const [loading, setLoading] = useState(true)
@@ -964,16 +1266,14 @@ function AiRecommendNotifyToggle(): JSX.Element {
     }
   }
   return (
-    <label className="flex items-start gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-bg-surface-hover">
-      <input type="checkbox" checked={enabled} onChange={toggle} disabled={loading || saving}
-        className="accent-clauday-blue mt-0.5" />
-      <div className="flex-1 min-w-0">
-        <p className="text-xs text-text-primary">AI 추천 새 글 알림</p>
-        <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
-          두레이 "AI 활용 사례" 프로젝트에 새 글이 올라오면 데스크톱 알림 (1시간 주기, 22~9시 보류)
-        </p>
-      </div>
-    </label>
+    <SettingsSwitchRow
+      label="AI 추천 새 글 알림"
+      description={'두레이 "AI 활용 사례" 프로젝트에 새 글이 올라오면 데스크톱 알림 (1시간 주기, 22~9시 보류)'}
+      searchKeywords={['notification', '알림', 'recommend']}
+      checked={enabled}
+      disabled={loading || saving}
+      onChange={() => void toggle()}
+    />
   )
 }
 
@@ -1005,9 +1305,9 @@ function FontSettingsSection(): JSX.Element {
             return (
               <button key={f} onClick={() => setFamily(f)}
                 className={`px-3 py-2 rounded-md text-left transition-colors border ${
-                  active ? 'bg-clauday-blue/10 border-clauday-blue/40' : 'bg-bg-primary border-bg-border hover:border-bg-border-light'
+                  active ? 'bg-bg-active border-bg-border-strong' : 'bg-bg-primary border-bg-border hover:border-bg-border-light'
                 }`}>
-                <span className={`block text-xs ${active ? 'text-clauday-blue font-medium' : 'text-text-primary'}`}>
+                <span className={`block text-xs ${active ? 'text-text-primary font-medium' : 'text-text-primary'}`}>
                   {FONT_FAMILY_LABELS[f]}
                 </span>
                 <span className="block text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">안녕하세요 Abc 123</span>
@@ -1030,14 +1330,14 @@ function FontSettingsSection(): JSX.Element {
           step={5}
           value={pct}
           onChange={(e) => setScale(Number(e.target.value) / 100)}
-          className="w-full accent-clauday-blue"
+          className="w-full"
         />
         <div className="flex flex-wrap gap-1.5 mt-2">
           {SCALE_PRESETS.map((p) => (
             <button key={p.value} onClick={() => setScale(p.value)}
               className={`px-2.5 py-1 rounded-md text-[calc(10px_*_var(--app-font-scale,1))] border transition-colors ${
                 Math.abs(settings.scale - p.value) < 0.01
-                  ? 'bg-clauday-blue/10 border-clauday-blue/40 text-clauday-blue font-medium'
+                  ? 'bg-bg-active border-bg-border-strong text-text-primary font-medium'
                   : 'bg-bg-primary border-bg-border text-text-secondary hover:text-text-primary'
               }`}>
               {p.label} <span className="text-text-tertiary">{Math.round(p.value * 100)}%</span>

@@ -1,38 +1,62 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 type Handler = (data: string) => void
+type ExitInfo = { exitCode: number; signal?: number }
+type ExitHandler = (info: ExitInfo) => void
 let lastPty: {
   write: ReturnType<typeof vi.fn>
   resize: ReturnType<typeof vi.fn>
   kill: ReturnType<typeof vi.fn>
   emitData: (data: string) => void
-  emitExit: () => void
+  emitExit: (info?: ExitInfo) => void
   pid: number
 } | null = null
+/** A-2 win32 분기 테스트용 — 마지막 spawn 호출 인자 캡처 */
+let lastSpawnCall: { file: string; args: string[] | string; options: Record<string, unknown> } | null = null
+let spawnCallCount = 0
+/** 다음 N 회 spawn 호출에서 순서대로 throw 할 에러 큐 (win32 폴백/ConPTY 재시도 테스트용) */
+let spawnFailureQueue: Error[] = []
 
 vi.mock('node-pty', () => ({
-  spawn: vi.fn(() => {
+  spawn: vi.fn((file: string, args: string[] | string, options: Record<string, unknown>) => {
+    spawnCallCount++
+    lastSpawnCall = { file, args, options }
+    if (spawnFailureQueue.length > 0) {
+      throw spawnFailureQueue.shift()!
+    }
     let onDataCb: Handler | null = null
-    let onExitCb: (() => void) | null = null
+    let onExitCb: ExitHandler | null = null
     const pty = {
       pid: Math.floor(Math.random() * 10000),
       write: vi.fn(),
       resize: vi.fn(),
       kill: vi.fn(),
       onData: (cb: Handler) => { onDataCb = cb },
-      onExit: (cb: () => void) => { onExitCb = cb },
+      onExit: (cb: ExitHandler) => { onExitCb = cb },
       emitData: (data: string) => onDataCb?.(data),
-      emitExit: () => onExitCb?.()
+      emitExit: (info: ExitInfo = { exitCode: 0, signal: undefined }) => onExitCb?.(info)
     }
     lastPty = pty
     return pty
   })
 }))
 
-import { TerminalManager } from './TerminalManager'
+const detectWindowsShellMock = vi.fn()
+vi.mock('./windowsShell', () => ({
+  detectWindowsShell: (...args: unknown[]) => detectWindowsShellMock(...args),
+  defaultShellProbe: vi.fn()
+}))
+
+import { TerminalManager, __resetConptyDllLatchForTest } from './TerminalManager'
+import { IPC_CHANNELS } from '../../shared/types/ipc'
 
 beforeEach(() => {
   lastPty = null
+  lastSpawnCall = null
+  spawnCallCount = 0
+  spawnFailureQueue = []
+  detectWindowsShellMock.mockReset()
+  __resetConptyDllLatchForTest()
 })
 
 describe('TerminalManager.create', () => {
@@ -47,6 +71,16 @@ describe('TerminalManager.create', () => {
     const m = new TerminalManager()
     const meta = m.create({})
     expect(meta.cwd).toBeTruthy()
+  })
+
+  it('사라진 폴더를 주면 홈에서 시작한다 — 워크트리를 지운 뒤 그 세션을 다시 열 때 실제로 일어난다', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const m = new TerminalManager()
+    const meta = m.create({ cwd: '/tmp/clauday-없는-폴더-xyz' })
+    expect(meta.cwd).not.toBe('/tmp/clauday-없는-폴더-xyz')
+    expect(meta.cwd).toBeTruthy()
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
   })
 
   it('command 지정 시 name 에 반영', () => {
@@ -139,13 +173,41 @@ describe('TerminalManager.onData 처리', () => {
     expect(send).not.toHaveBeenCalled()
   })
 
-  it('addOutputListener 등록/해제', () => {
-    // listener 는 TerminalManager 내부에서 호출되진 않지만 등록 인터페이스 검증
+  it('addOutputListener 가 onData 마다 (id, data) 로 호출됨 + unsubscribe 후 미호출', () => {
     const m = new TerminalManager()
+    const { id } = m.create({})
     const cb = vi.fn()
     const off = m.addOutputListener(cb)
+
+    lastPty!.emitData('chunk1')
+    expect(cb).toHaveBeenCalledWith(id, 'chunk1')
+
     off()
-    expect(typeof off).toBe('function')
+    lastPty!.emitData('chunk2')
+    expect(cb).toHaveBeenCalledTimes(1)
+  })
+
+  it('output listener 1개가 throw 해도 webContents.send 와 다른 listener 는 정상', () => {
+    const send = vi.fn()
+    const win = { isDestroyed: () => false, webContents: { send } }
+    const m = new TerminalManager()
+    m.setMainWindow(win as never)
+    const { id } = m.create({})
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const throwing = vi.fn(() => { throw new Error('boom') })
+    const ok = vi.fn()
+    m.addOutputListener(throwing)
+    m.addOutputListener(ok)
+
+    lastPty!.emitData('x')
+
+    expect(send).toHaveBeenCalledWith(IPC_CHANNELS.TERMINAL_OUTPUT, { id, data: 'x' })
+    expect(ok).toHaveBeenCalledWith(id, 'x')
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[TerminalManager] output listener 실패',
+      expect.objectContaining({ sessionId: id })
+    )
+    warnSpy.mockRestore()
   })
 
   it('pty exit → session 자동 제거', () => {
@@ -161,16 +223,7 @@ describe('TerminalManager.onData 처리', () => {
   })
 })
 
-describe('TerminalManager.exportSessions / setName / dispose', () => {
-  it('exportSessions 는 meta + output 반환', () => {
-    const m = new TerminalManager()
-    m.create({})
-    lastPty!.emitData('output text')
-    const exp = m.exportSessions()
-    expect(exp).toHaveLength(1)
-    expect(exp[0].output).toContain('output text')
-  })
-
+describe('TerminalManager.setName / dispose', () => {
   it('setName — 성공 시 true + meta.name 변경', () => {
     const m = new TerminalManager()
     const { id } = m.create({})
@@ -193,21 +246,258 @@ describe('TerminalManager.exportSessions / setName / dispose', () => {
     expect(p1.kill).toHaveBeenCalled()
     expect(p2.kill).toHaveBeenCalled()
   })
+})
 
-  it('exportSessions — alt screen exit 이후만 출력', () => {
+describe('TerminalManager exit 통지 (B-1)', () => {
+  it('PTY 종료 → webContents.send(TERMINAL_EXIT) 1회 + addExitListener 콜백 수신', () => {
+    const send = vi.fn()
+    const win = { isDestroyed: () => false, webContents: { send } }
     const m = new TerminalManager()
-    m.create({})
-    // alternate screen enter then exit, then normal output
-    lastPty!.emitData('\x1b[?1049hsome TUI redraw\x1b[?1049lAfter exit')
-    const exp = m.exportSessions()
-    expect(exp[0].output).toBe('After exit')
+    m.setMainWindow(win as never)
+    const { id } = m.create({})
+    const exitCb = vi.fn()
+    m.addExitListener(exitCb)
+
+    lastPty!.emitExit({ exitCode: 1, signal: undefined })
+
+    expect(send).toHaveBeenCalledWith(IPC_CHANNELS.TERMINAL_EXIT, { id, exitCode: 1, signal: null })
+    expect(exitCb).toHaveBeenCalledTimes(1)
+    expect(exitCb).toHaveBeenCalledWith({ id, exitCode: 1, signal: null })
   })
 
-  it('exportSessions — 마지막 미완성 ESC 자르기', () => {
+  it('exit listener 1개가 throw 해도 webContents.send 와 다른 listener 는 정상 (warn 로그에 sessionId 포함)', () => {
+    const send = vi.fn()
+    const win = { isDestroyed: () => false, webContents: { send } }
+    const m = new TerminalManager()
+    m.setMainWindow(win as never)
+    const { id } = m.create({})
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const throwing = vi.fn(() => { throw new Error('boom') })
+    const ok = vi.fn()
+    m.addExitListener(throwing)
+    m.addExitListener(ok)
+
+    lastPty!.emitExit({ exitCode: 0, signal: undefined })
+
+    expect(send).toHaveBeenCalledWith(IPC_CHANNELS.TERMINAL_EXIT, { id, exitCode: 0, signal: null })
+    expect(ok).toHaveBeenCalledWith({ id, exitCode: 0, signal: null })
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[TerminalManager] exit listener 실패',
+      expect.objectContaining({ sessionId: id })
+    )
+    warnSpy.mockRestore()
+  })
+
+  it('signal 미제공 시 payload 가 null (undefined 아님)', () => {
+    const m = new TerminalManager()
+    const { id } = m.create({})
+    const exitCb = vi.fn()
+    m.addExitListener(exitCb)
+
+    lastPty!.emitExit()
+
+    expect(exitCb).toHaveBeenCalledWith({ id, exitCode: 0, signal: null })
+  })
+
+  it('kill(id) 후 exit → 통지 없음', () => {
+    const send = vi.fn()
+    const win = { isDestroyed: () => false, webContents: { send } }
+    const m = new TerminalManager()
+    m.setMainWindow(win as never)
+    const { id } = m.create({})
+    const exitCb = vi.fn()
+    m.addExitListener(exitCb)
+
+    m.kill(id)
+    send.mockClear()
+    lastPty!.emitExit({ exitCode: 0, signal: undefined })
+
+    expect(exitCb).not.toHaveBeenCalled()
+    expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.TERMINAL_EXIT, expect.anything())
+  })
+
+  it('dispose() 후 각 세션 exit → 통지 없음', () => {
+    const send = vi.fn()
+    const win = { isDestroyed: () => false, webContents: { send } }
+    const m = new TerminalManager()
+    m.setMainWindow(win as never)
+    m.create({})
+    const p1 = lastPty!
+    m.create({})
+    const p2 = lastPty!
+    const exitCb = vi.fn()
+    m.addExitListener(exitCb)
+
+    m.dispose()
+    send.mockClear()
+    p1.emitExit()
+    p2.emitExit()
+
+    expect(exitCb).not.toHaveBeenCalled()
+    expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.TERMINAL_EXIT, expect.anything())
+  })
+
+  it('같은 세션 emitExit 2회 → 통지 1회 (at-most-once)', () => {
     const m = new TerminalManager()
     m.create({})
-    lastPty!.emitData('text\x1b[')  // incomplete CSI
-    const exp = m.exportSessions()
-    expect(exp[0].output).toBe('text')
+    const exitCb = vi.fn()
+    m.addExitListener(exitCb)
+
+    lastPty!.emitExit({ exitCode: 0, signal: undefined })
+    lastPty!.emitExit({ exitCode: 0, signal: undefined })
+
+    expect(exitCb).toHaveBeenCalledTimes(1)
+  })
+
+  it('이미 종료된 id 에 kill() 재호출 → 억제 예약 누수 없음(새 세션 exit 이 정상 통지됨)', () => {
+    const m = new TerminalManager()
+    const { id } = m.create({})
+    const firstPty = lastPty!
+
+    m.kill(id)
+    expect(firstPty.kill).toHaveBeenCalledTimes(1)
+    m.kill(id) // 세션이 이미 사라졌으므로 재호출은 아무 것도 하지 않는다 (예약 재생성 없음)
+    expect(firstPty.kill).toHaveBeenCalledTimes(1)
+
+    const { id: id2 } = m.create({})
+    const p2 = lastPty!
+    const exitCb = vi.fn()
+    m.addExitListener(exitCb)
+
+    p2.emitExit({ exitCode: 2, signal: undefined })
+
+    expect(exitCb).toHaveBeenCalledWith({ id: id2, exitCode: 2, signal: null })
+  })
+})
+
+describe('TerminalManager.getPid', () => {
+  it('존재하는 세션의 pid 를 돌려준다', () => {
+    const m = new TerminalManager()
+    const { id } = m.create({})
+    expect(m.getPid(id)).toBe(lastPty!.pid)
+  })
+
+  it('없는 id 는 null', () => {
+    const m = new TerminalManager()
+    expect(m.getPid('nope')).toBeNull()
+  })
+})
+
+describe('TerminalManager.create — 플랫폼별 spawn/env 분기 (A-2)', () => {
+  const withPlatform = (platform: string, fn: () => void): void => {
+    const orig = process.platform
+    Object.defineProperty(process, 'platform', { value: platform, configurable: true })
+    try {
+      fn()
+    } finally {
+      Object.defineProperty(process, 'platform', { value: orig, configurable: true })
+    }
+  }
+
+  it('darwin — $SHELL -l 로 1회만 spawn, env 에 LANG 있고 PYTHONUTF8 없음', () => {
+    withPlatform('darwin', () => {
+      const m = new TerminalManager()
+      m.create({})
+
+      expect(spawnCallCount).toBe(1)
+      expect(lastSpawnCall?.file).toBe(process.env.SHELL || '/bin/zsh')
+      expect(lastSpawnCall?.args).toEqual(['-l'])
+      const env = lastSpawnCall?.options.env as Record<string, string>
+      expect(env.LANG).toBeTruthy()
+      expect(env.PYTHONUTF8).toBeUndefined()
+    })
+  })
+
+  it('win32 — 1순위 후보 spawn 실패 → 2순위로 폴백하고 args 가 후보의 것으로 바뀐다', () => {
+    withPlatform('win32', () => {
+      detectWindowsShellMock.mockReturnValue([
+        { file: 'C:\\pwsh.exe', args: ['-NoLogo', '-NoExit'], kind: 'pwsh' },
+        { file: 'C:\\powershell.exe', args: ['-Command', 'x'], kind: 'powershell' }
+      ])
+      spawnFailureQueue = [new Error('spawn EPERM')]
+
+      const m = new TerminalManager()
+      m.create({})
+
+      expect(spawnCallCount).toBe(2)
+      expect(lastSpawnCall?.file).toBe('C:\\powershell.exe')
+      expect(lastSpawnCall?.args).toEqual(['-Command', 'x'])
+    })
+  })
+
+  it('win32 — 첫 시도 ConPTY DLL 오류 → 같은 후보 useConptyDll:false 재시도 성공, 이후 호출은 바로 false', () => {
+    withPlatform('win32', () => {
+      detectWindowsShellMock.mockReturnValue([{ file: 'C:\\pwsh.exe', args: ['-NoLogo'], kind: 'pwsh' }])
+      spawnFailureQueue = [new Error('Cannot load conpty.dll')]
+
+      const m = new TerminalManager()
+      m.create({})
+
+      expect(spawnCallCount).toBe(2)
+      expect(lastSpawnCall?.file).toBe('C:\\pwsh.exe')
+      expect(lastSpawnCall?.options.useConptyDll).toBe(false)
+
+      // 래치가 걸렸으므로 다음 create() 는 실패 없이 바로 useConptyDll:false 로 1회만 spawn
+      spawnFailureQueue = []
+      m.create({})
+      expect(spawnCallCount).toBe(3)
+      expect(lastSpawnCall?.options.useConptyDll).toBe(false)
+    })
+  })
+
+  it('win32 env 에 PYTHONUTF8/TERM_PROGRAM/FORCE_HYPERLINK 존재, LANG 은 강제되지 않는다', () => {
+    // 이 개발 머신의 로그인 셸이 이미 LANG 을 설정해뒀을 수 있어(darwin 관행) 순수하게
+    // "win32 분기가 LANG 을 만들어 넣지 않는다" 만 검증하려면 process.env.LANG 을 비우고 시작해야 한다.
+    const hadLang = 'LANG' in process.env
+    const originalLang = process.env.LANG
+    delete process.env.LANG
+    try {
+      withPlatform('win32', () => {
+        detectWindowsShellMock.mockReturnValue([{ file: 'C:\\pwsh.exe', args: [], kind: 'pwsh' }])
+        const m = new TerminalManager()
+        m.create({})
+
+        const env = lastSpawnCall?.options.env as Record<string, string>
+        expect(env.PYTHONUTF8).toBe('1')
+        expect(env.TERM_PROGRAM).toBe('Clauday')
+        expect(env.FORCE_HYPERLINK).toBe('1')
+        expect(env.LANG).toBeUndefined()
+      })
+    } finally {
+      if (hadLang) process.env.LANG = originalLang
+    }
+  })
+
+  it('전 후보 실패 시 throw + 실패 횟수만큼 warn', () => {
+    withPlatform('win32', () => {
+      detectWindowsShellMock.mockReturnValue([
+        { file: 'C:\\a.exe', args: [], kind: 'pwsh' },
+        { file: 'C:\\b.exe', args: [], kind: 'powershell' }
+      ])
+      spawnFailureQueue = [new Error('fail1'), new Error('fail2')]
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const m = new TerminalManager()
+      expect(() => m.create({})).toThrow('fail2')
+      expect(warnSpy).toHaveBeenCalledTimes(2)
+      warnSpy.mockRestore()
+    })
+  })
+
+  it('options.command 지정 시 detectWindowsShell 체인을 타지 않는다 (win32 포함)', () => {
+    withPlatform('win32', () => {
+      const m = new TerminalManager()
+      m.create({ command: 'node', args: ['-v'] })
+
+      expect(detectWindowsShellMock).not.toHaveBeenCalled()
+      expect(lastSpawnCall?.file).toBe('node')
+      expect(lastSpawnCall?.args).toEqual(['-v'])
+    })
+  })
+
+  it('options.name 이 있으면 meta.name 이 그 값을 우선한다', () => {
+    const m = new TerminalManager()
+    const meta = m.create({ command: 'claude', args: [], name: '표시이름' })
+    expect(meta.name).toBe('표시이름')
   })
 })

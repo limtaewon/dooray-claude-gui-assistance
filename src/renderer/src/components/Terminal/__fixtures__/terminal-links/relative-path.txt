@@ -1,0 +1,1 @@
+ M src/renderer/src/components/Terminal/TerminalPane.tsx

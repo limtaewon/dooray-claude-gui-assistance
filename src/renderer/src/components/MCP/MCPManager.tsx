@@ -5,6 +5,7 @@ import MCPForm from './MCPForm'
 import type { McpServerConfig } from '../../../../shared/types/mcp'
 import { getMcpTransport } from '../../../../shared/types/mcp'
 import { Button, EmptyView, LoadingView, Modal, SegTabs, useToast } from '../common/ds'
+import { ViewOnboarding } from '../common/onboarding/viewOnboarding'
 import { DEFAULT_WIKIS } from '../../../../shared/wiki-storage-defaults'
 import WikiStoragePicker from '../common/WikiStoragePicker'
 
@@ -406,7 +407,7 @@ function MCPManager(): JSX.Element {
   return (
     <div className="h-full overflow-y-auto">
       {uploadProgress && (
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-2xl border border-clauday-blue/40"
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-2xl border border-bg-border-light"
           style={{ background: 'var(--bg-surface-raised)' }}>
           <RefreshCw size={14} className="animate-spin text-clauday-blue" />
           <div className="flex flex-col">
@@ -420,12 +421,13 @@ function MCPManager(): JSX.Element {
       <div className="px-5 py-4 space-y-4">
         {/* DS PageHeader */}
         <div className="flex items-center gap-3 flex-wrap">
-          <Server size={18} className="text-clauday-blue" />
+          <Server size={18} className="text-brand-claude" />
           <h2 className="text-[calc(14px_*_var(--app-font-scale,1))] font-semibold text-text-primary">MCP 서버</h2>
           <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
             · {entries.length}개 · 활성 {activeCount}
           </span>
           <SegTabs<Tab>
+            data-tour="mcp-tabs"
             value={tab}
             onChange={(t) => { setTab(t); exitSelectMode() }}
             items={[
@@ -449,16 +451,17 @@ function MCPManager(): JSX.Element {
                 새로고침
               </Button>
               <Button
+                data-tour="mcp-select"
                 variant={selectMode ? 'orange' : 'secondary'}
                 onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
                 leftIcon={selectMode ? <X size={13} /> : <CheckSquare size={13} />}
               >
                 {selectMode ? '선택 종료' : '선택'}
               </Button>
-              <Button variant="secondary" onClick={handleImport} leftIcon={<Upload size={13} />}>
+              <Button data-tour="mcp-import" variant="secondary" onClick={handleImport} leftIcon={<Upload size={13} />}>
                 가져오기
               </Button>
-              <Button variant="primary" onClick={() => setFormState({ mode: 'add' })} leftIcon={<Plus size={12} />}>
+              <Button data-tour="mcp-add" variant="primary" onClick={() => setFormState({ mode: 'add' })} leftIcon={<Plus size={12} />}>
                 서버 추가
               </Button>
             </>
@@ -491,7 +494,7 @@ function MCPManager(): JSX.Element {
 
         {/* 다중 선택 액션바 — local + wiki 둘 다 */}
         {selectMode && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-clauday-orange/8 border border-clauday-orange/30">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-active border border-bg-border-light">
             <span className="text-xs text-text-primary font-medium">{selected.size}개 선택됨</span>
             <button
               type="button"
@@ -540,10 +543,16 @@ function MCPManager(): JSX.Element {
           loading ? (
             <LoadingView label="MCP 서버 목록을 불러오는 중..." />
           ) : entries.length === 0 ? (
-            <EmptyView
-              icon={Server}
-              title="등록된 MCP 서버가 없습니다"
-              body="'서버 추가' 버튼을 눌러 시작하세요"
+            <ViewOnboarding
+              view="mcp"
+              actions={[
+                {
+                  label: '서버 추가',
+                  variant: 'primary',
+                  icon: Plus,
+                  onClick: () => setFormState({ mode: 'add' })
+                }
+              ]}
             />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -592,7 +601,7 @@ function MCPManager(): JSX.Element {
                   <div
                     key={item.pageId}
                     onClick={selectMode ? () => toggleSelected(item.pageId) : () => setPreviewItem(item)}
-                    className={`ds-card transition-all cursor-pointer hover:border-clauday-blue/40`}
+                    className={`ds-card transition-all cursor-pointer hover:border-bg-border-strong`}
                     style={{
                       padding: '12px 14px',
                       ...(isSelected
@@ -601,10 +610,10 @@ function MCPManager(): JSX.Element {
                     }}
                   >
                     <div className="flex items-start gap-2.5">
-                      <div className="w-8 h-8 rounded-[6px] flex-none flex items-center justify-center bg-clauday-blue/10">
+                      <div className="w-8 h-8 rounded-[6px] flex-none flex items-center justify-center bg-bg-active">
                         {isRemote
                           ? <Globe size={16} className="text-clauday-blue" />
-                          : <Server size={16} className="text-clauday-blue" />}
+                          : <Server size={16} className="text-brand-claude" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -667,14 +676,14 @@ function MCPManager(): JSX.Element {
                       </div>
                     )}
                     {!selectMode && (
-                      <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-bg-border/60">
+                      <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-bg-border">
                         <div className="flex-1" />
                         <button onClick={(e) => { e.stopPropagation(); handleDownloadFromWiki(item) }}
                           className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:text-clauday-blue">
                           <Download size={11} /> 적용
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); handleDeleteFromWiki(item) }}
-                          className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:text-red-400">
+                          className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-c-red-fg hover:text-c-red-solid">
                           <Trash2 size={11} /> 삭제
                         </button>
                       </div>
@@ -699,7 +708,7 @@ function MCPManager(): JSX.Element {
         open={!!previewItem}
         onClose={() => setPreviewItem(null)}
         width="min(800px, 92vw)"
-        icon={<Server size={14} className="text-clauday-blue" />}
+        icon={<Server size={14} className="text-brand-claude" />}
         title={previewItem?.name}
         footer={
           <>

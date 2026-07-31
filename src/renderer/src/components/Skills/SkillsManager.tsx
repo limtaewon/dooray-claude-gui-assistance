@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plus, Save, Sparkles, Search, X, Download, Upload, User, Loader2, RefreshCw, Trash2, CheckSquare } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { ViewOnboarding } from '../common/onboarding/viewOnboarding'
 import SkillCard from './SkillCard'
 import SkillEditor from './SkillEditor'
 import SkillCreateModal from './SkillCreateModal'
 import type { Skill } from '../../../../shared/types/skills'
+import { sanitizeSkillFilename } from '@shared/utils/filename'
 import { Button, Modal, SegTabs, useToast } from '../common/ds'
 
 import { DEFAULT_WIKIS } from '../../../../shared/wiki-storage-defaults'
@@ -205,8 +207,15 @@ function SkillsManager(): JSX.Element {
         const full = await window.api.dooray.wiki.storageGet(activeWikiId, item.pageId)
         content = full.content
       }
-      await window.api.skills.save({ filename: item.name, content })
-      toast.success(`"${item.name}" 내려받음`)
+      // 위키 제목에 Windows 금지문자가 있으면 저장 전 정제 — 실제 저장명을 UI 가 알아야 거짓말을 안 함
+      // (ADR-v2-windows-fix-05 §1).
+      const filename = sanitizeSkillFilename(item.name)
+      await window.api.skills.save({ filename, content })
+      if (filename !== item.name) {
+        toast.success(`"${item.name}" 내려받음`, `Windows 호환을 위해 파일명이 "${filename}" 으로 저장됐습니다`)
+      } else {
+        toast.success(`"${item.name}" 내려받음`)
+      }
       await loadSkills()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '내려받기 실패')
@@ -341,7 +350,9 @@ function SkillsManager(): JSX.Element {
     if (!ok) return
     try {
       const res = await window.api.skills.deleteMany(Array.from(selected))
-      toast.success(`${res.deleted}개 삭제됨`)
+      if (res.deleted > 0) toast.success(`${res.deleted}개 삭제됨`)
+      // 부분 실패는 조용히 삼키지 않는다 — 삭제 성공과 별개로 실패 건수를 사용자에게 알림.
+      if (res.failed > 0) toast.warn(`${res.failed}개 삭제 실패`, '권한 또는 파일 잠금 문제일 수 있습니다')
       exitSelectMode()
       await loadSkills()
     } catch (err) {
@@ -373,6 +384,7 @@ function SkillsManager(): JSX.Element {
     const targets = wikiItems.filter((it) => selected.has(it.pageId))
     let okCount = 0
     let failCount = 0
+    let renamedCount = 0
     for (const item of targets) {
       try {
         let content = item.content
@@ -380,14 +392,18 @@ function SkillsManager(): JSX.Element {
           const full = await window.api.dooray.wiki.storageGet(activeWikiId, item.pageId)
           content = full.content
         }
-        await window.api.skills.save({ filename: item.name, content })
+        const filename = sanitizeSkillFilename(item.name)
+        if (filename !== item.name) renamedCount++
+        await window.api.skills.save({ filename, content })
         okCount++
       } catch (err) {
         failCount++
         console.error('[Skills] bulk download failed:', item.name, err)
       }
     }
-    if (okCount > 0) toast.success(`${okCount}개 내려받음`)
+    if (okCount > 0) {
+      toast.success(`${okCount}개 내려받음`, renamedCount > 0 ? `${renamedCount}개는 Windows 호환을 위해 파일명이 변경됐습니다` : undefined)
+    }
     if (failCount > 0) toast.error(`${failCount}개 실패`)
     exitSelectMode()
     await loadSkills()
@@ -432,7 +448,7 @@ function SkillsManager(): JSX.Element {
   return (
     <div className="h-full overflow-y-auto">
       {uploadProgress && (
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-2xl border border-clauday-blue/40"
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-2xl border border-bg-border-light"
           style={{ background: 'var(--bg-surface-raised)' }}>
           <Loader2 size={14} className="animate-spin text-clauday-blue" />
           <div className="flex flex-col">
@@ -446,12 +462,13 @@ function SkillsManager(): JSX.Element {
       <div className="px-5 py-4 space-y-3">
         {/* PageHeader */}
         <div className="flex items-center gap-3 flex-wrap">
-          <Sparkles size={18} className="text-clauday-blue" />
+          <Sparkles size={18} className="text-brand-claude" />
           <h2 className="text-[calc(14px_*_var(--app-font-scale,1))] font-semibold text-text-primary">Claude 스킬</h2>
           <span className="ds-chip neutral">
             {tab === 'mine' ? `${skills.length}개` : `${wikiItems.length}개 공유됨`}
           </span>
           <SegTabs<FilterTab>
+            data-tour="skills-tabs"
             value={tab}
             onChange={(t) => { setTab(t); exitSelectMode() }}
             items={[
@@ -481,10 +498,10 @@ function SkillsManager(): JSX.Element {
               >
                 {selectMode ? '선택 종료' : '선택'}
               </Button>
-              <Button variant="secondary" onClick={handleImport} leftIcon={<Upload size={13} />}>
+              <Button data-tour="skills-import" variant="secondary" onClick={handleImport} leftIcon={<Upload size={13} />}>
                 가져오기
               </Button>
-              <Button variant="primary" onClick={() => setCreating(true)} leftIcon={<Plus size={13} />}>
+              <Button data-tour="skills-add" variant="primary" onClick={() => setCreating(true)} leftIcon={<Plus size={13} />}>
                 스킬 추가
               </Button>
             </>
@@ -502,7 +519,7 @@ function SkillsManager(): JSX.Element {
               >
                 {selectMode ? '선택 종료' : '선택'}
               </Button>
-              <Button variant="primary" onClick={() => { setPickerSelected(new Set()); setPickerSearch(''); setSharePickerOpen(true) }} leftIcon={<Upload size={13} />}>
+              <Button data-tour="skills-share" variant="primary" onClick={() => { setPickerSelected(new Set()); setPickerSearch(''); setSharePickerOpen(true) }} leftIcon={<Upload size={13} />}>
                 내 스킬 공유하기
               </Button>
             </>
@@ -511,7 +528,7 @@ function SkillsManager(): JSX.Element {
 
         {/* 다중 선택 액션바 — mine / wiki 탭 별도 액션 */}
         {selectMode && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-clauday-orange/8 border border-clauday-orange/30">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-active border border-bg-border-light">
             <span className="text-xs text-text-primary font-medium">{selected.size}개 선택됨</span>
             <button
               type="button"
@@ -580,14 +597,10 @@ function SkillsManager(): JSX.Element {
         {/* Grid */}
         {tab === 'mine' ? (
           skills.length === 0 ? (
-            <div className="py-16 text-center">
-              <Sparkles size={32} className="mx-auto text-text-tertiary mb-3" />
-              <p className="text-sm font-medium text-text-primary mb-1">스킬이 없습니다</p>
-              <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mb-4">'스킬 추가' 버튼으로 첫 스킬을 만들어보세요</p>
-              <Button variant="primary" onClick={() => setCreating(true)} leftIcon={<Plus size={13} />}>
-                스킬 추가
-              </Button>
-            </div>
+            <ViewOnboarding
+              view="skills"
+              actions={[{ label: '스킬 추가', variant: 'primary', icon: Plus, onClick: () => setCreating(true) }]}
+            />
           ) : filteredSkills.length === 0 ? (
             <div className="py-12 text-center text-[calc(12px_*_var(--app-font-scale,1))] text-text-tertiary">
               "{search}"에 일치하는 스킬이 없습니다
@@ -650,7 +663,7 @@ function SkillsManager(): JSX.Element {
                   <div
                     key={item.pageId}
                     onClick={selectMode ? () => toggleSelected(item.pageId) : openPreview}
-                    className="ds-card cursor-pointer transition-all hover:border-clauday-blue/40"
+                    className="ds-card cursor-pointer transition-all hover:border-bg-border-strong"
                     style={{
                       padding: '12px 14px',
                       ...(isSelected
@@ -659,8 +672,8 @@ function SkillsManager(): JSX.Element {
                     }}
                   >
                     <div className="flex items-start gap-2.5">
-                      <div className="w-7 h-7 rounded-[6px] flex-none flex items-center justify-center bg-clauday-blue/10">
-                        <Sparkles size={15} className="text-clauday-blue" />
+                      <div className="w-7 h-7 rounded-[6px] flex-none flex items-center justify-center bg-bg-active">
+                        <Sparkles size={15} className="text-brand-claude" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary truncate">{item.name}</div>
@@ -675,14 +688,14 @@ function SkillsManager(): JSX.Element {
                       </div>
                     </div>
                     {!selectMode && (
-                      <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-bg-border/60">
+                      <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-bg-border">
                         <div className="flex-1" />
                         <button onClick={(e) => { e.stopPropagation(); handleDownloadFromWiki(item) }}
                           className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:text-clauday-blue">
                           <Download size={11} /> 내려받기
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); handleDeleteFromWiki(item) }}
-                          className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:text-red-400">
+                          className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-c-red-fg hover:text-c-red-solid">
                           <Trash2 size={11} /> 삭제
                         </button>
                       </div>
@@ -781,10 +794,10 @@ function SkillsManager(): JSX.Element {
                 return (
                   <label key={skill.filename}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer select-none transition-colors ${
-                      checked ? 'bg-clauday-blue/10 border-clauday-blue/40' : 'bg-bg-surface border-bg-border hover:bg-bg-surface-hover'
+                      checked ? 'bg-bg-active border-bg-border-strong' : 'bg-bg-surface border-bg-border hover:bg-bg-surface-hover'
                     }`}>
-                    <input type="checkbox" className="accent-clauday-blue flex-shrink-0" checked={checked} onChange={toggle} />
-                    <Sparkles size={13} className="text-clauday-blue flex-shrink-0" />
+                    <input type="checkbox" className="flex-shrink-0" checked={checked} onChange={toggle} />
+                    <Sparkles size={13} className="text-brand-claude flex-shrink-0" />
                     <span className="text-sm text-text-primary truncate flex-1" title={skill.name}>{skill.name}</span>
                     {alreadyShared && <span className="ds-chip neutral flex-shrink-0">공유됨</span>}
                   </label>
@@ -802,7 +815,7 @@ function SkillsManager(): JSX.Element {
         open={!!activeSkill}
         onClose={closeEditor}
         width="min(1000px, 92vw)"
-        icon={<Sparkles size={14} className="text-clauday-blue" />}
+        icon={<Sparkles size={14} className="text-brand-claude" />}
         title={activeSkill ? `스킬 편집 — ${activeSkill.name}` : ''}
         footer={
           <>
@@ -835,7 +848,7 @@ function SkillsManager(): JSX.Element {
         open={!!previewShared}
         onClose={() => setPreviewShared(null)}
         width="min(900px, 92vw)"
-        icon={<Sparkles size={14} className="text-clauday-blue" />}
+        icon={<Sparkles size={14} className="text-brand-claude" />}
         title={previewShared?.name}
         footer={
           <>
@@ -914,7 +927,7 @@ function SkillsManager(): JSX.Element {
                   className="w-full flex items-center gap-2 px-4 py-2 text-left text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary hover:bg-bg-surface-hover transition-colors"
                   type="button"
                 >
-                  <Sparkles size={12} className="text-clauday-blue" />
+                  <Sparkles size={12} className="text-brand-claude" />
                   <span className="flex-1">{w.wikiName || w.wikiId}</span>
                 </button>
               ))}

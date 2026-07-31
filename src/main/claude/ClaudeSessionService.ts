@@ -1,9 +1,7 @@
 import { promises as fs } from 'fs'
-import { homedir } from 'os'
 import { join } from 'path'
 import Store from 'electron-store'
-
-const PROJECTS_DIR = join(homedir(), '.claude', 'projects')
+import { claudeProjectsRoot, findProjectDir } from '../utils/claudeProjects'
 
 export interface ClaudeSessionMeta {
   sessionId: string
@@ -52,22 +50,21 @@ interface JsonlEntry {
  * Claude Code 가 디스크에 남기는 세션 jsonl 을 읽어 메타/메시지로 변환.
  * 위치: ~/.claude/projects/{encodedCwd}/{sessionId}.jsonl
  *
- * - encodedCwd: '/Users/nhn/Desktop/foo' → '-Users-nhn-Desktop-foo' (slash → dash)
+ * - encodedCwd 인코딩 규칙은 `../utils/claudeProjects` 의 `encodeCwd` 참조.
  * - 한 line 이 한 event. type 이 'user'/'assistant' 인 것만 채팅 메시지로 취급.
  */
 export class ClaudeSessionService {
   private titleStore: Store<TitleStoreShape>
+  private configDir?: string
+  private projectsRoot: string
 
-  constructor() {
+  constructor(opts?: { configDir?: string }) {
     this.titleStore = new Store<TitleStoreShape>({
       name: 'clauday-session-titles',
       defaults: { titles: {}, starred: [] }
     })
-  }
-
-  /** cwd 를 claude code 가 쓰는 디렉토리명 형태로 변환 */
-  private encodeCwd(cwd: string): string {
-    return cwd.replace(/\//g, '-')
+    this.configDir = opts?.configDir
+    this.projectsRoot = claudeProjectsRoot({ configDir: this.configDir })
   }
 
   // ===== 사용자 정의 세션 이름 =====
@@ -103,10 +100,6 @@ export class ClaudeSessionService {
     return this.titleStore.get('starred', []).includes(sessionId)
   }
 
-  private projectDir(cwd: string): string {
-    return join(PROJECTS_DIR, this.encodeCwd(cwd))
-  }
-
   /**
    * 특정 cwd 의 세션 목록 (최근 활동 순).
    * cwd 가 없으면 모든 프로젝트 디렉토리를 훑음.
@@ -114,11 +107,13 @@ export class ClaudeSessionService {
   async listSessions(cwd?: string): Promise<ClaudeSessionMeta[]> {
     const projectDirs: string[] = []
     if (cwd) {
-      projectDirs.push(this.projectDir(cwd))
+      const dir = await findProjectDir(cwd, { configDir: this.configDir })
+      if (!dir) return []
+      projectDirs.push(dir)
     } else {
       try {
-        const entries = await fs.readdir(PROJECTS_DIR)
-        for (const e of entries) projectDirs.push(join(PROJECTS_DIR, e))
+        const entries = await fs.readdir(this.projectsRoot)
+        for (const e of entries) projectDirs.push(join(this.projectsRoot, e))
       } catch {
         return []
       }
@@ -155,7 +150,9 @@ export class ClaudeSessionService {
    * Tool 사용/결과는 일단 skip (대화 흐름 위주 표시).
    */
   async loadSession(sessionId: string, cwd: string): Promise<ClaudeSessionMessage[]> {
-    const file = join(this.projectDir(cwd), `${sessionId}.jsonl`)
+    const dir = await findProjectDir(cwd, { configDir: this.configDir })
+    if (!dir) return []
+    const file = join(dir, `${sessionId}.jsonl`)
     let raw: string
     try {
       raw = await fs.readFile(file, 'utf-8')

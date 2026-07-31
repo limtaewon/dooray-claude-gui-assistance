@@ -91,7 +91,7 @@ function WatcherEditModal({ watcher, onClose, onSaved }: Props): JSX.Element {
         style={{ background: 'var(--bg-primary)', border: '1px solid var(--bg-border)' }}>
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-bg-border flex-shrink-0">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-clauday-orange/15 border border-clauday-orange/30">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-bg-active border border-bg-border-light">
             <Radar size={15} className="text-clauday-orange" />
           </div>
           <div className="flex-1">
@@ -145,7 +145,7 @@ function WatcherEditModal({ watcher, onClose, onSaved }: Props): JSX.Element {
 
           {/* 생성된 규칙 — 직접 편집/추가/삭제 가능 */}
           {filter && (
-            <div className="rounded-xl bg-clauday-orange/5 border border-clauday-orange/30 p-3 space-y-2">
+            <div className="rounded-xl bg-bg-active border border-bg-border-light p-3 space-y-2">
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-1.5">
                   <Check size={11} className="text-clauday-orange" />
@@ -168,7 +168,7 @@ function WatcherEditModal({ watcher, onClose, onSaved }: Props): JSX.Element {
                 <EditableRuleSection label="제외 정규식" items={filter.excludeRegex} color="text-red-400" mono
                   onChange={(items) => setFilter({ ...filter, excludeRegex: items })} />
               </div>
-              <p className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary pt-1 border-t border-bg-border/50">
+              <p className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary pt-1 border-t border-bg-border">
                 💡 칩의 × 로 삭제, 아래 입력란으로 직접 추가. AI 결과 전체를 바꾸려면 지시사항 수정 후 "다시 생성"
               </p>
             </div>
@@ -187,7 +187,7 @@ function WatcherEditModal({ watcher, onClose, onSaved }: Props): JSX.Element {
                 className="w-full pl-7 pr-3 py-1.5 rounded-lg text-xs bg-bg-surface border border-bg-border text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-orange"
               />
             </div>
-            <div className="max-h-48 overflow-y-auto rounded-lg border border-bg-border divide-y divide-bg-border/50">
+            <div className="max-h-48 overflow-y-auto rounded-lg border border-bg-border divide-y divide-bg-border">
               {filteredChannels.length === 0 ? (
                 <div className="px-3 py-4 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center">채널이 없습니다</div>
               ) : filteredChannels.map((c) => {
@@ -196,7 +196,7 @@ function WatcherEditModal({ watcher, onClose, onSaved }: Props): JSX.Element {
                 return (
                   <label key={c.id}
                     className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors ${
-                      selected ? 'bg-clauday-orange/10' : 'hover:bg-bg-surface-hover'
+                      selected ? 'bg-bg-active' : 'hover:bg-bg-surface-hover'
                     }`}>
                     <input type="checkbox" checked={selected} onChange={() => toggleChannel(c.id)}
                       className="accent-clauday-orange" />
@@ -224,7 +224,7 @@ function WatcherEditModal({ watcher, onClose, onSaved }: Props): JSX.Element {
             취소
           </button>
           <button onClick={handleSave} disabled={saving}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-clauday-orange hover:bg-clauday-orange/90 disabled:opacity-40">
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-clauday-orange hover:opacity-90 disabled:opacity-40">
             {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
             {saving ? '저장 중...' : isEdit ? '수정 완료' : '와처 만들기'}
           </button>

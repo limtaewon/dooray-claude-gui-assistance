@@ -54,12 +54,12 @@ function AIProgressIndicator({
   const isLarge = size === 'large'
 
   return (
-    <div className={`rounded-xl bg-gradient-to-br from-clauday-orange/10 via-clauday-blue/5 to-transparent border border-clauday-orange/20 ${isLarge ? 'p-5' : 'p-3'} ${className}`}>
+    <div className={`rounded-xl bg-gradient-to-br to-transparent border border-bg-border-light ${isLarge ? 'p-5' : 'p-3'} ${className}`}>
       <div className="flex items-center gap-2.5">
         <div className="relative flex-shrink-0">
           <Sparkles size={isLarge ? 18 : 14} className="text-clauday-orange animate-pulse" />
           {progress.stage !== 'error' && (
-            <Loader2 size={isLarge ? 24 : 18} className="absolute -top-0.5 -left-0.5 text-clauday-orange/30 animate-spin" />
+            <Loader2 size={isLarge ? 24 : 18} className="absolute -top-0.5 -left-0.5 text-text-tertiary animate-spin" />
           )}
         </div>
         <span className={`font-medium text-text-primary flex-1 ${isLarge ? 'text-sm' : 'text-xs'}`}>
@@ -84,7 +84,7 @@ function AIProgressIndicator({
               key={s}
               className={`flex-1 ${isLarge ? 'h-1.5' : 'h-1'} rounded-full transition-all ${
                 isActive ? 'bg-clauday-orange animate-pulse' :
-                isDone ? 'bg-clauday-blue/60' :
+                isDone ? 'bg-bg-border-strong' :
                 'bg-bg-border'
               }`}
             />
@@ -113,7 +113,7 @@ function AIProgressIndicator({
         <pre
           ref={preRef}
           onScroll={handleScroll}
-          className={`mt-3 text-text-secondary font-mono p-3 bg-bg-primary/60 rounded-lg border border-bg-border/50 whitespace-pre-wrap overflow-y-auto leading-relaxed ${
+          className={`mt-3 text-text-secondary font-mono p-3 bg-bg-primary rounded-lg border border-bg-border whitespace-pre-wrap overflow-y-auto leading-relaxed ${
             isLarge ? 'text-[calc(11px_*_var(--app-font-scale,1))] max-h-80' : 'text-[calc(10px_*_var(--app-font-scale,1))] max-h-24'
           }`}
         >

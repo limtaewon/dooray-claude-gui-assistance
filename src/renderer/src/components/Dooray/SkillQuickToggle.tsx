@@ -417,7 +417,7 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
 {skills.filter((s) => s.enabled).map((s) => `\n### ${s.name}\n${s.content}`).join('\n\n')}
                   </pre>
                 )}
-                <button onClick={() => setMode('list')} className="mt-3 text-[calc(10px_*_var(--app-font-scale,1))] text-clauday-blue hover:underline">← 목록으로</button>
+                <button onClick={() => setMode('list')} className="mt-3 text-[calc(10px_*_var(--app-font-scale,1))] text-link hover:underline">← 목록으로</button>
               </div>
             )}
 
@@ -458,7 +458,7 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
                           <button key={name} onClick={() => toggleMcp(name)}
                             className={`flex items-center gap-1 px-2 py-1 rounded-md text-[calc(10px_*_var(--app-font-scale,1))] border transition-colors ${
                               checked
-                                ? 'bg-clauday-blue/15 border-clauday-blue/40 text-clauday-blue font-medium'
+                                ? 'bg-bg-active border-bg-border-strong text-text-primary font-medium'
                                 : 'bg-bg-primary border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light'
                             }`}>
                             <span className={`w-3 h-3 rounded border flex items-center justify-center flex-shrink-0 ${
@@ -507,13 +507,13 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
                   className="w-full px-2.5 py-1.5 bg-bg-primary border border-bg-border rounded-md text-xs text-text-secondary placeholder-text-tertiary font-mono focus:outline-none focus:border-clauday-blue resize-y mb-2" />
                 <div className="flex items-center justify-between">
                   <label className="flex items-center gap-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">
-                    <input type="checkbox" checked={editing.autoApply} onChange={(e) => setEditing({ ...editing, autoApply: e.target.checked })} className="accent-blue-500" />
+                    <input type="checkbox" checked={editing.autoApply} onChange={(e) => setEditing({ ...editing, autoApply: e.target.checked })} />
                     자동 적용
                   </label>
                   <div className="flex gap-1.5">
                     <button onClick={() => { setEditing(null); setMode('list') }} className="px-2.5 py-1 rounded-md text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary hover:text-text-primary border border-bg-border">취소</button>
                     <button onClick={saveSkill} disabled={!editing.name.trim()}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-blue-500 text-white text-[calc(10px_*_var(--app-font-scale,1))] font-medium hover:bg-blue-600 disabled:opacity-40">
+                      className="ds-btn primary xs">
                       <Save size={10} /> 저장
                     </button>
                   </div>
@@ -558,7 +558,7 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
                         <span className="text-[calc(8px_*_var(--app-font-scale,1))] px-1 py-0.5 rounded bg-purple-500/15 text-purple-300 font-medium flex-shrink-0">전체</span>
                       )}
                       <button onClick={() => startEdit(skill)} className="p-1 rounded text-text-tertiary hover:text-text-secondary" title="편집"><Edit3 size={11} /></button>
-                      <button onClick={() => deleteSkill(skill.id)} className="p-1 rounded text-text-tertiary hover:text-red-400" title="삭제"><Trash2 size={11} /></button>
+                      <button onClick={() => deleteSkill(skill.id)} className="p-1 rounded text-c-red-fg hover:text-c-red-solid" title="삭제"><Trash2 size={11} /></button>
                     </div>
                   ))
                 )}

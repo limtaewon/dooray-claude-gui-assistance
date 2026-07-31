@@ -44,14 +44,18 @@ describe('MCPManager (integration)', () => {
     expect(screen.getByText(/· 2개 · 활성 2/)).toBeInTheDocument()
   })
 
-  it('shows empty view when no servers are registered', async () => {
+  it('shows onboarding when no servers are registered', async () => {
     vi.mocked(window.api.mcp.list).mockResolvedValue({})
 
     renderWithDs(<MCPManager />)
 
+    // 비어 있을 때는 '없음'이 아니라 무엇을 할 수 있는지를 안내한다
     await waitFor(() => {
-      expect(screen.getByText('등록된 MCP 서버가 없습니다')).toBeInTheDocument()
+      expect(
+        screen.getByText('Claude Code 가 쓸 도구 서버를 등록하고 켜고 끕니다.')
+      ).toBeInTheDocument()
     })
+    expect(screen.getAllByRole('button', { name: /서버 추가/ }).length).toBeGreaterThan(0)
   })
 
   it('reloads list when 새로고침 버튼 is clicked', async () => {

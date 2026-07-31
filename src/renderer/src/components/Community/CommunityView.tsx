@@ -9,6 +9,7 @@ import rehypeRaw from 'rehype-raw'
 import type { DoorayTask, DoorayTaskDetail, DoorayTaskComment } from '../../../../shared/types/dooray'
 import DoorayImage, { DoorayFileContext } from '../common/DoorayImage'
 import { LoadingView, ErrorView, EmptyView } from '../common/StateViews'
+import { ViewOnboarding } from '../common/onboarding/viewOnboarding'
 
 /** Clauday 커뮤니티 프로젝트 (공개 프로젝트) */
 const COMMUNITY_PROJECT_ID = '4312559241344624232'
@@ -138,7 +139,7 @@ function CommunityView({ active = true }: { active?: boolean } = {}): JSX.Elemen
       <div className="px-5 pt-4 pb-3 border-b border-bg-border flex-shrink-0">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-clauday-blue/10 border border-clauday-blue/30">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-bg-active border border-bg-border-light">
               <Users size={14} className="text-clauday-blue" />
             </div>
             <div>
@@ -196,13 +197,18 @@ function CommunityView({ active = true }: { active?: boolean } = {}): JSX.Elemen
         ) : error ? (
           <ErrorView message={error} onRetry={load} />
         ) : filtered.length === 0 ? (
-          <EmptyView
-            icon={MessageSquare}
-            title={search ? '검색 결과가 없습니다' : '아직 글이 없습니다'}
-            description={search ? '다른 키워드로 검색해보세요' : '첫 글을 작성해보세요!'}
-            actionLabel={search ? undefined : '새 글 쓰기'}
-            onAction={search ? undefined : () => setWriting(true)}
-          />
+          search ? (
+            <EmptyView
+              icon={MessageSquare}
+              title="검색 결과가 없습니다"
+              description="다른 키워드로 검색해보세요"
+            />
+          ) : (
+            <ViewOnboarding
+              view="community"
+              actions={[{ label: '새 글 쓰기', variant: 'primary', onClick: () => setWriting(true) }]}
+            />
+          )
         ) : (
           <div className="p-4 space-y-2">
             {filtered.map((p) => (
@@ -886,7 +892,7 @@ ${body || '(빈 내용. 제목을 보고 초안을 작성해줘.)'}
         <div className="flex items-center justify-between px-5 py-3.5"
           style={{ borderBottom: '1px solid var(--bg-border)', background: 'var(--bg-primary)' }}>
           <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-clauday-orange/15 border border-clauday-orange/30">
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-bg-active border border-bg-border-light">
               <Plus size={13} className="text-clauday-orange" />
             </div>
             <h3 className="text-sm font-bold text-text-primary">새 글 쓰기</h3>

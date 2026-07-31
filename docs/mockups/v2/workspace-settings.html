@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clauday v2.0 — 설정 · 워크스페이스 목업</title>
+<style>
+  :root{
+    --bg:#0e1014; --panel:#161a22; --panel2:#1c212b; --border:#272d3a; --border2:#333b4a;
+    --tx:#e7ebf2; --tx2:#9aa4b6; --tx3:#6b7484;
+    --orange:#ff7a1a; --blue:#4a9eff;
+    --ok:#34d399; --warn:#fbbf24; --bad:#f87171;
+    --radius:10px;
+    font-synthesis:none;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--tx);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    font-size:13px; line-height:1.5; overflow:hidden;
+  }
+  code,.mono,input.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+  /* ===== App shell (harness-studio-mockup 패턴 준수) ===== */
+  .app{display:flex; flex-direction:column; height:100vh}
+  .titlebar{height:38px; background:#0b0d11; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:10px; padding:0 14px; flex:none; -webkit-user-select:none}
+  .lights{display:flex; gap:7px}
+  .lights i{width:11px;height:11px;border-radius:50%}
+  .lights i:nth-child(1){background:#ff5f57}.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}
+  .title{font-weight:600; font-size:12.5px; letter-spacing:.2px}
+  .title b{background:linear-gradient(90deg,var(--orange),var(--blue));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .titlebar .spacer{flex:1}
+  .cmdk{font-size:11px; color:var(--tx3); border:1px solid var(--border2); padding:3px 8px; border-radius:6px}
+  .body{display:flex; flex:1; min-height:0}
+  /* sidebar 56px 아이콘 네비 */
+  .sidebar{width:56px; background:#0b0d11; border-right:1px solid var(--border); flex:none;
+    display:flex; flex-direction:column; align-items:center; padding-top:10px; gap:5px}
+  .nav{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    color:var(--tx3); cursor:pointer; font-size:17px; position:relative}
+  .nav:hover{background:#181c24;color:var(--tx2)}
+  .nav.active{background:linear-gradient(135deg,rgba(255,122,26,.22),rgba(74,158,255,.22));color:var(--tx)}
+  .nav.active::before{content:"";position:absolute;left:-10px;top:8px;bottom:8px;width:3px;border-radius:3px;background:linear-gradient(var(--orange),var(--blue))}
+  .main{flex:1; display:flex; flex-direction:column; min-width:0}
+
+  /* ===== 설정 레이아웃: 좌측 카테고리 + 우측 콘텐츠 ===== */
+  .settings{display:flex; flex:1; min-height:0}
+  .setnav{width:210px; flex:none; border-right:1px solid var(--border); padding:16px 10px; background:rgba(11,13,17,.4)}
+  .setnav h1{font-size:14px; margin:2px 8px 12px; font-weight:800}
+  .setnav .si{display:flex; align-items:center; gap:9px; padding:8px 12px; border-radius:9px;
+    color:var(--tx2); cursor:pointer; font-size:12.5px; position:relative}
+  .setnav .si:hover{background:#181c24; color:var(--tx)}
+  .setnav .si.active{background:linear-gradient(135deg,rgba(255,122,26,.18),rgba(74,158,255,.18)); color:var(--tx); font-weight:600}
+  .setnav .si.active::before{content:""; position:absolute; left:-10px; top:7px; bottom:7px; width:3px; border-radius:3px;
+    background:linear-gradient(var(--orange),var(--blue))}
+  .setnav .si .ic{width:16px; text-align:center; font-size:14px}
+  .setcontent{flex:1; min-width:0; overflow:auto; padding:22px 28px 40px}
+  .pagehead{margin-bottom:18px}
+  .pagehead h2{margin:0; font-size:17px; font-weight:800}
+  .pagehead p{margin:5px 0 0; color:var(--tx2); font-size:12px}
+
+  /* ===== ds-card ===== */
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px 18px; margin-bottom:16px; max-width:860px}
+  .card h3{margin:0 0 4px; font-size:13.5px; display:flex; align-items:center; gap:8px}
+  .card h3 .num{font-size:10px; font-weight:800; color:var(--tx3); border:1px solid var(--border2);
+    border-radius:6px; padding:0 5px; letter-spacing:.4px}
+  .card .desc{color:var(--tx2); font-size:11.5px; margin:0 0 13px}
+  .caption{color:var(--tx3); font-size:11px; margin-top:8px}
+
+  .btn{font-size:12px; padding:7px 13px; border-radius:8px; border:1px solid var(--border2); background:var(--panel2);
+    color:var(--tx); cursor:pointer; display:inline-flex; align-items:center; gap:6px}
+  .btn:hover{border-color:var(--blue)}
+  .btn.sm{font-size:11px; padding:4px 9px; border-radius:7px}
+  .btn.danger:hover{border-color:var(--bad); color:var(--bad)}
+  .btn.primary{background:linear-gradient(135deg,var(--orange),#ff924a); border:none; color:#1a0e03; font-weight:600}
+
+  /* ① 저장소 레지스트리 */
+  .repo{display:flex; align-items:center; gap:14px; background:var(--panel2); border:1px solid var(--border);
+    border-radius:var(--radius); padding:12px 14px; margin-bottom:9px}
+  .repo:hover{border-color:var(--border2)}
+  .repo .ric{width:34px; height:34px; border-radius:9px; flex:none; display:flex; align-items:center; justify-content:center;
+    font-size:16px; background:linear-gradient(135deg,rgba(255,122,26,.16),rgba(74,158,255,.16))}
+  .repo .rmeta{flex:1; min-width:0}
+  .repo .rname{font-weight:700; font-size:13px; display:flex; align-items:center; gap:8px}
+  .repo .rpath{color:var(--tx2); font-size:11.5px; margin-top:1px}
+  .repo .rsub{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px}
+  .kv{font-size:10.5px; padding:2px 8px; border-radius:20px; border:1px solid var(--border2); color:var(--tx2); white-space:nowrap}
+  .kv b{color:var(--tx); font-weight:600}
+  .kv.default b{color:var(--tx3); font-weight:500}
+  .kv.override{border-color:rgba(255,122,26,.45); color:#ffc79a; background:rgba(255,122,26,.07)}
+  .kv.override b{color:var(--orange)}
+  .repo .ract{display:flex; gap:6px; flex:none}
+  .addrow{margin-top:11px}
+
+  /* ② 매핑 테이블 */
+  table.map{width:100%; border-collapse:collapse; font-size:12.5px}
+  table.map th{text-align:left; color:var(--tx3); font-size:10.5px; font-weight:700; letter-spacing:.4px;
+    text-transform:uppercase; padding:4px 10px 8px; border-bottom:1px solid var(--border)}
+  table.map td{padding:9px 10px; border-bottom:1px solid var(--border)}
+  table.map tr:last-child td{border-bottom:none}
+  table.map .proj{font-weight:600}
+  table.map .proj .pic{margin-right:7px}
+  table.map .arrow{color:var(--tx3); text-align:center; width:36px}
+  table.map td.repo-cell{text-align:right; width:220px}
+  tr.unmapped .proj, tr.unmapped .arrow{color:var(--tx3); font-weight:400}
+  select{background:var(--panel2); color:var(--tx); border:1px solid var(--border2); border-radius:8px;
+    padding:6px 10px; font-size:12px; font-family:inherit; cursor:pointer; outline:none}
+  select:focus{border-color:var(--blue)}
+  select.dim{color:var(--tx3); font-style:italic}
+
+  /* ③ 브랜치 템플릿 */
+  input[type=text]{width:100%; background:var(--bg); border:1px solid var(--border2); border-radius:9px;
+    color:var(--tx); padding:10px 12px; font-size:13px; outline:none}
+  input[type=text]:focus{border-color:var(--blue); box-shadow:0 0 0 3px rgba(74,158,255,.12)}
+  .tokens{display:flex; gap:6px; flex-wrap:wrap; margin-top:9px; align-items:center}
+  .tokens .tl{font-size:10.5px; color:var(--tx3); margin-right:2px}
+  .tok{font-size:11px; padding:2px 9px; border-radius:20px; border:1px solid var(--border2);
+    color:var(--tx2); cursor:pointer; background:var(--panel2)}
+  .tok:hover{border-color:var(--blue); color:var(--tx)}
+  .preview{margin-top:12px; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:11px 13px}
+  .preview .pl{display:flex; align-items:center; gap:9px; padding:3px 0}
+  .preview .pk{color:var(--tx3); font-size:11px; width:104px; flex:none}
+  .preview code{font-size:12.5px; background:var(--panel2); border:1px solid var(--border);
+    padding:2px 8px; border-radius:6px; color:#9fd0ff}
+  .preview .warnmsg{color:var(--warn); font-size:11px}
+  .preview .fallback code{color:var(--tx2)}
+
+  /* ④ 실행 */
+  .frow{display:flex; align-items:center; gap:16px; padding:9px 0}
+  .frow + .frow{border-top:1px solid var(--border)}
+  .frow .fl{flex:1}
+  .frow .fl b{font-size:12.5px}
+  .frow .fl .sub{color:var(--tx3); font-size:11px; margin-top:1px}
+  .stepper{display:inline-flex; align-items:center; border:1px solid var(--border2); border-radius:9px; overflow:hidden; flex:none}
+  .stepper button{width:32px; height:30px; border:none; background:var(--panel2); color:var(--tx); cursor:pointer; font-size:15px; line-height:1}
+  .stepper button:hover{background:#242b38}
+  .stepper button:disabled{color:var(--tx3); cursor:default; background:var(--panel2)}
+  .stepper .val{width:46px; text-align:center; font-weight:800; font-size:14px}
+
+  /* ⑤ 정리 정책 */
+  .check{display:flex; align-items:center; gap:9px; cursor:pointer; font-size:12.5px; user-select:none}
+  .check input{accent-color:var(--orange); width:15px; height:15px; cursor:pointer}
+
+  .footnote{max-width:860px; color:var(--tx3); font-size:11px; margin-top:4px}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- titlebar -->
+  <div class="titlebar">
+    <div class="lights"><i></i><i></i><i></i></div>
+    <div class="title"><b>Clauday</b> · 설정 <span style="font-weight:400;color:var(--tx3)">— 워크스페이스</span></div>
+    <div class="spacer"></div>
+    <div class="cmdk">⌘K</div>
+  </div>
+  <div class="body">
+    <!-- sidebar: 56px 아이콘 네비 -->
+    <div class="sidebar">
+      <div class="nav" title="두레이">🏠</div>
+      <div class="nav" title="터미널">▢</div>
+      <div class="nav" title="세션">💬</div>
+      <div class="nav" title="MCP">🧩</div>
+      <div class="nav" title="스킬">⚡</div>
+      <div class="nav" title="Harness Studio">🧭</div>
+      <div class="nav" title="사용량">📊</div>
+      <div class="nav active" title="설정">⚙</div>
+    </div>
+    <!-- main -->
+    <div class="main">
+      <div class="settings">
+        <!-- 설정 카테고리 -->
+        <div class="setnav">
+          <h1>설정</h1>
+          <div class="si"><span class="ic">🎛</span>일반</div>
+          <div class="si"><span class="ic">🔗</span>두레이 연동</div>
+          <div class="si active"><span class="ic">🗂</span>워크스페이스</div>
+          <div class="si"><span class="ic">▣</span>터미널</div>
+          <div class="si"><span class="ic">🤖</span>AI 모델</div>
+        </div>
+
+        <!-- 콘텐츠 -->
+        <div class="setcontent">
+          <div class="pagehead">
+            <h2>워크스페이스</h2>
+            <p>저장소 등록, 두레이 프로젝트 매핑, 워크트리 브랜치 규칙과 실행·정리 정책을 관리합니다.</p>
+          </div>
+
+          <!-- ① 저장소 레지스트리 -->
+          <div class="card">
+            <h3><span class="num">①</span>저장소 레지스트리</h3>
+            <p class="desc">Clauday 가 워크트리를 만들 수 있는 로컬 git 저장소 목록입니다.</p>
+
+            <div class="repo">
+              <div class="ric">📁</div>
+              <div class="rmeta">
+                <div class="rname">ios-dooray</div>
+                <div class="rpath mono">~/work/ios-dooray</div>
+                <div class="rsub">
+                  <span class="kv">기본 base <b class="mono">origin/develop</b></span>
+                  <span class="kv default">프리픽스 <b>(기본 템플릿)</b></span>
+                </div>
+              </div>
+              <div class="ract">
+                <button class="btn sm">편집</button>
+                <button class="btn sm danger">제거</button>
+              </div>
+            </div>
+
+            <div class="repo">
+              <div class="ric">📁</div>
+              <div class="rmeta">
+                <div class="rname">mobile-kmp</div>
+                <div class="rpath mono">~/work/mobile-kmp</div>
+                <div class="rsub">
+                  <span class="kv">기본 base <b class="mono">origin/main</b></span>
+                  <span class="kv override">프리픽스 override <b class="mono">feat/</b></span>
+                </div>
+              </div>
+              <div class="ract">
+                <button class="btn sm">편집</button>
+                <button class="btn sm danger">제거</button>
+              </div>
+            </div>
+
+            <div class="addrow">
+              <button class="btn primary">＋ 폴더 추가</button>
+            </div>
+            <div class="caption">git 저장소 루트를 선택하세요. 서브모듈은 자동 감지됩니다.</div>
+          </div>
+
+          <!-- ② 두레이 프로젝트 ↔ 저장소 매핑 -->
+          <div class="card">
+            <h3><span class="num">②</span>두레이 프로젝트 ↔ 저장소 매핑</h3>
+            <p class="desc">두레이 태스크에서 워크스페이스를 만들 때 어느 저장소를 사용할지 결정합니다.</p>
+            <table class="map">
+              <thead>
+                <tr><th>두레이 프로젝트</th><th></th><th style="text-align:right">저장소</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="proj"><span class="pic">🟠</span>dooray-D-TF</td>
+                  <td class="arrow">→</td>
+                  <td class="repo-cell">
+                    <select>
+                      <option selected>ios-dooray</option>
+                      <option>mobile-kmp</option>
+                      <option>기본 저장소 사용</option>
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="proj"><span class="pic">🔵</span>dooray-KMP</td>
+                  <td class="arrow">→</td>
+                  <td class="repo-cell">
+                    <select>
+                      <option>ios-dooray</option>
+                      <option selected>mobile-kmp</option>
+                      <option>기본 저장소 사용</option>
+                    </select>
+                  </td>
+                </tr>
+                <tr class="unmapped">
+                  <td class="proj"><span class="pic">⚪</span>dooray-NEON</td>
+                  <td class="arrow">→</td>
+                  <td class="repo-cell">
+                    <select class="dim">
+                      <option selected>기본 저장소 사용</option>
+                      <option>ios-dooray</option>
+                      <option>mobile-kmp</option>
+                    </select>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="caption">매핑하지 않은 프로젝트는 워크스페이스 생성 시 기본 저장소를 사용합니다.</div>
+          </div>
+
+          <!-- ③ 브랜치 이름 템플릿 -->
+          <div class="card">
+            <h3><span class="num">③</span>브랜치 이름 템플릿</h3>
+            <p class="desc">워크트리 생성 시 태스크 정보로 브랜치 이름을 만듭니다. 저장소별 프리픽스 override 가 있으면 그쪽이 우선합니다.</p>
+
+            <input type="text" id="branchTemplate" class="mono" value="feature/{projectCode}-{taskNumber}"
+              spellcheck="false" autocomplete="off">
+
+            <div class="tokens">
+              <span class="tl">사용 가능 토큰</span>
+              <span class="tok mono" data-token="{projectCode}">{projectCode}</span>
+              <span class="tok mono" data-token="{taskNumber}">{taskNumber}</span>
+              <span class="tok mono" data-token="{taskId6}">{taskId6}</span>
+            </div>
+
+            <div class="preview" id="previewBox">
+              <div class="pl"><span class="pk">미리보기</span><code id="pvMain">feature/D-TF-2619</code></div>
+              <div class="pl fallback" id="pvFallbackRow"><span class="pk">taskNumber 없음</span><code id="pvFallback">feature/D-TF-9f3a2c</code></div>
+            </div>
+            <div class="caption">taskNumber 가 없으면 taskId 뒤 6자리로 대체됩니다</div>
+          </div>
+
+          <!-- ④ 실행 -->
+          <div class="card">
+            <h3><span class="num">④</span>실행</h3>
+            <p class="desc">워크스페이스에서 동시에 돌릴 수 있는 Claude Code 실행 개수와 스폰 간격을 제한합니다.</p>
+
+            <div class="frow">
+              <div class="fl">
+                <b>동시 실행 상한</b>
+                <div class="sub">초과분은 순차 대기</div>
+              </div>
+              <div class="stepper">
+                <button id="ccMinus" aria-label="감소">−</button>
+                <span class="val" id="ccVal">4</span>
+                <button id="ccPlus" aria-label="증가">＋</button>
+              </div>
+            </div>
+
+            <div class="frow">
+              <div class="fl">
+                <b>스폰 딜레이</b>
+                <div class="sub">연속 스폰 사이 대기 간격 프리셋</div>
+              </div>
+              <select>
+                <option selected>보통 (기본)</option>
+                <option>느린 머신</option>
+                <option>빠름</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- ⑤ 정리 정책 -->
+          <div class="card">
+            <h3><span class="num">⑤</span>정리 정책</h3>
+            <p class="desc">쓰지 않는 워크스페이스가 디스크에 쌓이지 않도록 정리 규칙을 정합니다.</p>
+
+            <div class="frow">
+              <div class="fl">
+                <b>보관된 워크스페이스 자동 삭제</b>
+                <div class="sub">보관(archive) 처리 후 경과 기간 기준</div>
+              </div>
+              <select>
+                <option selected>30일 후 (기본)</option>
+                <option>7일 후</option>
+                <option>90일 후</option>
+                <option>안 함</option>
+              </select>
+            </div>
+
+            <div class="frow">
+              <label class="check">
+                <input type="checkbox" checked>
+                워크트리 제거 시 미커밋 변경 경고
+              </label>
+            </div>
+          </div>
+
+          <div class="footnote">변경 사항은 즉시 저장됩니다. 실행 중인 워크스페이스에는 다음 실행부터 적용됩니다.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ===== ③ 브랜치 템플릿 라이브 미리보기 =====
+  const SAMPLE = { projectCode: 'D-TF', taskNumber: '2619', taskId6: '9f3a2c' };
+  const KNOWN_TOKENS = ['projectCode', 'taskNumber', 'taskId6'];
+
+  const tplInput   = document.getElementById('branchTemplate');
+  const pvMain     = document.getElementById('pvMain');
+  const pvFallback = document.getElementById('pvFallback');
+  const pvFallbackRow = document.getElementById('pvFallbackRow');
+
+  // 템플릿의 {token} 을 데이터로 치환. taskNumber 부재 시 taskId6 로 폴백.
+  function renderTemplate(tpl, data, useFallback) {
+    return tpl.replace(/\{([a-zA-Z0-9_]+)\}/g, (match, key) => {
+      if (key === 'taskNumber' && useFallback) return data.taskId6;
+      if (KNOWN_TOKENS.includes(key)) return data[key];
+      return match; // 알 수 없는 토큰은 그대로 노출
+    });
+  }
+
+  function hasUnknownToken(tpl) {
+    const m = tpl.match(/\{([a-zA-Z0-9_]+)\}/g) || [];
+    return m.some(t => !KNOWN_TOKENS.includes(t.slice(1, -1)));
+  }
+
+  function updatePreview() {
+    const tpl = tplInput.value.trim();
+    if (!tpl) {
+      pvMain.textContent = '(템플릿이 비어 있습니다)';
+      pvFallbackRow.style.display = 'none';
+      return;
+    }
+    const main = renderTemplate(tpl, SAMPLE, false);
+    pvMain.textContent = main;
+    if (tpl.includes('{taskNumber}')) {
+      pvFallbackRow.style.display = '';
+      pvFallback.textContent = renderTemplate(tpl, SAMPLE, true);
+    } else {
+      pvFallbackRow.style.display = 'none';
+    }
+    // 알 수 없는 토큰 경고 색상
+    const unknown = hasUnknownToken(tpl);
+    pvMain.style.color = unknown ? 'var(--warn)' : '';
+    pvMain.title = unknown ? '알 수 없는 토큰이 포함되어 있습니다 — 치환되지 않고 그대로 사용됩니다' : '';
+  }
+
+  tplInput.addEventListener('input', updatePreview);
+  updatePreview();
+
+  // 토큰 칩 클릭 → 커서 위치에 삽입
+  document.querySelectorAll('.tok').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const token = chip.dataset.token;
+      const start = tplInput.selectionStart ?? tplInput.value.length;
+      const end   = tplInput.selectionEnd ?? tplInput.value.length;
+      tplInput.value = tplInput.value.slice(0, start) + token + tplInput.value.slice(end);
+      const pos = start + token.length;
+      tplInput.focus();
+      tplInput.setSelectionRange(pos, pos);
+      updatePreview();
+    });
+  });
+
+  // ===== ④ 동시 실행 상한 스텝퍼 =====
+  const CC_MIN = 1, CC_MAX = 8;
+  const ccVal = document.getElementById('ccVal');
+  const ccMinus = document.getElementById('ccMinus');
+  const ccPlus  = document.getElementById('ccPlus');
+
+  function setConcurrency(n) {
+    const v = Math.min(CC_MAX, Math.max(CC_MIN, n));
+    ccVal.textContent = v;
+    ccMinus.disabled = v <= CC_MIN;
+    ccPlus.disabled  = v >= CC_MAX;
+  }
+  ccMinus.addEventListener('click', () => setConcurrency(Number(ccVal.textContent) - 1));
+  ccPlus .addEventListener('click', () => setConcurrency(Number(ccVal.textContent) + 1));
+  setConcurrency(4);
+</script>
+
+<!--
+═══════════════════════════════════════════════════════════════════════
+ 구현 매핑 노트 (v2.0 — 설정 › 워크스페이스)
+═══════════════════════════════════════════════════════════════════════
+
+■ Renderer
+  - src/renderer/src/components/Settings/WorkspaceSettings.tsx (신규)
+    · 이 목업의 우측 콘텐츠 전체. 설정 뷰(SettingsView)의 카테고리 라우팅에
+      'workspace' 항목 추가 (일반/두레이 연동/워크스페이스/터미널/AI 모델).
+    · 섹션 컴포넌트 분리 권장:
+      RepoRegistrySection / ProjectMappingSection / BranchTemplateSection /
+      ExecutionSection / CleanupPolicySection
+    · 브랜치 템플릿 라이브 미리보기 로직(renderTemplate, taskNumber→taskId6
+      폴백)은 shared 순수 함수로 분리해서 main 의 실제
+      브랜치 생성 로직과 *동일 함수* 를 공유할 것:
+      src/shared/branchTemplate.ts → vitest 단위 테스트 필수 (DoD).
+
+■ Main — WorkspaceStore (electron-store) 스키마
+  - src/main/git/WorkspaceStore.ts (신규 또는 기존 git/ 확장)
+    interface WorkspaceSettings {
+      repositories: Array<{
+        id: string;               // uuid
+        name: string;             // 'ios-dooray'
+        path: string;             // '~/work/ios-dooray' (절대경로로 정규화 저장)
+        defaultBase: string;      // 'origin/develop'
+        branchPrefixOverride?: string; // 'feat/' — 없으면 기본 템플릿 사용
+      }>;
+      projectMappings: Record<string, string>;
+        // { doorayProjectCode → repositoryId }, 미매핑 = 기본 저장소 폴백
+      defaultRepositoryId?: string;
+      branchTemplate: string;     // 기본 'feature/{projectCode}-{taskNumber}'
+        // 토큰: {projectCode} {taskNumber} {taskId6}
+        // taskNumber 부재 시 taskId 뒤 6자리({taskId6})로 대체
+        // 브랜치 충돌 시 '-2','-3' 접미
+      execution: {
+        maxConcurrent: number;    // 1~8, 기본 4. 초과분 순차 대기 큐
+        spawnDelayPreset: 'normal' | 'slow' | 'fast';
+      };
+      cleanup: {
+        archiveRetentionDays: 30 | 7 | 90 | null; // null = 안 함
+        warnUncommittedOnRemove: boolean;         // 기본 true
+      };
+    }
+
+■ IPC (shared/types/ipc.ts → preload → main/index.ts, 3+1 규칙)
+  - IPC_CHANNELS.WORKSPACE_SETTINGS_GET / _UPDATE
+  - IPC_CHANNELS.WORKSPACE_REPO_ADD (폴더 선택 dialog → git 루트/서브모듈 감지)
+  - window.api.workspace.getSettings() / updateSettings() / addRepository()
+
+■ 연계 도메인
+  - src/main/git/ : 워크트리 생성 시 WorkspaceStore.branchTemplate +
+    repo.branchPrefixOverride + defaultBase 참조
+  - 두레이 프로젝트 목록: DoorayClient 프로젝트 API 로 매핑 테이블 행 구성
+  - 매뉴얼: ClaudeManual.tsx SECTIONS 에 '워크스페이스 설정' 추가 (DoD)
+═══════════════════════════════════════════════════════════════════════
+-->
+</body>
+</html>

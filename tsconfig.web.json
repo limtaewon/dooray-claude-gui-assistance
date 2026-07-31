@@ -27,6 +27,8 @@
     "src/shared/**/*.ts",
     "src/preload/**/*.ts",
     "src/main/claude/ClaudeSessionService.ts",
+    "src/main/utils/claudeProjects.ts",
+    "src/main/utils/paths.ts",
     "test/**/*.ts",
     "test/**/*.tsx"
   ]

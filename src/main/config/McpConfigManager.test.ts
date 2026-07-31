@@ -104,6 +104,51 @@ describe('McpConfigManager.update', () => {
   })
 })
 
+describe('McpConfigManager.add/update — win32 stdio 정규화 (ADR-v2-windows-fix-06)', () => {
+  const withPlatform = async (platform: NodeJS.Platform, fn: () => Promise<void>): Promise<void> => {
+    const orig = process.platform
+    Object.defineProperty(process, 'platform', { value: platform, configurable: true })
+    try {
+      await fn()
+    } finally {
+      Object.defineProperty(process, 'platform', { value: orig, configurable: true })
+    }
+  }
+
+  it('win32 에서 add 후 파일에는 cmd /c 로 감싼 형태가 저장된다', async () => {
+    await withPlatform('win32', async () => {
+      await makeManager().add('fs', { command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem'] } as never)
+      const cfg = readConfig() as Record<string, Record<string, unknown>>
+      expect(cfg.mcpServers.fs).toEqual({ command: 'cmd', args: ['/c', 'npx', '-y', '@modelcontextprotocol/server-filesystem'] })
+    })
+  })
+
+  it('darwin 에서 add 후 파일에는 원본 커맨드가 그대로 저장된다', async () => {
+    await withPlatform('darwin', async () => {
+      await makeManager().add('fs', { command: 'npx', args: ['-y', 'server'] } as never)
+      const cfg = readConfig() as Record<string, Record<string, unknown>>
+      expect(cfg.mcpServers.fs).toEqual({ command: 'npx', args: ['-y', 'server'] })
+    })
+  })
+
+  it('win32 에서 토글(비활성화→활성화)을 반복해도 이중 래핑되지 않는다 (멱등)', async () => {
+    await withPlatform('win32', async () => {
+      const m = makeManager()
+      await m.add('fs', { command: 'npx', args: ['-y', 'server'] } as never)
+      await m.update('fs', { command: 'cmd', args: ['/c', 'npx', '-y', 'server'], disabled: true } as never)
+      await m.update('fs', { command: 'cmd', args: ['/c', 'npx', '-y', 'server'], disabled: false } as never)
+      const cfg = readConfig() as Record<string, Record<string, unknown>>
+      expect(cfg.mcpServers.fs).toEqual({ command: 'cmd', args: ['/c', 'npx', '-y', 'server'] })
+    })
+  })
+
+  it('원자적 쓰기 경로를 탄다 — 쓰기 후 tmp 파일이 남지 않는다', async () => {
+    await makeManager().add('foo', { command: 'a' } as never)
+    expect(existsSync(join(tmpHome, '.claude.json.clauday-tmp'))).toBe(false)
+    expect(existsSync(join(tmpHome, '.claude.json'))).toBe(true)
+  })
+})
+
 describe('McpConfigManager.delete', () => {
   it('양쪽에서 모두 삭제', async () => {
     writeFileSync(join(tmpHome, '.claude.json'), JSON.stringify({

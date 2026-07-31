@@ -29,6 +29,12 @@ SocketModeClient   ─ events ─▶  BotService  ─ raw event ─▶  MentionD
                                                                        HookServer  (127.0.0.1, X-Clauday-Secret 검증)
                                                                               │
                                                                               ▼
+                                                                 ClaudeHookRouter (cwd → resolver first-match)
+                                                                              │ kind='mention'
+                                                                              ▼
+                                                                 MentionHookHandler (resolve/handle)
+                                                                              │
+                                                                              ▼
                                                               transcriptReader (~/.claude/projects/<...>.jsonl)
                                                                               │
                                                                               ▼
@@ -45,9 +51,11 @@ SocketModeClient   ─ events ─▶  BotService  ─ raw event ─▶  MentionD
 - `src/main/dooray/mention/MentionDispatcher.ts` — trigger 매칭 (`@clauday`).
 - `src/main/dooray/mention/ContextCollector.ts` — 최근 채널 메시지 fetch.
 - `src/main/dooray/mention/promptBuilder.ts` — 컨텍스트 → md 본문 변환 (정형 가드라인 X, 자유 응답 허용).
-- `src/main/dooray/mention/AgentWorkspaceManager.ts` — 채널별 작업 폴더 준비.
+- `src/main/dooray/mention/AgentWorkspaceManager.ts` — 채널별 작업 폴더 준비. trust/hook settings 파일 작성은 `src/main/claude/claudeDirSetup.ts` 에 위임(v2.0 C-0, 워크트리 소비처와 공유).
 - `src/main/dooray/mention/MentionTerminalSpawner.ts` — 터미널 새 탭 / 기존 탭 재사용 결정 + claude 명령 입력.
 - `src/main/dooray/mention/HookServer.ts` — loopback HTTP. claude code 의 `type:"http"` hook 수신.
+- `src/main/hooks/ClaudeHookRouter.ts` (v2.0 C-0 신설) — hook 을 소유자에게 배타적으로 라우팅. `cwd` resolver 를 등록 순서대로 first-match 시도하고, 매칭된 `kind` 의 핸들러에 위임. 멘션 외 소유자(워크스페이스 등)를 추가할 때 이 라우터에 resolver 만 얹으면 됨 — dooray-bot 코드를 다시 열 필요 없음.
+- `src/main/dooray/mention/MentionHookHandler.ts` (v2.0 C-0 신설, 구 `index.ts` 의 `handleClaudeHook`) — 멘션 전용 hook 처리. `resolve(cwd)` 로 채널 소속 판정(`ClaudeHookRouter` 의 resolver), `handle(ev, route)` 로 도구 사용 누적 → Stop 응답 조립 → 두레이 송신 → `claudeSessionId` 보존 → `markIdle`.
 - `src/main/dooray/mention/transcriptReader.ts` — claude 의 jsonl 파싱.
 - `src/main/dooray/mention/ClaudayResponder.ts` — 채널에 송신. `[Clauday]` prefix 강제 + 코드블록/일반 영역 split 후 일반은 ```md``` 로 wrap.
 
@@ -64,7 +72,7 @@ SocketModeClient   ─ events ─▶  BotService  ─ raw event ─▶  MentionD
 claude code 가 어떤 외부 endpoint 든 부를 수 있으니, 임의 호출을 차단. `HookServer` 가 부팅 시 랜덤 secret 생성 → `.claude/settings.local.json` 의 hook 정의에 `X-Clauday-Secret: <secret>` 헤더로 박아둠 → 들어오는 요청에서 비교.
 
 ### 4. Stop hook 으로 응답 회수
-claude code 의 작업이 끝나면 *stop hook* 이 발사. 그게 HookServer 를 두드리고, 우리는 그 시점에 해당 채널의 jsonl 을 읽어 마지막 assistant 메시지를 채널로 회신.
+claude code 의 작업이 끝나면 *stop hook* 이 발사. 그게 HookServer 를 두드리고, `HookServer` 는 `ClaudeHookRouter` 에 위임한다. 라우터는 `cwd` 로 소유자를 판정(resolver first-match, 배타적)해 `MentionHookHandler` 에 넘기고, 거기서 해당 채널의 jsonl 을 읽어 마지막 assistant 메시지를 채널로 회신한다(v2.0 C-0 — 이전엔 `index.ts` 모듈 클로저 1개가 이 전부를 했음, 이제 라우터·핸들러 분리로 워크스페이스 등 다른 소유자를 resolver 추가만으로 확장 가능).
 
 ### 5. 코드블록 wrapping (두레이 highlight)
 두레이 메신저는 ```{lang}``` 코드 펜스 안에서만 syntax highlight. 일반 markdown(헤더/리스트/테이블) 도 ```md``` 안에 넣어야 보기 좋음. ClaudayResponder 가 응답을 코드블록/일반 영역으로 split → 일반 영역만 ```md``` 로 감쌈.

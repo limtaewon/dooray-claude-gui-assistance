@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
-export type ChipTone = 'blue' | 'orange' | 'emerald' | 'red' | 'violet' | 'yellow' | 'neutral'
+/** selected 는 필터/토글 같은 크롬 칩의 활성 상태 — 상태 칩과 달리 무채색으로 그린다. */
+export type ChipTone = 'blue' | 'orange' | 'emerald' | 'red' | 'violet' | 'yellow' | 'neutral' | 'selected'
 
 export interface ChipProps {
   tone?: ChipTone

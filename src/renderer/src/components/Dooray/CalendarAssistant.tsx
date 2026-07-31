@@ -211,11 +211,11 @@ function CalendarFilter({ events, filterIds, onFilter, colorOverrides, onChangeC
   return (
     <div className="relative">
       <button onClick={() => setOpen(!open)}
-        className={`ds-btn icon sm ${filterIds.length > 0 ? 'text-clauday-blue' : ''}`}
+        className={`ds-btn icon sm ${filterIds.length > 0 ? 'text-brand-dooray' : ''}`}
         title="표시할 캘린더 선택">
         <Settings size={15} />
         {filterIds.length > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-clauday-blue text-[calc(8px_*_var(--app-font-scale,1))] text-white flex items-center justify-center font-bold">
+          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-brand-dooray text-[calc(8px_*_var(--app-font-scale,1))] text-white flex items-center justify-center font-bold">
             {filterIds.length}
           </span>
         )}
@@ -557,7 +557,7 @@ function CalendarAssistant(): JSX.Element {
           <button
             onClick={handleRefresh}
             disabled={loading || syncing}
-            className="ds-btn icon sm text-clauday-blue"
+            className="ds-btn icon sm"
             title="서버에서 새로고침"
           >
             <RefreshCw size={15} className={(loading || syncing) ? 'animate-spin' : ''} />
@@ -580,7 +580,7 @@ function CalendarAssistant(): JSX.Element {
         <ListTodo size={14} className="text-clauday-blue flex-shrink-0" />
         <input
           type="text"
-          className="flex-1 bg-bg-surface border border-bg-border hover:border-clauday-blue/40 focus:border-clauday-blue/60 outline-none rounded-lg px-3 py-1.5 text-[calc(13px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary transition-colors"
+          className="flex-1 bg-bg-surface border border-bg-border hover:border-bg-border-strong focus:border-bg-border-strong outline-none rounded-lg px-3 py-1.5 text-[calc(13px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary transition-colors"
           placeholder='오늘 할 일 입력 후 Enter'
           value={quickTodo}
           onChange={(e) => setQuickTodo(e.target.value)}
@@ -600,7 +600,7 @@ function CalendarAssistant(): JSX.Element {
 
       {/* CalDAV 미연결 안내 배너 */}
       {caldavStatus && !caldavStatus.connected && (
-        <div className="mx-6 mt-3 p-3 rounded-xl bg-clauday-orange/5 border border-clauday-orange/20 flex items-center gap-3 flex-shrink-0">
+        <div className="mx-6 mt-3 p-3 rounded-xl bg-bg-active border border-bg-border-light flex items-center gap-3 flex-shrink-0">
           <AlertCircle size={14} className="text-clauday-orange flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary font-medium">두레이 CalDAV가 연결되지 않았습니다</p>
@@ -610,7 +610,7 @@ function CalendarAssistant(): JSX.Element {
           </div>
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('goto-settings', { detail: { tab: 'caldav' } }))}
-            className="px-2.5 py-1 rounded-md bg-clauday-blue text-white text-[calc(10px_*_var(--app-font-scale,1))] font-medium hover:bg-clauday-blue/80 flex-shrink-0">
+            className="px-2.5 py-1 rounded-md bg-brand-dooray text-white text-[calc(10px_*_var(--app-font-scale,1))] font-medium hover:opacity-90 flex-shrink-0">
             연결하러 가기
           </button>
         </div>
@@ -669,7 +669,7 @@ function CalendarAssistant(): JSX.Element {
                               <span className="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-emerald-400/15 text-emerald-400 font-medium">진행 중</span>
                             )}
                             {isUpcoming && (
-                              <span className="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-clauday-blue/15 text-clauday-blue font-medium">예정</span>
+                              <span className="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-bg-active text-text-primary font-medium">예정</span>
                             )}
                           </div>
                           <div className="flex items-center gap-3 mt-0.5">
@@ -695,7 +695,7 @@ function CalendarAssistant(): JSX.Element {
               const isToday = dateKey === todayKey
               return (
                 <div key={dateKey}>
-                  <h3 className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isToday ? 'text-clauday-blue' : 'text-text-secondary'}`}>
+                  <h3 className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isToday ? 'text-text-primary' : 'text-text-secondary'}`}>
                     {safeDate(dateKey + 'T00:00:00+09:00')} {isToday && '(오늘)'} <span className="text-text-tertiary font-normal">{dayEvents.length}개</span>
                   </h3>
                   <div className="space-y-1.5">

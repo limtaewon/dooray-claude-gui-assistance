@@ -20,6 +20,18 @@ function envToText(e?: Record<string, string>): string {
   return Object.entries(e).map(([k, v]) => `${k}=${v}`).join('\n')
 }
 
+// main/config/mcpNormalize.ts 의 needsWrap 판정과 동일 기준 — 표시용 힌트만, 실제 정규화(cmd /c 래핑)는
+// 저장 시 main 이 수행한다 (ADR-v2-windows-fix-06 §4: renderer 는 정규화하지 않는다).
+const WINDOWS_WRAP_TARGET_NAMES = new Set(['npx', 'uvx', 'npm', 'pnpm', 'yarn', 'bunx'])
+const CMD_BAT_SUFFIX_RE = /\.(cmd|bat)$/i
+
+function needsWindowsWrapHint(command: string): boolean {
+  const lower = command.trim().toLowerCase()
+  if (!lower) return false
+  if (CMD_BAT_SUFFIX_RE.test(lower)) return true
+  return WINDOWS_WRAP_TARGET_NAMES.has(lower)
+}
+
 function MCPForm({ editName, editConfig, onSave, onCancel }: MCPFormProps): JSX.Element {
   const initialTransport: McpTransport = editConfig ? getMcpTransport(editConfig) : 'stdio'
 
@@ -33,6 +45,8 @@ function MCPForm({ editName, editConfig, onSave, onCancel }: MCPFormProps): JSX.
 
   const isEdit = !!editName
   const isRemote = transport === 'http' || transport === 'sse'
+  const isWindows = window.api?.system?.platform === 'win32'
+  const showWindowsWrapHint = isWindows && !isRemote && needsWindowsWrapHint(command)
 
   useEffect(() => {
     if (editName) setName(editName)
@@ -168,6 +182,11 @@ function MCPForm({ editName, editConfig, onSave, onCancel }: MCPFormProps): JSX.
                 placeholder="npx"
                 className="w-full px-3 py-2 bg-bg-primary border border-bg-border rounded text-sm text-text-primary placeholder-text-secondary focus:outline-none focus:border-clauday-blue font-mono"
               />
+              {showWindowsWrapHint && (
+                <p className="mt-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
+                  Windows 에서는 npx/uvx 명령이 자동으로 <code className="text-clauday-blue">cmd /c</code> 로 저장됩니다
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-xs text-text-secondary mb-1">인수 (한 줄에 하나씩)</label>
@@ -203,7 +222,7 @@ function MCPForm({ editName, editConfig, onSave, onCancel }: MCPFormProps): JSX.
           </button>
           <button
             onClick={handleSubmit}
-            className="px-4 py-1.5 rounded text-sm bg-clauday-blue text-white hover:bg-clauday-blue/80 transition-colors"
+            className="px-4 py-1.5 rounded text-sm bg-clauday-blue text-white hover:opacity-90 transition-colors"
           >
             {isEdit ? '수정' : '추가'}
           </button>

@@ -168,7 +168,7 @@ function EventEditModal({ event, calendars, onClose, onSaved }: Props): JSX.Elem
       </span>
       <span className={`ml-1 px-1.5 py-0.5 rounded text-[calc(9px_*_var(--app-font-scale,1))] font-medium flex-shrink-0 ${
         event.source === 'local' ? 'bg-emerald-500/15 text-emerald-400'
-          : event.source === 'caldav' ? 'bg-clauday-blue/15 text-clauday-blue'
+          : event.source === 'caldav' ? 'bg-bg-active text-text-primary'
           : 'bg-rose-500/15 text-rose-400'
       }`}>
         {event.source === 'local' ? '내 일정' : event.source === 'caldav' ? '두레이' : '공휴일'}
@@ -213,7 +213,7 @@ function EventEditModal({ event, calendars, onClose, onSaved }: Props): JSX.Elem
       <div className="space-y-3 text-[calc(11px_*_var(--app-font-scale,1))]">
         {/* 읽기 전용 안내 (공휴일) */}
         {isReadOnly && (
-          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-clauday-orange/5 border border-clauday-orange/20">
+          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-bg-active border border-bg-border-light">
             <AlertTriangle size={13} className="text-clauday-orange flex-shrink-0" />
             <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary">공휴일 일정은 편집할 수 없습니다.</span>
           </div>
@@ -241,7 +241,7 @@ function EventEditModal({ event, calendars, onClose, onSaved }: Props): JSX.Elem
           <label className="flex items-center gap-1.5 text-text-secondary cursor-pointer select-none">
             <input
               type="checkbox"
-              className="accent-clauday-blue"
+             
               checked={allDay}
               onChange={(e) => {
                 const next = e.target.checked

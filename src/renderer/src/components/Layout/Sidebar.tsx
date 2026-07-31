@@ -1,36 +1,45 @@
 import { useEffect, useState } from 'react'
-import { Server, Sparkles, BarChart3, Calendar, Terminal, BookOpen, MessageSquare, GitBranch, Settings, Users, Radar, Lightbulb, Bot, MessageSquarePlus, Workflow } from 'lucide-react'
-import { useFeedback } from '../Feedback/FeedbackProvider'
+import { Server, Sparkles, BarChart3, Calendar, Terminal, MessageSquare, GitBranch, Settings, Users, Radar, Lightbulb, Bot, Workflow, Compass } from 'lucide-react'
 
-export type SidebarView = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'git' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent' | 'harness'
+export type SidebarView = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'onboarding' | 'sessions' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent' | 'harness' | 'workspace'
 // 호환성 유지를 위해 기존 별칭도 export
 export type View = SidebarView
 
 interface SidebarProps {
   activeView: View
   onViewChange: (view: View) => void
+  /** 아이콘만 보기 ↔ 아이콘+이름. 토글 버튼은 타이틀바에 있다. */
+  expanded?: boolean
 }
 
-export interface SidebarNavItem { view: View; icon: typeof Server; label: string }
+/** 도메인 식별색 — Claude 계열은 주황, 두레이 계열은 파랑. 나머지는 무채색. */
+export type NavAccent = 'claude' | 'dooray' | 'terminal'
+
+export interface SidebarNavItem { view: View; icon: typeof Server; label: string; accent?: NavAccent }
+
+const ACCENT_CLASS: Record<NavAccent, string> = {
+  claude: 'text-brand-claude',
+  dooray: 'text-brand-dooray',
+  terminal: 'text-brand-terminal'
+}
 
 /** 사용자가 순서/노출을 커스텀할 수 있는 항목 전체 (settings/manual 은 standalone, 항상 노출/고정). */
 export const CUSTOMIZABLE_NAV_ITEMS: SidebarNavItem[] = [
-  { view: 'dooray', icon: Calendar, label: '두레이' },
-  { view: 'monitoring', icon: Radar, label: '모니터링' },
-  { view: 'agent', icon: Bot, label: '에이전트' },
-  { view: 'terminal', icon: Terminal, label: '터미널' },
-  { view: 'git', icon: GitBranch, label: '브랜치 작업' },
-  { view: 'harness', icon: Workflow, label: 'Harness Studio' },
-  { view: 'community', icon: Users, label: '커뮤니티' },
-  { view: 'mcp', icon: Server, label: 'MCP 서버' },
-  { view: 'skills', icon: Sparkles, label: 'Claude 스킬' },
-  { view: 'ai-recommend', icon: Lightbulb, label: 'AI 추천' },
-  { view: 'sessions', icon: MessageSquare, label: 'Claude 채팅' },
-  { view: 'usage', icon: BarChart3, label: '사용량' }
+  { view: 'dooray', icon: Calendar, label: '두레이', accent: 'dooray' },
+  { view: 'monitoring', icon: Radar, label: '모니터링', accent: 'dooray' },
+  { view: 'agent', icon: Bot, label: '에이전트', accent: 'dooray' },
+  { view: 'terminal', icon: Terminal, label: '터미널', accent: 'terminal' },
+  { view: 'harness', icon: Workflow, label: 'Harness Studio', accent: 'claude' },
+  { view: 'community', icon: Users, label: '커뮤니티', accent: 'dooray' },
+  { view: 'mcp', icon: Server, label: 'MCP 서버', accent: 'claude' },
+  { view: 'skills', icon: Sparkles, label: 'Claude 스킬', accent: 'claude' },
+  { view: 'ai-recommend', icon: Lightbulb, label: 'AI 추천', accent: 'claude' },
+  { view: 'sessions', icon: MessageSquare, label: 'Claude 채팅', accent: 'claude' },
+  { view: 'usage', icon: BarChart3, label: '사용량', accent: 'claude' }
 ]
 
 const STANDALONE_ITEMS: SidebarNavItem[] = [
-  { view: 'manual', icon: BookOpen, label: '매뉴얼' },
+  { view: 'onboarding', icon: Compass, label: '온보딩' },
   { view: 'settings', icon: Settings, label: '설정' }
 ]
 
@@ -46,8 +55,17 @@ export const DEFAULT_SIDEBAR_PREFS: SidebarPrefs = {
   hidden: []
 }
 
+/**
+ * 실험실 기능 — 기본 모드에서는 목록에 아예 나오지 않는다.
+ * 설정에서 켜야 사이드바·커맨드 팔레트에 등장한다.
+ */
+export const EXPERIMENTAL_VIEWS: View[] = ['harness']
+
 /** 저장된 prefs 와 현재 카탈로그를 머지 — 신규 항목은 뒤에 append, 사라진 항목은 제거. */
-function resolveOrderedItems(prefs: SidebarPrefs | null): SidebarNavItem[] {
+export function resolveOrderedItems(
+  prefs: SidebarPrefs | null,
+  experimentalEnabled: View[] = []
+): SidebarNavItem[] {
   const map = new Map(CUSTOMIZABLE_NAV_ITEMS.map((i) => [i.view, i]))
   const seen = new Set<View>()
   const ordered: SidebarNavItem[] = []
@@ -61,49 +79,74 @@ function resolveOrderedItems(prefs: SidebarPrefs | null): SidebarNavItem[] {
   for (const item of CUSTOMIZABLE_NAV_ITEMS) {
     if (!seen.has(item.view)) ordered.push(item)
   }
-  return ordered.filter((i) => !hidden.has(i.view))
+  const enabled = new Set(experimentalEnabled)
+  return ordered.filter(
+    (i) => !hidden.has(i.view) && (!EXPERIMENTAL_VIEWS.includes(i.view) || enabled.has(i.view))
+  )
 }
 
-/** Design System v1 Sidebar (56px). 36×36 버튼, 20px 아이콘, 활성 상태 blue 그라디언트.
- *  불투명도 낮은 분리선으로 그룹 구분. */
+/** Design System Sidebar. 36×36 버튼, 20px 아이콘. 활성 상태는 무채색(--bg-active 면 + 밝은 글자) —
+ *  크롬에는 색을 쓰지 않는다. 다만 **읽지 않음 배지는 정보**라 색을 쓴다(--badge-*: 라이트 주황 / 다크 노랑). */
 function NavButton({
-  view, icon: Icon, label, active, onClick, badge, pulse
-}: SidebarNavItem & { active: boolean; onClick: () => void; badge?: number; pulse?: boolean }): JSX.Element {
+  view, icon: Icon, label, accent, active, onClick, badge, pulse, expanded
+}: SidebarNavItem & { active: boolean; onClick: () => void; badge?: number; pulse?: boolean; expanded: boolean }): JSX.Element {
+  // 도메인 색은 활성/비활성과 무관하게 유지한다 — 클릭할 때 색이 빠지면 이질적이다.
+  const iconClass = accent ? ACCENT_CLASS[accent] : ''
   return (
     <button
       key={view}
       onClick={onClick}
-      title={label}
+      title={expanded ? undefined : label}
       aria-label={label}
-      className={`relative w-9 h-9 rounded-[7px] flex items-center justify-center transition-all duration-150 ${
+      className={`relative h-9 rounded-[7px] flex items-center transition-all duration-150 ${
+        expanded ? 'w-full gap-2.5 px-2.5 justify-start' : 'w-9 justify-center'
+      } ${
         active
-          ? 'bg-gradient-to-br from-clauday-blue to-clauday-blue/80 text-white shadow-md shadow-clauday-blue/20'
+          ? 'bg-bg-active text-text-primary'
           : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
       }`}
     >
-      <Icon size={20} />
+      <Icon size={20} className={`flex-none ${iconClass}`} />
+      {expanded && (
+        <span className="text-[calc(12px_*_var(--app-font-scale,1))] font-medium truncate">{label}</span>
+      )}
       {badge !== undefined && badge > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-[3px] rounded-full bg-clauday-orange text-white text-[calc(9px_*_var(--app-font-scale,1))] font-bold flex items-center justify-center border-2 border-bg-surface">
+        <span className={`min-w-[14px] h-[14px] px-[3px] rounded-full bg-badge-bg text-badge-fg text-[calc(9px_*_var(--app-font-scale,1))] font-bold flex items-center justify-center ${
+          expanded ? 'ml-auto flex-none' : 'absolute -top-0.5 -right-0.5 border-2 border-bg-sidebar'
+        }`}>
           {badge > 99 ? '99+' : badge}
         </span>
       )}
       {pulse && (!badge || badge === 0) && (
         <span className="absolute top-0.5 right-0.5 flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full rounded-full bg-clauday-orange opacity-75 animate-ping" />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-clauday-orange" />
+          <span className="absolute inline-flex h-full w-full rounded-full bg-badge-bg opacity-75 animate-ping" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-badge-bg" />
         </span>
       )}
     </button>
   )
 }
 
-function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
-  const feedback = useFeedback()
+function Sidebar({ activeView, onViewChange, expanded = true }: SidebarProps): JSX.Element {
   const [monitoringUnread, setMonitoringUnread] = useState(0)
   const [monitoringPulse, setMonitoringPulse] = useState(false)
   const [agentUnread, setAgentUnread] = useState(0)
   const [agentPulse, setAgentPulse] = useState(false)
   const [prefs, setPrefs] = useState<SidebarPrefs | null>(null)
+  const [experimental, setExperimental] = useState<View[]>([])
+
+  // 실험실 기능 목록 — 설정에서 켜야 사이드바에 나온다.
+  useEffect(() => {
+    const load = (): void => {
+      void window.api.settings
+        .get('experimentalViews')
+        .then((saved) => setExperimental(Array.isArray(saved) ? (saved as View[]) : []))
+        .catch(() => setExperimental([]))
+    }
+    load()
+    window.addEventListener('experimental-views-changed', load)
+    return () => window.removeEventListener('experimental-views-changed', load)
+  }, [])
 
   // 저장된 prefs 로드 + 변경 이벤트 구독 — 설정에서 바꾸면 즉시 반영
   useEffect(() => {
@@ -155,10 +198,12 @@ function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
     }
   }, [activeView])
 
-  const items = resolveOrderedItems(prefs)
+  const items = resolveOrderedItems(prefs, experimental)
 
   return (
-    <aside className="w-14 bg-bg-surface border-r border-bg-border flex flex-col items-center py-2 gap-0.5 flex-shrink-0">
+    <aside className={`bg-bg-sidebar border-r border-bg-border flex flex-col py-2 gap-0.5 flex-shrink-0 transition-[width] duration-150 ${
+      expanded ? 'w-44 items-stretch px-2' : 'w-14 items-center'
+    }`}>
       {items.map((item) => (
         <NavButton
           key={item.view}
@@ -173,25 +218,18 @@ function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
             item.view === 'monitoring' ? monitoringPulse :
             item.view === 'agent' ? agentPulse : undefined
           }
+          expanded={expanded}
         />
       ))}
       <div className="flex-1" />
-      <div className="w-7 h-px bg-bg-border/60 my-1" />
-      {/* 피드백 버튼 */}
-      <button
-        onClick={() => feedback.open()}
-        title="피드백"
-        aria-label="피드백"
-        className="w-9 h-9 rounded-[7px] flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover transition-all duration-150"
-      >
-        <MessageSquarePlus size={20} />
-      </button>
+      <div className="w-7 h-px bg-bg-border my-1" />
       {STANDALONE_ITEMS.map((item) => (
         <NavButton
           key={item.view}
           {...item}
           active={activeView === item.view}
           onClick={() => onViewChange(item.view)}
+          expanded={expanded}
         />
       ))}
     </aside>

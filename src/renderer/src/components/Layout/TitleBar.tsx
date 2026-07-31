@@ -1,4 +1,4 @@
-import { Clover, Search, Moon, Sun } from 'lucide-react'
+import { Clover, Search, Moon, Sun, PanelLeft } from 'lucide-react'
 import GlobalAIIndicator from '../common/GlobalAIIndicator'
 import { useTheme } from '../../hooks/useTheme'
 import { Kbd } from '../common/ds'
@@ -6,10 +6,13 @@ import { Kbd } from '../common/ds'
 interface TitleBarProps {
   /** ⌘K 커맨드 팔레트 트리거 */
   onOpenCommandPalette?: () => void
+  /** 사이드바 아이콘/이름 토글 — 신호등 옆에 둔다(Orca 배치) */
+  sidebarExpanded?: boolean
+  onToggleSidebar?: () => void
 }
 
 /** Design System v1 TitleBar (36px). 좌측 traffic lights + 브랜드, 우측 ⌘K + 테마 토글 */
-function TitleBar({ onOpenCommandPalette }: TitleBarProps): JSX.Element {
+function TitleBar({ onOpenCommandPalette, sidebarExpanded, onToggleSidebar }: TitleBarProps): JSX.Element {
   const { theme, toggle } = useTheme()
 
   return (
@@ -18,6 +21,17 @@ function TitleBar({ onOpenCommandPalette }: TitleBarProps): JSX.Element {
       style={{ paddingLeft: 82 }}  /* 신호등 자리 */
     >
       <div className="flex items-center gap-1.5 no-drag relative z-10">
+        {onToggleSidebar && (
+          <button
+            onClick={onToggleSidebar}
+            title={sidebarExpanded ? '사이드바 접기' : '사이드바 펼치기'}
+            aria-label={sidebarExpanded ? '사이드바 접기' : '사이드바 펼치기'}
+            aria-pressed={sidebarExpanded}
+            className="ds-btn ghost icon sm mr-1"
+          >
+            <PanelLeft size={14} />
+          </button>
+        )}
         <Clover size={15} className="text-clauday-orange" />
         <span className="text-[calc(12px_*_var(--app-font-scale,1))] font-semibold text-text-primary leading-none">Clauday</span>
         <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary leading-none ml-0.5">Claude Code GUI</span>

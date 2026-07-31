@@ -333,7 +333,7 @@ function InputForm({
                 '태스크 내용을 자유롭게 입력하세요.\n예) "결제 API에 PG 연동 추가 — 보안 검토 필요"\n\n두레이 태스크 URL 도 가능합니다.'
               }
               rows={6}
-              className="w-full resize-none rounded-lg border border-[color:var(--bg-border)] bg-[color:var(--bg-primary)] text-sm text-[color:var(--text-primary)] placeholder:text-[color:var(--text-tertiary)] px-3 py-2.5 focus:outline-none focus:border-[color:var(--clauday-blue)] transition-colors"
+              className="w-full resize-none rounded-lg border border-[color:var(--bg-border)] bg-[color:var(--bg-primary)] text-sm text-[color:var(--text-primary)] placeholder:text-[color:var(--text-tertiary)] px-3 py-2.5 focus:outline-none focus:border-[color:var(--bg-border-strong)] transition-colors"
             />
             {isDooray && (
               <div className="absolute bottom-2.5 right-2.5">

@@ -299,8 +299,8 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
     >
       {/* 드롭 오버레이 — Pane 전체에 시각 피드백 */}
       {dragOver && (
-        <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-clauday-orange/5 backdrop-blur-[1px] border-2 border-dashed border-clauday-orange/60">
-          <div className="px-4 py-2 rounded-full bg-clauday-orange/15 border border-clauday-orange/50 text-[calc(12px_*_var(--app-font-scale,1))] font-semibold text-clauday-orange">
+        <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-bg-active backdrop-blur-[1px] border-2 border-dashed border-bg-border-light">
+          <div className="px-4 py-2 rounded-full bg-bg-active border border-bg-border-light text-[calc(12px_*_var(--app-font-scale,1))] font-semibold text-clauday-orange">
             놓으면 첨부됩니다
           </div>
         </div>
@@ -310,7 +310,7 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
         <div className="flex items-center gap-2 px-4 py-2 border-b border-bg-border text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary flex-shrink-0">
           <FolderOpen size={13} className="text-text-tertiary" />
           <span className="font-mono truncate text-text-tertiary">{cwd}</span>
-          {sessionId && <span className="text-text-tertiary/70">· 세션 {sessionId.slice(0, 8)}</span>}
+          {sessionId && <span className="text-text-tertiary">· 세션 {sessionId.slice(0, 8)}</span>}
           <div className="flex-1" />
           {!hideHistoryButton && (
             <SessionHistoryButton
@@ -345,7 +345,7 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
       <div ref={scrollRef} onScroll={handleTranscriptScroll} className="flex-1 overflow-y-auto">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center gap-3 text-text-tertiary">
-            <Sparkles size={36} className="text-clauday-orange/60" />
+            <Sparkles size={36} className="text-text-tertiary" />
             <div className="text-center">
               <div className="text-sm font-medium text-text-primary">Claude Code</div>
               <div className="text-[calc(11px_*_var(--app-font-scale,1))] mt-1">아래 입력창에 질문이나 지시를 입력하세요</div>
@@ -416,7 +416,7 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
                     onClick={() => insertSkill(s)}
                     className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer border-l-2 transition-colors ${
                       isHi
-                        ? 'bg-clauday-orange/15 border-l-clauday-orange'
+                        ? 'bg-bg-active border-l-clauday-orange'
                         : 'border-l-transparent hover:bg-bg-surface-hover'
                     }`}
                   >
@@ -575,7 +575,7 @@ function LinkChip({ target }: { target: string }): JSX.Element {
           e.preventDefault()
           handleOpen()
         }}
-        className="text-clauday-blue underline decoration-clauday-blue/40 hover:decoration-clauday-blue cursor-pointer"
+        className="text-link underline decoration-link cursor-pointer"
       >
         {target}
       </a>
@@ -708,14 +708,14 @@ const markdownComponents = {
             openTarget(href)
           }}
           title={isFile ? `⌘+클릭으로 열기 — ${href}` : `클릭으로 열기 — ${href}`}
-          className={`text-clauday-blue hover:underline ${isFile ? 'cursor-pointer' : ''}`}
+          className={`text-link hover:underline ${isFile ? 'cursor-pointer' : ''}`}
         >
           {children}
         </a>
       )
     }
     return (
-      <a href={href} target="_blank" rel="noopener noreferrer" className="text-clauday-blue hover:underline">
+      <a href={href} target="_blank" rel="noopener noreferrer" className="text-link hover:underline">
         {children}
       </a>
     )
@@ -897,7 +897,7 @@ function SessionHistoryButton({
                       key={s.sessionId}
                       onClick={() => onSelect(s.sessionId, s.cwd)}
                       className={`w-full text-left px-3 py-2 hover:bg-bg-surface-hover transition-colors flex flex-col gap-0.5 ${
-                        isCurrent ? 'bg-clauday-blue/10 border-l-2 border-clauday-blue' : ''
+                        isCurrent ? 'bg-bg-active border-l-2 border-clauday-blue' : ''
                       }`}
                     >
                       <span className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary line-clamp-2 font-medium">

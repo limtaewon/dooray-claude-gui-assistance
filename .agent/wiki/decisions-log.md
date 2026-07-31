@@ -11,6 +11,11 @@
 
 ## 결정 이력 (워크플로우 도입 후)
 
+- 2026-07-30 — [claude code hook 수신을 cwd resolver first-match + kind 핸들러 라우터로 일반화](../../feature/workspace/v2-workspace-p0/adr.md) — `HookServer` 의 단일 멘션 전용 핸들러를 도메인 무지(domain-agnostic) `ClaudeHookRouter` 로 분리, 멘션 로직은 `MentionHookHandler` 로 이사해 처음으로 단위 테스트 가능해짐(무동작변경). C-2 워크스페이스 hook 은 resolver 추가만으로 확장 가능. 영향: dooray-bot, claude-chat.
+- 2026-07-30 — [.claude 준비 로직을 claudeDirSetup 모듈 함수로 추출](../../feature/workspace/v2-workspace-p0/adr.md) — `AgentWorkspaceManager` 의 private trust/hook settings 메서드를 경로 주입 가능한 모듈 함수(`src/main/claude/claudeDirSetup.ts`)로 분리. 테스트가 개발자의 실제 `~/.claude.json` 을 오염시키던 문제 제거. 영향: dooray-bot, claude-chat.
+- 2026-07-30 — [TaskRow 추출 시 taskStyles.ts 동반 분리](../../feature/workspace/v2-workspace-p0/adr.md) — 비export 로컬 `TaskRow`/워크플로·태그 스타일 헬퍼를 `Dooray/TaskRow.tsx`+`Dooray/taskStyles.ts` 로 승격, 후속 워크스페이스 뷰가 `import` 한 줄로 재사용 가능. 영향: renderer-only.
+- 2026-07-30 — [Git 패널 prop 타입은 shared/types/git 계약을 사용](../../feature/workspace/v2-workspace-p0/adr.md) — `DiffPanel`/`FileComparePanel` 추출 시 `shared/types/git` 의 `GitDiffResult`/`GitFileCompare` 를 prop 타입으로 채택. `BranchWorkspace` 의 로컬 중복 타입 정리는 이번 트랙에서 하지 않고 후속(C-3)으로 이월. 영향: renderer-only.
+- 2026-07-30 — [무동작변경의 정의: 텍스트 동일성 + characterization 테스트](../../feature/workspace/v2-workspace-p0/adr.md) — 추출 리팩터 4건의 무회귀를 baseline `diff`(허용 변형 4종 외 0) + 현행 동작 고정 테스트로 기계적으로 증명. 발견한 기존 결함(형제 경로 오매칭, send 실패 시 markIdle 스킵 등)은 수정하지 않고 impl-log 에 기록만. 영향: dooray-bot, claude-chat, renderer-only.
 - 2026-06-23 — **글자 크기 스케일을 root font-size 가 아니라 font-size 속성에만 적용** — 기존 `html` root font-size 배율 방식은 px 하드코딩 텍스트(~680곳)·`.ds-*` 공용 컴포넌트·`--t-*` 토큰을 스케일에서 누락시켜 "확대만 되고 글자는 안 커진다"는 체감. `html` 16px 고정 + tailwind `fontSize` 테마·`--t-*`·`.ds-*` 를 `calc(* var(--app-font-scale))` 로 전환 → 여백/레이아웃 고정, 글자만 스케일. scale=1 은 이전과 픽셀 단위 동일. 터미널(canvas)·일부 inline fontSize 는 범위 외. 영향: renderer.
 
 ## 시드 — 과거 큰 결정 (CLAUDE.md / CHANGELOG.md 기반 재구성)

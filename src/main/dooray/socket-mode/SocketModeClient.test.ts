@@ -1,3 +1,4 @@
+import { reconnectDelayMs } from './types'
 import { describe, it, expect, vi } from 'vitest'
 
 // ws + electron 모킹 — 실제 네트워크 X
@@ -122,5 +123,31 @@ describe('SocketModeClient — isSessionLimitClose / connect 가드', () => {
     await c.connect()
     expect(warnSpy).toHaveBeenCalled()
     warnSpy.mockRestore()
+  })
+})
+
+describe('reconnectDelayMs — 자동 재연결 백오프', () => {
+  it('시도할수록 늘어난다', () => {
+    // 지터를 0 으로 고정해 순수 지수만 본다
+    const noJitter = (): number => 0.5
+    expect(reconnectDelayMs(1, noJitter)).toBe(1000)
+    expect(reconnectDelayMs(2, noJitter)).toBe(2000)
+    expect(reconnectDelayMs(3, noJitter)).toBe(4000)
+    expect(reconnectDelayMs(6, noJitter)).toBe(30000)
+  })
+
+  it('상한을 넘지 않는다 — 서버가 오래 죽어도 30초 간격으로만 두드린다', () => {
+    for (let attempt = 1; attempt <= 20; attempt += 1) {
+      expect(reconnectDelayMs(attempt, () => 1)).toBeLessThanOrEqual(36000)
+    }
+  })
+
+  it('지터가 섞여도 최소 간격 아래로 내려가지 않는다', () => {
+    expect(reconnectDelayMs(1, () => 0)).toBeGreaterThanOrEqual(1000)
+    expect(reconnectDelayMs(5, () => 0)).toBeGreaterThan(1000)
+  })
+
+  it('같은 시도라도 지터로 값이 갈린다 — 여러 클라이언트가 동시에 몰리지 않게', () => {
+    expect(reconnectDelayMs(4, () => 0)).not.toBe(reconnectDelayMs(4, () => 1))
   })
 })
