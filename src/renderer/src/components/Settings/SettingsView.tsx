@@ -14,7 +14,8 @@ import {
   SettingsDivider,
   SettingsRow,
   SettingsSegmentedControl,
-  SettingsSubsectionHeader
+  SettingsSubsectionHeader,
+  SettingsSwitchRow
 } from './controls'
 import {
   DEFAULT_SETTINGS_SECTION,
@@ -926,17 +927,8 @@ function BehaviorSettings(): JSX.Element {
         />
       }
     />,
-    <div key="renderer" className="space-y-3">
-      <SettingsSubsectionHeader
-        title="터미널 렌더러"
-        description="GPU 문제로 화면이 깨지면 DOM 으로 바꾸세요. WebGL 을 못 쓰면 자동으로 DOM 으로 폴백하고 알려줍니다."
-      />
-      <TerminalRendererSection />
-    </div>,
-    <div key="notify" className="space-y-3">
-      <SettingsSubsectionHeader title="알림" />
-      <AiRecommendNotifyToggle />
-    </div>
+    <TerminalRendererSection key="renderer" />,
+    <AiRecommendNotifyToggle key="notify" />
   ]
 
   return <SettingsBlocks blocks={blocks} />
@@ -961,7 +953,7 @@ function SettingsBlocks({ blocks }: { blocks: React.ReactNode[] }): JSX.Element 
 
 type TerminalRendererSetting = 'webgl' | 'dom'
 const TERMINAL_RENDERER_OPTIONS: { value: TerminalRendererSetting; label: string; description: string }[] = [
-  { value: 'webgl', label: 'WebGL (기본값)', description: 'GPU 가속 — 긴 로그·TUI 재그리기에 유리' },
+  { value: 'webgl', label: 'WebGL', description: 'GPU 가속(기본값) — 긴 로그·TUI 재그리기에 유리' },
   { value: 'dom', label: 'DOM', description: '호환 모드 — GPU 드라이버 문제 시 폴백' }
 ]
 
@@ -980,23 +972,26 @@ function TerminalRendererSection(): JSX.Element {
     await window.api.settings.set('terminalRenderer', v)
   }
 
+  const current = TERMINAL_RENDERER_OPTIONS.find((o) => o.value === value)
+
   return (
-    <div className="p-2">
-      {TERMINAL_RENDERER_OPTIONS.map((opt) => (
-        <label key={opt.value}
-          className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-            value === opt.value ? 'bg-bg-active' : 'hover:bg-bg-surface-hover'
-          }`}>
-          <input type="radio" name="terminal-renderer" checked={value === opt.value}
-            onChange={() => save(opt.value)}
-            className="accent-[var(--text-secondary)]" />
-          <div className="flex-1 min-w-0">
-            <p className={`text-xs ${value === opt.value ? 'text-text-primary font-medium' : 'text-text-primary'}`}>{opt.label}</p>
-            <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">{opt.description}</p>
-          </div>
-        </label>
-      ))}
-    </div>
+    <SettingsRow
+      label="터미널 렌더러"
+      description={`GPU 문제로 화면이 깨지면 DOM 으로 바꾸세요. WebGL 을 못 쓰면 자동으로 폴백하고 알려줍니다. — ${current?.description ?? ''}`}
+      searchKeywords={['renderer', 'webgl', 'dom', 'gpu']}
+      control={
+        <SettingsSegmentedControl
+          value={value}
+          onChange={(next) => void save(next)}
+          ariaLabel="터미널 렌더러"
+          options={TERMINAL_RENDERER_OPTIONS.map((opt) => ({
+            value: opt.value,
+            label: opt.label,
+            title: opt.description
+          }))}
+        />
+      }
+    />
   )
 }
 
@@ -1133,16 +1128,14 @@ function AiRecommendNotifyToggle(): JSX.Element {
     }
   }
   return (
-    <label className="flex items-start gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-bg-surface-hover">
-      <input type="checkbox" checked={enabled} onChange={toggle} disabled={loading || saving}
-        className="accent-[var(--text-secondary)] mt-0.5" />
-      <div className="flex-1 min-w-0">
-        <p className="text-xs text-text-primary">AI 추천 새 글 알림</p>
-        <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
-          두레이 "AI 활용 사례" 프로젝트에 새 글이 올라오면 데스크톱 알림 (1시간 주기, 22~9시 보류)
-        </p>
-      </div>
-    </label>
+    <SettingsSwitchRow
+      label="AI 추천 새 글 알림"
+      description={'두레이 "AI 활용 사례" 프로젝트에 새 글이 올라오면 데스크톱 알림 (1시간 주기, 22~9시 보류)'}
+      searchKeywords={['notification', '알림', 'recommend']}
+      checked={enabled}
+      disabled={loading || saving}
+      onChange={() => void toggle()}
+    />
   )
 }
 
