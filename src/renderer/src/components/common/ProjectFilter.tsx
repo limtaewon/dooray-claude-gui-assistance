@@ -1,18 +1,25 @@
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Settings, Check, FolderOpen, Search, X, Plus, Link, Trash2 } from 'lucide-react'
+import { Settings, Check, ChevronRight, FolderOpen, Search, X, Plus, Link, Trash2 } from 'lucide-react'
 import type { DoorayProject } from '../../../../shared/types/dooray'
 import { anchoredMenuPosition, type AnchoredMenuPosition } from './anchoredMenu'
 
 interface ProjectFilterProps {
   /** 설정 키 (기본: pinnedProjects) - 태스크/위키 분리용 */
   settingsKey?: string
+  /** 하단에 '설정에서 프로젝트별 규칙 정하기' 링크를 보일지 (업무 목록에서만 의미가 있다) */
+  showSettingsLink?: boolean
   /** 프로젝트 목록 대신 위키 도메인 목록을 사용할지 */
   useWikiDomains?: boolean
   onChanged?: () => void
 }
 
-function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false, onChanged }: ProjectFilterProps): JSX.Element {
+function ProjectFilter({
+  settingsKey = 'pinnedProjects',
+  useWikiDomains = false,
+  showSettingsLink = false,
+  onChanged
+}: ProjectFilterProps): JSX.Element {
   const [open, setOpen] = useState(false)
   const [allProjects, setAllProjects] = useState<DoorayProject[]>([])
   const [customProjects, setCustomProjects] = useState<DoorayProject[]>([])
@@ -75,6 +82,11 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
     } catch { /* ok */ }
     finally { setLoading(false) }
   }, [settingsKey, useWikiDomains, customKey])
+
+  // 배지는 열어보기 전에도 보여야 한다 — 몇 개를 고른 상태인지가 버튼의 정보다.
+  useEffect(() => {
+    void load()
+  }, [load])
 
   useEffect(() => {
     if (open) {
@@ -216,12 +228,14 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
                     <button onClick={() => toggle(p.id)}
                       className="flex-1 flex items-center gap-2 px-3 py-1.5 hover:bg-bg-surface-hover transition-colors text-left">
                       <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 ${
-                        checked ? 'bg-clauday-blue border-clauday-blue' : 'border-bg-border-light'
+                        checked
+                          ? 'bg-brand-dooray border-brand-dooray'
+                          : 'border-bg-border-strong'
                       }`}>
-                        {checked && <Check size={9} className="text-white" />}
+                        {checked && <Check size={9} className="text-white" strokeWidth={3} />}
                       </div>
                       {isCustom ? (
-                        <Link size={11} className={`flex-shrink-0 ${checked ? 'text-clauday-orange' : 'text-text-tertiary'}`} />
+                        <Link size={11} className={`flex-shrink-0 ${checked ? 'text-brand-dooray' : 'text-text-tertiary'}`} />
                       ) : (
                         <FolderOpen size={11} className={`flex-shrink-0 ${checked ? 'text-text-primary' : 'text-text-tertiary'}`} />
                       )}
@@ -268,6 +282,24 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
                 </button>
               )}
             </div>
+
+            {/* 고른 뒤에 정할 것들(저장소·브랜치 이름·첫 지시 문구)은 이 좁은 팝오버에서 다룰 수 없다.
+                여기서 어설프게 흉내 내지 말고 제대로 된 화면으로 보낸다. */}
+            {showSettingsLink && (
+              <button
+                onClick={() => {
+                  setOpen(false)
+                  window.dispatchEvent(
+                    new CustomEvent('goto-settings', { detail: { tab: 'workspace' } })
+                  )
+                }}
+                className="flex items-center gap-1.5 w-full px-3 py-2 border-t border-bg-border text-left text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover transition-colors"
+              >
+                <Settings size={11} className="flex-none" />
+                <span className="flex-1 min-w-0">프로젝트별 규칙 정하기 — 저장소 · 브랜치 이름 · 첫 지시 문구</span>
+                <ChevronRight size={11} className="flex-none text-text-tertiary" />
+              </button>
+            )}
           </div>
         </>,
         document.body
