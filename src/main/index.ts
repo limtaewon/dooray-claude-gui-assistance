@@ -82,6 +82,11 @@ import { AnalyticsService } from './analytics/AnalyticsService'
 import { WorkspaceStore } from './workspace/WorkspaceStore'
 import { WorkspaceService } from './workspace/WorkspaceService'
 import { TaskDropService } from './workspace/TaskDropService'
+import {
+  ClaudeDoneNotifier,
+  DEFAULT_CLAUDE_DONE_SETTINGS,
+  type ClaudeDoneSettings
+} from './terminal/ClaudeDoneNotifier'
 import { TaskWorktreeService } from './workspace/TaskWorktreeService'
 import { AgentRunSpawner } from './workspace/AgentRunSpawner'
 import { WorkspaceHookHandler, WORKSPACE_HOOK_KIND } from './workspace/WorkspaceHookHandler'
@@ -217,6 +222,19 @@ const claudeSessions = new ClaudeSessionService()
 const claudeAttachments = new AttachmentService()
 const store = new Store({ name: 'clauday-data' })
 const terminalManager = new TerminalManager()
+
+const claudeDoneNotifier = new ClaudeDoneNotifier({
+  getForeground: (id) => terminalManager.getForegroundProcess(id),
+  getLabel: (id) =>
+    terminalManager.listSessions().find((s) => s.id === id)?.name ?? '터미널',
+  getSettings: () => ({
+    ...DEFAULT_CLAUDE_DONE_SETTINGS,
+    ...((store.get('claudeDoneNotify') as Partial<ClaudeDoneSettings> | undefined) ?? {})
+  }),
+  getWindow: () => BrowserWindow.getAllWindows()[0] ?? null
+})
+terminalManager.addOutputListener((id, data) => claudeDoneNotifier.handleOutput(id, data))
+terminalManager.addExitListener((payload) => claudeDoneNotifier.forget(payload.id))
 // v2.0 M-A: 터미널 워크스페이스 스냅샷 저장소 — electron-store 를 SnapshotStorage 로 주입 (ADR-v2-terminal-p2-03).
 const snapshotStore = new SnapshotStore({
   get: <T,>(key: string, defaultValue: T): T => store.get(key, defaultValue) as T,
@@ -337,6 +355,8 @@ function createWindow(): BrowserWindow {
     typeof x === 'string' ? x : (x && typeof x === 'object' && 'id' in x ? String((x as { id: unknown }).id) : '')
   ).filter(Boolean)
   taskService.setCustomProjectIds(customIds)
+  // v2.0: 터미널의 claude 가 내 차례를 넘기면 알린다 (설정에서 끌 수 있다)
+  claudeDoneNotifier.start()
   watcherService.setMainWindow(mainWindow)
   watcherService.start()
   // 두레이 봇 (Socket Mode WebSocket) — 토큰/도메인이 설정돼있고 enabled면 부팅 시 자동 시작

@@ -3,6 +3,15 @@ import { isSafeGitRef } from './gitRef'
 /** 기본 브랜치 템플릿. `{taskNumber}` 는 값이 없으면 `{taskId6}` 로 자동 대체된다. */
 export const DEFAULT_BRANCH_TEMPLATE = 'feature/{projectCode}-{taskNumber}'
 
+/** 브랜치 이름 템플릿에 쓸 수 있는 토큰 — 설정 화면이 그대로 보여준다. */
+export const BRANCH_NAME_PLACEHOLDERS: { token: string; label: string }[] = [
+  { token: '{projectCode}', label: '프로젝트 코드 (예: NEON)' },
+  { token: '{taskNumber}', label: '업무 번호 (없으면 taskId6)' },
+  { token: '{taskId6}', label: '업무 ID 뒤 6자리' },
+  { token: '{subject}', label: '업무 제목' },
+  { token: '{prefix}', label: '저장소 프리픽스' }
+]
+
 export interface BranchNameInput {
   template: string
   projectCode?: string

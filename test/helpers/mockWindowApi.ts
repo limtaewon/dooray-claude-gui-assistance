@@ -155,6 +155,8 @@ export function createMockWindowApi(): Record<string, unknown> {
       resolvePath: vi.fn().mockResolvedValue([]),
       sessionCwd: vi.fn().mockResolvedValue(null),
       foreground: vi.fn().mockResolvedValue(null),
+      onClaudeDone: vi.fn().mockReturnValue(noopUnsub),
+      onFocusSession: vi.fn().mockReturnValue(noopUnsub),
       onMentionOpened: vi.fn().mockReturnValue(noopUnsub),
       onMentionFocus: vi.fn().mockReturnValue(noopUnsub)
     },

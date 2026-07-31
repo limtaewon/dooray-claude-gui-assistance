@@ -167,6 +167,8 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
   const [drawerTab, setDrawerTab] = useState<DrawerTab>('tasks')
   const [drawerWidth, setDrawerWidth] = useState(DRAWER_DEFAULT_WIDTH)
   const [dropHint, setDropHint] = useState<string | null>(null)
+  /** claude 가 내 차례를 넘긴 세션 — 그 탭을 보면 지워진다. */
+  const [doneSessions, setDoneSessions] = useState<Set<string>>(new Set())
   /** 저장소가 여럿 매핑됐고 지금 자리가 그중 어디도 아닐 때 — 어디서 시작할지 묻는다. */
   const [repoChoice, setRepoChoice] = useState<{
     task: TaskDropRequest
@@ -669,6 +671,41 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       pane
     )
   }, [runTaskInPane, toast, createPaneForTask])
+
+  // v2.0: claude 가 멈추면 탭에 표시하고, 알림을 누르면 그 탭으로 데려간다.
+  useEffect(() => {
+    const offDone = window.api.terminal.onClaudeDone?.(({ sessionId }) => {
+      setDoneSessions((prev) => {
+        if (prev.has(sessionId)) return prev
+        const next = new Set(prev)
+        next.add(sessionId)
+        return next
+      })
+    })
+    const offFocus = window.api.terminal.onFocusSession?.(({ sessionId }) => {
+      const tab = tabsRef.current.find((t) =>
+        Object.values(t.panes).some((pane) => pane.sessionId === sessionId)
+      )
+      if (tab) activateTab(tab.tabId)
+    })
+    return () => {
+      offDone?.()
+      offFocus?.()
+    }
+  }, [activateTab])
+
+  // 그 탭을 보고 있으면 표시를 지운다 — 이미 확인했다는 뜻이다.
+  useEffect(() => {
+    const tab = tabs.find((t) => t.tabId === activeTabId)
+    if (!tab) return
+    const ids = Object.values(tab.panes).map((pane) => pane.sessionId)
+    setDoneSessions((prev) => {
+      if (!ids.some((id) => prev.has(id))) return prev
+      const next = new Set(prev)
+      for (const id of ids) next.delete(id)
+      return next
+    })
+  }, [activeTabId, tabs])
 
   const setFocusedLeaf = useCallback((tabId: string, leafId: string) => {
     setTabs((prev) => prev.map((t) => (
@@ -1232,6 +1269,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
                   paneCount={isDiffTab(tab) ? 0 : collectLeafIds(tab.tree).length}
                   isActive={activeTabId === tab.tabId}
                   isExited={allPanesExited(tab)}
+                  isDone={Object.values(tab.panes).some((pane) => doneSessions.has(pane.sessionId))}
                   onSelect={() => activateTab(tab.tabId)}
                   onClose={() => closeTabEntry(tab.tabId)}
                   onRename={(newName) => renameTab(tab.tabId, newName)}
@@ -1458,6 +1496,7 @@ function SortableTabLabel(props: {
   paneCount: number
   isActive: boolean
   isExited: boolean
+  isDone: boolean
   onSelect: () => void
   onClose: () => void
   onRename: (newName: string) => void
@@ -1487,6 +1526,7 @@ function TabLabel({
   paneCount,
   isActive,
   isExited,
+  isDone,
   onSelect,
   onClose,
   onRename,
@@ -1501,6 +1541,8 @@ function TabLabel({
   paneCount: number
   isActive: boolean
   isExited: boolean
+  /** claude 가 내 차례를 넘긴 탭 — 점으로 표시한다 */
+  isDone: boolean
   onSelect: () => void
   onClose: () => void
   onRename: (newName: string) => void
@@ -1544,6 +1586,12 @@ function TabLabel({
       title={isExited ? '종료됨' : isDiff ? '파일 비교' : undefined}
     >
       {isDiff ? <FileDiff size={11} className="text-text-tertiary" /> : <Terminal size={11} />}
+      {isDone && !isActive && (
+        <span
+          className="w-1.5 h-1.5 rounded-full bg-brand-terminal flex-none"
+          title="claude 가 멈췄습니다 — 확인이 필요합니다"
+        />
+      )}
       {editing ? (
         <input
           ref={inputRef}

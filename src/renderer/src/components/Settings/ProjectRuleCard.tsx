@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { FolderGit2, Plus, RotateCcw, X } from 'lucide-react'
 import type { DoorayProject } from '@shared/types/dooray'
 import type { ProjectOverride, RepoRegistryEntry } from '@shared/types/workspace'
-import { buildBranchName } from '@shared/workspace/branchName'
+import { BRANCH_NAME_PLACEHOLDERS, buildBranchName } from '@shared/workspace/branchName'
 import {
   DEFAULT_TASK_DROP_PROMPT,
   TASK_DROP_PLACEHOLDERS,
@@ -130,6 +130,13 @@ function ProjectRuleCard({ project, repos, config, onChange }: ProjectRuleCardPr
           aria-label={`${project.code || project.id} 브랜치 이름 템플릿`}
           onBlur={(e) => onChange({ branchTemplate: e.target.value })}
         />
+        <div className="flex flex-wrap gap-1">
+          {BRANCH_NAME_PLACEHOLDERS.map((p) => (
+            <span key={p.token} title={p.label} className="ds-chip neutral font-mono">
+              {p.token}
+            </span>
+          ))}
+        </div>
         <Preview label="예시" value={branchPreview} />
       </Field>
 

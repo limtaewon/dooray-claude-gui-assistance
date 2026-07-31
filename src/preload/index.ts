@@ -481,6 +481,18 @@ const api = {
     /** v2.0: 지금 그 pane 에서 돌고 있는 프로그램 이름 — 셸이면 프롬프트가 비어 있다는 뜻. */
     foreground: (sessionId: string): Promise<string | null> =>
       ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_FOREGROUND, sessionId),
+    /** v2.0: 터미널의 claude 가 내 차례를 넘겼을 때 (탭 배지용) */
+    onClaudeDone: (callback: (payload: { sessionId: string }) => void): (() => void) => {
+      const handler = (_: IpcRendererEvent, payload: { sessionId: string }): void => callback(payload)
+      ipcRenderer.on(IPC_CHANNELS.TERMINAL_CLAUDE_DONE, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.TERMINAL_CLAUDE_DONE, handler)
+    },
+    /** v2.0: 알림 클릭 — 그 세션 탭으로 이동 */
+    onFocusSession: (callback: (payload: { sessionId: string }) => void): (() => void) => {
+      const handler = (_: IpcRendererEvent, payload: { sessionId: string }): void => callback(payload)
+      ipcRenderer.on(IPC_CHANNELS.TERMINAL_FOCUS_SESSION, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.TERMINAL_FOCUS_SESSION, handler)
+    },
     /** v1.4: 두레이 멘션이 main에서 새 터미널을 열었을 때 렌더러로 푸시되는 메타 */
     onMentionOpened: (callback: (meta: TerminalSession) => void): (() => void) => {
       const handler = (_: unknown, meta: TerminalSession): void => callback(meta)

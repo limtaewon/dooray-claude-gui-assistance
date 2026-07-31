@@ -144,6 +144,7 @@ export const SETTINGS_SEARCH_TARGETS: SettingsSearchTarget[] = [
   { sectionId: 'appearance', title: '사이드바 구성', description: '메뉴 순서와 표시 여부', keywords: ['sidebar', 'menu', '메뉴', '순서'] },
 
   { sectionId: 'behavior', title: '시작 화면', keywords: ['startup', '시작', '첫 화면'] },
+  { sectionId: 'behavior', title: 'claude 작업 완료 알림', description: '터미널의 claude 가 멈추면 알립니다', keywords: ['notification', '알림', 'claude', '완료', 'terminal', '터미널'] },
   { sectionId: 'behavior', title: '터미널 렌더러', description: 'WebGL 또는 DOM', keywords: ['renderer', 'webgl', 'gpu', '터미널'] },
   { sectionId: 'behavior', title: 'AI 추천 알림', keywords: ['notification', '알림', 'recommend'] }
 ]

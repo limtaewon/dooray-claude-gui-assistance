@@ -183,6 +183,9 @@ function makeStubClass(extra: Record<string, unknown> = {}): new (...args: unkno
     checkBusy = vi.fn().mockReturnValue({ busy: false, sinceMs: 0 })
     // v2.0 C-2: WorkspaceService 생성자가 TerminalManager.addExitListener 를 즉시 구독한다.
     addExitListener = vi.fn().mockReturnValue(() => {})
+    // v2.0: ClaudeDoneNotifier 가 부팅 시 PTY 출력을 구독한다.
+    addOutputListener = vi.fn().mockReturnValue(() => {})
+    addStateListener = vi.fn().mockReturnValue(() => {})
     getProjectWorkflows = vi.fn().mockResolvedValue([])
   } as unknown as new (...args: unknown[]) => unknown
 }

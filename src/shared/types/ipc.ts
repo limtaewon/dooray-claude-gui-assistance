@@ -162,6 +162,10 @@ export const IPC_CHANNELS = {
   /** 세션의 **현재** cwd. 셸이 OSC7 을 안 쏘는 환경에서 `cd` 를 따라가려면 이 실측이 필요하다. */
   TERMINAL_SESSION_CWD: 'terminal:session-cwd',
   TERMINAL_FOREGROUND: 'terminal:foreground',
+  /** main → renderer: 그 세션의 claude 가 내 차례를 넘겼다 */
+  TERMINAL_CLAUDE_DONE: 'terminal:claude-done',
+  /** main → renderer: 알림 클릭 — 이 세션 탭으로 데려간다 */
+  TERMINAL_FOCUS_SESSION: 'terminal:focus-session',
   /** v1.4: 두레이 멘션이 새 터미널을 열었음을 렌더러에 알림 (entries 추가/활성화 요청) */
   MENTION_TERMINAL_OPENED: 'mention:terminal:opened',
   /** v1.4: 기존 채널 탭을 재사용 — 렌더러에 활성화만 요청 (id 페이로드) */

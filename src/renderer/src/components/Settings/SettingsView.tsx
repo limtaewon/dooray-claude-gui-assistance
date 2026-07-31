@@ -12,6 +12,7 @@ import { Modal } from '../common/ds'
 import SettingsSection, { SettingsSectionProvider } from './SettingsSection'
 import {
   SettingsDivider,
+  SettingsNumberRow,
   SettingsRow,
   SettingsSegmentedControl,
   SettingsSubsectionHeader,
@@ -930,6 +931,7 @@ function BehaviorSettings(): JSX.Element {
       }
     />,
     <TerminalRendererSection key="renderer" />,
+    <ClaudeDoneNotifySection key="claude-done" />,
     <AiRecommendNotifyToggle key="notify" />
   ]
 
@@ -1107,6 +1109,82 @@ function SidebarPrefsSection(): JSX.Element {
  * AI 추천 새 글 OS 알림 토글 — 1시간 폴링 + 22~9시 silent.
  * 사용자 설정은 main 측 electron-store 에 저장. UI 는 단순 boolean.
  */
+interface ClaudeDoneSettingsShape {
+  enabled: boolean
+  onlyWhenUnfocused: boolean
+  idleSeconds: number
+}
+
+const CLAUDE_DONE_DEFAULTS: ClaudeDoneSettingsShape = {
+  enabled: true,
+  onlyWhenUnfocused: true,
+  idleSeconds: 12
+}
+
+/**
+ * 터미널의 claude 가 내 차례를 넘겼을 때의 알림.
+ *
+ * 판정은 "출력이 멎었는가" 로 한다 — 다 끝났든 뭘 물어보려고 멈췄든, 사용자에겐 둘 다
+ * '돌아가서 봐야 하는 순간' 이라 굳이 가르지 않는다.
+ */
+function ClaudeDoneNotifySection(): JSX.Element {
+  const [value, setValue] = useState<ClaudeDoneSettingsShape>(CLAUDE_DONE_DEFAULTS)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    window.api.settings
+      .get('claudeDoneNotify')
+      .then((v) => {
+        if (!cancelled && v && typeof v === 'object') {
+          setValue({ ...CLAUDE_DONE_DEFAULTS, ...(v as Partial<ClaudeDoneSettingsShape>) })
+        }
+      })
+      .catch(() => { /* 기본값 유지 */ })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  const patch = (next: Partial<ClaudeDoneSettingsShape>): void => {
+    const merged = { ...value, ...next }
+    setValue(merged)
+    void window.api.settings.set('claudeDoneNotify', merged)
+  }
+
+  return (
+    <>
+      <SettingsSwitchRow
+        label="claude 작업 완료 알림"
+        description="터미널에서 돌던 claude 가 멈추면(끝났거나 물어볼 때) 데스크톱 알림을 띄웁니다. 알림을 누르면 그 터미널 탭으로 갑니다."
+        searchKeywords={['notification', '알림', 'claude', '완료', 'terminal']}
+        checked={value.enabled}
+        disabled={loading}
+        onChange={() => patch({ enabled: !value.enabled })}
+      />
+      <SettingsSwitchRow
+        label="앱을 보고 있지 않을 때만"
+        description="창이 앞에 있으면 알리지 않습니다. 화면을 보고 있는데 알림이 뜨면 방해만 됩니다."
+        searchKeywords={['notification', '알림', 'focus']}
+        checked={value.onlyWhenUnfocused}
+        disabled={loading || !value.enabled}
+        onChange={() => patch({ onlyWhenUnfocused: !value.onlyWhenUnfocused })}
+      />
+      <SettingsNumberRow
+        label="멈춘 것으로 볼 시간"
+        description="출력이 이만큼 없으면 끝난 것으로 봅니다. 짧게 두면 생각하는 중에도 알림이 올 수 있습니다."
+        searchKeywords={['idle', '대기', '초']}
+        value={value.idleSeconds}
+        min={3}
+        max={120}
+        step={1}
+        suffix="초"
+        defaultValue={CLAUDE_DONE_DEFAULTS.idleSeconds}
+        onChange={(next) => patch({ idleSeconds: next })}
+      />
+    </>
+  )
+}
+
 function AiRecommendNotifyToggle(): JSX.Element {
   const [enabled, setEnabled] = useState<boolean>(true)
   const [loading, setLoading] = useState(true)
