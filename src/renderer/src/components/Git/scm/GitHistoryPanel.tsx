@@ -10,7 +10,7 @@ import {
 import { Button } from '../../common/ds'
 import GitHistoryGraphSvg from './GitHistoryGraphSvg'
 import { STATUS_COLORS, STATUS_LABELS, splitPath } from './statusDisplay'
-import type { DiffRequest } from './DiffViewerOverlay'
+import type { DiffRequest } from './DiffView'
 
 const PAGE_SIZE = 50
 
@@ -39,7 +39,7 @@ function relativeTime(timestamp: number | undefined): string {
  * 커밋 히스토리 + 그래프.
  *
  * 폴링하지 않는다 — 히스토리는 git 을 여러 번 부르므로 진입/커밋 후/수동 새로고침에만 읽는다.
- * Load more 는 offset(`--skip`) 방식이라 `--all` 토폴로지가 페이지 사이에 일관된다.
+ * Load more 는 offset(`--skip`) 방식이라 전 브랜치 토폴로지가 페이지 사이에 일관된다.
  * ⚠️ 레인 계산은 직전 행 결과에 의존하므로 누적 목록 전체를 계산하고 렌더만 잘라야 한다.
  */
 function GitHistoryPanel({ repoPath, onOpenDiff }: GitHistoryPanelProps): JSX.Element {

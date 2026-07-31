@@ -226,7 +226,35 @@ export function createMockWindowApi(): Record<string, unknown> {
       compareBranches: vi.fn().mockResolvedValue({ files: [] }),
       compareFile: vi.fn().mockResolvedValue(null),
       prune: vi.fn().mockResolvedValue(undefined),
-      deleteBranch: vi.fn().mockResolvedValue(undefined)
+      deleteBranch: vi.fn().mockResolvedValue(undefined),
+      // v2.0: 소스 제어 (터미널 우측 드로어)
+      scm: {
+        status: vi.fn().mockResolvedValue({ entries: [], conflictOperation: 'none' }),
+        history: vi.fn().mockResolvedValue({ items: [], hasMore: false, limit: 50, skip: 0 }),
+        commitDetail: vi.fn().mockResolvedValue({ commitOid: '', files: [] }),
+        fileDiff: vi.fn().mockResolvedValue({
+          path: '',
+          original: '',
+          modified: '',
+          originalBinary: false,
+          modifiedBinary: false
+        }),
+        stage: vi.fn().mockResolvedValue(undefined),
+        unstage: vi.fn().mockResolvedValue(undefined),
+        discard: vi.fn().mockResolvedValue(undefined),
+        commit: vi.fn().mockResolvedValue({ ok: true, message: '' }),
+        lastCommitMessage: vi.fn().mockResolvedValue(''),
+        push: vi.fn().mockResolvedValue({ ok: true, message: '' }),
+        pull: vi.fn().mockResolvedValue({ ok: true, message: '' }),
+        fetch: vi.fn().mockResolvedValue({ ok: true, message: '' }),
+        remotes: vi.fn().mockResolvedValue([]),
+        stashList: vi.fn().mockResolvedValue([]),
+        stashPush: vi.fn().mockResolvedValue(undefined),
+        stashAction: vi.fn().mockResolvedValue(undefined),
+        createBranch: vi.fn().mockResolvedValue(undefined),
+        checkout: vi.fn().mockResolvedValue(undefined),
+        abort: vi.fn().mockResolvedValue(undefined)
+      }
     },
     // v2.0 C-2: 워크스페이스(태스크 ↔ 워크트리 ↔ 에이전트 run). renderer 뷰는 C-3 이후에 붙는다.
     workspace: {

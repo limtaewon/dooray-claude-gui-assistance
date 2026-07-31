@@ -62,6 +62,12 @@ vi.mock('./TerminalPane', () => ({
   })
 }))
 
+vi.mock('@monaco-editor/react', () => ({
+  DiffEditor: ({ original, modified }: { original: string; modified: string }) => (
+    <div data-testid="diff-editor" data-original={original} data-modified={modified} />
+  )
+}))
+
 // Import 는 mock 등록 이후.
 import TerminalView from './TerminalView'
 
@@ -79,6 +85,78 @@ function makeSnapshotWithTabs(count: number): TerminalWorkspaceSnapshotV2 {
   })
   return { version: 2, savedAt: Date.now(), activeTabId: tabs[0]?.tabId ?? null, tabs }
 }
+
+describe('TerminalView — diff 탭 (v2.0 소스 제어)', () => {
+  beforeEach(() => {
+    installMockWindowApi()
+    // 드로어를 '변경사항' 탭으로 열어둔 상태에서 시작한다.
+    vi.mocked(window.api.settings.get).mockImplementation(async (key: string) =>
+      key === 'terminalDrawerTab' ? 'changes' : null
+    )
+    vi.mocked(window.api.terminal.sessionCwd).mockResolvedValue('/repo')
+    vi.mocked(window.api.git.repoRoot).mockResolvedValue('/repo')
+    vi.mocked(window.api.git.scm.status).mockResolvedValue({
+      entries: [{ path: 'src/a.ts', status: 'modified', area: 'unstaged' }],
+      conflictOperation: 'none',
+      branch: 'refs/heads/main'
+    })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    resetMockWindowApi()
+    vi.clearAllMocks()
+  })
+
+  /** 터미널 탭 하나를 만들고 드로어의 변경 파일 행이 나타날 때까지 기다린다. */
+  async function openChangesWithOneFile(): Promise<void> {
+    renderWithDs(<TerminalView active />)
+    await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+    await screen.findByTitle('src/a.ts')
+  }
+
+  it('변경 파일을 클릭하면 오버레이가 아니라 터미널 탭으로 열린다', async () => {
+    await openChangesWithOneFile()
+
+    // 클릭 전에는 diff 에디터가 없다
+    expect(screen.queryByTestId('diff-editor')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByTitle('src/a.ts'))
+
+    // 탭이 하나 늘고, 그 탭 안에 diff 가 그려진다
+    await waitFor(() => expect(screen.getByTestId('diff-editor')).toBeInTheDocument())
+    expect(window.api.git.scm.fileDiff).toHaveBeenCalledWith(
+      expect.objectContaining({ repoPath: '/repo', path: 'src/a.ts' })
+    )
+    // 전체 화면 오버레이(포털)로 body 에 붙지 않는다 — 타이틀바를 덮던 버그의 회귀 방지
+    expect(document.body.querySelector(':scope > [class*="fixed"]')).toBeNull()
+  })
+
+  it('같은 파일을 다시 클릭해도 탭이 늘지 않는다', async () => {
+    await openChangesWithOneFile()
+
+    await userEvent.click(screen.getByTitle('src/a.ts'))
+    await waitFor(() => expect(screen.getByTestId('diff-editor')).toBeInTheDocument())
+    const tabsAfterFirst = screen.getAllByTitle('탭 닫기').length
+
+    await userEvent.click(screen.getByTitle('src/a.ts'))
+    await waitFor(() => expect(screen.getAllByTitle('탭 닫기')).toHaveLength(tabsAfterFirst))
+  })
+
+  it('diff 탭은 스냅샷에 저장하지 않는다 — PTY 가 없어 복원 대상이 아니다', async () => {
+    await openChangesWithOneFile()
+    await userEvent.click(screen.getByTitle('src/a.ts'))
+    await waitFor(() => expect(screen.getByTestId('diff-editor')).toBeInTheDocument())
+
+    // beforeunload 는 즉시 flush 한다
+    act(() => { window.dispatchEvent(new Event('beforeunload')) })
+
+    await waitFor(() => expect(window.api.terminal.saveState).toHaveBeenCalled())
+    const calls = vi.mocked(window.api.terminal.saveState).mock.calls
+    const snapshot = calls[calls.length - 1][0] as TerminalWorkspaceSnapshotV2
+    expect(snapshot.tabs.every((t) => !t.tabId.startsWith('diff '))).toBe(true)
+  })
+})
 
 describe('TerminalView (integration)', () => {
   beforeEach(() => {

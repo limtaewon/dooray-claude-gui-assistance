@@ -64,7 +64,7 @@ THE SOFTWARE.
 | `src/shared/git/porcelainV2Parser.ts` | Orca | `src/shared/git-status-porcelain-parser.ts` + `src/main/git/status.ts` 의 `parseUnmergedEntry`/`parseConflictKind` | adapted (두 파일 병합 — 충돌 u 레코드 해석을 파서 안으로 흡수, `submoduleRoot` 제거) |
 | `src/shared/git/historyTypes.ts` | Orca | `src/shared/git-history-types.ts` | adapted (`allBranches` / `skip` 추가 — Orca 는 HEAD-only + 페이지네이션 없음) |
 | `src/shared/git/historyLogParser.ts` | Orca | `src/shared/git-history-log-parser.ts` | verbatim (빈 메시지 문구만 한국어화) |
-| `src/shared/git/history.ts` | Orca | `src/shared/git-history.ts` | adapted (전 브랜치 `--all` + `--skip` 페이지네이션 추가, incoming/outgoing 판정 제거) |
+| `src/shared/git/history.ts` | Orca | `src/shared/git-history.ts` | adapted (전 브랜치 조회 `--branches --remotes --tags` + `--skip` 페이지네이션 추가, incoming/outgoing 판정 제거) |
 | `src/shared/git/historyGraph.ts` | Orca | `src/shared/git-history-graph.ts` | adapted (경계 행 합성 `git-history-boundary-rows.ts` 제거, 머지 부모 색 조회를 선형 탐색 → Map 인덱스) |
 | `src/shared/git/remoteError.ts` | Orca | `src/shared/git-remote-error.ts` | adapted (서브모듈 재귀 push 분기 제거, 메시지 한국어화, `isGitAuthFailure` 분리) |
 | `src/shared/git/largeDiffLimit.ts` | Orca | `src/shared/large-diff-render-limit.ts` | adapted (조기 종료 라인 카운트만 유지, 이미지/노트북 뷰어 분기 제거) |

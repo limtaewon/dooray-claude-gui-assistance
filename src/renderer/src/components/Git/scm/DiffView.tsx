@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { DiffEditor } from '@monaco-editor/react'
-import { FileDiff, X } from 'lucide-react'
+import { FileDiff } from 'lucide-react'
 import type { GitFileDiffContent, GitFileDiffParams } from '@shared/git/scmTypes'
 import { useTheme } from '../../../hooks/useTheme'
 import { LoadingView } from '../../common/ds'
@@ -23,16 +22,18 @@ export interface DiffRequest extends GitFileDiffParams {
   caption?: string
 }
 
-interface DiffViewerOverlayProps {
-  request: DiffRequest
-  onClose: () => void
+/** 같은 파일·같은 비교 대상이면 탭을 새로 만들지 않고 재사용하기 위한 안정 키. */
+export function diffTabId(request: DiffRequest): string {
+  const source =
+    request.source.kind === 'commit' ? `commit:${request.source.commitOid}` : request.source.kind
+  return `diff ${request.repoPath} ${source} ${request.path}`
 }
 
 /**
- * 파일 diff 오버레이. 터미널 탭 스키마(PTY 전용)를 건드리지 않으려고 중앙 탭이 아니라
- * `document.body` 포털 오버레이로 띄운다 — xterm portal 순회 불변식을 유지하기 위함.
+ * 파일 diff 화면. 터미널 탭 하나로 들어간다 — 전체 화면 오버레이로 띄우면 커스텀 타이틀바(신호등
+ * 버튼)를 덮어버리고, 터미널로 돌아가려면 매번 닫아야 해서 비교하며 작업하기 어렵다.
  */
-function DiffViewerOverlay({ request, onClose }: DiffViewerOverlayProps): JSX.Element {
+function DiffView({ request }: { request: DiffRequest }): JSX.Element {
   const { theme } = useTheme()
   const [diff, setDiff] = useState<GitFileDiffContent | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -48,29 +49,20 @@ function DiffViewerOverlay({ request, onClose }: DiffViewerOverlayProps): JSX.El
     return () => { cancelled = true }
   }, [request])
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   const binary = diff?.originalBinary || diff?.modifiedBinary
 
-  return createPortal(
-    <div className="fixed inset-0 z-[60] flex flex-col bg-bg-primary">
-      <div className="flex items-center gap-2 px-4 h-11 flex-none border-b border-bg-border bg-bg-surface">
-        <FileDiff size={14} className="text-text-secondary flex-none" />
-        <span className="text-[calc(12.5px_*_var(--app-font-scale,1))] font-medium text-text-primary truncate">
+  return (
+    <div className="flex flex-col h-full min-h-0 bg-bg-primary">
+      <div className="flex items-center gap-2 px-3 h-8 flex-none border-b border-bg-border bg-bg-surface">
+        <FileDiff size={12} className="text-text-tertiary flex-none" />
+        <span className="text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-primary truncate font-mono">
           {request.path}
         </span>
         {request.caption && (
-          <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary truncate">
+          <span className="text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-tertiary truncate">
             {request.caption}
           </span>
         )}
-        <button onClick={onClose} className="ds-btn ghost icon ml-auto flex-none" aria-label="diff 닫기">
-          <X size={15} />
-        </button>
       </div>
 
       <div className="flex-1 min-h-0">
@@ -115,9 +107,8 @@ function DiffViewerOverlay({ request, onClose }: DiffViewerOverlayProps): JSX.El
           />
         )}
       </div>
-    </div>,
-    document.body
+    </div>
   )
 }
 
-export default DiffViewerOverlay
+export default DiffView

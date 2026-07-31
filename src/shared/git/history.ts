@@ -3,7 +3,7 @@
  *
  * Portions ported from Orca (https://github.com/stablyai/orca) — orca@1.4.162-rc.0,
  * `src/shared/git-history.ts`. Copyright (c) 2026 Lovecast Inc. — MIT License.
- * 변경: ① 전 브랜치 조회(`allBranches` → `--all`) ② 커서 페이지네이션(Load more) 추가.
+ * 변경: ① 전 브랜치 조회(`allBranches` → `--branches --remotes --tags`) ② 페이지네이션(`--skip`) 추가.
  *   Orca 는 HEAD 만 조회하고 페이지네이션이 없다 — 소스트리급 히스토리에는 둘 다 필요하다.
  *
  * ref 검증 원칙(Orca): 정규식 화이트리스트 대신 `--end-of-options` + leading-dash 거부.
@@ -172,7 +172,9 @@ export async function loadGitHistory(
       // 한 건 더 받아서 hasMore 를 판정한다.
       `-n${limit + 1}`,
       ...(skip > 0 ? [`--skip=${skip}`] : []),
-      ...(options.allBranches ? ['--all'] : [headOid]),
+      // `--all` 은 refs/stash 까지 포함해 스태시와 그 내부 커밋(index/untracked)이 목록에 섞인다.
+      // 소스트리처럼 브랜치·원격·태그만 본다.
+      ...(options.allBranches ? ['--branches', '--remotes', '--tags'] : [headOid]),
       // 뒤따르는 인자가 경로로 해석되지 않게 못박는다.
       '--'
     ],

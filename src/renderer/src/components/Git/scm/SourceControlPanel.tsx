@@ -25,7 +25,7 @@ import {
   splitIntoSections,
   splitPath
 } from './statusDisplay'
-import type { DiffRequest } from './DiffViewerOverlay'
+import type { DiffRequest } from './DiffView'
 
 const CONFLICT_OPERATION_LABELS: Record<string, string> = {
   merge: '머지',

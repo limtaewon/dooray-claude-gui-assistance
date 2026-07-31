@@ -83,15 +83,21 @@ describe('loadGitHistory — 조회 범위/페이지네이션 (Orca 대비 Claud
     expect(logArgs).not.toContain('--all')
   })
 
-  it('allBranches 면 --all 로 전 브랜치를 조회한다', async () => {
+  it('allBranches 면 브랜치·원격·태그를 조회한다', async () => {
     const { git, calls } = makeGit(base)
     await loadGitHistory(git, '/repo', { allBranches: true })
     const logArgs = calls.find((a) => a[0] === 'log')!
-    expect(logArgs).toContain('--all')
+    expect(logArgs).toEqual(expect.arrayContaining(['--branches', '--remotes', '--tags']))
     expect(logArgs).not.toContain(HEAD_OID)
   })
 
-  it('skip 은 --skip 으로 넘어간다 — 커서(oid)가 아니라 offset 이어야 --all 토폴로지가 유지된다', async () => {
+  it('--all 을 쓰지 않는다 — refs/stash 가 딸려와 스태시와 그 내부 커밋이 히스토리에 섞인다', async () => {
+    const { git, calls } = makeGit(base)
+    await loadGitHistory(git, '/repo', { allBranches: true })
+    expect(calls.find((a) => a[0] === 'log')).not.toContain('--all')
+  })
+
+  it('skip 은 --skip 으로 넘어간다 — 커서(oid)가 아니라 offset 이어야 전 브랜치 토폴로지가 유지된다', async () => {
     const { git, calls } = makeGit(base)
     await loadGitHistory(git, '/repo', { skip: 50, allBranches: true })
     expect(calls.find((a) => a[0] === 'log')).toContain('--skip=50')

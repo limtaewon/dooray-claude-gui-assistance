@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, X, Terminal, Trash2, Pencil, ClipboardList } from 'lucide-react'
+import { Plus, X, Terminal, Trash2, Pencil, ClipboardList, FileDiff } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -43,7 +43,7 @@ import SideDrawer, { type DrawerTab } from './SideDrawer'
 import SourceControlPanel from '../Git/scm/SourceControlPanel'
 import GitHistoryPanel from '../Git/scm/GitHistoryPanel'
 import BranchesPanel from '../Git/scm/BranchesPanel'
-import DiffViewerOverlay, { type DiffRequest } from '../Git/scm/DiffViewerOverlay'
+import DiffView, { diffTabId, type DiffRequest } from '../Git/scm/DiffView'
 import DrawerRepoEmptyState from '../Git/scm/DrawerRepoEmptyState'
 import { useTerminalRepo } from '../Git/scm/useRepoRoot'
 import { buildTaskDropSteps } from './taskDrop'
@@ -82,15 +82,28 @@ interface PaneRuntime {
   restoreSnapshot?: TerminalPaneSnapshot
 }
 
-/** 탭 1개 — split 트리 + 포커스 leaf + leaf 별 런타임(ADR-v2-terminal-p2-02 §3). */
+/**
+ * 탭 1개 — split 트리 + 포커스 leaf + leaf 별 런타임(ADR-v2-terminal-p2-02 §3).
+ *
+ * `kind` 는 판별자다. 값이 없으면 터미널 탭 — 기존 스냅샷을 그대로 읽기 위해 optional 로 둔다.
+ * diff 탭은 PTY 를 갖지 않으므로 `panes` 가 비어 있고 `tree` 는 자리표시자 leaf 하나뿐이다.
+ * pane 을 순회하는 코드는 `tab.panes[leafId]` 가 없으면 건너뛰므로 그대로 안전하다.
+ */
 interface TabEntry {
   tabId: string
   name: string
+  kind?: 'terminal' | 'diff'
   /** 사용자가 직접 이름을 바꿨으면 셸 제목으로 덮어쓰지 않는다 (Warp 와 동일) */
   nameIsCustom?: boolean
   tree: SplitNode
   focusedLeafId: string
   panes: Record<string, PaneRuntime>
+  /** kind === 'diff' 일 때만 — 무엇을 비교할지 */
+  diff?: DiffRequest
+}
+
+function isDiffTab(tab: TabEntry): boolean {
+  return tab.kind === 'diff'
 }
 
 function allPanesExited(tab: TabEntry): boolean {
@@ -110,7 +123,6 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
   /** v2.0 C-3.5 — 우측 드로어(두레이 업무 / 소스 제어). 탭 선택도 함께 영속화한다. */
   const [drawerOpen, setDrawerOpen] = useState(true)
   const [drawerTab, setDrawerTab] = useState<DrawerTab>('tasks')
-  const [diffRequest, setDiffRequest] = useState<DiffRequest | null>(null)
   const [dropHint, setDropHint] = useState<string | null>(null)
   const [dropBusy, setDropBusy] = useState<string | null>(null)
   // v2.0 D — 단축키 오버라이드. keydown 클로저가 최신 값을 보도록 ref 로 동기화한다.
@@ -140,13 +152,21 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
   useEffect(() => { tabsRef.current = tabs }, [tabs])
   const activeTabIdRef = useRef<string | null>(activeTabId)
   useEffect(() => { activeTabIdRef.current = activeTabId }, [activeTabId])
+  /** diff 탭을 보는 동안에도 소스 제어가 같은 저장소를 계속 가리키도록 마지막 터미널 탭을 기억한다. */
+  const lastTerminalTabIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    const active = tabsRef.current.find((t) => t.tabId === activeTabId)
+    if (active && active.kind !== 'diff') lastTerminalTabIdRef.current = activeTabId
+  }, [activeTabId, tabs])
   // v2.0 B-5: pane.serialize() 가 null 을 반환할 때(addon 미준비 등) 재사용할 마지막 성공 스냅샷.
   const lastPaneSnapshotRef = useRef<Map<string, TerminalPaneSnapshot>>(new Map())
 
   /** v2.0 B-5: 현재 상태를 스냅샷으로 조립한다 — 모든 트리거(debounce/autosave/beforeunload/
    *  onRequestState)가 공유하는 단일 진입점. null 인 pane 은 마지막 성공값을 재사용한다(없으면 빈 값). */
   const collectSnapshot = useCallback((): TerminalWorkspaceSnapshotV2 => {
-    const tabsSnapshot = tabsRef.current.map((tab) => {
+    // diff 탭은 저장하지 않는다 — 파일 상태에서 파생되는 뷰라 복원해도 의미가 없고,
+    // PTY 가 없어 스냅샷 스키마(panes 필수)와도 맞지 않는다.
+    const tabsSnapshot = tabsRef.current.filter((t) => !isDiffTab(t)).map((tab) => {
       const panes: Record<string, TerminalPaneSnapshot> = {}
       for (const leafId of collectLeafIds(tab.tree)) {
         const pane = tab.panes[leafId]
@@ -160,7 +180,11 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       }
       return { tabId: tab.tabId, name: tab.name, tree: tab.tree, focusedLeafId: tab.focusedLeafId, panes }
     })
-    return { version: 2, savedAt: Date.now(), activeTabId: activeTabIdRef.current, tabs: tabsSnapshot }
+    // 활성 탭이 diff 였다면 저장 목록에 없으므로 복원 시 무시된다 — null 로 명시한다.
+    const activeId = tabsSnapshot.some((t) => t.tabId === activeTabIdRef.current)
+      ? activeTabIdRef.current
+      : null
+    return { version: 2, savedAt: Date.now(), activeTabId: activeId, tabs: tabsSnapshot }
   }, [])
 
   const persistSnapshot = useCallback(async (): Promise<void> => {
@@ -491,6 +515,32 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
   }, [activateTab, notifyLayoutChanged])
 
   /**
+   * 파일 diff 를 탭으로 연다. 같은 파일·같은 비교 대상이면 새로 만들지 않고 그 탭을 활성화한다 —
+   * 목록을 훑으며 여러 파일을 볼 때 탭이 무한정 쌓이지 않게.
+   */
+  const openDiffTab = useCallback((request: DiffRequest) => {
+    const tabId = diffTabId(request)
+    const existing = tabsRef.current.find((t) => t.tabId === tabId)
+    if (existing) {
+      activateTab(tabId)
+      return
+    }
+    const leafId = crypto.randomUUID()
+    setTabs((prev) => [...prev, {
+      tabId,
+      kind: 'diff',
+      name: request.path.split('/').pop() || request.path,
+      // diff 탭에는 PTY 가 없다 — 자리표시자 leaf 하나만 두고 panes 는 비운다.
+      tree: { type: 'leaf', leafId },
+      focusedLeafId: leafId,
+      panes: {},
+      diff: request
+    }])
+    activateTab(tabId)
+    notifyLayoutChanged()
+  }, [activateTab, notifyLayoutChanged])
+
+  /**
    * v2.0 C-3: 이미 만들어진 PTY 세션을 탭으로 받아들인다 — 워크스페이스 시작으로 main 이 spawn 한
    * run 터미널을 여기서 연다. 같은 세션이 이미 탭으로 있으면 그 탭을 활성화만 한다.
    */
@@ -559,9 +609,16 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     void window.api.settings.set('terminalDrawerTab', tab)
   }, [])
 
-  /** 소스 제어 패널은 지금 보고 있는 터미널의 저장소를 따라간다 — 별도 선택 UI 를 두지 않는다. */
+  /**
+   * 소스 제어 패널은 지금 보고 있는 터미널의 저장소를 따라간다 — 별도 선택 UI 를 두지 않는다.
+   * diff 탭이 활성일 때는 그 diff 를 연 터미널을 계속 따라가야 하므로 마지막 터미널 탭으로 떨어진다.
+   */
   const focusedPane = (() => {
-    const tab = tabs.find((t) => t.tabId === activeTabId)
+    const active = tabs.find((t) => t.tabId === activeTabId)
+    const tab = active && !isDiffTab(active)
+      ? active
+      : tabs.find((t) => t.tabId === lastTerminalTabIdRef.current && !isDiffTab(t)) ??
+        tabs.find((t) => !isDiffTab(t))
     return tab ? tab.panes[tab.focusedLeafId] : undefined
   })()
   const {
@@ -598,7 +655,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     const tabId = activeTabIdRef.current
     if (!tabId) return
     const tab = tabsRef.current.find((t) => t.tabId === tabId)
-    if (!tab) return
+    if (!tab || isDiffTab(tab)) return
     const cwd = tab.panes[tab.focusedLeafId]?.cwd
     let session: TerminalSession
     try {
@@ -873,7 +930,8 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
                 <SortableTabLabel
                   tabId={tab.tabId}
                   name={tab.name}
-                  paneCount={collectLeafIds(tab.tree).length}
+                  kind={tab.kind ?? 'terminal'}
+                  paneCount={isDiffTab(tab) ? 0 : collectLeafIds(tab.tree).length}
                   isActive={activeTabId === tab.tabId}
                   isExited={allPanesExited(tab)}
                   onSelect={() => activateTab(tab.tabId)}
@@ -967,13 +1025,17 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
               onDragLeave={tab.tabId === activeTabId ? onTaskDragLeave : undefined}
               onDrop={tab.tabId === activeTabId ? (e) => void onTaskDrop(e, tab.tabId) : undefined}
             >
-              <SplitLayout
-                tree={tab.tree}
-                getHost={getOrCreateHost}
-                getHandle={getHandle}
-                onRatioCommit={(path, ratio) => commitRatio(tab.tabId, path, ratio)}
-                onDragActiveChange={setIsDividerDragging}
-              />
+              {tab.kind === 'diff' && tab.diff ? (
+                <DiffView request={tab.diff} />
+              ) : (
+                <SplitLayout
+                  tree={tab.tree}
+                  getHost={getOrCreateHost}
+                  getHandle={getHandle}
+                  onRatioCommit={(path, ratio) => commitRatio(tab.tabId, path, ratio)}
+                  onDragActiveChange={setIsDividerDragging}
+                />
+              )}
               {dropHint && tab.tabId === activeTabId && (
                 <div className="absolute inset-2 z-20 pointer-events-none rounded-lg border-2 border-dashed border-bg-border-strong bg-black/10 flex items-center justify-center">
                   <span className="px-3 py-1.5 rounded-md bg-bg-surface border border-bg-border text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-primary shadow">
@@ -998,9 +1060,9 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
         ) : !repoRoot ? (
           <DrawerRepoEmptyState tab={drawerTab} cwd={focusedCwd ?? undefined} resolving={repoResolving} />
         ) : drawerTab === 'changes' ? (
-          <SourceControlPanel repoPath={repoRoot} onOpenDiff={setDiffRequest} onRepoChanged={notifyRepoChanged} />
+          <SourceControlPanel repoPath={repoRoot} onOpenDiff={openDiffTab} onRepoChanged={notifyRepoChanged} />
         ) : drawerTab === 'history' ? (
-          <GitHistoryPanel repoPath={repoRoot} onOpenDiff={setDiffRequest} />
+          <GitHistoryPanel repoPath={repoRoot} onOpenDiff={openDiffTab} />
         ) : (
           <BranchesPanel
             repoPath={repoRoot}
@@ -1010,7 +1072,6 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
         )}
       </SideDrawer>
     )}
-    {diffRequest && <DiffViewerOverlay request={diffRequest} onClose={() => setDiffRequest(null)} />}
     </div>
   )
 }
@@ -1036,6 +1097,7 @@ function TabDropIndicator(): JSX.Element {
 function SortableTabLabel(props: {
   tabId: string
   name: string
+  kind: 'terminal' | 'diff'
   paneCount: number
   isActive: boolean
   isExited: boolean
@@ -1064,6 +1126,7 @@ function SortableTabLabel(props: {
  */
 function TabLabel({
   name,
+  kind,
   paneCount,
   isActive,
   isExited,
@@ -1077,6 +1140,7 @@ function TabLabel({
 }: {
   tabId: string
   name: string
+  kind: 'terminal' | 'diff'
   paneCount: number
   isActive: boolean
   isExited: boolean
@@ -1088,6 +1152,8 @@ function TabLabel({
   dragListeners?: DraggableSyntheticListeners
   isDragging?: boolean
 }): JSX.Element {
+  // diff 탭 이름은 파일명이 곧 이름이라 사용자가 바꿀 대상이 아니다.
+  const isDiff = kind === 'diff'
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(name)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -1116,11 +1182,11 @@ function TabLabel({
       {...dragAttributes}
       {...dragListeners}
       onClick={onSelect}
-      onDoubleClick={(e) => { e.stopPropagation(); setEditing(true) }}
+      onDoubleClick={(e) => { if (isDiff) return; e.stopPropagation(); setEditing(true) }}
       className={`ds-tab group ${isActive ? 'active' : ''} ${isExited || isDragging ? 'opacity-50' : ''}`}
-      title={isExited ? '종료됨' : undefined}
+      title={isExited ? '종료됨' : isDiff ? '파일 비교' : undefined}
     >
-      <Terminal size={11} />
+      {isDiff ? <FileDiff size={11} className="text-text-tertiary" /> : <Terminal size={11} />}
       {editing ? (
         <input
           ref={inputRef}
@@ -1152,12 +1218,14 @@ function TabLabel({
           {isExited && (
             <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">종료됨</span>
           )}
-          <button onClick={(e) => { e.stopPropagation(); setEditing(true) }}
-            onPointerDown={(e) => e.stopPropagation()}
-            className="text-text-tertiary hover:text-text-primary ml-0.5"
-            title="이름 변경">
-            <Pencil size={10} />
-          </button>
+          {!isDiff && (
+            <button onClick={(e) => { e.stopPropagation(); setEditing(true) }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="text-text-tertiary hover:text-text-primary ml-0.5"
+              title="이름 변경">
+              <Pencil size={10} />
+            </button>
+          )}
         </>
       )}
       <button onClick={(e) => { e.stopPropagation(); onClose() }}
