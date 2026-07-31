@@ -215,6 +215,103 @@ describe('TerminalView — 업무 드래그&드롭', () => {
     })
   })
 
+  it('저장소 폴더에 있을 때도 그 업무의 워크트리로 옮겨 시작한다', async () => {
+    // 사용자가 실제로 겪은 배치 — 저장소를 지정해두고 그 폴더에서 드롭한다.
+    vi.mocked(window.api.workspace.settings.get).mockResolvedValue({
+      projectOverrides: { p1: { repoIds: ['r1'] } }
+    } as never)
+    vi.mocked(window.api.workspace.repos.list).mockResolvedValue([
+      { id: 'r1', path: '/Users/me/Desktop/2NEON', name: '2NEON' }
+    ])
+    vi.mocked(window.api.terminal.sessionCwd).mockResolvedValue('/Users/me/Desktop/2NEON')
+    vi.mocked(window.api.git.mainRepoRoot).mockResolvedValue('/Users/me/Desktop/2NEON')
+
+    renderWithDs(<TerminalView active />)
+    await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+    fireEvent.drop(await screen.findByTestId(/^term-pane-/), { dataTransfer: taskTransfer() })
+
+    await waitFor(() => {
+      const sent = vi.mocked(window.api.terminal.input).mock.calls.map((c) => c[1]).join('')
+      expect(sent).toContain("cd '/Users/me/Desktop/2NEON-worktrees/feature-task-t1'")
+    })
+  })
+
+  it('워크트리 API 가 없는 구버전 preload 에서도 저장소 폴더에서 시작한다', async () => {
+    // 앱을 다시 켜기 전에는 새 채널이 없다 — 여기서 죽으면 드롭이 아무 반응 없이 사라진다.
+    vi.mocked(window.api.workspace.settings.get).mockResolvedValue({
+      projectOverrides: { p1: { repoIds: ['r1'] } }
+    } as never)
+    vi.mocked(window.api.workspace.repos.list).mockResolvedValue([
+      { id: 'r1', path: '/Users/me/Desktop/2NEON', name: '2NEON' }
+    ])
+    vi.mocked(window.api.terminal.sessionCwd).mockResolvedValue('/Users/me/Desktop/2NEON')
+    const api = window.api as unknown as Record<string, Record<string, unknown>>
+    api.workspace.taskWorktree = undefined
+    api.git.mainRepoRoot = undefined
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    renderWithDs(<TerminalView active />)
+    await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+    fireEvent.drop(await screen.findByTestId(/^term-pane-/), { dataTransfer: taskTransfer() })
+
+    await waitFor(() => {
+      const sent = vi.mocked(window.api.terminal.input).mock.calls.map((c) => c[1]).join('')
+      expect(sent).toContain('claude')
+    })
+    warn.mockRestore()
+  })
+
+  it('드롭이 실패하면 조용히 사라지지 않고 이유를 알린다', async () => {
+    vi.mocked(window.api.workspace.settings.get).mockRejectedValue(new Error('boom'))
+    vi.mocked(window.api.workspace.repos.list).mockRejectedValue(new Error('boom'))
+    vi.mocked(window.api.terminal.sessionCwd).mockRejectedValue(new Error('probe 실패'))
+    vi.mocked(window.api.workspace.taskDrop.linked).mockImplementation(() => {
+      throw new Error('링크를 읽지 못했습니다')
+    })
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    renderWithDs(<TerminalView active />)
+    await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+    fireEvent.drop(await screen.findByTestId(/^term-pane-/), { dataTransfer: taskTransfer() })
+
+    expect(await screen.findByText('업무를 시작하지 못했습니다')).toBeInTheDocument()
+    error.mockRestore()
+  })
+
+  it('claude 가 돌고 있는 pane 에는 타이핑하지 않고 새 탭에서 시작한다', async () => {
+    // 실행 중인 TUI 에 명령을 보내면 그 프로그램 입력으로 먹혀 진행 중인 대화가 오염된다.
+    vi.mocked(window.api.workspace.settings.get).mockResolvedValue({
+      projectOverrides: { p1: { repoIds: ['r1'] } }
+    } as never)
+    vi.mocked(window.api.workspace.repos.list).mockResolvedValue([
+      { id: 'r1', path: '/Users/me/Desktop/2NEON', name: '2NEON' }
+    ])
+    // 다른 업무의 워크트리에서 claude 를 돌리는 중
+    vi.mocked(window.api.terminal.sessionCwd).mockResolvedValue(
+      '/Users/me/Desktop/.2NEON-worktrees/feature-NEON-6460'
+    )
+    vi.mocked(window.api.git.mainRepoRoot).mockResolvedValue('/Users/me/Desktop/2NEON')
+    vi.mocked(window.api.terminal.foreground).mockResolvedValue('claude')
+
+    renderWithDs(<TerminalView active />)
+    await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+    const before = vi.mocked(window.api.terminal.create).mock.calls.length
+    fireEvent.drop(await screen.findByTestId(/^term-pane-/), { dataTransfer: taskTransfer() })
+
+    await waitFor(() => {
+      expect(vi.mocked(window.api.terminal.create).mock.calls.length).toBe(before + 1)
+    })
+    // 새 탭은 목적지 워크트리에서 바로 열고, 거기에 다시 cd 하지 않는다
+    expect(vi.mocked(window.api.terminal.create).mock.calls.at(-1)?.[0]).toEqual({
+      cwd: '/Users/me/Desktop/2NEON-worktrees/feature-task-t1'
+    })
+    await waitFor(() => {
+      const sent = vi.mocked(window.api.terminal.input).mock.calls.map((c) => c[1]).join('')
+      expect(sent).toContain('claude')
+    })
+    expect(vi.mocked(window.api.terminal.input).mock.calls.map((c) => c[1]).join('')).not.toContain('cd ')
+  })
+
   it('이미 그 업무의 워크트리 안이면 묻지도 cd 하지도 않는다', async () => {
     vi.mocked(window.api.workspace.settings.get).mockResolvedValue({
       projectOverrides: { p1: { repoIds: ['r1', 'r2'] } }

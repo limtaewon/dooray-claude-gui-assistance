@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, X, Terminal, Trash2, Pencil, FileDiff, PanelRight } from 'lucide-react'
+import { Plus, X, Terminal, Trash2, Pencil, FileDiff, PanelRight, Loader2 } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -65,6 +65,7 @@ import {
   type TaskDropPlan
 } from '@shared/workspace/taskDropPlan'
 import { buildBranchName } from '@shared/workspace/branchName'
+import { isPaneBusy } from '@shared/terminal/foreground'
 import RepoChoiceModal from '../Workspace/RepoChoiceModal'
 import type {
   RepoRegistryEntry,
@@ -174,7 +175,8 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     settings: WorkspaceSettingsShape | null
     links: TaskSessionLink[]
   } | null>(null)
-  const [dropBusy, setDropBusy] = useState<string | null>(null)
+  /** 드롭 진행 표시 — 무엇을 하는 중인지와 어느 폴더인지 같이 보여준다. */
+  const [dropBusy, setDropBusy] = useState<{ label: string; where?: string } | null>(null)
   // v2.0 D — 단축키 오버라이드. keydown 클로저가 최신 값을 보도록 ref 로 동기화한다.
   const keybindingOverrides = useKeybindingOverrides()
   const overridesRef = useRef(keybindingOverrides)
@@ -255,6 +257,12 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       void persistSnapshot()
     }, SAVE_DEBOUNCE_MS)
   }, [persistSnapshot])
+
+  // 언마운트 시 예약된 저장을 취소한다 — 남겨두면 사라진 뷰의 스냅샷이 뒤늦게 덮어쓴다.
+  useEffect(() => () => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = null
+  }, [])
 
   // v2.0 B-5: 30초 autosave (ADR-03 §3-2) — main 의 옛 setInterval 을 이관받았다.
   useEffect(() => {
@@ -410,16 +418,23 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       taskId: task.taskId
     })
 
-    setDropBusy(`${branch} 워크트리 준비 중…`)
-    const info = await window.api.workspace
-      .taskWorktree({ repoPath: repo.path, branch, baseBranch: repo.baseBranch })
-      .catch((err: unknown) => {
+    setDropBusy({ label: '워크트리 준비 중…', where: `${repo.name} · ${branch}` })
+    const ensure = window.api.workspace.taskWorktree
+    if (!ensure) {
+      // 앱을 다시 켜기 전(구버전 preload)에는 이 채널이 없다 — 죽지 말고 저장소 폴더로 진행한다.
+      console.warn('[TaskDrop] workspace.taskWorktree 없음 — 저장소 폴더에서 시작합니다')
+      setDropBusy(null)
+      return plan
+    }
+    const info = await ensure({ repoPath: repo.path, branch, baseBranch: repo.baseBranch }).catch(
+      (err: unknown) => {
         toast.error(
           '워크트리를 만들지 못했습니다',
           err instanceof Error ? err.message : `${repo.name} 폴더에서 그대로 시작합니다`
         )
         return null
-      })
+      }
+    )
     setDropBusy(null)
     if (!info) return plan
 
@@ -473,11 +488,16 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       currentCwd: plan.needsCd ? undefined : plan.cwd,
       skipPermissions: settings?.taskDropSkipPermissions === true
     })) {
-      setDropBusy(step.label)
+      setDropBusy({ label: step.label, where: plan.cwd })
       window.api.terminal.input(pane.sessionId, step.data)
       if (step.delayMs > 0) await new Promise((r) => setTimeout(r, step.delayMs))
     }
     setDropBusy(null)
+    // 어디서 시작했는지 남긴다 — 엉뚱한 워크트리로 갔다면 이걸로 바로 안다.
+    toast.info(
+      sessionId ? '이전 세션을 이어갑니다' : '업무를 시작했습니다',
+      plan.cwd ?? '지금 터미널이 있는 폴더'
+    )
 
     // 새 세션이면 방금 만들어진 것을 (업무, 폴더) 쌍에 연결한다 (resume 은 이미 연결돼 있음).
     // 폴더를 모르면 연결 키를 만들 수 없어 건너뛴다 — 실행 자체는 이미 끝났다.
@@ -492,7 +512,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
           .catch(() => undefined)
       }, 8000)
     }
-  }, [])
+  }, [toast])
 
   /**
    * 업무 하나를 지정한 pane 에서 시작한다.
@@ -501,7 +521,35 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
    * 것 자체가 선택이라 다른 데로 `cd` 하면 그 선택을 덮는다. 매핑되지 않은 자리에 놓았을 때만
    * 어디로 갈지 정하는데, 후보가 하나면 그냥 가고 여럿이면 묻는다.
    */
-  const runTaskInPane = useCallback(async (
+  /**
+   * 이 계획을 어느 pane 에서 실행할지 — **claude 나 vim 이 돌고 있는 pane 에는 타이핑하지 않는다.**
+   *
+   * 실행 중인 TUI 에 명령을 보내면 그 프로그램의 입력으로 먹혀서, 진행 중인 대화가 오염되고
+   * 명령은 엉뚱한 폴더에서 실행된다(실제로 6460 워크트리에서 6787 이 시작된 사고). 새 탭을 연다.
+   */
+  const paneForPlan = useCallback(async (
+    pane: PaneRuntime,
+    plan: Extract<TaskDropPlan, { kind: 'start' }>
+  ): Promise<{ pane: PaneRuntime; plan: Extract<TaskDropPlan, { kind: 'start' }> }> => {
+    const foreground = await (
+      window.api.terminal.foreground?.(pane.sessionId) ?? Promise.resolve(null)
+    ).catch(() => null)
+    if (!isPaneBusy(foreground)) return { pane, plan }
+
+    const created = await createTabRef.current?.(plan.cwd ? { cwd: plan.cwd } : undefined)
+    if (!created) {
+      toast.error('실행 중인 터미널이라 시작할 수 없습니다', `${foreground} 를 먼저 끝내주세요`)
+      throw new Error(`pane 이 사용 중입니다 (${foreground})`)
+    }
+    toast.info(`${foreground} 실행 중이라 새 탭에서 시작합니다`)
+    // 갓 만든 PTY 는 프롬프트가 뜨기 전이라 첫 입력이 씹힌다.
+    await new Promise((r) => setTimeout(r, 400))
+    // 새 탭은 목적지에서 바로 열었으므로 다시 `cd` 하지 않는다.
+    return { pane: created.pane, plan: { ...plan, needsCd: false } }
+  }, [toast])
+
+  /** 실제 해석·실행. 실패는 위의 `runTaskInPane` 이 사용자에게 알린다. */
+  const runTaskInPaneUnsafe = useCallback(async (
     task: TaskDropRequest,
     pane: PaneRuntime
   ): Promise<void> => {
@@ -522,7 +570,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
 
     // 워크트리 안이면 경로가 등록된 저장소와 다르다 — 본 저장소로 환산해 비교한다.
     const currentRepoRoot = liveCwd
-      ? await window.api.git.mainRepoRoot(liveCwd).catch(() => null)
+      ? await (window.api.git.mainRepoRoot?.(liveCwd) ?? Promise.resolve(null)).catch(() => null)
       : null
 
     const repoIds = settings ? resolveProjectConfig(settings, task.projectId).repoIds : []
@@ -544,8 +592,23 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       return
     }
 
-    await executeDropPlan(task, pane, await withWorktree(plan, task, settings, links, liveCwd), settings)
-  }, [toast, executeDropPlan, withWorktree])
+    const target = await paneForPlan(pane, await withWorktree(plan, task, settings, links, liveCwd))
+    await executeDropPlan(task, target.pane, target.plan, settings)
+  }, [toast, executeDropPlan, withWorktree, paneForPlan])
+
+  const runTaskInPane = useCallback(async (
+    task: TaskDropRequest,
+    pane: PaneRuntime
+  ): Promise<void> => {
+    try {
+      await runTaskInPaneUnsafe(task, pane)
+    } catch (err) {
+      // 여기서 삼키면 '드롭했는데 아무 일도 안 일어난다' 가 된다 — 무엇이 막았는지는 말해줘야 한다.
+      setDropBusy(null)
+      console.error('[TaskDrop] 실패:', err)
+      toast.error('업무를 시작하지 못했습니다', err instanceof Error ? err.message : String(err))
+    }
+  }, [runTaskInPaneUnsafe, toast])
 
   // createTab 은 아래에서 선언되므로 ref 로 우회한다 (선언 순서 의존 제거)
   const createTabRef = useRef<
@@ -1281,8 +1344,18 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
           </div>
         )}
         {dropBusy && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-md bg-bg-surface border border-bg-border text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary shadow">
-            {dropBusy}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-3.5 py-2 rounded-lg bg-bg-surface-raised border border-bg-border-strong shadow-xl">
+            <Loader2 size={13} className="animate-spin text-brand-terminal flex-none" />
+            <span className="flex flex-col">
+              <span className="text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-primary">
+                {dropBusy.label}
+              </span>
+              {dropBusy.where && (
+                <span className="font-mono text-[calc(9.5px_*_var(--app-font-scale,1))] text-text-tertiary">
+                  {dropBusy.where}
+                </span>
+              )}
+            </span>
           </div>
         )}
       </div>
@@ -1334,12 +1407,11 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
           setRepoChoice(null)
           void (async () => {
             const plan = planFromCandidate(candidate, choice.currentCwd)
-            await executeDropPlan(
-              choice.task,
+            const target = await paneForPlan(
               choice.pane,
-              await withWorktree(plan, choice.task, choice.settings, choice.links, choice.currentCwd),
-              choice.settings
+              await withWorktree(plan, choice.task, choice.settings, choice.links, choice.currentCwd)
             )
+            await executeDropPlan(choice.task, target.pane, target.plan, choice.settings)
           })()
         }}
       />

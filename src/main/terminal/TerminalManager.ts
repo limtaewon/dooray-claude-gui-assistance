@@ -229,6 +229,20 @@ export class TerminalManager {
   }
 
   /** 세션의 PTY pid 조회 — 존재하지 않으면 null. pid cwd probe(M-B) 등 조회 전용 용도. */
+  /**
+   * pane 에서 지금 돌고 있는 프로그램 이름 — 셸이면 프롬프트가 비어 있다는 뜻.
+   * node-pty 가 주는 값이라 플랫폼별로 정확도가 다르다. 판정은 `isPaneBusy` 가 한다.
+   */
+  getForegroundProcess(id: string): string | null {
+    const session = this.sessions.get(id)
+    if (!session) return null
+    try {
+      return session.pty.process || null
+    } catch {
+      return null
+    }
+  }
+
   getPid(id: string): number | null {
     const session = this.sessions.get(id)
     return session ? session.pty.pid : null

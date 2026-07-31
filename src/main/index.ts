@@ -976,6 +976,11 @@ function registerIpcHandlers(): void {
     return probed ?? terminalManager.listSessions().find((s) => s.id === sessionId)?.cwd ?? null
   })
 
+  // v2.0: pane 이 사용 중인지 — 실행 중인 TUI 에 명령을 타이핑하지 않기 위한 판정 재료.
+  ipcMain.handle(IPC_CHANNELS.TERMINAL_FOREGROUND, (_, sessionId: string) =>
+    terminalManager.getForegroundProcess(sessionId)
+  )
+
   // Claude Code Task Bridge - 태스크 컨텍스트로 Claude Code 세션 시작
   ipcMain.handle(
     IPC_CHANNELS.CLAUDE_START_TASK,

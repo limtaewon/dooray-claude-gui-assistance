@@ -477,6 +477,9 @@ const api = {
     /** v2.0: 세션의 현재 cwd (pid 실측 → spawn cwd 폴백). `cd` 이후를 따라가야 하는 곳에서 쓴다. */
     sessionCwd: (sessionId: string): Promise<string | null> =>
       ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_SESSION_CWD, sessionId),
+    /** v2.0: 지금 그 pane 에서 돌고 있는 프로그램 이름 — 셸이면 프롬프트가 비어 있다는 뜻. */
+    foreground: (sessionId: string): Promise<string | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_FOREGROUND, sessionId),
     /** v1.4: 두레이 멘션이 main에서 새 터미널을 열었을 때 렌더러로 푸시되는 메타 */
     onMentionOpened: (callback: (meta: TerminalSession) => void): (() => void) => {
       const handler = (_: unknown, meta: TerminalSession): void => callback(meta)
