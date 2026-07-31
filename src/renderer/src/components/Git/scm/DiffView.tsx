@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { DiffEditor } from '@monaco-editor/react'
-import { FileDiff } from 'lucide-react'
+import type { editor } from 'monaco-editor'
+import { ChevronDown, ChevronUp, FileDiff } from 'lucide-react'
+import { currentChangeIndex, formatChangePosition } from './diffNavigation'
 import type { GitFileDiffContent, GitFileDiffParams } from '@shared/git/scmTypes'
 import { useTheme } from '../../../hooks/useTheme'
 import { LoadingView } from '../../common/ds'
@@ -25,7 +27,11 @@ export interface DiffRequest extends GitFileDiffParams {
 /** 같은 파일·같은 비교 대상이면 탭을 새로 만들지 않고 재사용하기 위한 안정 키. */
 export function diffTabId(request: DiffRequest): string {
   const source =
-    request.source.kind === 'commit' ? `commit:${request.source.commitOid}` : request.source.kind
+    request.source.kind === 'commit'
+      ? `commit:${request.source.commitOid}`
+      : request.source.kind === 'range'
+        ? `range:${request.source.baseOid}`
+        : request.source.kind
   return `diff ${request.repoPath} ${source} ${request.path}`
 }
 
@@ -37,6 +43,45 @@ function DiffView({ request }: { request: DiffRequest }): JSX.Element {
   const { theme } = useTheme()
   const [diff, setDiff] = useState<GitFileDiffContent | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const editorRef = useRef<editor.IStandaloneDiffEditor | null>(null)
+  const [nav, setNav] = useState({ index: 0, count: 0 })
+
+  const syncNav = useCallback(() => {
+    const instance = editorRef.current
+    if (!instance) return
+    const changes = instance.getLineChanges() ?? []
+    const line = instance.getModifiedEditor().getPosition()?.lineNumber ?? 1
+    setNav({ index: currentChangeIndex(changes, line), count: changes.length })
+  }, [])
+
+  const goToChange = useCallback((target: 'next' | 'previous') => {
+    const instance = editorRef.current
+    if (!instance) return
+    instance.goToDiff(target)
+    instance.getModifiedEditor().focus()
+    syncNav()
+  }, [syncNav])
+
+  const handleMount = useCallback((
+    instance: editor.IStandaloneDiffEditor,
+    monaco: typeof import('monaco-editor')
+  ) => {
+    editorRef.current = instance
+    const modified = instance.getModifiedEditor()
+    instance.onDidUpdateDiff(syncNav)
+    modified.onDidChangeCursorPosition(syncNav)
+    // IntelliJ 와 같은 키 — 에디터에 포커스가 있을 때만 먹는다(터미널 입력과 겹치지 않는다).
+    modified.addCommand(monaco.KeyCode.F7, () => goToChange('next'))
+    modified.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F7, () => goToChange('previous'))
+    syncNav()
+  }, [syncNav, goToChange])
+
+  // 파일이 바뀌면 이전 파일의 위치 표시가 남지 않게 초기화한다.
+  useEffect(() => {
+    setNav({ index: 0, count: 0 })
+  }, [request])
+
+  const position = formatChangePosition(nav.index, nav.count)
 
   useEffect(() => {
     let cancelled = false
@@ -63,6 +108,30 @@ function DiffView({ request }: { request: DiffRequest }): JSX.Element {
             {request.caption}
           </span>
         )}
+
+        <div className="ml-auto flex items-center gap-1 flex-none">
+          <span className="text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-tertiary tabular-nums">
+            {position ?? '변경 없음'}
+          </span>
+          <button
+            onClick={() => goToChange('previous')}
+            disabled={nav.count === 0}
+            className="ds-btn ghost icon"
+            title="이전 변경 (Shift+F7)"
+            aria-label="이전 변경"
+          >
+            <ChevronUp size={12} />
+          </button>
+          <button
+            onClick={() => goToChange('next')}
+            disabled={nav.count === 0}
+            className="ds-btn ghost icon"
+            title="다음 변경 (F7)"
+            aria-label="다음 변경"
+          >
+            <ChevronDown size={12} />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 min-h-0">
@@ -91,6 +160,7 @@ function DiffView({ request }: { request: DiffRequest }): JSX.Element {
         ) : (
           <DiffEditor
             height="100%"
+            onMount={handleMount}
             language={languageOf(request.path)}
             original={diff.original}
             modified={diff.modified}
