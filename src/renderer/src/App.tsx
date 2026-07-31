@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   Calendar as CalendarIcon, Terminal as TerminalIcon, GitBranch, Users, Server, Sparkles,
-  MessageSquare, BarChart3, BookOpen, Settings as SettingsIcon, Radar, Moon, Sun, Lightbulb, Bot,
+  MessageSquare, BarChart3, BookOpen, Compass, Settings as SettingsIcon, Radar, Moon, Sun, Lightbulb, Bot,
   LayoutDashboard, ListTodo, MessageCircle, FileText, CheckSquare, Workflow
 } from 'lucide-react'
 import Sidebar from './components/Layout/Sidebar'
@@ -14,7 +14,9 @@ import DooraySetup from './components/Dooray/DooraySetup'
 import DoorayAssistant from './components/Dooray/DoorayAssistant'
 import TerminalView from './components/Terminal/TerminalView'
 import MentionAgentView from './components/MentionAgent/MentionAgentView'
-import ClaudeManual from './components/ClaudeManual/ClaudeManual'
+import OnboardingHub from './components/Onboarding/OnboardingHub'
+import TourOverlay from './components/common/onboarding/TourOverlay'
+import { TOURS, type TourViewId } from './components/common/onboarding/tours'
 import ClaudeCodeSessionsView from './components/Sessions/ClaudeCodeSessionsView'
 import SettingsView from './components/Settings/SettingsView'
 import ImageLightbox from './components/common/ImageLightbox'
@@ -29,7 +31,7 @@ import FeedbackProvider from './components/Feedback/FeedbackProvider'
 import { useTheme } from './hooks/useTheme'
 import { useShortcut } from './hooks/useKeybindings'
 
-type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent' | 'harness' | 'workspace'
+type View = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'onboarding' | 'sessions' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent' | 'harness' | 'workspace'
 
 /** Cmd+E 최근 뷰 LRU 항목 — sub 가 있으면 같은 view 안의 sub-tab 별로 별개 entry */
 interface RecentViewItem {
@@ -55,6 +57,42 @@ function App(): JSX.Element {
   useEffect(() => {
     if (activeView !== 'settings') previousViewRef.current = activeView
   }, [activeView])
+  // ── 온보딩 투어 ─────────────────────────────────────────────
+  // 시작하면 그 메뉴로 옮겨간 뒤 오버레이가 뜬다. 화면이 그려질 틈을 주지 않으면 앵커를 못 찾는다.
+  const [tour, setTour] = useState<{ view: TourViewId; step: number } | null>(null)
+  const [tourCompleted, setTourCompleted] = useState<TourViewId[]>([])
+
+  useEffect(() => {
+    void window.api.settings
+      .get('onboardingCompleted')
+      .then((v) => { if (Array.isArray(v)) setTourCompleted(v as TourViewId[]) })
+      .catch(() => undefined)
+  }, [])
+
+  const startTour = useCallback((view: TourViewId) => {
+    setActiveView(view as View)
+    window.setTimeout(() => setTour({ view, step: 0 }), 220)
+  }, [])
+
+  const finishTour = useCallback(() => {
+    setTour((current) => {
+      if (current) {
+        setTourCompleted((prev) => {
+          if (prev.includes(current.view)) return prev
+          const next = [...prev, current.view]
+          void window.api.settings.set('onboardingCompleted', next).catch(() => undefined)
+          return next
+        })
+      }
+      return null
+    })
+  }, [])
+
+  const resetTourProgress = useCallback(() => {
+    setTourCompleted([])
+    void window.api.settings.set('onboardingCompleted', []).catch(() => undefined)
+  }, [])
+
   const [doorayConfigured, setDoorayConfigured] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
   const [quickTodoOpen, setQuickTodoOpen] = useState(false)
@@ -282,7 +320,7 @@ function App(): JSX.Element {
         { id: 'go-ai-recommend', label: 'AI 추천', icon: <Lightbulb size={13} /> },
         { id: 'go-sessions', label: '세션', icon: <MessageSquare size={13} /> },
         { id: 'go-usage', label: '사용량', icon: <BarChart3 size={13} /> },
-        { id: 'go-manual', label: '매뉴얼', icon: <BookOpen size={13} /> },
+        { id: 'go-onboarding', label: '온보딩', icon: <Compass size={13} /> },
         { id: 'go-settings', label: '설정', icon: <SettingsIcon size={13} /> }
       ]
     },
@@ -392,12 +430,28 @@ function App(): JSX.Element {
               </ErrorBoundary>
             </div>
             <div className={`absolute inset-0 ${vis('usage')}`}><UsageDashboard /></div>
-            <div className={`absolute inset-0 ${vis('manual')}`}><ClaudeManual /></div>
+            <div className={`absolute inset-0 ${vis('onboarding')}`}>
+              <OnboardingHub
+                onStartTour={startTour}
+                completed={tourCompleted}
+                onResetCompleted={resetTourProgress}
+              />
+            </div>
             <div className={`absolute inset-0 ${vis('settings')}`}>
               <SettingsView onExit={() => setActiveView(previousViewRef.current)} />
             </div>
           </main>
         </div>
+
+        {tour && (
+          <TourOverlay
+            steps={TOURS[tour.view] ?? []}
+            index={tour.step}
+            onIndexChange={(step) => setTour((current) => (current ? { ...current, step } : current))}
+            onClose={() => setTour(null)}
+            onFinish={finishTour}
+          />
+        )}
         <ImageLightbox />
         <CommandPalette
           open={cmdOpen}
@@ -449,7 +503,7 @@ function RecentViewsPalette({ open, items, index, onHover, onPick, onClose }: {
         case 'ai-recommend': return { label: 'AI 추천', icon: <Lightbulb size={13} /> }
         case 'sessions': return { label: '세션', icon: <MessageSquare size={13} /> }
         case 'usage': return { label: '사용량', icon: <BarChart3 size={13} /> }
-        case 'manual': return { label: '매뉴얼', icon: <BookOpen size={13} /> }
+        case 'onboarding': return { label: '온보딩', icon: <Compass size={13} /> }
         case 'settings': return { label: '설정', icon: <SettingsIcon size={13} /> }
         case 'agent': return { label: '에이전트', icon: <Bot size={13} /> }
         case 'harness': return { label: 'Harness Studio', icon: <Workflow size={13} /> }

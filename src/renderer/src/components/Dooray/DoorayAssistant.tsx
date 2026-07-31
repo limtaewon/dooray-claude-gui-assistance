@@ -49,7 +49,7 @@ function DoorayAssistant({ onDisconnect }: DoorayAssistantProps): JSX.Element {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="ds-tabbar">
+      <div className="ds-tabbar" data-tour="dooray-tabs">
         {tabs.map(({ id, icon: Icon, label }) => {
           const active = activeTab === id
           const aiActive = active && AI_TABS.has(id)

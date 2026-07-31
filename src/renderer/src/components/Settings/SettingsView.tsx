@@ -98,6 +98,7 @@ function SettingsView({ onExit }: { onExit?: () => void }): JSX.Element {
           <div className="p-2 pb-0 flex-none">
             <button
               onClick={onExit}
+              data-tour="settings-back"
               className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary hover:bg-bg-surface-hover hover:text-text-primary"
             >
               <ArrowLeft size={13} className="flex-none" />
@@ -113,6 +114,7 @@ function SettingsView({ onExit }: { onExit?: () => void }): JSX.Element {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Escape') { setSearchInput(''); searchRef.current?.blur() } }}
+              data-tour="settings-search"
               placeholder="설정 검색"
               aria-label="설정 검색"
               className="ds-input sm"

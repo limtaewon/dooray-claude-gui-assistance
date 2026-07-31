@@ -4,7 +4,7 @@ import { VIEW_ONBOARDING, ViewOnboarding, type OnboardingViewId } from './viewOn
 import { CUSTOMIZABLE_NAV_ITEMS } from '../../Layout/Sidebar'
 
 /** 온보딩 대상이 아닌 메뉴 — 화면 자체가 설명이라 별도 안내가 필요 없다. */
-const EXEMPT = new Set(['settings', 'manual', 'workspace'])
+const EXEMPT = new Set(['settings', 'onboarding', 'workspace'])
 
 describe('온보딩 커버리지', () => {
   it('사이드바의 모든 메뉴가 온보딩 문구를 가진다 — 메뉴를 추가하면 여기서 걸린다', () => {

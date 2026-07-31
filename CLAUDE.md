@@ -156,9 +156,10 @@ npm run icons        # scripts/generate-icons.mjs
    - IPC 핸들러처럼 electron 의존이 큰 코드는 핵심 로직만 순수 함수로 분리해서 테스트.
    - 단위 게이트는 70% 라인 커버리지 (`vitest.config.ts` 의 thresholds) — 신규 모듈로 떨어뜨리지 말 것.
 
-2. **매뉴얼 업데이트**
-   - 사용자 가시 기능이면 `src/renderer/src/components/ClaudeManual/ClaudeManual.tsx` 의 `SECTIONS` 배열 안 해당 영역(또는 새 섹션)에 한국어로 짧게 추가.
-   - 단축키/토글/새 패널 같이 발견이 어려운 기능은 반드시 매뉴얼에. 내부 구조 변경만은 매뉴얼 대상 X.
+2. **온보딩 업데이트** (읽는 매뉴얼은 v2.0 에서 폐기 — 설명은 그 기능이 있는 화면에서 한다)
+   - 사용자 가시 기능이면 `src/renderer/src/components/common/onboarding/tours.ts` 의 해당 메뉴 `TOURS` 에 단계를 추가하고, 가리킬 요소에 `data-tour="..."` 를 붙인다.
+   - 앵커 이름은 전역에서 유일해야 한다 (`tours.test.ts` 가 중복을 막는다). 앵커를 못 찾으면 그 단계는 화면 가운데 카드로 나온다 — 동작은 하지만 가리키지는 못하므로 되도록 붙인다.
+   - 빈 화면 문구(`VIEW_ONBOARDING`)도 새 메뉴면 함께 추가. 단축키/토글/새 패널처럼 발견이 어려운 기능은 반드시 투어에. 내부 구조 변경만은 대상 X.
    - 큰 사이클이 끝나면 `CHANGELOG.md` 에 항목 추가, 사용자에게 보이는 변경은 `README.md` 의 스크린샷/스펙도 점검.
 
 ## 릴리즈

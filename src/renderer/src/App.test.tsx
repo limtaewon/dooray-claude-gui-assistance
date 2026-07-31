@@ -40,8 +40,8 @@ vi.mock('./components/Terminal/TerminalView', () => ({
 vi.mock('./components/MentionAgent/MentionAgentView', () => ({
   default: (): JSX.Element => <div data-testid="view-agent">agent</div>
 }))
-vi.mock('./components/ClaudeManual/ClaudeManual', () => ({
-  default: (): JSX.Element => <div data-testid="view-manual">manual</div>
+vi.mock('./components/Onboarding/OnboardingHub', () => ({
+  default: (): JSX.Element => <div data-testid="view-onboarding">onboarding</div>
 }))
 vi.mock('./components/Sessions/ClaudeCodeSessionsView', () => ({
   default: (): JSX.Element => <div data-testid="view-sessions">sessions</div>

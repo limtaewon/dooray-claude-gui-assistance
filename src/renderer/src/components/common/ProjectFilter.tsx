@@ -154,7 +154,8 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
 
   return (
     <div className="relative">
-      <button ref={anchorRef} onClick={() => setOpen(!open)}
+      <button
+      data-tour="dooray-project-filter" ref={anchorRef} onClick={() => setOpen(!open)}
         className="ds-btn secondary sm"
         title="표시할 프로젝트 선택">
         <Settings size={13} />

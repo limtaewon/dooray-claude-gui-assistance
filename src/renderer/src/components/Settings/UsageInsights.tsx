@@ -11,7 +11,7 @@ const FEATURE_LABELS: Record<string, string> = {
   'view.skills': 'Claude 스킬',
   'view.sessions': '세션',
   'view.usage': '사용량',
-  'view.manual': '매뉴얼',
+  'view.onboarding': '온보딩',
   'view.settings': '설정',
   'ai.briefing': 'AI 브리핑',
   'ai.report': '보고서',

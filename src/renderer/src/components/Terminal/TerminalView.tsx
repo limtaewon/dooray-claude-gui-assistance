@@ -1241,12 +1241,14 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
           </SortableContext>
           {insertionIndex === tabs.length && <TabDropIndicator />}
           <button onClick={() => createTab()}
+            data-tour="terminal-new-tab"
             className="w-7 h-7 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover flex-shrink-0"
             title="새 터미널 (⌘T)">
             <Plus size={14} />
           </button>
           <div className="ml-auto flex items-center gap-2 flex-shrink-0">
             <button onClick={toggleDrawer}
+              data-tour="terminal-drawer-toggle"
               aria-pressed={drawerOpen}
               className={`flex items-center gap-1.5 h-7 px-2.5 rounded-[7px] text-[calc(11.5px_*_var(--app-font-scale,1))] font-medium border transition-colors ${
                 drawerOpen

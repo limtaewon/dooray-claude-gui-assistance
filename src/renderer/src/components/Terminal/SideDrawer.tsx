@@ -128,6 +128,7 @@ function SideDrawer({
             <button
               key={id}
               onClick={() => onTabChange(id)}
+              data-tour={`drawer-tab-${id}`}
               aria-pressed={active}
               title={label}
               aria-label={label}

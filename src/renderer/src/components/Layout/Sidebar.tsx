@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Server, Sparkles, BarChart3, Calendar, Terminal, BookOpen, MessageSquare, GitBranch, Settings, Users, Radar, Lightbulb, Bot, Workflow } from 'lucide-react'
+import { Server, Sparkles, BarChart3, Calendar, Terminal, MessageSquare, GitBranch, Settings, Users, Radar, Lightbulb, Bot, Workflow, Compass } from 'lucide-react'
 
-export type SidebarView = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'manual' | 'sessions' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent' | 'harness' | 'workspace'
+export type SidebarView = 'mcp' | 'skills' | 'usage' | 'dooray' | 'terminal' | 'onboarding' | 'sessions' | 'settings' | 'community' | 'monitoring' | 'ai-recommend' | 'agent' | 'harness' | 'workspace'
 // 호환성 유지를 위해 기존 별칭도 export
 export type View = SidebarView
 
@@ -39,7 +39,7 @@ export const CUSTOMIZABLE_NAV_ITEMS: SidebarNavItem[] = [
 ]
 
 const STANDALONE_ITEMS: SidebarNavItem[] = [
-  { view: 'manual', icon: BookOpen, label: '매뉴얼' },
+  { view: 'onboarding', icon: Compass, label: '온보딩' },
   { view: 'settings', icon: Settings, label: '설정' }
 ]
 
