@@ -113,7 +113,7 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
             <span className="text-[calc(11.5px_*_var(--app-font-scale,1))] font-semibold text-text-primary">두레이 업무</span>
             {/* 프로젝트 선택은 자기 줄을 차지할 만큼 자주 쓰지 않는다 — 헤더 아이콘으로 접어둔다. */}
             <div className="ml-auto flex items-center gap-0.5 flex-none">
-              <ProjectFilter settingsKey={PROJECTS_SETTINGS_KEY} showSettingsLink onChanged={() => void load(true)} />
+              <ProjectFilter settingsKey={PROJECTS_SETTINGS_KEY} readOnly showSettingsLink onChanged={() => void load(true)} />
               <Button variant="ghost" size="xs" onClick={() => void load(true)} aria-label="업무 새로고침">
                 <RefreshCw size={12} />
               </Button>

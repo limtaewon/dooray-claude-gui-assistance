@@ -36,6 +36,10 @@ export const IPC_CHANNELS = {
   AI_RECOMMEND_NOTIFY_SET_ENABLED: 'ai-recommend:notify:set-enabled',
 
   // Dooray
+  GITHUB_STATUS: 'github:status',
+  GITHUB_CONNECT: 'github:connect',
+  GITHUB_DISCONNECT: 'github:disconnect',
+
   DOORAY_TOKEN_SET: 'dooray:token:set',
   DOORAY_TOKEN_GET: 'dooray:token:get',
   DOORAY_TOKEN_DELETE: 'dooray:token:delete',

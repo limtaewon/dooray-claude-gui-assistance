@@ -82,6 +82,7 @@ import { AnalyticsService } from './analytics/AnalyticsService'
 import { WorkspaceStore } from './workspace/WorkspaceStore'
 import { WorkspaceService } from './workspace/WorkspaceService'
 import { TaskDropService } from './workspace/TaskDropService'
+import { GitHubService } from './github/GitHubService'
 import {
   ClaudeDoneNotifier,
   DEFAULT_CLAUDE_DONE_SETTINGS,
@@ -221,6 +222,7 @@ const claudeChat = new ClaudeChatService(getClaudeBin())
 const claudeSessions = new ClaudeSessionService()
 const claudeAttachments = new AttachmentService()
 const store = new Store({ name: 'clauday-data' })
+const githubService = new GitHubService()
 const terminalManager = new TerminalManager()
 
 const claudeDoneNotifier = new ClaudeDoneNotifier({
@@ -1273,6 +1275,11 @@ function registerIpcHandlers(): void {
   })
 
   // Settings
+  // GitHub 연동 — 토큰은 키체인에만 두고 렌더러에는 계정 정보만 돌려준다.
+  ipcMain.handle(IPC_CHANNELS.GITHUB_STATUS, (_, refresh?: boolean) => githubService.status(refresh === true))
+  ipcMain.handle(IPC_CHANNELS.GITHUB_CONNECT, (_, token: string) => githubService.connect(token))
+  ipcMain.handle(IPC_CHANNELS.GITHUB_DISCONNECT, () => githubService.disconnect())
+
   ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, (_, key: string) => store.get(key))
   ipcMain.handle(IPC_CHANNELS.SETTINGS_SET, (_, { key, value }: { key: string; value: unknown }) => {
     store.set(key, value)

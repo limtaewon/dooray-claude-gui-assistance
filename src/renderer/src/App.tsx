@@ -15,6 +15,7 @@ import DoorayAssistant from './components/Dooray/DoorayAssistant'
 import TerminalView from './components/Terminal/TerminalView'
 import MentionAgentView from './components/MentionAgent/MentionAgentView'
 import OnboardingHub from './components/Onboarding/OnboardingHub'
+import SetupWizard from './components/Onboarding/SetupWizard'
 import TourOverlay from './components/common/onboarding/TourOverlay'
 import { TOURS, type TourViewId } from './components/common/onboarding/tours'
 import ClaudeCodeSessionsView from './components/Sessions/ClaudeCodeSessionsView'
@@ -92,6 +93,33 @@ function App(): JSX.Element {
     setTourCompleted([])
     void window.api.settings.set('onboardingCompleted', []).catch(() => undefined)
   }, [])
+
+  // 처음 켠 사람에게 무엇부터 해야 하는지 보여준다 — 한 번 닫으면 다시 뜨지 않는다.
+  const [setupOpen, setSetupOpen] = useState(false)
+  useEffect(() => {
+    void window.api.settings
+      .get('setupCompleted')
+      .then((done) => { if (!done) setSetupOpen(true) })
+      .catch(() => undefined)
+  }, [])
+
+  /** 실험실 기능 — 켜지 않으면 사이드바·팔레트·화면 어디에도 나오지 않는다. */
+  const [experimentalViews, setExperimentalViews] = useState<View[]>([])
+  useEffect(() => {
+    const load = (): void => {
+      void window.api.settings
+        .get('experimentalViews')
+        .then((saved) => setExperimentalViews(Array.isArray(saved) ? (saved as View[]) : []))
+        .catch(() => setExperimentalViews([]))
+    }
+    load()
+    window.addEventListener('experimental-views-changed', load)
+    return () => window.removeEventListener('experimental-views-changed', load)
+  }, [])
+  const harnessEnabled = experimentalViews.includes('harness')
+  useEffect(() => {
+    if (!harnessEnabled && activeView === 'harness') setActiveView('dooray')
+  }, [harnessEnabled, activeView])
 
   const [doorayConfigured, setDoorayConfigured] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
@@ -313,7 +341,9 @@ function App(): JSX.Element {
         { id: 'go-agent', label: '에이전트', icon: <Bot size={13} /> },
         { id: 'go-terminal', label: '터미널', icon: <TerminalIcon size={13} />, hint: '⌘3' },
         { id: 'go-git', label: '브랜치 · 소스 제어', icon: <GitBranch size={13} />, hint: '터미널 우측 패널' },
-        { id: 'go-harness', label: 'Harness Studio', icon: <Workflow size={13} /> },
+        ...(harnessEnabled
+          ? [{ id: 'go-harness', label: 'Harness Studio', icon: <Workflow size={13} /> }]
+          : []),
         { id: 'go-community', label: '커뮤니티', icon: <Users size={13} /> },
         { id: 'go-mcp', label: 'MCP 서버', icon: <Server size={13} /> },
         { id: 'go-skills', label: 'Claude 스킬', icon: <Sparkles size={13} /> },
@@ -424,11 +454,14 @@ function App(): JSX.Element {
                 <ClaudeCodeSessionsView active={activeView === 'sessions'} />
               </ErrorBoundary>
             </div>
-            <div className={`absolute inset-0 ${vis('harness')}`}>
-              <ErrorBoundary label="Harness Studio">
-                <HarnessStudioView active={activeView === 'harness'} />
-              </ErrorBoundary>
-            </div>
+            {/* 실험실: 켜기 전에는 마운트조차 하지 않는다 — 안 쓰는 기능이 백그라운드로 돌지 않게. */}
+            {harnessEnabled && (
+              <div className={`absolute inset-0 ${vis('harness')}`}>
+                <ErrorBoundary label="Harness Studio">
+                  <HarnessStudioView active={activeView === 'harness'} />
+                </ErrorBoundary>
+              </div>
+            )}
             <div className={`absolute inset-0 ${vis('usage')}`}><UsageDashboard /></div>
             <div className={`absolute inset-0 ${vis('onboarding')}`}>
               <OnboardingHub
@@ -442,6 +475,8 @@ function App(): JSX.Element {
             </div>
           </main>
         </div>
+
+        {setupOpen && <SetupWizard onClose={() => setSetupOpen(false)} />}
 
         {tour && (
           <TourOverlay

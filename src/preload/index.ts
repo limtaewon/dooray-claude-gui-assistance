@@ -152,6 +152,7 @@ import type {
   TerminalResolvePathRequest,
   TerminalResolvedPath
 } from '../shared/types/terminal'
+import type { GitHubStatus } from '../shared/types/github'
 import type {
   GitWorktree,
   GitWorktreeUsage,
@@ -631,6 +632,15 @@ const api = {
   claudeCli: {
     info: (): Promise<{ version: string; mainHelp: string; mcpHelp: string; authHelp: string; agentsHelp: string; pluginHelp: string }> =>
       ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_CLI_INFO)
+  },
+
+  /** GitHub 연동 — 토큰은 키체인에만, 렌더러로는 계정 정보만 온다. */
+  github: {
+    status: (refresh?: boolean): Promise<GitHubStatus> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GITHUB_STATUS, refresh),
+    connect: (token: string): Promise<GitHubStatus> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GITHUB_CONNECT, token),
+    disconnect: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.GITHUB_DISCONNECT)
   },
 
   // Git Worktree

@@ -9,6 +9,12 @@ interface ProjectFilterProps {
   settingsKey?: string
   /** 하단에 '설정에서 프로젝트별 규칙 정하기' 링크를 보일지 (업무 목록에서만 의미가 있다) */
   showSettingsLink?: boolean
+  /**
+   * 고르지 못하게 하고 **지금 뭐가 켜져 있는지만** 보여준다.
+   * 프로젝트를 고른 뒤 정할 것들(저장소·브랜치·첫 지시)이 설정에만 있어서, 두 군데서 고르게 하면
+   * 여기서 고른 프로젝트가 규칙 없이 남는다.
+   */
+  readOnly?: boolean
   /** 프로젝트 목록 대신 위키 도메인 목록을 사용할지 */
   useWikiDomains?: boolean
   onChanged?: () => void
@@ -18,6 +24,7 @@ function ProjectFilter({
   settingsKey = 'pinnedProjects',
   useWikiDomains = false,
   showSettingsLink = false,
+  readOnly = false,
   onChanged
 }: ProjectFilterProps): JSX.Element {
   const [open, setOpen] = useState(false)
@@ -160,7 +167,10 @@ function ProjectFilter({
   for (const cp of customProjects) {
     if (!allProjects.some((p) => p.id === cp.id)) mergedProjects.push(cp)
   }
-  const filtered = mergedProjects.filter((p) =>
+  const visibleProjects = readOnly
+    ? mergedProjects.filter((p) => pinnedIds.includes(p.id))
+    : mergedProjects
+  const filtered = visibleProjects.filter((p) =>
     !searchQuery || p.code.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
@@ -171,7 +181,7 @@ function ProjectFilter({
         className="ds-btn secondary sm"
         title="표시할 프로젝트 선택">
         <Settings size={13} />
-        프로젝트 선택
+        {readOnly ? '표시 중인 프로젝트' : '프로젝트 선택'}
         {pinnedCount > 0 && (
           <span className="ml-0.5 px-1.5 rounded-full bg-brand-dooray text-white text-[calc(9px_*_var(--app-font-scale,1))] font-semibold">
             {pinnedCount}
@@ -192,10 +202,13 @@ function ProjectFilter({
             }}
           >
             <div className="px-3 py-2 border-b border-bg-border bg-bg-surface-hover">
-              <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">표시할 프로젝트 선택</span>
+              <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">
+                {readOnly ? '표시 중인 프로젝트' : '표시할 프로젝트 선택'}
+              </span>
               <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary ml-2">{pinnedCount > 0 ? `${pinnedCount}개 선택` : '전체 표시'}</span>
             </div>
-            {/* 검색 */}
+            {/* 검색 — 조회 전용일 때는 목록이 짧아 필요 없다 */}
+            {!readOnly && (
             <div className="px-2 py-1.5 border-b border-bg-border">
               <div className="relative">
                 <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary" />
@@ -214,19 +227,27 @@ function ProjectFilter({
                 )}
               </div>
             </div>
+            )}
             {/* 프로젝트 목록 */}
             <div className="flex-1 min-h-0 overflow-y-auto py-1">
               {loading ? (
                 <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">로딩...</div>
               ) : filtered.length === 0 ? (
-                <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">검색 결과 없음</div>
+                <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">
+                  {readOnly ? '아직 고른 프로젝트가 없습니다' : '검색 결과 없음'}
+                </div>
               ) : filtered.map((p) => {
                 const checked = pinnedIds.includes(p.id)
                 const isCustom = customIds.has(p.id)
                 return (
                   <div key={p.id} className="flex items-center group">
-                    <button onClick={() => toggle(p.id)}
-                      className="flex-1 flex items-center gap-2 px-3 py-1.5 hover:bg-bg-surface-hover transition-colors text-left">
+                    <button
+                      onClick={() => { if (!readOnly) void toggle(p.id) }}
+                      disabled={readOnly}
+                      className={`flex-1 flex items-center gap-2 px-3 py-1.5 transition-colors text-left ${
+                        readOnly ? 'cursor-default' : 'hover:bg-bg-surface-hover'
+                      }`}
+                    >
                       <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 ${
                         checked
                           ? 'bg-brand-dooray border-brand-dooray'
@@ -253,6 +274,7 @@ function ProjectFilter({
               })}
             </div>
             {/* 수동 추가 */}
+            {!readOnly && (
             <div className="border-t border-bg-border">
               {showAddForm ? (
                 <div className="px-2 py-2 space-y-1.5">
@@ -282,6 +304,7 @@ function ProjectFilter({
                 </button>
               )}
             </div>
+            )}
 
             {/* 고른 뒤에 정할 것들(저장소·브랜치 이름·첫 지시 문구)은 이 좁은 팝오버에서 다룰 수 없다.
                 여기서 어설프게 흉내 내지 말고 제대로 된 화면으로 보낸다. */}
@@ -296,7 +319,9 @@ function ProjectFilter({
                 className="flex items-center gap-1.5 w-full px-3 py-2 border-t border-bg-border text-left text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover transition-colors"
               >
                 <Settings size={11} className="flex-none" />
-                <span className="flex-1 min-w-0">프로젝트별 규칙 정하기 — 저장소 · 브랜치 이름 · 첫 지시 문구</span>
+                <span className="flex-1 min-w-0">
+                  설정에서 프로젝트 고르기 — 저장소 · 브랜치 이름 · 첫 지시 문구
+                </span>
                 <ChevronRight size={11} className="flex-none text-text-tertiary" />
               </button>
             )}

@@ -33,7 +33,7 @@ describe('ProjectFilter', () => {
     renderWithDs(<ProjectFilter showSettingsLink />)
 
     await userEvent.click(screen.getByRole('button', { name: /프로젝트 선택/ }))
-    await userEvent.click(await screen.findByText(/프로젝트별 규칙 정하기/))
+    await userEvent.click(await screen.findByText(/설정에서 프로젝트 고르기/))
 
     await waitFor(() => expect(listener).toHaveBeenCalled())
     const event = listener.mock.calls[0][0] as CustomEvent<{ tab: string }>
@@ -41,10 +41,22 @@ describe('ProjectFilter', () => {
     window.removeEventListener('goto-settings', listener)
   })
 
+  it('조회 전용이면 고를 수 없고 켜진 것만 보여준다', async () => {
+    renderWithDs(<ProjectFilter readOnly />)
+    await userEvent.click(screen.getByRole('button', { name: /표시 중인 프로젝트/ }))
+
+    // 고른 것만 나오고, 그 행은 눌러도 바뀌지 않는다
+    expect(await screen.findByText('NEON')).toBeInTheDocument()
+    expect(screen.queryByText('Clauday')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /NEON/ })).toBeDisabled()
+    expect(screen.queryByPlaceholderText('프로젝트 검색...')).not.toBeInTheDocument()
+    expect(screen.queryByText(/프로젝트 수동 추가/)).not.toBeInTheDocument()
+  })
+
   it('링크를 켜지 않으면 나오지 않는다', async () => {
     renderWithDs(<ProjectFilter />)
     await userEvent.click(screen.getByRole('button', { name: /프로젝트 선택/ }))
     await screen.findByPlaceholderText('프로젝트 검색...')
-    expect(screen.queryByText(/프로젝트별 규칙 정하기/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/설정에서 프로젝트 고르기/)).not.toBeInTheDocument()
   })
 })

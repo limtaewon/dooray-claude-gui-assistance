@@ -7,8 +7,7 @@ import {
   Keyboard,
   Palette,
   SlidersHorizontal,
-  type LucideIcon
-} from 'lucide-react'
+  type LucideIcon, Github } from 'lucide-react'
 import type { SettingsSearchTarget } from './settingsSearch'
 
 export type SettingsSectionId =
@@ -16,6 +15,7 @@ export type SettingsSectionId =
   | 'insights'
   | 'dooray'
   | 'caldav'
+  | 'github'
   | 'workspace'
   | 'keys'
   | 'appearance'
@@ -43,7 +43,8 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
     label: '연결',
     items: [
       { id: 'dooray', label: '두레이', icon: Key },
-      { id: 'caldav', label: '캘린더', icon: CalendarDays }
+      { id: 'caldav', label: '캘린더', icon: CalendarDays },
+      { id: 'github', label: 'GitHub', icon: Github }
     ]
   },
   {
@@ -84,6 +85,10 @@ export const SETTINGS_SECTION_META: Record<
   dooray: {
     title: '두레이 연결',
     description: 'API 토큰을 연결하면 업무·위키·캘린더·메신저를 앱 안에서 봅니다. 토큰은 OS 키체인에 저장됩니다.'
+  },
+  github: {
+    title: 'GitHub 연결',
+    description: '개인 액세스 토큰으로 계정을 연결합니다. 토큰은 OS 키체인에 저장되고 앱 밖으로 나가지 않습니다.'
   },
   caldav: {
     title: '캘린더 연결',
@@ -127,6 +132,7 @@ export const SETTINGS_SEARCH_TARGETS: SettingsSearchTarget[] = [
   })),
 
   { sectionId: 'dooray', title: 'API 토큰', keywords: ['token', 'api', '인증', '로그인'] },
+  { sectionId: 'github', title: 'GitHub 연결', description: '개인 액세스 토큰 · 연결된 계정', keywords: ['github', '깃허브', 'token', '토큰', 'pat'] },
   { sectionId: 'caldav', title: 'CalDAV 엔드포인트', keywords: ['caldav', 'calendar', '일정'] },
   { sectionId: 'dooray', title: 'Socket Mode 봇', description: '@clauday 멘션 수신', keywords: ['socket', 'bot', '멘션', 'mention', 'clauday'] },
   { sectionId: 'workspace', title: '두레이 프로젝트 선택', keywords: ['project', '핀', '고정'] },
@@ -144,6 +150,7 @@ export const SETTINGS_SEARCH_TARGETS: SettingsSearchTarget[] = [
   { sectionId: 'appearance', title: '사이드바 구성', description: '메뉴 순서와 표시 여부', keywords: ['sidebar', 'menu', '메뉴', '순서'] },
 
   { sectionId: 'behavior', title: '시작 화면', keywords: ['startup', '시작', '첫 화면'] },
+  { sectionId: 'behavior', title: '실험실', description: 'Harness Studio 등 아직 다듬는 중인 기능', keywords: ['experimental', '실험', 'lab', 'harness'] },
   { sectionId: 'behavior', title: 'claude 작업 완료 알림', description: '터미널의 claude 가 멈추면 알립니다', keywords: ['notification', '알림', 'claude', '완료', 'terminal', '터미널'] },
   { sectionId: 'behavior', title: '터미널 렌더러', description: 'WebGL 또는 DOM', keywords: ['renderer', 'webgl', 'gpu', '터미널'] },
   { sectionId: 'behavior', title: 'AI 추천 알림', keywords: ['notification', '알림', 'recommend'] }

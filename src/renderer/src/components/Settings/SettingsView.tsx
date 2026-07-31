@@ -10,6 +10,7 @@ import { useFontSettings, FONT_FAMILY_LABELS, type FontFamily } from '../../hook
 import ThemePicker from './ThemePicker'
 import { Modal } from '../common/ds'
 import SettingsSection, { SettingsSectionProvider } from './SettingsSection'
+import GitHubSettings from './GitHubSettings'
 import {
   SettingsDivider,
   SettingsNumberRow,
@@ -177,6 +178,9 @@ function SettingsView({ onExit }: { onExit?: () => void }): JSX.Element {
           <SettingsSectionProvider activeSectionId={activeSection} query={searchQuery}>
             <SettingsSection id="dooray" title={meta.title} description={meta.description} bare>
               <DoorayTokenSettings />
+            </SettingsSection>
+            <SettingsSection id="github" title={meta.title} description={meta.description} bare>
+              <GitHubSettings />
             </SettingsSection>
             <SettingsSection id="caldav" title={meta.title} description={meta.description} bare>
               <CalDAVSettings />
@@ -931,6 +935,7 @@ function BehaviorSettings(): JSX.Element {
       }
     />,
     <TerminalRendererSection key="renderer" />,
+    <ExperimentalSection key="experimental" />,
     <ClaudeDoneNotifySection key="claude-done" />,
     <AiRecommendNotifyToggle key="notify" />
   ]
@@ -1109,6 +1114,50 @@ function SidebarPrefsSection(): JSX.Element {
  * AI 추천 새 글 OS 알림 토글 — 1시간 폴링 + 22~9시 silent.
  * 사용자 설정은 main 측 electron-store 에 저장. UI 는 단순 boolean.
  */
+/** 실험실 — 아직 다듬는 중인 기능. 켜기 전에는 사이드바·팔레트에 나오지 않는다. */
+const EXPERIMENTAL_ITEMS: { view: string; label: string; description: string }[] = [
+  {
+    view: 'harness',
+    label: 'Harness Studio',
+    description: '작업 방법론을 캔버스로 그리고 실행 전에 흐름을 확인합니다. 아직 다듬는 중입니다.'
+  }
+]
+
+function ExperimentalSection(): JSX.Element {
+  const [enabled, setEnabled] = useState<string[]>([])
+
+  useEffect(() => {
+    void window.api.settings
+      .get('experimentalViews')
+      .then((saved) => setEnabled(Array.isArray(saved) ? (saved as string[]) : []))
+      .catch(() => undefined)
+  }, [])
+
+  const toggle = (view: string): void => {
+    const next = enabled.includes(view) ? enabled.filter((v) => v !== view) : [...enabled, view]
+    setEnabled(next)
+    void window.api.settings.set('experimentalViews', next)
+    // 사이드바·팔레트가 즉시 반영하도록 알린다.
+    window.dispatchEvent(new CustomEvent('experimental-views-changed'))
+  }
+
+  return (
+    <>
+      <SettingsSubsectionHeader title="실험실" />
+      {EXPERIMENTAL_ITEMS.map((item) => (
+        <SettingsSwitchRow
+          key={item.view}
+          label={item.label}
+          description={item.description}
+          searchKeywords={['experimental', '실험', 'lab', item.view]}
+          checked={enabled.includes(item.view)}
+          onChange={() => toggle(item.view)}
+        />
+      ))}
+    </>
+  )
+}
+
 interface ClaudeDoneSettingsShape {
   enabled: boolean
   onlyWhenUnfocused: boolean

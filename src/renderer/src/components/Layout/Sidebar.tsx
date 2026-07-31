@@ -55,8 +55,17 @@ export const DEFAULT_SIDEBAR_PREFS: SidebarPrefs = {
   hidden: []
 }
 
+/**
+ * 실험실 기능 — 기본 모드에서는 목록에 아예 나오지 않는다.
+ * 설정에서 켜야 사이드바·커맨드 팔레트에 등장한다.
+ */
+export const EXPERIMENTAL_VIEWS: View[] = ['harness']
+
 /** 저장된 prefs 와 현재 카탈로그를 머지 — 신규 항목은 뒤에 append, 사라진 항목은 제거. */
-function resolveOrderedItems(prefs: SidebarPrefs | null): SidebarNavItem[] {
+export function resolveOrderedItems(
+  prefs: SidebarPrefs | null,
+  experimentalEnabled: View[] = []
+): SidebarNavItem[] {
   const map = new Map(CUSTOMIZABLE_NAV_ITEMS.map((i) => [i.view, i]))
   const seen = new Set<View>()
   const ordered: SidebarNavItem[] = []
@@ -70,7 +79,10 @@ function resolveOrderedItems(prefs: SidebarPrefs | null): SidebarNavItem[] {
   for (const item of CUSTOMIZABLE_NAV_ITEMS) {
     if (!seen.has(item.view)) ordered.push(item)
   }
-  return ordered.filter((i) => !hidden.has(i.view))
+  const enabled = new Set(experimentalEnabled)
+  return ordered.filter(
+    (i) => !hidden.has(i.view) && (!EXPERIMENTAL_VIEWS.includes(i.view) || enabled.has(i.view))
+  )
 }
 
 /** Design System Sidebar. 36×36 버튼, 20px 아이콘. 활성 상태는 무채색(--bg-active 면 + 밝은 글자) —
@@ -121,6 +133,20 @@ function Sidebar({ activeView, onViewChange, expanded = true }: SidebarProps): J
   const [agentUnread, setAgentUnread] = useState(0)
   const [agentPulse, setAgentPulse] = useState(false)
   const [prefs, setPrefs] = useState<SidebarPrefs | null>(null)
+  const [experimental, setExperimental] = useState<View[]>([])
+
+  // 실험실 기능 목록 — 설정에서 켜야 사이드바에 나온다.
+  useEffect(() => {
+    const load = (): void => {
+      void window.api.settings
+        .get('experimentalViews')
+        .then((saved) => setExperimental(Array.isArray(saved) ? (saved as View[]) : []))
+        .catch(() => setExperimental([]))
+    }
+    load()
+    window.addEventListener('experimental-views-changed', load)
+    return () => window.removeEventListener('experimental-views-changed', load)
+  }, [])
 
   // 저장된 prefs 로드 + 변경 이벤트 구독 — 설정에서 바꾸면 즉시 반영
   useEffect(() => {
@@ -172,7 +198,7 @@ function Sidebar({ activeView, onViewChange, expanded = true }: SidebarProps): J
     }
   }, [activeView])
 
-  const items = resolveOrderedItems(prefs)
+  const items = resolveOrderedItems(prefs, experimental)
 
   return (
     <aside className={`bg-bg-sidebar border-r border-bg-border flex flex-col py-2 gap-0.5 flex-shrink-0 transition-[width] duration-150 ${

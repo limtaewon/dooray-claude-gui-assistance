@@ -15,7 +15,6 @@ const ORDER: TourViewId[] = [
   'community',
   'ai-recommend',
   'usage',
-  'harness',
   'settings'
 ]
 

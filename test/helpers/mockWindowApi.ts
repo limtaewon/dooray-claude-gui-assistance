@@ -217,6 +217,11 @@ export function createMockWindowApi(): Record<string, unknown> {
     claudeCli: {
       info: vi.fn().mockResolvedValue({ version: '', mainHelp: '', mcpHelp: '', authHelp: '', agentsHelp: '', pluginHelp: '' })
     },
+    github: {
+      status: vi.fn().mockResolvedValue({ connected: false }),
+      connect: vi.fn().mockResolvedValue({ connected: false }),
+      disconnect: vi.fn().mockResolvedValue(undefined)
+    },
     git: {
       isRepo: vi.fn().mockResolvedValue(false),
       repoRoot: vi.fn().mockResolvedValue(''),
