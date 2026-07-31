@@ -206,4 +206,26 @@ describe('TaskDropService', () => {
       expect(svc.listLinks('proj-1', 'task-1')).toHaveLength(2)
     })
   })
+  describe('link — 이름 붙이기', () => {
+    it('호출부가 준 라벨을 쓴다 — 워크트리 경로는 등록된 저장소와 절대 같지 않다', async () => {
+      const svc = make({
+        sessions: [{ sessionId: 's1', lastActivityAt: new Date(2000).toISOString() }]
+      })
+
+      await svc.link('p1', 't1', '/Users/me/Desktop/.2NEON-worktrees/feature-neon-6793', 1000, '2NEON · feature/neon-6793')
+
+      expect(svc.listLinks('p1', 't1')[0].repoName).toBe('2NEON · feature/neon-6793')
+    })
+
+    it('라벨이 없으면 폴더 이름으로 떨어진다 — 배지가 비어 보이면 안 된다', async () => {
+      const svc = make({
+        sessions: [{ sessionId: 's1', lastActivityAt: new Date(2000).toISOString() }]
+      })
+
+      await svc.link('p1', 't1', '/Users/me/Desktop/.2NEON-worktrees/feature-neon-6793', 1000)
+
+      expect(svc.listLinks('p1', 't1')[0].repoName).toBe('feature-neon-6793')
+    })
+  })
 })
+

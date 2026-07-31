@@ -81,7 +81,13 @@ export class TaskDropService {
    * 후보로 보고 가장 최근 것을 고른다 — 이미 열려 있던 다른 세션을 잘못 붙잡지 않기 위함.
    * 후보가 없으면 null 을 반환하며 매핑도 만들지 않는다(다음 드롭이 다시 시도한다).
    */
-  async link(projectId: string, taskId: string, cwd: string, since: number): Promise<string | null> {
+  async link(
+    projectId: string,
+    taskId: string,
+    cwd: string,
+    since: number,
+    label?: string
+  ): Promise<string | null> {
     const sessions = await this.listSessions(cwd)
     let best: { sessionId: string; at: number } | null = null
     for (const s of sessions) {
@@ -91,7 +97,12 @@ export class TaskDropService {
     }
     if (!best) return null
 
-    const repoName = this.store.listRepos().find((r) => r.path === cwd)?.name
+    // 워크트리 경로는 등록된 저장소와 절대 같지 않다 — 호출부가 준 이름(저장소 · 브랜치)을
+    // 우선 쓰고, 없으면 폴더 이름으로 떨어진다. 여기서 undefined 가 되면 배지가 밋밋해진다.
+    const repoName =
+      label?.trim() ||
+      this.store.listRepos().find((r) => r.path === cwd)?.name ||
+      cwd.replace(/[/\\]+$/, '').split(/[/\\]/).pop()
     this.store.upsertTaskSessionLink(workspaceKey(projectId, taskId), {
       cwd,
       claudeSessionId: best.sessionId,

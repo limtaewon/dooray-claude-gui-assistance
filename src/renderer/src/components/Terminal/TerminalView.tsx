@@ -506,14 +506,23 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     // 폴더를 모르면 연결 키를 만들 수 없어 건너뛴다 — 실행 자체는 이미 끝났다.
     const linkCwd = plan.cwd
     if (!sessionId && linkCwd) {
-      setTimeout(() => {
-        void window.api.workspace.taskDrop
-          .link(task.projectId, task.taskId, linkCwd, since)
-          .then((sid) => {
-            if (sid) window.dispatchEvent(new CustomEvent('task-session-linked'))
-          })
-          .catch(() => undefined)
-      }, 8000)
+      // claude 가 세션 파일을 언제 쓰는지는 우리가 정하지 못한다 — 한 번만 보고 포기하면
+      // 시작이 느린 날엔 배지가 영영 안 붙는다. 몇 번 더 확인한다.
+      const label = plan.repoName
+      const attempts = [8000, 20000, 45000]
+      void (async () => {
+        for (const delay of attempts) {
+          await new Promise((r) => setTimeout(r, delay))
+          const sid = await window.api.workspace.taskDrop
+            .link(task.projectId, task.taskId, linkCwd, since, label)
+            .catch(() => null)
+          if (sid) {
+            window.dispatchEvent(new CustomEvent('task-session-linked'))
+            return
+          }
+        }
+        console.warn(`[TaskDrop] 세션을 찾지 못해 연결하지 못했습니다 cwd=${linkCwd}`)
+      })()
     }
   }, [toast])
 

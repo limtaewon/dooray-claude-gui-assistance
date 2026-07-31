@@ -1811,8 +1811,14 @@ ${data}`,
     return taskDropService.resolve(projectId, taskId, preferCwd)
   })
   workspaceHandle(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINK, (params) => {
-    const { projectId, taskId, cwd, since } = params as { projectId: string; taskId: string; cwd: string; since: number }
-    return taskDropService.link(projectId, taskId, cwd, since)
+    const { projectId, taskId, cwd, since, label } = params as {
+      projectId: string
+      taskId: string
+      cwd: string
+      since: number
+      label?: string
+    }
+    return taskDropService.link(projectId, taskId, cwd, since, label)
   })
   workspaceHandle(IPC_CHANNELS.WORKSPACE_TASK_DROP_UNLINK, (params) => {
     const { projectId, taskId, cwd } = params as { projectId: string; taskId: string; cwd?: string }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ClipboardList, RefreshCw, Search, Unlink } from 'lucide-react'
+import { ClipboardList, RefreshCw, Search } from 'lucide-react'
 import type { DoorayTask } from '@shared/types/dooray'
 import type { TaskSessionLink } from '@shared/types/workspace'
 import { workspaceKey } from '@shared/workspace/workspaceKey'
@@ -85,14 +85,6 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
     })
   }, [tasks, query, filter])
 
-  const unlink = async (task: DoorayTask): Promise<void> => {
-    await window.api.workspace.taskDrop.unlink(task.projectId, task.id)
-    setLinks((prev) => {
-      const next = { ...prev }
-      delete next[workspaceKey(task.projectId, task.id)]
-      return next
-    })
-  }
 
   /** 저장소 배지 클릭 — 그 폴더의 세션을 새 터미널 탭에서 이어간다. */
   const resumeSession = (task: DoorayTask, link: TaskSessionLink): void => {
@@ -186,19 +178,6 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
                     }
                   }}
                 >
-                  {isLinked && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        void unlink(task)
-                      }}
-                      aria-label={`${task.subject} 세션 연결 해제`}
-                      className="text-text-tertiary hover:text-text-primary"
-                    >
-                      <Unlink size={11} />
-                    </button>
-                  )}
                 </TaskCard>
               )
             })

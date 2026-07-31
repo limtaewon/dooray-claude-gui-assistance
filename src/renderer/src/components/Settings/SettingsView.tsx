@@ -11,7 +11,17 @@ import ThemePicker from './ThemePicker'
 import { Modal } from '../common/ds'
 import SettingsSection, { SettingsSectionProvider } from './SettingsSection'
 import { DEFAULT_TERMINAL_THEME_ID, TERMINAL_THEMES } from '@shared/terminal/themes'
+import {
+  DEFAULT_TERMINAL_FONT,
+  TERMINAL_FONT_FAMILIES,
+  TERMINAL_FONT_SIZE_RANGE,
+  TERMINAL_LINE_HEIGHT_RANGE,
+  resolveTerminalFont,
+  terminalFontFamily,
+  type TerminalFontSettings
+} from '@shared/terminal/fonts'
 import { saveTerminalTheme } from '../../hooks/useTerminalTheme'
+import { saveTerminalFont } from '../../hooks/useTerminalFont'
 import GitHubSettings from './GitHubSettings'
 import {
   SettingsDivider,
@@ -890,6 +900,13 @@ function AppearanceSettings(): JSX.Element {
       <SettingsSubsectionHeader title="글꼴 & 크기" description="앱 전체에 적용됩니다." />
       <FontSettingsSection />
     </div>,
+    <div key="terminal-font" className="space-y-3">
+      <SettingsSubsectionHeader
+        title="터미널 글꼴"
+        description="글씨가 흐릿하면 시스템 고정폭으로 바꾸거나 굵기를 올려보세요 — 웹폰트는 내려받는 동안 흐리게 보일 수 있습니다."
+      />
+      <TerminalFontSection />
+    </div>,
     <div key="terminal-theme" className="space-y-3">
       <SettingsSubsectionHeader
         title="터미널 색"
@@ -907,6 +924,107 @@ function AppearanceSettings(): JSX.Element {
   ].filter(Boolean)
 
   return <SettingsBlocks blocks={blocks} />
+}
+
+/** 터미널 글꼴 — 고르면 열려 있는 터미널에 바로 반영된다. */
+function TerminalFontSection(): JSX.Element {
+  const [font, setFont] = useState<TerminalFontSettings>(DEFAULT_TERMINAL_FONT)
+
+  useEffect(() => {
+    void window.api.settings
+      .get('terminalFont')
+      .then((saved) => setFont(resolveTerminalFont(saved)))
+      .catch(() => undefined)
+  }, [])
+
+  const patch = (next: Partial<TerminalFontSettings>): void => {
+    const merged = resolveTerminalFont({ ...font, ...next })
+    setFont(merged)
+    void saveTerminalFont(merged)
+  }
+
+  const active = TERMINAL_FONT_FAMILIES.find((f) => f.id === font.familyId)
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-2">
+        {TERMINAL_FONT_FAMILIES.map((family) => {
+          const on = family.id === font.familyId
+          return (
+            <button
+              key={family.id}
+              onClick={() => patch({ familyId: family.id })}
+              aria-pressed={on}
+              className={`flex flex-col gap-1 p-2.5 rounded-lg border text-left transition-colors ${
+                on ? 'bg-bg-active border-bg-border-strong' : 'border-bg-border hover:bg-bg-surface-hover'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <span
+                  className={`flex-1 text-[calc(11.5px_*_var(--app-font-scale,1))] truncate ${
+                    on ? 'text-text-primary font-medium' : 'text-text-secondary'
+                  }`}
+                >
+                  {family.label}
+                </span>
+                {on && <Check size={11} className="flex-none text-text-primary" />}
+              </span>
+              <span
+                className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary truncate"
+                style={{ fontFamily: terminalFontFamily(family.id) }}
+              >
+                git commit -m &quot;한글 Ag 0O1l&quot;
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {active?.note && (
+        <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">{active.note}</p>
+      )}
+
+      <SettingsNumberRow
+        label="글자 크기"
+        description="터미널에만 적용됩니다."
+        searchKeywords={['font', 'size', '글자', '크기']}
+        value={font.size}
+        min={TERMINAL_FONT_SIZE_RANGE.min}
+        max={TERMINAL_FONT_SIZE_RANGE.max}
+        suffix="px"
+        defaultValue={DEFAULT_TERMINAL_FONT.size}
+        onChange={(next) => patch({ size: next })}
+      />
+      <SettingsRow
+        label="굵기"
+        description="흐릿해 보이면 한 단계 올려보세요."
+        searchKeywords={['weight', '굵기', 'bold']}
+        control={
+          <SettingsSegmentedControl
+            value={String(font.weight)}
+            onChange={(v) => patch({ weight: Number(v) as TerminalFontSettings['weight'] })}
+            ariaLabel="터미널 글꼴 굵기"
+            options={[
+              { value: '400', label: '보통' },
+              { value: '500', label: '조금 굵게' },
+              { value: '600', label: '굵게' }
+            ]}
+          />
+        }
+      />
+      <SettingsNumberRow
+        label="줄 간격"
+        description="1.0 이 가장 촘촘합니다."
+        searchKeywords={['line height', '줄간격']}
+        value={font.lineHeight}
+        min={TERMINAL_LINE_HEIGHT_RANGE.min}
+        max={TERMINAL_LINE_HEIGHT_RANGE.max}
+        step={0.1}
+        defaultValue={DEFAULT_TERMINAL_FONT.lineHeight}
+        onChange={(next) => patch({ lineHeight: next })}
+      />
+    </div>
+  )
 }
 
 /** 터미널 색 테마 — 고르면 열려 있는 터미널에 바로 반영된다. */

@@ -764,8 +764,14 @@ const api = {
       resolve: (projectId: string, taskId: string, preferCwd?: string): Promise<TaskDropTarget | null> =>
         ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_RESOLVE, { projectId, taskId, preferCwd }),
       /** 드롭 직후 생긴 세션을 태스크에 연결. `since` 이후 활동한 세션만 후보다. */
-      link: (projectId: string, taskId: string, cwd: string, since: number): Promise<string | null> =>
-        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINK, { projectId, taskId, cwd, since }),
+      link: (
+        projectId: string,
+        taskId: string,
+        cwd: string,
+        since: number,
+        label?: string
+      ): Promise<string | null> =>
+        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINK, { projectId, taskId, cwd, since, label }),
       /** cwd 를 주면 그 폴더 링크만, 안 주면 이 업무의 링크 전부를 해제한다. */
       unlink: (projectId: string, taskId: string, cwd?: string): Promise<void> =>
         ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_UNLINK, { projectId, taskId, cwd }),

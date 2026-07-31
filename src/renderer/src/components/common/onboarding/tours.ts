@@ -65,8 +65,8 @@ export const TOURS: Record<TourViewId, TourStep[]> = {
       body: '워크트리 헤더의 `정리…` 에서 오래 안 쓴 워크트리를 용량·마지막 사용과 함께 보고 골라 지웁니다. 브랜치와 커밋은 남으므로 같은 업무를 다시 시작하면 이어집니다.'
     },
     {
-      title: '터미널 색은 따로 고릅니다',
-      body: '설정 → 외관 → 터미널 색에서 19종 중에 고릅니다(Dracula · Tokyo Night · Catppuccin · Gruvbox · Nord · Solarized 등, 밝은 테마 4종 포함). 앱 테마와 분리돼 있어 밝은 앱에 어두운 터미널 같은 조합도 만들 수 있고, 고르면 열려 있는 터미널에 바로 반영됩니다.'
+      title: '터미널 글꼴과 색은 따로 고릅니다',
+      body: '설정 → 외관에서 터미널 글꼴(크기·굵기·줄 간격 포함)과 색을 따로 정합니다. 색은 19종 중에 고릅니다(Dracula · Tokyo Night · Catppuccin · Gruvbox · Nord · Solarized 등, 밝은 테마 4종 포함). 앱 테마와 분리돼 있어 밝은 앱에 어두운 터미널 같은 조합도 만들 수 있고, 고르면 열려 있는 터미널에 바로 반영됩니다.'
     },
     {
       title: 'claude 가 멈추면 알려줍니다',

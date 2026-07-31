@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Copy, ExternalLink, Hash, Play, Send, Terminal as TerminalIcon, TerminalSquare, Unlink, X } from 'lucide-react'
+import { Copy, ExternalLink, Hash, Play, Send, Terminal as TerminalIcon, TerminalSquare, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -272,11 +272,6 @@ function TaskSessionList({ task }: { task: DoorayTask }): JSX.Element | null {
     )
   }
 
-  const disconnect = async (link: TaskSessionLink): Promise<void> => {
-    await window.api.workspace.taskDrop.unlink(task.projectId, task.id, link.cwd)
-    load()
-    window.dispatchEvent(new CustomEvent('task-session-linked'))
-  }
 
   return (
     <div className="mb-5 rounded-lg border border-bg-border bg-bg-surface-raised p-3">
@@ -311,15 +306,6 @@ function TaskSessionList({ task }: { task: DoorayTask }): JSX.Element | null {
               title={`${link.cwd} 에서 이 세션 이어가기`}
             >
               <Play size={10} /> 이어가기
-            </button>
-            <button
-              type="button"
-              onClick={() => void disconnect(link)}
-              aria-label={`${link.repoName ?? link.cwd} 세션 연결 해제`}
-              title="연결 해제 — 다음부터 새 세션으로 시작합니다"
-              className="ds-btn ghost icon flex-none opacity-0 group-hover:opacity-100 focus:opacity-100"
-            >
-              <Unlink size={11} />
             </button>
           </div>
         ))}

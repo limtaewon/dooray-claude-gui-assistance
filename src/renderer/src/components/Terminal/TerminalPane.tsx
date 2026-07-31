@@ -20,6 +20,8 @@ import { createReplayGuard, REPLAY_CLEAR, POST_REPLAY_MODE_RESET } from './repla
 import { shouldAttachWebgl, getGlobalWebglFailure, setGlobalWebglFailure } from './webglPolicy'
 import { activateTerminalUnicodeProvider } from './terminalUnicodeProvider'
 import { useTerminalTheme } from '../../hooks/useTerminalTheme'
+import { useTerminalFont } from '../../hooks/useTerminalFont'
+import { terminalFontFamily } from '@shared/terminal/fonts'
 import { installLinkProviderGuard } from './links/terminalLinkProviderGuard'
 import { createFilePathLinkProvider } from './links/filePathLinkProvider'
 import { createLinkTooltip } from './links/linkTooltip'
@@ -37,6 +39,19 @@ import { windowsPtyOptions } from '@shared/utils/windowsPty'
 import { trimSerializedToBytes } from '@shared/utils/textBytes'
 import type { TerminalPaneSnapshot } from '@shared/types/terminal'
 import '@xterm/xterm/css/xterm.css'
+
+/**
+ * WebGL 렌더러가 캐시한 글리프 아틀라스를 비운다.
+ * 글꼴·배율이 바뀐 뒤 비우지 않으면 옛 비트맵이 남아 흐릿하게 보인다.
+ */
+function clearGlyphCache(term: Terminal): void {
+  const clear = (term as unknown as { clearTextureAtlas?: () => void }).clearTextureAtlas
+  try {
+    clear?.call(term)
+  } catch {
+    /* DOM 렌더러에는 없는 API — 없으면 그대로 둔다 */
+  }
+}
 
 /** v2.0 B-5: serialize() 스냅샷의 leaf 당 UTF-8 바이트 캡 (ADR-v2-terminal-p2-03 §9). */
 const PANE_SNAPSHOT_MAX_BYTES = 512 * 1024
@@ -136,6 +151,8 @@ function TerminalPaneInner(
   const { visible, focused } = resolvePaneActivation({ isVisible, isFocused, isActive })
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<Terminal | null>(null)
+  /** DPR 변경 구독 해제 — 마운트 effect 안에서 만들어 언마운트 때 푼다 */
+  const dprCleanupRef = useRef<(() => void) | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const searchAddonRef = useRef<SearchAddon | null>(null)
   const serializeAddonRef = useRef<SerializeAddon | null>(null)
@@ -168,13 +185,32 @@ function TerminalPaneInner(
   const onCwdChangeRef = useRef(onCwdChange)
   useEffect(() => { onCwdChangeRef.current = onCwdChange }, [onCwdChange])
   const terminalTheme = useTerminalTheme()
+  const terminalFont = useTerminalFont()
+  const fontRef = useRef(terminalFont)
+  fontRef.current = terminalFont
   const themeRef = useRef(terminalTheme)
   themeRef.current = terminalTheme
 
   // 설정에서 테마를 바꾸면 이미 떠 있는 pane 도 즉시 따라온다 — 새 탭부터만 바뀌면 헷갈린다.
   useEffect(() => {
-    if (terminalRef.current) terminalRef.current.options.theme = { ...terminalTheme.colors }
+    // options 는 xterm 인스턴스가 만들어진 뒤에만 있다(테스트 대역에는 없을 수 있다).
+    if (terminalRef.current?.options) terminalRef.current.options.theme = { ...terminalTheme.colors }
   }, [terminalTheme])
+
+  // 글꼴이 바뀌면 셀 크기가 달라지므로 다시 맞춘다. WebGL 은 글리프를 아틀라스에 캐시하므로
+  // 비우지 않으면 옛 글꼴이 흐릿하게 남는다.
+  useEffect(() => {
+    const term = terminalRef.current
+    if (!term?.options) return
+    term.options.fontFamily = terminalFontFamily(terminalFont.familyId)
+    term.options.fontSize = terminalFont.size
+    term.options.lineHeight = terminalFont.lineHeight
+    term.options.fontWeight = terminalFont.weight
+    clearGlyphCache(term)
+    try {
+      fitAddonRef.current?.fit()
+    } catch { /* 숨은 pane 은 0×0 이라 실패할 수 있다 */ }
+  }, [terminalFont])
 
   const onTitleChangeRef = useRef(onTitleChange)
   useEffect(() => { onTitleChangeRef.current = onTitleChange }, [onTitleChange])
@@ -241,11 +277,12 @@ function TerminalPaneInner(
     const terminal = new Terminal({
       // 테마는 설정에서 고른다(기본 Clauday). 살아 있는 pane 은 아래 effect 가 갱신한다.
       theme: { ...themeRef.current.colors },
-      // CJK(한·중·일) 폰트 fallback. JetBrains Mono 에 한글 글리프가 없어 시스템 폰트로 떨어지면
-      // 셀 폭이 어긋나 "테 스 트" 처럼 보이는 이슈 → 모노스페이스 한글 폰트를 우선 명시.
-      fontFamily: 'JetBrains Mono, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans Mono CJK KR", monospace',
-      fontSize: 13,
-      lineHeight: 1.4,
+      // 글꼴은 설정에서 고른다. CJK 폴백은 `terminalFontFamily` 가 항상 뒤에 붙인다 —
+      // 한글 글리프가 없는 폰트로 떨어지면 셀 폭이 어긋나 "테 스 트" 처럼 벌어진다.
+      fontFamily: terminalFontFamily(fontRef.current.familyId),
+      fontSize: fontRef.current.size,
+      lineHeight: fontRef.current.lineHeight,
+      fontWeight: fontRef.current.weight,
       cursorBlink: true,
       scrollback: 10000,
       allowProposedApi: true,
@@ -292,6 +329,30 @@ function TerminalPaneInner(
 
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
+
+    // 흐릿함의 두 원인을 여기서 막는다.
+    //  1) 웹폰트가 늦게 도착하면 xterm 은 이미 폴백 글꼴로 글리프 아틀라스를 만든 뒤다 —
+    //     도착 시점에 아틀라스를 비우고 다시 맞춘다.
+    //  2) 모니터를 옮기거나 배율이 바뀌면(devicePixelRatio 변경) 아틀라스가 옛 배율로 남는다.
+    void document.fonts?.ready
+      .then(() => {
+        if (terminalRef.current !== terminal) return
+        clearGlyphCache(terminal)
+        try { fitAddon.fit() } catch { /* 숨은 pane */ }
+      })
+      .catch(() => undefined)
+
+    // matchMedia 는 jsdom 등 일부 환경에 없다 — 없으면 이 보정만 건너뛴다(치명적이지 않다).
+    const dprQuery = window.matchMedia?.(`(resolution: ${window.devicePixelRatio}dppx)`)
+    if (dprQuery) {
+      const onDprChange = (): void => {
+        if (terminalRef.current !== terminal) return
+        clearGlyphCache(terminal)
+        try { fitAddon.fit() } catch { /* 숨은 pane */ }
+      }
+      dprQuery.addEventListener('change', onDprChange)
+      dprCleanupRef.current = () => dprQuery.removeEventListener('change', onDprChange)
+    }
     searchAddonRef.current = searchAddon
     serializeAddonRef.current = serializeAddon
     // 검색 결과 카운트를 useTerminalSearch 훅으로 전달 — decoration 이 켜져 있을 때만 발화한다.
@@ -770,6 +831,8 @@ function TerminalPaneInner(
 
     return () => {
       cleanup()
+      dprCleanupRef.current?.()
+      dprCleanupRef.current = null
       searchResultsDisposable.dispose()
       titleDisposable.dispose()
       deferredEnter.clear()
