@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Check, Cpu, Key, Eye, EyeOff, ExternalLink, LogOut, Moon, Sun, Loader2, AlertCircle, Zap, X, ChevronUp, ChevronDown, GripVertical, RotateCcw, Search } from 'lucide-react'
+import { ArrowLeft, Check, Cpu, Key, Eye, EyeOff, ExternalLink, LogOut, Moon, Sun, Loader2, AlertCircle, Zap, X, ChevronUp, ChevronDown, GripVertical, RotateCcw, Search } from 'lucide-react'
 import { CUSTOMIZABLE_NAV_ITEMS, DEFAULT_SIDEBAR_PREFS, type SidebarPrefs, type SidebarView } from '../Layout/Sidebar'
 import type { AIModelConfig, AIModelName } from '../../../../shared/types/ai'
 import UsageInsights from './UsageInsights'
@@ -32,7 +32,7 @@ import { SETTINGS_SEARCH_DEBOUNCE_MS, matchedSectionIds } from './settingsSearch
  * 전부 마운트하면 각 패널이 저마다 IPC 를 때려 설정 진입이 느려진다.
  * 저장은 즉시 저장이고 "저장됨" 토스트를 따로 띄우지 않는다 — 컨트롤 자체가 상태를 보여준다.
  */
-function SettingsView(): JSX.Element {
+function SettingsView({ onExit }: { onExit?: () => void }): JSX.Element {
   const [activeSection, setActiveSection] = useState<SettingsSectionId>(DEFAULT_SETTINGS_SECTION)
   /** 입력값과 적용값을 나눈다 — 적용은 섹션을 갈아끼우므로 타이핑마다 하면 버벅인다. */
   const [searchInput, setSearchInput] = useState('')
@@ -74,11 +74,36 @@ function SettingsView(): JSX.Element {
     if (first) setActiveSection(first.id)
   }, [searching, matched, activeSection])
 
+  // Escape 로 나가되, 입력 중이면 그쪽이 우선이다 — 편집을 취소하려다 설정이 닫히면 안 된다.
+  useEffect(() => {
+    if (!onExit) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      const el = e.target as HTMLElement | null
+      const tag = el?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || el?.isContentEditable) return
+      onExit()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onExit])
+
   const meta = SETTINGS_SECTION_META[activeSection]
 
   return (
     <div className="h-full flex min-h-0">
-      <aside className="w-[220px] flex-none flex flex-col min-h-0 border-r border-bg-border bg-bg-sidebar">
+      <aside className="w-[240px] flex-none flex flex-col min-h-0 border-r border-bg-border bg-bg-sidebar">
+        {onExit && (
+          <div className="p-2 pb-0 flex-none">
+            <button
+              onClick={onExit}
+              className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary hover:bg-bg-surface-hover hover:text-text-primary"
+            >
+              <ArrowLeft size={13} className="flex-none" />
+              앱으로 돌아가기
+            </button>
+          </div>
+        )}
         <div className="p-2 flex-none">
           <div className="relative">
             <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary" />
@@ -144,7 +169,7 @@ function SettingsView(): JSX.Element {
       </aside>
 
       <div className="flex-1 min-w-0 overflow-y-auto">
-        <div className="mx-auto max-w-3xl px-8 pt-8 pb-20">
+        <div className="mx-auto w-full max-w-3xl xl:max-w-4xl 2xl:max-w-5xl px-8 pt-8 pb-20">
           <SettingsSectionProvider activeSectionId={activeSection} query={searchQuery}>
             <SettingsSection id="dooray" title={meta.title} description={meta.description} bare>
               <DoorayTokenSettings />

@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Copy, ExternalLink, Hash, Send, TerminalSquare, X } from 'lucide-react'
+import { Copy, ExternalLink, Hash, Play, Send, Terminal as TerminalIcon, TerminalSquare, Unlink, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import type { DoorayTask, DoorayTaskComment, DoorayTaskDetail } from '@shared/types/dooray'
+import type { TaskSessionLink } from '@shared/types/workspace'
+import { workspaceKey } from '@shared/workspace/workspaceKey'
 import DoorayImage from '../common/DoorayImage'
 import { Button, Chip, LoadingView, useToast } from '../common/ds'
 import { getWorkflowName } from '../Dooray/taskStyles'
@@ -164,6 +166,8 @@ function TaskDetailOverlay({ task, onClose, onRunInTerminal, promptText }: TaskD
 
         <div className="flex-1 min-h-0 flex">
           <div className="flex-1 min-w-0 overflow-y-auto px-7 pb-6 border-t border-bg-border pt-5">
+            <TaskSessionList task={task} />
+
             {loading ? (
               <LoadingView label="업무 정보를 불러오는 중" />
             ) : detail?.body?.content ? (
@@ -237,6 +241,100 @@ function TaskDetailOverlay({ task, onClose, onRunInTerminal, promptText }: TaskD
     </div>,
     document.body
   )
+}
+
+/**
+ * 이 업무가 폴더별로 쓰던 claude 세션.
+ *
+ * 업무 하나가 여러 저장소에 걸치는 일이 흔해서(예: 서버와 AI 를 같이 고침) 폴더마다 세션이
+ * 따로 생긴다. 어디서 무엇으로 작업했는지 여기서 보고 바로 이어간다.
+ */
+function TaskSessionList({ task }: { task: DoorayTask }): JSX.Element | null {
+  const [links, setLinks] = useState<TaskSessionLink[]>([])
+
+  const load = useCallback(() => {
+    void window.api.workspace.taskDrop
+      .linked()
+      .then((map) => setLinks(map[workspaceKey(task.projectId, task.id)] ?? []))
+      .catch(() => setLinks([]))
+  }, [task.projectId, task.id])
+
+  useEffect(load, [load])
+
+  if (links.length === 0) return null
+
+  const resume = (link: TaskSessionLink): void => {
+    void window.api.workspace.taskDrop.touch(task.projectId, task.id, link.cwd)
+    window.dispatchEvent(
+      new CustomEvent('create-terminal', {
+        detail: { cwd: link.cwd, initialCommand: `claude --resume ${link.claudeSessionId}` }
+      })
+    )
+  }
+
+  const disconnect = async (link: TaskSessionLink): Promise<void> => {
+    await window.api.workspace.taskDrop.unlink(task.projectId, task.id, link.cwd)
+    load()
+    window.dispatchEvent(new CustomEvent('task-session-linked'))
+  }
+
+  return (
+    <div className="mb-5 rounded-lg border border-bg-border bg-bg-surface-raised p-3">
+      <div className="flex items-center gap-1.5 mb-2">
+        <TerminalIcon size={12} className="text-brand-terminal flex-none" />
+        <span className="text-[calc(11.5px_*_var(--app-font-scale,1))] font-semibold text-text-primary">
+          진행 중인 작업
+        </span>
+        <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+          {links.length}개 폴더
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        {links.map((link) => (
+          <div key={link.cwd} className="group flex items-center gap-2 rounded px-1.5 py-1 hover:bg-bg-surface-hover">
+            <div className="flex-1 min-w-0">
+              <div className="text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-primary truncate">
+                {link.repoName ?? link.cwd.split('/').filter(Boolean).pop()}
+              </div>
+              <div className="text-[calc(9.5px_*_var(--app-font-scale,1))] text-text-tertiary truncate font-mono">
+                {link.cwd}
+              </div>
+            </div>
+            <span className="flex-none text-[calc(9.5px_*_var(--app-font-scale,1))] text-text-tertiary">
+              {relativeDay(link.lastUsedAt)}
+            </span>
+            <button
+              type="button"
+              onClick={() => resume(link)}
+              className="ds-btn secondary xs flex-none"
+              title={`${link.cwd} 에서 이 세션 이어가기`}
+            >
+              <Play size={10} /> 이어가기
+            </button>
+            <button
+              type="button"
+              onClick={() => void disconnect(link)}
+              aria-label={`${link.repoName ?? link.cwd} 세션 연결 해제`}
+              title="연결 해제 — 다음부터 새 세션으로 시작합니다"
+              className="ds-btn ghost icon flex-none opacity-0 group-hover:opacity-100 focus:opacity-100"
+            >
+              <Unlink size={11} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** 마지막 사용 시각을 사람이 읽는 말로. */
+function relativeDay(timestamp: number): string {
+  const days = Math.floor((Date.now() - timestamp) / 86_400_000)
+  if (days <= 0) return '오늘'
+  if (days === 1) return '어제'
+  if (days < 30) return `${days}일 전`
+  return `${Math.floor(days / 30)}개월 전`
 }
 
 export default TaskDetailOverlay

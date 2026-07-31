@@ -50,6 +50,11 @@ const DOORAY_SUBTAB_LABELS: Record<string, string> = {
 
 function App(): JSX.Element {
   const [activeView, setActiveView] = useState<View>('dooray')
+  /** 설정에서 '앱으로 돌아가기' 를 눌렀을 때 되돌아갈 화면 — 설정 직전에 보던 곳. */
+  const previousViewRef = useRef<View>('dooray')
+  useEffect(() => {
+    if (activeView !== 'settings') previousViewRef.current = activeView
+  }, [activeView])
   const [doorayConfigured, setDoorayConfigured] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
   const [quickTodoOpen, setQuickTodoOpen] = useState(false)
@@ -340,7 +345,11 @@ function App(): JSX.Element {
           onToggleSidebar={toggleSidebar}
         />
         <div className="flex flex-1 overflow-hidden">
-          <Sidebar activeView={activeView} onViewChange={setActiveView} expanded={sidebarExpanded} />
+          {/* 설정에 들어가면 사이드바를 감춘다 — 설정 중에 다른 메뉴가 같이 보이면 지금 어디에
+              있는지가 흐려진다. 복귀는 설정 안의 '앱으로 돌아가기' 로만 한다. */}
+          {activeView !== 'settings' && (
+            <Sidebar activeView={activeView} onViewChange={setActiveView} expanded={sidebarExpanded} />
+          )}
           <main className="flex-1 overflow-hidden relative">
             <div className={`absolute inset-0 ${vis('dooray')}`}>
               {doorayConfigured ? (
@@ -384,7 +393,9 @@ function App(): JSX.Element {
             </div>
             <div className={`absolute inset-0 ${vis('usage')}`}><UsageDashboard /></div>
             <div className={`absolute inset-0 ${vis('manual')}`}><ClaudeManual /></div>
-            <div className={`absolute inset-0 ${vis('settings')}`}><SettingsView /></div>
+            <div className={`absolute inset-0 ${vis('settings')}`}>
+              <SettingsView onExit={() => setActiveView(previousViewRef.current)} />
+            </div>
           </main>
         </div>
         <ImageLightbox />

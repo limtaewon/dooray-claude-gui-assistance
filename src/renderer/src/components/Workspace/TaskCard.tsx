@@ -1,6 +1,7 @@
 import { memo } from 'react'
+import { Play } from 'lucide-react'
 import type { DoorayTask } from '@shared/types/dooray'
-import type { AgentRunStatus } from '@shared/types/workspace'
+import type { AgentRunStatus, TaskSessionLink } from '@shared/types/workspace'
 import { getWorkflowName } from '../Dooray/taskStyles'
 import { runStatusDotClass } from './runStatus'
 
@@ -10,8 +11,13 @@ export interface TaskCardProps {
   /** 워크스페이스가 있으면 브랜치명 + run 상태를 하단에 붙인다 */
   branch?: string
   runStatus?: AgentRunStatus
-  /** 세션만 연결된 경우(터미널 드로어) */
-  linked?: boolean
+  /**
+   * 이 업무가 폴더별로 쓰던 claude 세션 (최근 사용순).
+   * 한 업무가 여러 저장소에 걸치므로 배지도 폴더마다 하나씩 붙는다.
+   */
+  sessions?: TaskSessionLink[]
+  /** 저장소 배지를 눌렀을 때 — 그 폴더의 세션을 이어서 연다 */
+  onResumeSession?: (link: TaskSessionLink) => void
   onSelect?: (task: DoorayTask) => void
   /** 드래그 가능 카드로 만들 때 */
   draggableProps?: {
@@ -19,6 +25,10 @@ export interface TaskCardProps {
     onDragStart: (e: React.DragEvent) => void
   }
   children?: React.ReactNode
+}
+
+function basename(path: string): string {
+  return path.split(/[/\\]/).filter(Boolean).pop() || path
 }
 
 /** 워크플로우 상태 → 칩 색. 두레이 상태명이 자유 문자열이라 class 로만 판정한다. */
@@ -44,7 +54,8 @@ const TaskCard = memo(function TaskCard({
   selected = false,
   branch,
   runStatus,
-  linked = false,
+  sessions,
+  onResumeSession,
   onSelect,
   draggableProps,
   children
@@ -74,7 +85,22 @@ const TaskCard = memo(function TaskCard({
             {branch}
           </span>
         )}
-        {linked && !branch && <span className="ds-chip emerald">세션 연결됨</span>}
+        {!branch &&
+          sessions?.map((link) => (
+            <button
+              key={link.cwd}
+              type="button"
+              title={`${link.cwd} — 이 폴더의 세션 이어가기`}
+              onClick={(e) => {
+                e.stopPropagation()
+                onResumeSession?.(link)
+              }}
+              className="ds-chip emerald cursor-pointer max-w-[120px]"
+            >
+              <Play size={8} className="flex-none" />
+              <span className="truncate">{link.repoName ?? basename(link.cwd)}</span>
+            </button>
+          ))}
         {children}
       </div>
     </div>

@@ -354,7 +354,11 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       setTimeout(() => setDropBusy(null), 2500)
       return
     }
-    const target = await window.api.workspace.taskDrop.resolve(task.projectId, task.taskId).catch(() => null)
+    // 드롭한 pane 이 이미 있는 폴더에 이 업무의 세션이 있으면 그걸 이어간다 —
+    // 업무 하나가 여러 저장소에 걸치므로 "지금 이 자리" 가 어느 세션인지를 가른다.
+    const target = await window.api.workspace.taskDrop
+      .resolve(task.projectId, task.taskId, pane.cwd)
+      .catch(() => null)
     if (!target) {
       setDropBusy('저장소가 등록되어 있지 않습니다 — 설정 → 워크스페이스')
       setTimeout(() => setDropBusy(null), 4000)

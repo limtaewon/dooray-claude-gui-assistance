@@ -167,16 +167,51 @@ describe('WorkspaceStore — workspace / run 조회', () => {
   })
 })
 
-describe('WorkspaceStore — taskSessionLinks', () => {
-  it('setTaskSessionLink 후 getTaskSessionLink 로 조회', () => {
+describe('WorkspaceStore — taskSessionLinks (업무 × 폴더)', () => {
+  it('upsert 후 목록으로 조회', () => {
     const store = new WorkspaceStore(new MemoryStorage())
-    store.setTaskSessionLink('proj-1:task-1', { cwd: '/wt', claudeSessionId: 'sid', lastUsedAt: 1 })
-    expect(store.getTaskSessionLink('proj-1:task-1')?.claudeSessionId).toBe('sid')
+    store.upsertTaskSessionLink('proj-1:task-1', { cwd: '/wt', claudeSessionId: 'sid', lastUsedAt: 1 })
+    expect(store.listTaskSessionLinks('proj-1:task-1')[0].claudeSessionId).toBe('sid')
   })
 
-  it('없는 키는 null', () => {
+  it('없는 키는 빈 배열', () => {
     const store = new WorkspaceStore(new MemoryStorage())
-    expect(store.getTaskSessionLink('none:none')).toBeNull()
+    expect(store.listTaskSessionLinks('none:none')).toEqual([])
+  })
+
+  it('폴더가 다르면 나란히 쌓인다 — 한 업무가 여러 저장소에 걸치는 경우', () => {
+    const store = new WorkspaceStore(new MemoryStorage())
+    store.upsertTaskSessionLink('k', { cwd: '/a', claudeSessionId: 'a', lastUsedAt: 1 })
+    store.upsertTaskSessionLink('k', { cwd: '/b', claudeSessionId: 'b', lastUsedAt: 2 })
+    expect(store.listTaskSessionLinks('k')).toHaveLength(2)
+  })
+
+  it('같은 폴더는 덮어쓴다', () => {
+    const store = new WorkspaceStore(new MemoryStorage())
+    store.upsertTaskSessionLink('k', { cwd: '/a', claudeSessionId: 'old', lastUsedAt: 1 })
+    store.upsertTaskSessionLink('k', { cwd: '/a', claudeSessionId: 'new', lastUsedAt: 2 })
+    expect(store.listTaskSessionLinks('k')).toEqual([
+      { cwd: '/a', claudeSessionId: 'new', lastUsedAt: 2 }
+    ])
+  })
+
+  it('최근 사용순으로 준다', () => {
+    const store = new WorkspaceStore(new MemoryStorage())
+    store.upsertTaskSessionLink('k', { cwd: '/a', claudeSessionId: 'a', lastUsedAt: 1 })
+    store.upsertTaskSessionLink('k', { cwd: '/b', claudeSessionId: 'b', lastUsedAt: 9 })
+    expect(store.listTaskSessionLinks('k').map((l) => l.cwd)).toEqual(['/b', '/a'])
+  })
+
+  it('cwd 를 주면 그 폴더만 지우고, 안 주면 키 전체를 지운다', () => {
+    const store = new WorkspaceStore(new MemoryStorage())
+    store.upsertTaskSessionLink('k', { cwd: '/a', claudeSessionId: 'a', lastUsedAt: 1 })
+    store.upsertTaskSessionLink('k', { cwd: '/b', claudeSessionId: 'b', lastUsedAt: 2 })
+
+    store.removeTaskSessionLink('k', '/a')
+    expect(store.listTaskSessionLinks('k').map((l) => l.cwd)).toEqual(['/b'])
+
+    store.removeTaskSessionLink('k')
+    expect(store.listTaskSessionLinks('k')).toEqual([])
   })
 })
 

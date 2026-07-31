@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ClipboardList, RefreshCw, Search, Unlink } from 'lucide-react'
 import type { DoorayTask } from '@shared/types/dooray'
+import type { TaskSessionLink } from '@shared/types/workspace'
 import { workspaceKey } from '@shared/workspace/workspaceKey'
 import { Button, Input, LoadingView } from '../common/ds'
 import ProjectFilter from '../common/ProjectFilter'
@@ -34,7 +35,8 @@ interface TaskDrawerProps {
  */
 function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
   const [tasks, setTasks] = useState<DoorayTask[]>([])
-  const [linked, setLinked] = useState<Set<string>>(new Set())
+  /** `projectId:taskId` → 폴더별 세션. 한 업무가 여러 저장소에 걸칠 수 있다. */
+  const [links, setLinks] = useState<Record<string, TaskSessionLink[]>>({})
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<WorkflowFilter>('mine')
@@ -44,13 +46,13 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
     setLoading(true)
     try {
       const projectIds = ((await window.api.settings.get(PROJECTS_SETTINGS_KEY)) as string[] | null) ?? []
-      const [list, links] = await Promise.all([
+      const [list, linkMap] = await Promise.all([
         // 프로젝트를 고르지 않았으면 목록을 비운다 — 수백 건을 쏟아붓지 않는다
         projectIds.length > 0 ? window.api.dooray.tasks.list(projectIds, force) : Promise.resolve([]),
-        window.api.workspace.taskDrop.linked().catch(() => [] as string[])
+        window.api.workspace.taskDrop.linked().catch(() => ({}) as Record<string, TaskSessionLink[]>)
       ])
       setTasks(list)
-      setLinked(new Set(links))
+      setLinks(linkMap)
     } catch {
       setTasks([])
     } finally {
@@ -63,7 +65,7 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
     const onLinked = (): void => {
       void window.api.workspace.taskDrop
         .linked()
-        .then((keys) => setLinked(new Set(keys)))
+        .then(setLinks)
         .catch(() => undefined)
     }
     window.addEventListener('task-session-linked', onLinked)
@@ -82,11 +84,21 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
 
   const unlink = async (task: DoorayTask): Promise<void> => {
     await window.api.workspace.taskDrop.unlink(task.projectId, task.id)
-    setLinked((prev) => {
-      const next = new Set(prev)
-      next.delete(workspaceKey(task.projectId, task.id))
+    setLinks((prev) => {
+      const next = { ...prev }
+      delete next[workspaceKey(task.projectId, task.id)]
       return next
     })
+  }
+
+  /** 저장소 배지 클릭 — 그 폴더의 세션을 새 터미널 탭에서 이어간다. */
+  const resumeSession = (task: DoorayTask, link: TaskSessionLink): void => {
+    void window.api.workspace.taskDrop.touch(task.projectId, task.id, link.cwd)
+    window.dispatchEvent(
+      new CustomEvent('create-terminal', {
+        detail: { cwd: link.cwd, initialCommand: `claude --resume ${link.claudeSessionId}` }
+      })
+    )
   }
 
   return (
@@ -146,7 +158,8 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
           ) : (
             filtered.map((task) => {
               const key = workspaceKey(task.projectId, task.id)
-              const isLinked = linked.has(key)
+              const taskLinks = links[key] ?? []
+              const isLinked = taskLinks.length > 0
               const payload: TaskDragPayload = {
                 projectId: task.projectId,
                 taskId: task.id,
@@ -157,7 +170,8 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
                 <TaskCard
                   key={task.id}
                   task={task}
-                  linked={isLinked}
+                  sessions={taskLinks}
+                  onResumeSession={(link) => resumeSession(task, link)}
                   onSelect={setSelected}
                   draggableProps={{
                     draggable: true,

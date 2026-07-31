@@ -127,15 +127,29 @@ export class WorkspaceStore {
     return null
   }
 
-  getTaskSessionLink(key: WorkspaceKey): TaskSessionLink | null {
-    return this.state.taskSessionLinks[key] ?? null
+  /** 이 업무가 쓰던 세션들 — 폴더마다 하나씩, 최근 사용순. */
+  listTaskSessionLinks(key: WorkspaceKey): TaskSessionLink[] {
+    return [...(this.state.taskSessionLinks[key] ?? [])].sort((a, b) => b.lastUsedAt - a.lastUsedAt)
   }
 
-  /** link 가 null 이면 매핑을 해제한다 (터미널 태스크 드로어의 "연결 해제"). */
-  setTaskSessionLink(key: WorkspaceKey, link: TaskSessionLink | null): void {
+  /** 같은 폴더의 링크는 덮어쓰고, 다른 폴더면 나란히 둔다. */
+  upsertTaskSessionLink(key: WorkspaceKey, link: TaskSessionLink): void {
+    const existing = this.state.taskSessionLinks[key] ?? []
+    const next = [...existing.filter((l) => l.cwd !== link.cwd), link]
+    this.state.taskSessionLinks = { ...this.state.taskSessionLinks, [key]: next }
+    this.persist()
+  }
+
+  /** cwd 를 주면 그 폴더 링크만, 안 주면 이 업무의 링크 전부를 지운다. */
+  removeTaskSessionLink(key: WorkspaceKey, cwd?: string): void {
     const next = { ...this.state.taskSessionLinks }
-    if (link) next[key] = link
-    else delete next[key]
+    if (cwd) {
+      const remaining = (next[key] ?? []).filter((l) => l.cwd !== cwd)
+      if (remaining.length > 0) next[key] = remaining
+      else delete next[key]
+    } else {
+      delete next[key]
+    }
     this.state.taskSessionLinks = next
     this.persist()
   }

@@ -400,6 +400,8 @@ export const IPC_CHANNELS = {
   WORKSPACE_TASK_DROP_LINK: 'workspace:task-drop:link',
   WORKSPACE_TASK_DROP_UNLINK: 'workspace:task-drop:unlink',
   WORKSPACE_TASK_DROP_LINKED: 'workspace:task-drop:linked',
+  /** 세션을 다시 열었을 때 최근 사용 시각 갱신 */
+  WORKSPACE_TASK_DROP_TOUCH: 'workspace:task-drop:touch',
   /** main → renderer push 전용. ipcMain.handle 등록 금지. */
   WORKSPACE_RUN_UPDATED: 'workspace:run:updated',
   DOORAY_PROJECT_WORKFLOWS: 'dooray:project:workflows',

@@ -68,10 +68,19 @@ export interface TaskWorkspace {
 }
 
 /** 터미널 태스크 드로어(C-3.5) — 태스크 ↔ claude 세션 매핑. */
+/**
+ * 업무 하나가 특정 폴더에서 쓰던 claude 세션.
+ *
+ * 키가 **(업무, 폴더) 쌍**인 이유: 한 업무가 여러 저장소에 걸치는 일이 흔하다.
+ * 예를 들어 한 기능을 서버(2NEON)와 AI(neon-ai) 양쪽에서 동시에 고친다.
+ * 업무 하나에 세션 하나만 매달면 폴더를 옮길 때마다 이전 대화가 끊긴다.
+ */
 export interface TaskSessionLink {
   cwd: string
   claudeSessionId: string
   lastUsedAt: number
+  /** 표시용 저장소 이름 — 저장소 등록이 풀려도 어디였는지는 남아야 한다 */
+  repoName?: string
 }
 
 /** 태스크를 터미널 pane 에 드롭했을 때 열 대상 — `cd` 할 폴더와 이어갈 세션(있으면). */

@@ -49,6 +49,30 @@ describe('migrateWorkspaceState — 기본 상태', () => {
   it('taskSessionLinks 기본값은 {}', () => {
     expect(migrateWorkspaceState(undefined, {}).taskSessionLinks).toEqual({})
   })
+
+  it('v2.0 이전의 단일 링크를 원소 1개 배열로 올린다', () => {
+    const migrated = migrateWorkspaceState({
+      taskSessionLinks: { 'p:t': { cwd: '/a', claudeSessionId: 's', lastUsedAt: 1 } }
+    })
+    expect(migrated.taskSessionLinks['p:t']).toEqual([
+      { cwd: '/a', claudeSessionId: 's', lastUsedAt: 1 }
+    ])
+  })
+
+  it('이미 배열이면 그대로 둔다', () => {
+    const links = [{ cwd: '/a', claudeSessionId: 's', lastUsedAt: 1 }]
+    expect(migrateWorkspaceState({ taskSessionLinks: { 'p:t': links } }).taskSessionLinks['p:t'])
+      .toEqual(links)
+  })
+
+  it('모양이 깨진 링크는 버린다 — 저장소가 손상돼도 앱이 죽지 않아야 한다', () => {
+    const migrated = migrateWorkspaceState({
+      taskSessionLinks: { 'p:t': [{ cwd: '/a' }, null, { cwd: '/b', claudeSessionId: 's', lastUsedAt: 1 }] }
+    })
+    expect(migrated.taskSessionLinks['p:t']).toEqual([
+      { cwd: '/b', claudeSessionId: 's', lastUsedAt: 1 }
+    ])
+  })
 })
 
 describe('migrateWorkspaceState — legacyGitRepoPath 승격', () => {

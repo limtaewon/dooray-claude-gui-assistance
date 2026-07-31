@@ -14,7 +14,8 @@ export interface WorkspaceState {
   repos: RepoRegistryEntry[]
   projectRepoMap: Record<string, string>
   workspaces: Record<WorkspaceKey, TaskWorkspace>
-  taskSessionLinks: Record<WorkspaceKey, TaskSessionLink>
+  /** 업무 하나가 여러 폴더에 걸칠 수 있어 폴더별 배열이다 (v2.0에서 단일 → 배열로 승격). */
+  taskSessionLinks: Record<WorkspaceKey, TaskSessionLink[]>
   settings: WorkspaceSettings
 }
 
@@ -86,6 +87,25 @@ export function makeRepoId(absPath: string, platform: NodeJS.Platform = process.
  * 저장된 원시 상태를 현재 스키마로 마이그레이션한다. 형태가 깨졌으면 throw 하지 않고 빈 상태로 시작한다.
  * `legacyGitRepoPath` 가 있고 레지스트리가 비어 있으면 첫 저장소로 승격한다(멱등, `gitRepoPath` 키는 지우지 않음).
  */
+/**
+ * 업무↔세션 매핑을 폴더별 배열로 올린다.
+ * v2.0 이전에는 업무당 링크가 하나였다 — 그 값은 원소 1개짜리 배열로 감싼다.
+ */
+function migrateTaskSessionLinks(raw: unknown): Record<WorkspaceKey, TaskSessionLink[]> {
+  if (!isPlainObject(raw)) return {}
+  const result: Record<WorkspaceKey, TaskSessionLink[]> = {}
+  for (const [key, value] of Object.entries(raw)) {
+    const links = Array.isArray(value) ? value : [value]
+    const valid = links.filter((link): link is TaskSessionLink => {
+      if (!isPlainObject(link)) return false
+      const record = link as Record<string, unknown>
+      return typeof record.cwd === 'string' && typeof record.claudeSessionId === 'string'
+    })
+    if (valid.length > 0) result[key] = valid
+  }
+  return result
+}
+
 export function migrateWorkspaceState(raw: unknown, opts: { legacyGitRepoPath?: string } = {}): WorkspaceState {
   const state: WorkspaceState = isPlainObject(raw)
     ? {
@@ -93,9 +113,7 @@ export function migrateWorkspaceState(raw: unknown, opts: { legacyGitRepoPath?: 
         repos: Array.isArray(raw.repos) ? (raw.repos as RepoRegistryEntry[]) : [],
         projectRepoMap: isPlainObject(raw.projectRepoMap) ? (raw.projectRepoMap as Record<string, string>) : {},
         workspaces: isPlainObject(raw.workspaces) ? (raw.workspaces as Record<WorkspaceKey, TaskWorkspace>) : {},
-        taskSessionLinks: isPlainObject(raw.taskSessionLinks)
-          ? (raw.taskSessionLinks as Record<WorkspaceKey, TaskSessionLink>)
-          : {},
+        taskSessionLinks: migrateTaskSessionLinks(raw.taskSessionLinks),
         settings: isPlainObject(raw.settings)
           ? { ...DEFAULT_WORKSPACE_SETTINGS, ...(raw.settings as Partial<WorkspaceSettings>) }
           : { ...DEFAULT_WORKSPACE_SETTINGS }

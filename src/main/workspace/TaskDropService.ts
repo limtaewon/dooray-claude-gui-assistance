@@ -31,27 +31,43 @@ export class TaskDropService {
   }
 
   /**
-   * 드롭한 태스크를 어디서 열지 결정한다. 기존 세션 링크의 폴더가 살아 있으면 그것을,
-   * 아니면 프로젝트에 매핑된 저장소(없으면 기본 저장소)를 돌려준다. 저장소가 없으면 null.
+   * 드롭한 태스크를 어디서 열지 결정한다.
+   *
+   * 우선순위: ① 드롭한 pane 이 이미 있는 폴더의 링크(같은 자리에서 이어가는 게 자연스럽다)
+   * ② 가장 최근에 쓴 링크 중 폴더가 살아 있는 것 ③ 프로젝트에 매핑된 저장소(없으면 첫 저장소).
+   * 저장소가 하나도 없으면 null.
    */
-  async resolve(projectId: string, taskId: string): Promise<TaskDropTarget | null> {
+  async resolve(projectId: string, taskId: string, preferCwd?: string): Promise<TaskDropTarget | null> {
     const key = workspaceKey(projectId, taskId)
-    const link = this.store.getTaskSessionLink(key)
+    const links = this.store.listTaskSessionLinks(key).filter((l) => this.pathExists(l.cwd))
     const repos = this.store.listRepos()
+    const nameOf = (cwd: string, fallback?: string): string =>
+      repos.find((r) => r.path === cwd)?.name ?? fallback ?? cwd
+
+    const preferred = preferCwd ? links.find((l) => l.cwd === preferCwd) : undefined
+    const chosen = preferred ?? links[0]
+    if (chosen) {
+      return {
+        cwd: chosen.cwd,
+        repoName: nameOf(chosen.cwd, chosen.repoName),
+        claudeSessionId: chosen.claudeSessionId
+      }
+    }
+
     const mappedId = this.store.getState().projectRepoMap[projectId]
     const repo = repos.find((r) => r.id === mappedId) ?? repos[0]
-
-    if (link && this.pathExists(link.cwd)) {
-      const owner = repos.find((r) => r.path === link.cwd)
-      return { cwd: link.cwd, repoName: owner?.name ?? repo?.name ?? link.cwd, claudeSessionId: link.claudeSessionId }
-    }
     if (!repo) return null
     return { cwd: repo.path, repoName: repo.name }
   }
 
+  /** 이 업무가 폴더별로 쓰던 세션 목록 (최근 사용순). */
+  listLinks(projectId: string, taskId: string): TaskSessionLink[] {
+    return this.store.listTaskSessionLinks(workspaceKey(projectId, taskId))
+  }
+
   /**
-   * 드롭 직후 생긴 claude 세션을 태스크에 연결한다. `since` 이후 활동한 세션만 후보로 보고
-   * 가장 최근 것을 고른다 — 이미 열려 있던 다른 세션을 잘못 붙잡지 않기 위함.
+   * 드롭 직후 생긴 claude 세션을 (업무, 폴더) 쌍에 연결한다. `since` 이후 활동한 세션만
+   * 후보로 보고 가장 최근 것을 고른다 — 이미 열려 있던 다른 세션을 잘못 붙잡지 않기 위함.
    * 후보가 없으면 null 을 반환하며 매핑도 만들지 않는다(다음 드롭이 다시 시도한다).
    */
   async link(projectId: string, taskId: string, cwd: string, since: number): Promise<string | null> {
@@ -64,18 +80,41 @@ export class TaskDropService {
     }
     if (!best) return null
 
-    const record: TaskSessionLink = { cwd, claudeSessionId: best.sessionId, lastUsedAt: Date.now() }
-    this.store.setTaskSessionLink(workspaceKey(projectId, taskId), record)
+    const repoName = this.store.listRepos().find((r) => r.path === cwd)?.name
+    this.store.upsertTaskSessionLink(workspaceKey(projectId, taskId), {
+      cwd,
+      claudeSessionId: best.sessionId,
+      lastUsedAt: Date.now(),
+      repoName
+    })
     return best.sessionId
   }
 
-  /** 매핑 해제 — 다음 드롭은 새 세션으로 시작한다. */
-  unlink(projectId: string, taskId: string): void {
-    this.store.setTaskSessionLink(workspaceKey(projectId, taskId), null)
+  /** 세션을 다시 열었을 때 최근 사용 시각만 갱신한다 — 목록 정렬이 실제 사용을 따르게. */
+  touch(projectId: string, taskId: string, cwd: string): void {
+    const key = workspaceKey(projectId, taskId)
+    const link = this.store.listTaskSessionLinks(key).find((l) => l.cwd === cwd)
+    if (!link) return
+    this.store.upsertTaskSessionLink(key, { ...link, lastUsedAt: Date.now() })
   }
 
-  /** 링크가 있는 태스크 키 목록 — 드로어의 🔗 배지용. */
-  linkedKeys(): string[] {
-    return Object.keys(this.store.getState().taskSessionLinks)
+  /** 매핑 해제. cwd 를 주면 그 폴더만, 안 주면 이 업무의 링크 전부. */
+  unlink(projectId: string, taskId: string, cwd?: string): void {
+    this.store.removeTaskSessionLink(workspaceKey(projectId, taskId), cwd)
+  }
+
+  /** 업무 키 → 폴더별 링크. 드로어 카드의 저장소 배지에 그대로 쓴다. */
+  linkedMap(): Record<string, TaskSessionLink[]> {
+    const repos = this.store.listRepos()
+    const result: Record<string, TaskSessionLink[]> = {}
+    for (const [key, links] of Object.entries(this.store.getState().taskSessionLinks)) {
+      result[key] = [...links]
+        .sort((a, b) => b.lastUsedAt - a.lastUsedAt)
+        .map((link) => ({
+          ...link,
+          repoName: repos.find((r) => r.path === link.cwd)?.name ?? link.repoName
+        }))
+    }
+    return result
   }
 }

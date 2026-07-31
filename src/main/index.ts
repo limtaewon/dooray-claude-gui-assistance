@@ -1747,19 +1747,28 @@ ${data}`,
 
   // 터미널 태스크 드로어 (C-3.5)
   workspaceHandle(IPC_CHANNELS.WORKSPACE_TASK_DROP_RESOLVE, (params) => {
-    const { projectId, taskId } = params as { projectId: string; taskId: string }
-    return taskDropService.resolve(projectId, taskId)
+    const { projectId, taskId, preferCwd } = params as {
+      projectId: string
+      taskId: string
+      preferCwd?: string
+    }
+    return taskDropService.resolve(projectId, taskId, preferCwd)
   })
   workspaceHandle(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINK, (params) => {
     const { projectId, taskId, cwd, since } = params as { projectId: string; taskId: string; cwd: string; since: number }
     return taskDropService.link(projectId, taskId, cwd, since)
   })
   workspaceHandle(IPC_CHANNELS.WORKSPACE_TASK_DROP_UNLINK, (params) => {
-    const { projectId, taskId } = params as { projectId: string; taskId: string }
-    taskDropService.unlink(projectId, taskId)
+    const { projectId, taskId, cwd } = params as { projectId: string; taskId: string; cwd?: string }
+    taskDropService.unlink(projectId, taskId, cwd)
     return null
   })
-  workspaceHandle(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINKED, () => taskDropService.linkedKeys())
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_TASK_DROP_TOUCH, (params) => {
+    const { projectId, taskId, cwd } = params as { projectId: string; taskId: string; cwd: string }
+    taskDropService.touch(projectId, taskId, cwd)
+    return null
+  })
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINKED, () => taskDropService.linkedMap())
 
   // Analytics (로컬 전용 사용 분석)
   ipcMain.on(IPC_CHANNELS.ANALYTICS_TRACK, (_, event: { type: string; params?: Record<string, unknown> }) => {
