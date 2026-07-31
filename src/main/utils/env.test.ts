@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { homedir } from 'os'
-import { join, delimiter } from 'path'
+import { join, delimiter, posix } from 'path'
 import { mergePathIntoEnv, claudeExtraPaths } from './env'
 
 describe('mergePathIntoEnv', () => {
@@ -154,8 +154,10 @@ describe('claudeExtraPaths / mergePathIntoEnv — platform·home 옵션 생략 �
   })
 
   it('claudeExtraPaths — home 옵션 생략 시 실제 os.homedir() 을 사용', () => {
+    // platform 을 주입하므로 경로 구분자도 그 platform 것이어야 한다 —
+    // Windows 러너에서 posix join 을 기대하면 실패한다.
     const paths = claudeExtraPaths({ platform: 'darwin' })
-    expect(paths[0]).toBe(join(homedir(), '.claude', 'local'))
+    expect(paths[0]).toBe(posix.join(homedir(), '.claude', 'local'))
   })
 
   it('mergePathIntoEnv — delimiter 옵션 생략 시 path.delimiter 를 사용', () => {

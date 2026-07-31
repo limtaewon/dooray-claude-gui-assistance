@@ -147,14 +147,18 @@ describe('SkillsManager.save / read / delete', () => {
     expect(existsSync(outside)).toBe(false)
   })
 
-  it('read/delete 는 정제 전(레거시) 이름 그대로 만든 디렉토리에 접근할 수 있다 (봉쇄 검증만, 이름 변형 없음)', async () => {
+  // Windows 는 파일명에 `:` 를 못 쓴다 — 그 이름의 디렉터리 자체를 만들 수 없어 전제가 성립하지 않는다.
+  it.skipIf(process.platform === 'win32')(
+    'read/delete 는 정제 전(레거시) 이름 그대로 만든 디렉토리에 접근할 수 있다 (봉쇄 검증만, 이름 변형 없음)',
+    async () => {
     // mac/Linux 에서는 'Q&A: 정리' 같은 디렉토리가 실제로 존재할 수 있다 — read/delete 가 이를 변형하면 ENOENT.
     makeSkill('Q&A: 정리', '레거시 내용')
     const m = makeManager()
     expect(await m.read('Q&A: 정리')).toBe('레거시 내용')
     await expect(m.delete('Q&A: 정리')).resolves.toBeUndefined()
     expect(existsSync(join(tmpDir, 'Q&A: 정리'))).toBe(false)
-  })
+    }
+  )
 })
 
 describe('SkillsManager.importFromFiles', () => {
