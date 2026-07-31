@@ -49,33 +49,49 @@ describe('행 액션 가능 여부', () => {
 })
 
 describe('splitIntoSections', () => {
-  it('충돌 · 스테이징 · 변경 · 추적안됨으로 가른다', () => {
+  it('추적 여부로만 가른다 — 스테이징으로 가르면 체크할 때마다 파일이 섹션을 옮겨 다닌다', () => {
     const sections = splitIntoSections([
-      entry({ path: 'staged.ts', area: 'staged' }),
-      entry({ path: 'changed.ts' }),
-      entry({ path: 'new.ts', area: 'untracked', status: 'untracked' }),
-      entry({ path: 'conflict.ts', conflictKind: 'both_modified' })
+      entry({ path: 'a.ts', area: 'staged' }),
+      entry({ path: 'b.ts', area: 'unstaged' }),
+      entry({ path: 'c.ts', area: 'untracked', status: 'untracked' })
     ])
-    expect(sections.staged.map((e) => e.path)).toEqual(['staged.ts'])
-    expect(sections.changes.map((e) => e.path)).toEqual(['changed.ts'])
-    expect(sections.untracked.map((e) => e.path)).toEqual(['new.ts'])
-    expect(sections.conflicts.map((e) => e.path)).toEqual(['conflict.ts'])
+    expect(sections.changes.map((e) => e.path)).toEqual(['a.ts', 'b.ts'])
+    expect(sections.untracked.map((e) => e.path)).toEqual(['c.ts'])
   })
 
-  it('충돌은 area 와 무관하게 충돌 섹션으로 간다 — 스테이징 규칙이 다르다', () => {
-    const sections = splitIntoSections([entry({ area: 'staged', conflictKind: 'both_added' })])
-    expect(sections.staged).toHaveLength(0)
+  it('한 파일이 staged·unstaged 양쪽에 걸리면 한 줄로 합친다', () => {
+    const sections = splitIntoSections([
+      entry({ path: 'a.ts', area: 'staged', added: 10, removed: 2 }),
+      entry({ path: 'a.ts', area: 'unstaged', added: 3, removed: 1 })
+    ])
+    expect(sections.changes).toHaveLength(1)
+    expect(sections.changes[0]).toMatchObject({ added: 13, removed: 3 })
+  })
+
+  it('새로 추가된 파일이라는 사실이 우선한다', () => {
+    const sections = splitIntoSections([
+      entry({ path: 'a.ts', area: 'staged', status: 'added' }),
+      entry({ path: 'a.ts', area: 'unstaged', status: 'modified' })
+    ])
+    expect(sections.changes[0].status).toBe('added')
+  })
+
+  it('충돌은 따로 뺀다', () => {
+    const sections = splitIntoSections([
+      entry({ path: 'x.ts', area: 'staged', conflictKind: 'both_added' })
+    ])
     expect(sections.conflicts).toHaveLength(1)
+    expect(sections.changes).toHaveLength(0)
   })
 
-  it('빈 입력도 네 섹션을 모두 돌려준다', () => {
-    expect(splitIntoSections([])).toEqual({ staged: [], changes: [], untracked: [], conflicts: [] })
+  it('빈 입력', () => {
+    expect(splitIntoSections([])).toEqual({ changes: [], untracked: [], conflicts: [] })
   })
 })
 
 describe('entryKey', () => {
-  it('같은 파일이 staged/unstaged 양쪽에 있어도 키가 겹치지 않는다', () => {
-    expect(entryKey(entry({ area: 'staged' }))).not.toBe(entryKey(entry({ area: 'unstaged' })))
+  it('합쳐진 뒤에는 경로가 곧 한 줄이다', () => {
+    expect(entryKey(entry({ path: 'src/a.ts' }))).toBe('src/a.ts')
   })
 })
 

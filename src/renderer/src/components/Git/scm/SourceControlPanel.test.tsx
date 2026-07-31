@@ -16,15 +16,25 @@ const ENTRIES: GitStatusEntry[] = [
   entry({ path: 'docs/new.sql', area: 'untracked', status: 'untracked' })
 ]
 
-describe('SourceControlPanel — 커밋 대상 체크박스', () => {
+function mockStatus(entries: GitStatusEntry[] = ENTRIES): void {
+  vi.mocked(window.api.git.scm.status).mockResolvedValue({
+    entries,
+    branch: 'refs/heads/feature/neon-6793',
+    head: 'abc1234',
+    conflictOperation: 'none'
+  } as never)
+}
+
+async function render(): Promise<void> {
+  renderWithDs(<SourceControlPanel repoPath="/repo" onOpenDiff={() => {}} />)
+  await screen.findByText('feature/neon-6793')
+}
+
+describe('SourceControlPanel — 커밋 대상 선택', () => {
   beforeEach(() => {
     installMockWindowApi()
-    vi.mocked(window.api.git.scm.status).mockResolvedValue({
-      entries: ENTRIES,
-      branch: 'refs/heads/feature/neon-6793',
-      head: 'abc1234',
-      conflictOperation: 'none'
-    } as never)
+    mockStatus()
+    vi.mocked(window.api.git.scm.commit).mockResolvedValue({ ok: true, message: '' })
   })
 
   afterEach(() => {
@@ -32,54 +42,97 @@ describe('SourceControlPanel — 커밋 대상 체크박스', () => {
     vi.clearAllMocks()
   })
 
-  it('스테이징된 파일은 체크, 나머지는 해제로 보인다', async () => {
-    renderWithDs(<SourceControlPanel repoPath="/repo" onOpenDiff={() => {}} />)
+  it('추적 여부로만 나눈다 — 체크해도 파일이 섹션을 옮겨 다니지 않는다', async () => {
+    await render()
 
-    expect(await screen.findByRole('checkbox', { name: /src\/staged\.ts 커밋에서 빼기/ })).toBeChecked()
+    expect(screen.getByText('변경')).toBeInTheDocument()
+    expect(screen.getByText('버전이 없는 파일')).toBeInTheDocument()
+    // 스테이징 섹션은 없다
+    expect(screen.queryByText('커밋에 포함')).not.toBeInTheDocument()
+
+    const box = screen.getByRole('checkbox', { name: /docs\/new\.sql 커밋에 포함/ })
+    await userEvent.click(box)
+
+    // 체크만 바뀌고 여전히 같은 섹션에 있다
+    expect(screen.getByRole('checkbox', { name: /docs\/new\.sql 커밋에서 빼기/ })).toBeChecked()
+    expect(screen.getByText('버전이 없는 파일')).toBeInTheDocument()
+  })
+
+  it('추적 중인 변경은 기본으로 골라두고, 버전 없는 파일은 아니다', async () => {
+    await render()
+
+    expect(screen.getByRole('checkbox', { name: /src\/changed\.ts 커밋에서 빼기/ })).toBeChecked()
+    // 빌드 산출물이 딸려 들어가면 되돌리기 번거롭다 — 새 파일은 사용자가 직접 고른다
+    expect(screen.getByRole('checkbox', { name: /docs\/new\.sql 커밋에 포함/ })).not.toBeChecked()
+  })
+
+  it('체크한 파일만 커밋한다', async () => {
+    await render()
+
+    await userEvent.click(screen.getByRole('checkbox', { name: /src\/changed\.ts 커밋에서 빼기/ }))
+    await userEvent.type(screen.getByPlaceholderText(/커밋 메시지/), '작업')
+    await userEvent.click(screen.getByRole('button', { name: '커밋' }))
+
+    await waitFor(() => {
+      expect(window.api.git.scm.commit).toHaveBeenCalledWith(
+        expect.objectContaining({ repoPath: '/repo', message: '작업', paths: ['src/staged.ts'] })
+      )
+    })
+  })
+
+  it('버전 없는 파일도 골라서 커밋에 넣는다', async () => {
+    await render()
+
+    await userEvent.click(screen.getByRole('checkbox', { name: /docs\/new\.sql 커밋에 포함/ }))
+    await userEvent.type(screen.getByPlaceholderText(/커밋 메시지/), '새 파일')
+    await userEvent.click(screen.getByRole('button', { name: '커밋' }))
+
+    await waitFor(() => {
+      const call = vi.mocked(window.api.git.scm.commit).mock.calls.at(-1)?.[0]
+      expect(call?.paths).toContain('docs/new.sql')
+    })
+  })
+
+  it('섹션 헤더 체크박스로 그 섹션을 통째로 넣고 뺀다', async () => {
+    await render()
+
+    await userEvent.click(screen.getByRole('checkbox', { name: '버전이 없는 파일 전체 커밋에 포함' }))
+    expect(screen.getByRole('checkbox', { name: /docs\/new\.sql 커밋에서 빼기/ })).toBeChecked()
+
+    await userEvent.click(screen.getByRole('checkbox', { name: '변경 전체 빼기' }))
     expect(screen.getByRole('checkbox', { name: /src\/changed\.ts 커밋에 포함/ })).not.toBeChecked()
   })
 
-  it('체크하면 커밋에 포함된다(stage)', async () => {
-    renderWithDs(<SourceControlPanel repoPath="/repo" onOpenDiff={() => {}} />)
+  it('고른 파일이 없으면 커밋할 수 없다', async () => {
+    await render()
 
-    await userEvent.click(
-      await screen.findByRole('checkbox', { name: /src\/changed\.ts 커밋에 포함/ })
-    )
+    await userEvent.type(screen.getByPlaceholderText(/커밋 메시지/), '작업')
+    await userEvent.click(screen.getByRole('checkbox', { name: '변경 전체 빼기' }))
+
+    expect(screen.getByRole('button', { name: '커밋' })).toBeDisabled()
+  })
+
+  it('커밋 및 푸시는 커밋 후 바로 올린다', async () => {
+    vi.mocked(window.api.git.scm.push).mockResolvedValue({ ok: true, message: '' })
+    await render()
+
+    await userEvent.type(screen.getByPlaceholderText(/커밋 메시지/), '작업')
+    await userEvent.click(screen.getByRole('button', { name: '커밋 및 푸시' }))
 
     await waitFor(() => {
-      expect(window.api.git.scm.stage).toHaveBeenCalledWith('/repo', ['src/changed.ts'])
+      expect(window.api.git.scm.commit).toHaveBeenCalled()
+      expect(window.api.git.scm.push).toHaveBeenCalled()
     })
   })
 
-  it('추적되지 않은 파일도 체크로 커밋에 넣는다', async () => {
-    renderWithDs(<SourceControlPanel repoPath="/repo" onOpenDiff={() => {}} />)
+  it('커밋이 실패하면 푸시하지 않는다', async () => {
+    vi.mocked(window.api.git.scm.commit).mockResolvedValue({ ok: false, message: 'hook 거부' })
+    await render()
 
-    await userEvent.click(await screen.findByRole('checkbox', { name: /docs\/new\.sql 커밋에 포함/ }))
+    await userEvent.type(screen.getByPlaceholderText(/커밋 메시지/), '작업')
+    await userEvent.click(screen.getByRole('button', { name: '커밋 및 푸시' }))
 
-    await waitFor(() => {
-      expect(window.api.git.scm.stage).toHaveBeenCalledWith('/repo', ['docs/new.sql'])
-    })
-  })
-
-  it('체크를 풀면 커밋에서 뺀다(unstage)', async () => {
-    renderWithDs(<SourceControlPanel repoPath="/repo" onOpenDiff={() => {}} />)
-
-    await userEvent.click(
-      await screen.findByRole('checkbox', { name: /src\/staged\.ts 커밋에서 빼기/ })
-    )
-
-    await waitFor(() => {
-      expect(window.api.git.scm.unstage).toHaveBeenCalledWith('/repo', ['src/staged.ts'])
-    })
-  })
-
-  it('섹션 헤더 체크박스로 그 섹션을 통째로 넣는다', async () => {
-    renderWithDs(<SourceControlPanel repoPath="/repo" onOpenDiff={() => {}} />)
-
-    await userEvent.click(await screen.findByRole('checkbox', { name: /추적되지 않음 전체 커밋에 포함/ }))
-
-    await waitFor(() => {
-      expect(window.api.git.scm.stage).toHaveBeenCalledWith('/repo', ['docs/new.sql'])
-    })
+    await waitFor(() => expect(window.api.git.scm.commit).toHaveBeenCalled())
+    expect(window.api.git.scm.push).not.toHaveBeenCalled()
   })
 })

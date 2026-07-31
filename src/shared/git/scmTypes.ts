@@ -91,6 +91,11 @@ export interface GitCommitParams {
   repoPath: string
   message: string
   amend?: boolean
+  /**
+   * 커밋할 파일들. 주면 **이 경로만** 커밋한다(작업 트리 상태 기준).
+   * 화면에서 체크한 것만 들어가야 하므로, 인덱스에 이미 올라가 있던 다른 파일은 따라오지 않는다.
+   */
+  paths?: string[]
 }
 
 export interface GitPushParams {

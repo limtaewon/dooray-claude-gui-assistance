@@ -62,25 +62,57 @@ export function canDiscard(entry: GitStatusEntry): boolean {
 }
 
 export interface StatusSections {
-  staged: GitStatusEntry[]
+  /** 추적 중인 파일의 변경 — 스테이징 여부와 무관하게 **한 파일 한 줄** */
   changes: GitStatusEntry[]
+  /** git 이 아직 모르는 파일 */
   untracked: GitStatusEntry[]
   conflicts: GitStatusEntry[]
 }
 
-/** 엔트리를 화면 섹션으로 가른다. 충돌은 스테이징 가능 여부가 달라 별도 섹션으로 뺀다. */
+/**
+ * 엔트리를 화면 섹션으로 가른다 — 기준은 **추적 여부**이지 스테이징이 아니다.
+ *
+ * 스테이징으로 가르면 체크할 때마다 파일이 섹션을 옮겨 다녀 목록이 출렁인다. 커밋 대상 선택은
+ * 체크박스가 맡고, 목록은 "무엇이 바뀌었나" 만 보여준다(IntelliJ 의 변경/버전 없는 파일과 같은 구분).
+ * 같은 파일이 staged·unstaged 양쪽에 걸리면 한 줄로 합친다.
+ */
 export function splitIntoSections(entries: GitStatusEntry[]): StatusSections {
-  const sections: StatusSections = { staged: [], changes: [], untracked: [], conflicts: [] }
+  const conflicts: GitStatusEntry[] = []
+  const untracked: GitStatusEntry[] = []
+  const byPath = new Map<string, GitStatusEntry>()
+
   for (const entry of entries) {
-    if (entry.conflictKind) sections.conflicts.push(entry)
-    else if (entry.area === 'staged') sections.staged.push(entry)
-    else if (entry.area === 'untracked') sections.untracked.push(entry)
-    else sections.changes.push(entry)
+    if (entry.conflictKind) {
+      conflicts.push(entry)
+      continue
+    }
+    if (entry.area === 'untracked') {
+      untracked.push(entry)
+      continue
+    }
+    const existing = byPath.get(entry.path)
+    if (!existing) {
+      byPath.set(entry.path, { ...entry })
+      continue
+    }
+    // 합칠 때: 새로 추가된 파일이라는 사실(added)이 우선, 수치는 양쪽을 더해 HEAD 대비로 본다.
+    byPath.set(entry.path, {
+      ...existing,
+      status: existing.status === 'added' || entry.status === 'added' ? 'added' : existing.status,
+      added: sumStat(existing.added, entry.added),
+      removed: sumStat(existing.removed, entry.removed)
+    })
   }
-  return sections
+
+  return { changes: [...byPath.values()], untracked, conflicts }
 }
 
-/** 목록 안정 정렬 키 — status 갱신마다 행이 튀지 않게 경로로만 정렬한다. */
+function sumStat(a: number | undefined, b: number | undefined): number | undefined {
+  if (a === undefined && b === undefined) return undefined
+  return (a ?? 0) + (b ?? 0)
+}
+
+/** 목록 안정 키 — 합쳐진 뒤에는 경로가 곧 한 줄이다. */
 export function entryKey(entry: GitStatusEntry): string {
-  return `${entry.area}:${entry.path}`
+  return entry.path
 }

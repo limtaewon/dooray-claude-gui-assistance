@@ -537,9 +537,21 @@ export class GitScmService {
   async commit(params: GitCommitParams): Promise<{ ok: boolean; message: string }> {
     const message = params.message.trim()
     if (!message) return { ok: false, message: '커밋 메시지가 비어 있습니다.' }
+    const paths = (params.paths ?? []).map((path) => assertRelativeRepoPath(path))
     try {
+      // 추적되지 않은 파일은 add 를 거쳐야 커밋에 들어간다. 이미 추적 중인 파일에는 무해하다.
+      if (paths.length > 0) {
+        await runGit(['add', '--', ...paths.map(literalPathspec)], params.repoPath)
+      }
       const { stdout } = await runGit(
-        ['commit', ...(params.amend ? ['--amend'] : []), '-m', message],
+        [
+          'commit',
+          ...(params.amend ? ['--amend'] : []),
+          '-m',
+          message,
+          // pathspec 을 주면 그 경로만 커밋한다 — 다른 곳에서 스테이징해둔 파일이 딸려오지 않는다.
+          ...(paths.length > 0 ? ['--', ...paths.map(literalPathspec)] : [])
+        ],
         params.repoPath
       )
       return { ok: true, message: stdout.trim() }

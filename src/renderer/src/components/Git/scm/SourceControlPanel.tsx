@@ -6,8 +6,6 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  Minus,
-  Plus,
   RefreshCw,
   Undo2
 } from 'lucide-react'
@@ -19,8 +17,6 @@ import {
   STATUS_COLORS,
   STATUS_LABELS,
   canDiscard,
-  canStage,
-  canUnstage,
   entryKey,
   splitIntoSections,
   splitPath
@@ -56,6 +52,8 @@ function SourceControlPanel({ repoPath, onOpenDiff, onRepoChanged }: SourceContr
   const [busy, setBusy] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const toast = useToast()
+  /** 이전에 본 경로들 — 새로 나타난 변경만 자동 선택하기 위해. */
+  const seenPathsRef = useRef<Set<string>>(new Set())
   const repoRef = useRef(repoPath)
   repoRef.current = repoPath
 
@@ -89,6 +87,42 @@ function SourceControlPanel({ repoPath, onOpenDiff, onRepoChanged }: SourceContr
   }, [refresh])
 
   const sections = useMemo(() => splitIntoSections(status?.entries ?? []), [status])
+
+  /**
+   * 커밋에 넣을 파일 — **스테이징과 분리된 화면 상태**다.
+   * 체크를 스테이징에 직결하면 파일이 섹션을 옮겨 다녀 목록이 출렁인다(IntelliJ 도 이렇게 하지 않는다).
+   * 실제 `git add` 는 커밋 직전에 한 번 한다.
+   */
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+
+  // 목록이 바뀌면 사라진 파일은 선택에서 빼고, 새로 생긴 **추적 중** 파일은 기본으로 넣는다.
+  // 추적되지 않은 파일은 자동으로 넣지 않는다 — 빌드 산출물이 딸려 들어가면 되돌리기 번거롭다.
+  useEffect(() => {
+    if (!status) return
+    const tracked = sections.changes.map((entry) => entry.path)
+    const known = new Set([...tracked, ...sections.untracked.map((entry) => entry.path)])
+    // ref 갱신은 updater **밖**에서 — React 는 updater 를 두 번 호출할 수 있어서
+    // 안에 두면 두 번째 호출이 "이미 본 경로" 로 읽어 자동 선택이 통째로 사라진다.
+    const seen = seenPathsRef.current
+    seenPathsRef.current = known
+    setSelected((prev) => {
+      const next = new Set<string>()
+      for (const path of prev) if (known.has(path)) next.add(path)
+      for (const path of tracked) if (!seen.has(path)) next.add(path)
+      return next
+    })
+  }, [status, sections])
+
+  const toggleSelected = useCallback((paths: string[], next: boolean): void => {
+    setSelected((prev) => {
+      const updated = new Set(prev)
+      for (const path of paths) {
+        if (next) updated.add(path)
+        else updated.delete(path)
+      }
+      return updated
+    })
+  }, [])
 
   const run = useCallback(
     async (label: string, action: () => Promise<void>): Promise<void> => {
@@ -124,29 +158,27 @@ function SourceControlPanel({ repoPath, onOpenDiff, onRepoChanged }: SourceContr
     [refresh, onRepoChanged, toast]
   )
 
-  /**
-   * 체크 = 커밋에 포함. git 에는 '커밋 대상' 이라는 별도 상태가 없으므로 스테이징을 그대로 쓴다 —
-   * 추적되지 않은 파일도 체크하면 `git add` 되어 그대로 커밋에 들어간다.
-   */
-  const toggleStaged = useCallback(
-    (paths: string[], next: boolean): void => {
-      if (paths.length === 0) return
-      void run(next ? '커밋에 포함' : '커밋에서 빼기', () =>
-        next ? window.api.git.scm.stage(repoPath, paths) : window.api.git.scm.unstage(repoPath, paths)
-      )
-    },
-    [repoPath, run]
-  )
-
   const commit = async (): Promise<void> => {
-    const result = await window.api.git.scm.commit({ repoPath, message, amend })
+    const paths = [...selected]
+    const result = await window.api.git.scm.commit({ repoPath, message, amend, paths })
     if (!result.ok) {
       toast.error(result.message)
-      return
+      throw new Error(result.message)
     }
     setMessage('')
     setAmend(false)
-    toast.success('커밋했습니다')
+    toast.success(`${paths.length}개 파일을 커밋했습니다`)
+  }
+
+  /** 커밋하고 바로 올린다 — 커밋만 하고 잊는 일이 잦아 한 버튼으로 묶는다(IntelliJ 와 같은 흐름). */
+  const commitAndPush = async (): Promise<void> => {
+    await commit()
+    const result = await window.api.git.scm.push({
+      repoPath,
+      setUpstream: !status?.upstreamStatus?.hasUpstream
+    })
+    if (result.ok) toast.success('푸시 완료')
+    else toast.error(result.message || '푸시 실패')
   }
 
   const toggleAmend = async (): Promise<void> => {
@@ -169,8 +201,10 @@ function SourceControlPanel({ repoPath, onOpenDiff, onRepoChanged }: SourceContr
   }
 
   const upstream = status?.upstreamStatus
-  const stagedCount = sections.staged.length
+  const selectedCount = selected.size
   const hasConflicts = sections.conflicts.length > 0
+  const commitDisabled =
+    busy !== null || hasConflicts || (!amend && selected.size === 0) || !message.trim()
   const conflictOperation = status?.conflictOperation ?? 'none'
 
   if (error) {
@@ -250,38 +284,6 @@ function SourceControlPanel({ repoPath, onOpenDiff, onRepoChanged }: SourceContr
         </div>
       )}
 
-      {/* 커밋 입력 */}
-      <div className="px-3 py-2.5 flex flex-col gap-2 flex-none border-b border-bg-border">
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder={stagedCount > 0 ? `${stagedCount}개 파일 커밋 메시지` : '커밋 메시지'}
-          rows={2}
-          className="ds-input resize-none text-[calc(11.5px_*_var(--app-font-scale,1))]"
-        />
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1.5 text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-tertiary cursor-pointer select-none">
-            <input type="checkbox" checked={amend} onChange={() => void toggleAmend()} />
-            직전 커밋 수정
-          </label>
-          <Button
-            variant="primary"
-            size="xs"
-            className="ml-auto"
-            disabled={busy !== null || hasConflicts || (!amend && stagedCount === 0) || !message.trim()}
-            onClick={() => void run('커밋', commit)}
-            leftIcon={<Check size={11} />}
-          >
-            커밋
-          </Button>
-        </div>
-        {hasConflicts && (
-          <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-git-deleted">
-            충돌을 먼저 해결해야 커밋할 수 있습니다.
-          </p>
-        )}
-      </div>
-
       {/* 파일 목록 */}
       <div className="flex-1 min-h-0 overflow-y-auto py-1">
         {status?.didHitLimit && (
@@ -305,44 +307,71 @@ function SourceControlPanel({ repoPath, onOpenDiff, onRepoChanged }: SourceContr
           busy={busy !== null}
         />
         <Section
-          id="staged"
-          title="커밋에 포함"
-          entries={sections.staged}
-          collapsed={collapsed}
-          onToggle={setCollapsed}
-          onOpenDiff={openDiff}
-          onToggleStaged={toggleStaged}
-          busy={busy !== null}
-          onStage={(paths) => void run('스테이지', () => window.api.git.scm.stage(repoPath, paths))}
-          onUnstage={(paths) => void run('언스테이지', () => window.api.git.scm.unstage(repoPath, paths))}
-          onDiscard={(paths) => void run('되돌리기', () => window.api.git.scm.discard(repoPath, paths))}
-        />
-        <Section
           id="changes"
           title="변경"
           entries={sections.changes}
           collapsed={collapsed}
           onToggle={setCollapsed}
           onOpenDiff={openDiff}
-          onToggleStaged={toggleStaged}
+          selected={selected}
+          onSelect={toggleSelected}
           busy={busy !== null}
-          onStage={(paths) => void run('스테이지', () => window.api.git.scm.stage(repoPath, paths))}
-          onUnstage={(paths) => void run('언스테이지', () => window.api.git.scm.unstage(repoPath, paths))}
           onDiscard={(paths) => void run('되돌리기', () => window.api.git.scm.discard(repoPath, paths))}
         />
         <Section
           id="untracked"
-          title="추적되지 않음"
+          title="버전이 없는 파일"
           entries={sections.untracked}
           collapsed={collapsed}
           onToggle={setCollapsed}
           onOpenDiff={openDiff}
-          onToggleStaged={toggleStaged}
+          selected={selected}
+          onSelect={toggleSelected}
           busy={busy !== null}
-          onStage={(paths) => void run('스테이지', () => window.api.git.scm.stage(repoPath, paths))}
-          onUnstage={(paths) => void run('언스테이지', () => window.api.git.scm.unstage(repoPath, paths))}
           onDiscard={(paths) => void run('되돌리기', () => window.api.git.scm.discard(repoPath, paths))}
         />
+      </div>
+
+      {/* 커밋 — 목록 아래에 둔다(IntelliJ 와 같은 배치). 고른 파일이 바로 위에 보인다. */}
+      <div className="px-3 py-2.5 flex flex-col gap-2 flex-none border-t border-bg-border">
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder={selectedCount > 0 ? `${selectedCount}개 파일 커밋 메시지` : '커밋 메시지'}
+          rows={2}
+          className="ds-input resize-none text-[calc(11.5px_*_var(--app-font-scale,1))]"
+        />
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-1.5 text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-tertiary cursor-pointer select-none">
+            <input type="checkbox" checked={amend} onChange={() => void toggleAmend()} />
+            직전 커밋 수정
+          </label>
+          <div className="ml-auto flex items-center gap-1.5">
+            <Button
+              variant="primary"
+              size="xs"
+              disabled={commitDisabled}
+              onClick={() => void run('커밋', commit)}
+              leftIcon={<Check size={11} />}
+            >
+              커밋
+            </Button>
+            <Button
+              variant="secondary"
+              size="xs"
+              disabled={commitDisabled}
+              onClick={() => void run('커밋 및 푸시', commitAndPush)}
+              leftIcon={<ArrowUpFromLine size={11} />}
+            >
+              커밋 및 푸시
+            </Button>
+          </div>
+        </div>
+        {hasConflicts && (
+          <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-git-deleted">
+            충돌을 먼저 해결해야 커밋할 수 있습니다.
+          </p>
+        )}
       </div>
     </div>
   )
@@ -356,10 +385,9 @@ interface SectionProps {
   onToggle: (updater: (prev: Record<string, boolean>) => Record<string, boolean>) => void
   onOpenDiff: (entry: GitStatusEntry) => void
   busy: boolean
-  /** 커밋에 포함할지 = 스테이징 여부. 체크하면 stage, 풀면 unstage. */
-  onToggleStaged?: (paths: string[], next: boolean) => void
-  onStage?: (paths: string[]) => void
-  onUnstage?: (paths: string[]) => void
+  /** 커밋에 넣을 파일들 (경로 집합) */
+  selected?: Set<string>
+  onSelect?: (paths: string[], next: boolean) => void
   onDiscard?: (paths: string[]) => void
 }
 
@@ -371,31 +399,29 @@ function Section({
   onToggle,
   onOpenDiff,
   busy,
-  onToggleStaged,
-  onStage,
-  onUnstage,
+  selected,
+  onSelect,
   onDiscard
 }: SectionProps): JSX.Element | null {
   if (entries.length === 0) return null
   const isCollapsed = collapsed[id] === true
-  const stageable = entries.filter((entry) => !entry.conflictKind)
-  const stagedCount = stageable.filter((entry) => entry.area === 'staged').length
-  const allStaged = stageable.length > 0 && stagedCount === stageable.length
+  const selectable = entries.filter((entry) => !entry.conflictKind)
+  const pickedCount = selected ? selectable.filter((entry) => selected.has(entry.path)).length : 0
+  const allPicked = selectable.length > 0 && pickedCount === selectable.length
 
   return (
     <div className="mb-0.5">
       <div className="group flex items-center gap-1 px-2 h-6 hover:bg-bg-surface-hover">
-        {onToggleStaged && stageable.length > 0 && (
+        {onSelect && selectable.length > 0 && (
           <input
             type="checkbox"
-            checked={allStaged}
+            checked={allPicked}
             ref={(el) => {
               // 일부만 골랐을 때는 중간 상태로 — 전부/일부/없음이 눈에 바로 들어와야 한다.
-              if (el) el.indeterminate = stagedCount > 0 && !allStaged
+              if (el) el.indeterminate = pickedCount > 0 && !allPicked
             }}
-            disabled={busy}
-            onChange={() => onToggleStaged(stageable.map((entry) => entry.path), !allStaged)}
-            aria-label={`${title} 전체 ${allStaged ? '빼기' : '커밋에 포함'}`}
+            onChange={() => onSelect(selectable.map((entry) => entry.path), !allPicked)}
+            aria-label={`${title} 전체 ${allPicked ? '빼기' : '커밋에 포함'}`}
             className="flex-none"
           />
         )}
@@ -419,9 +445,8 @@ function Section({
             entry={entry}
             busy={busy}
             onOpenDiff={() => onOpenDiff(entry)}
-            onToggleStaged={onToggleStaged && ((next) => onToggleStaged([entry.path], next))}
-            onStage={onStage && (() => onStage([entry.path]))}
-            onUnstage={onUnstage && (() => onUnstage([entry.path]))}
+            picked={selected?.has(entry.path) ?? false}
+            onSelect={onSelect && ((next) => onSelect([entry.path], next))}
             onDiscard={onDiscard && (() => onDiscard([entry.path]))}
           />
         ))}
@@ -433,35 +458,24 @@ interface EntryRowProps {
   entry: GitStatusEntry
   busy: boolean
   onOpenDiff: () => void
-  /** 체크 = 이 파일을 커밋에 포함(스테이징) */
-  onToggleStaged?: (next: boolean) => void
-  onStage?: () => void
-  onUnstage?: () => void
+  /** 커밋에 넣기로 고른 파일인지 */
+  picked: boolean
+  onSelect?: (next: boolean) => void
   onDiscard?: () => void
 }
 
-function EntryRow({
-  entry,
-  busy,
-  onOpenDiff,
-  onToggleStaged,
-  onStage,
-  onUnstage,
-  onDiscard
-}: EntryRowProps): JSX.Element {
+function EntryRow({ entry, busy, onOpenDiff, picked, onSelect, onDiscard }: EntryRowProps): JSX.Element {
   const { dir, name } = splitPath(entry.path)
-  const staged = entry.area === 'staged'
 
   return (
     <div className="group/row flex items-center gap-1 h-6 pl-2 pr-2 hover:bg-bg-surface-hover">
-      {onToggleStaged && !entry.conflictKind && (
+      {onSelect && !entry.conflictKind && (
         <input
           type="checkbox"
-          checked={staged}
-          disabled={busy}
-          onChange={() => onToggleStaged(!staged)}
-          title={staged ? '커밋에서 빼기' : '커밋에 포함'}
-          aria-label={`${entry.path} ${staged ? '커밋에서 빼기' : '커밋에 포함'}`}
+          checked={picked}
+          onChange={() => onSelect(!picked)}
+          title={picked ? '커밋에서 빼기' : '커밋에 포함'}
+          aria-label={`${entry.path} ${picked ? '커밋에서 빼기' : '커밋에 포함'}`}
           className="flex-none"
         />
       )}
@@ -477,16 +491,6 @@ function EntryRow({
         {onDiscard && canDiscard(entry) && (
           <button onClick={onDiscard} disabled={busy} className="ds-btn ghost icon" title="변경 되돌리기" aria-label="변경 되돌리기">
             <Undo2 size={11} />
-          </button>
-        )}
-        {onUnstage && canUnstage(entry) && (
-          <button onClick={onUnstage} disabled={busy} className="ds-btn ghost icon" title="스테이징 내리기" aria-label="스테이징 내리기">
-            <Minus size={11} />
-          </button>
-        )}
-        {onStage && canStage(entry) && (
-          <button onClick={onStage} disabled={busy} className="ds-btn ghost icon" title="스테이징 올리기" aria-label="스테이징 올리기">
-            <Plus size={11} />
           </button>
         )}
       </div>

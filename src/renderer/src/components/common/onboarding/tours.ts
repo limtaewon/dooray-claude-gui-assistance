@@ -52,7 +52,7 @@ export const TOURS: Record<TourViewId, TourStep[]> = {
     {
       anchor: 'drawer-tab-changes',
       title: '변경사항 — 체크한 파일만 커밋합니다',
-      body: '각 파일의 체크박스가 곧 커밋 대상입니다. 추적되지 않은 새 파일도 체크하면 그대로 들어갑니다. 섹션 헤더 체크박스로 한 번에 넣고 뺍니다. 파일을 누르면 diff 가 탭으로 열리고, 푸시는 upstream 이 없으면 자동으로 -u 를 붙입니다.'
+      body: '목록은 변경 / 버전이 없는 파일로만 나뉘고, 체크해도 파일이 자리를 옮기지 않습니다. 추적 중인 변경은 기본으로 골라져 있고 새 파일은 직접 고릅니다. 아래 커밋 상자에서 `커밋` 또는 `커밋 및 푸시` 를 누르면 고른 파일만 올라갑니다.'
     },
     {
       anchor: 'drawer-tab-branchDiff',
