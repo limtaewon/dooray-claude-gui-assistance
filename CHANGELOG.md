@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased] - v2.0 (feat/version-2.0 브랜치)
+## [2.0.0] - 2026-07-31
 
 ### 새 기능 — 터미널 작업 패널 (소스트리급 git)
 
