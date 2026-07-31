@@ -3,7 +3,7 @@
 exports[`TaskRow — 렌더 스냅샷 > isSelected=true 렌더 1`] = `
 <div>
   <div
-    class="flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors bg-clauday-blue/5"
+    class="flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors bg-bg-active"
     style="content-visibility: auto; contain-intrinsic-size: 0 60px;"
   >
     <svg

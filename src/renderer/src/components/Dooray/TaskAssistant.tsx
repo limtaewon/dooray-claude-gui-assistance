@@ -189,7 +189,7 @@ function TaskAssistant({ onDisconnect }: TaskAssistantProps): JSX.Element {
                   return (
                     <div
                       key={task.id}
-                      className="flex items-start gap-3 p-3 bg-bg-surface border border-bg-border rounded-lg hover:border-clauday-blue/30 hover:bg-bg-surface-hover transition-all"
+                      className="flex items-start gap-3 p-3 bg-bg-surface border border-bg-border rounded-lg hover:border-bg-border-strong hover:bg-bg-surface-hover transition-all"
                     >
                       <Icon size={16} className={`mt-0.5 flex-shrink-0 ${color}`} />
                       <div className="flex-1 min-w-0">

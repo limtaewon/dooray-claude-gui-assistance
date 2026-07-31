@@ -139,7 +139,7 @@ function CommunityView({ active = true }: { active?: boolean } = {}): JSX.Elemen
       <div className="px-5 pt-4 pb-3 border-b border-bg-border flex-shrink-0">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-clauday-blue/10 border border-clauday-blue/30">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-bg-active border border-bg-border-light">
               <Users size={14} className="text-clauday-blue" />
             </div>
             <div>
@@ -892,7 +892,7 @@ ${body || '(빈 내용. 제목을 보고 초안을 작성해줘.)'}
         <div className="flex items-center justify-between px-5 py-3.5"
           style={{ borderBottom: '1px solid var(--bg-border)', background: 'var(--bg-primary)' }}>
           <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-clauday-orange/15 border border-clauday-orange/30">
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-bg-active border border-bg-border-light">
               <Plus size={13} className="text-clauday-orange" />
             </div>
             <h3 className="text-sm font-bold text-text-primary">새 글 쓰기</h3>

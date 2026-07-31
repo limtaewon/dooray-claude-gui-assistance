@@ -26,6 +26,11 @@
   --brand-dooray:          #2563EB;
   /* 터미널 — 어느 도메인도 아닌 앱의 바닥 화면. 셸 프롬프트의 관습색을 쓴다. */
   --brand-terminal:        #16A34A;
+  /* 도메인색의 배경 tint 짝. **반드시 이 짝을 쓸 것** — CSS 변수 색에 `/10` 같은 불투명도
+     수정자를 붙이면 Tailwind 가 규칙을 통째로 드롭해 색이 아예 사라진다. */
+  --brand-dooray-bg:       #E1EBFC;
+  --brand-claude-bg:       #FCEADA;
+  --brand-terminal-bg:     #DCFCE7;
   --clauday-blue-light:    #3B82F6;
   --clauday-blue-soft:     #DCE6FB;
 
@@ -265,6 +270,9 @@
   --brand-claude:        #FB923C;
   --brand-dooray:        #60A5FA;
   --brand-terminal:      #4ADE80;
+  --brand-dooray-bg:     rgba(96,165,250,0.16);
+  --brand-claude-bg:     rgba(251,146,60,0.16);
+  --brand-terminal-bg:   rgba(74,222,128,0.16);
   --accent-orange-soft:  rgba(251,146,60,0.18);
 
   /* Mode-aware semantic — DARK. 칩은 채도를 낮추고 텍스트를 밝게: 검정 위에서 '빛나는 알약'. */

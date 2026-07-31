@@ -227,8 +227,8 @@ const MODEL_FEATURES: ModelFeatureDef[] = [
 
 const MODEL_INFO: Record<AIModelName, { label: string; speed: string; quality: string; cost: string; color: string }> = {
   haiku: { label: 'Haiku', speed: '매우 빠름', quality: '기본', cost: '$', color: 'text-emerald-400 bg-emerald-400/10' },
-  sonnet: { label: 'Sonnet', speed: '빠름', quality: '좋음', cost: '$$', color: 'text-clauday-blue bg-clauday-blue/10' },
-  opus: { label: 'Opus', speed: '느림', quality: '최상', cost: '$$$', color: 'text-clauday-orange bg-clauday-orange/10' }
+  sonnet: { label: 'Sonnet', speed: '빠름', quality: '좋음', cost: '$$', color: 'text-clauday-blue bg-bg-active' },
+  opus: { label: 'Opus', speed: '느림', quality: '최상', cost: '$$$', color: 'text-clauday-orange bg-bg-active' }
 }
 
 function ModelSettings(): JSX.Element {
@@ -289,7 +289,7 @@ function ModelSettings(): JSX.Element {
           const current = config[feat.key]
           return (
             <div key={feat.key}
-              className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? 'border-t border-bg-border/50' : ''}`}>
+              className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? 'border-t border-bg-border' : ''}`}>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-text-primary">{feat.label}</span>
@@ -329,7 +329,7 @@ function ModelSettings(): JSX.Element {
         <div className="flex items-center gap-3">
           {saved && <span className="flex items-center gap-1 text-xs text-emerald-400"><Check size={12} /> 저장됨</span>}
           <button onClick={handleSave} disabled={saving}
-            className="px-5 py-2 rounded-lg bg-clauday-blue text-white text-sm font-medium hover:bg-clauday-blue/80 disabled:opacity-50">
+            className="px-5 py-2 rounded-lg bg-clauday-blue text-white text-sm font-medium hover:opacity-90 disabled:opacity-50">
             {saving ? '저장 중...' : '저장'}
           </button>
         </div>
@@ -415,7 +415,7 @@ function DoorayTokenSettings(): JSX.Element {
       </div>
 
       {/* 토큰 발급 안내 */}
-      <div className="p-3 rounded-xl bg-clauday-blue/5 border border-clauday-blue/20 mb-3">
+      <div className="p-3 rounded-xl bg-bg-active border border-bg-border-light mb-3">
         <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary mb-2">
           <strong className="text-text-primary">토큰 발급 방법:</strong>
         </p>
@@ -450,7 +450,7 @@ function DoorayTokenSettings(): JSX.Element {
           </button>
         </div>
         <button onClick={handleSave} disabled={saving || !newToken.trim()}
-          className="mt-2 px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-xs font-medium hover:bg-clauday-blue/80 disabled:opacity-50">
+          className="mt-2 px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-xs font-medium hover:opacity-90 disabled:opacity-50">
           {saving ? '검증 중...' : '저장 및 검증'}
         </button>
       </div>
@@ -591,7 +591,7 @@ function SocketModeSettings({ hasApiToken }: { hasApiToken: boolean }): JSX.Elem
           className="w-full px-3 py-2 bg-bg-surface border border-bg-border rounded-lg text-xs font-mono text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-orange"
         />
         <button onClick={save} disabled={saving || !hasApiToken || !domainDraft.trim()}
-          className="mt-2 px-4 py-1.5 rounded-lg bg-clauday-orange text-white text-xs font-medium hover:bg-clauday-orange/80 disabled:opacity-50">
+          className="mt-2 px-4 py-1.5 rounded-lg bg-clauday-orange text-white text-xs font-medium hover:opacity-90 disabled:opacity-50">
           {saving ? '연결 중...' : domain ? '재연결' : '연결'}
         </button>
       </div>
@@ -721,7 +721,7 @@ function CalDAVSettings(): JSX.Element {
       </div>
 
       {/* 비번 발급 안내 */}
-      <div className="p-3 rounded-xl bg-clauday-blue/5 border border-clauday-blue/20 mb-3">
+      <div className="p-3 rounded-xl bg-bg-active border border-bg-border-light mb-3">
         <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary mb-2">
           <strong className="text-text-primary">CalDAV 비밀번호 발급:</strong>
         </p>
@@ -783,7 +783,7 @@ function CalDAVSettings(): JSX.Element {
             연결 테스트
           </button>
           <button onClick={handleSave} disabled={saving || testing || !username.trim() || !password}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-xs font-medium hover:bg-clauday-blue/80 disabled:opacity-50">
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-xs font-medium hover:opacity-90 disabled:opacity-50">
             {saving && <Loader2 size={12} className="animate-spin" />}
             저장 및 연결
           </button>
@@ -830,7 +830,7 @@ function CalDAVSettings(): JSX.Element {
             <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">이후엔 45초 주기로 변경분만 자동 동기화됩니다.</p>
             <div className="flex justify-end">
               <button onClick={() => setSyncProgress({ stage: 'idle' })}
-                className="px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-[calc(11px_*_var(--app-font-scale,1))] font-medium hover:bg-clauday-blue/80">
+                className="px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-[calc(11px_*_var(--app-font-scale,1))] font-medium hover:opacity-90">
                 확인
               </button>
             </div>
@@ -841,7 +841,7 @@ function CalDAVSettings(): JSX.Element {
             <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-rose-400">{syncProgress.message}</p>
             <div className="flex justify-end">
               <button onClick={() => setSyncProgress({ stage: 'idle' })}
-                className="px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-[calc(11px_*_var(--app-font-scale,1))] font-medium hover:bg-clauday-blue/80">
+                className="px-4 py-1.5 rounded-lg bg-clauday-blue text-white text-[calc(11px_*_var(--app-font-scale,1))] font-medium hover:opacity-90">
                 닫기
               </button>
             </div>
@@ -992,7 +992,7 @@ function TerminalRendererSection(): JSX.Element {
       {TERMINAL_RENDERER_OPTIONS.map((opt) => (
         <label key={opt.value}
           className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-            value === opt.value ? 'bg-clauday-blue/10' : 'hover:bg-bg-surface-hover'
+            value === opt.value ? 'bg-bg-active' : 'hover:bg-bg-surface-hover'
           }`}>
           <input type="radio" name="terminal-renderer" checked={value === opt.value}
             onChange={() => save(opt.value)}
@@ -1086,12 +1086,12 @@ function SidebarPrefsSection(): JSX.Element {
               </span>
               <button onClick={() => move(item.view, -1)} disabled={isFirst}
                 aria-label="위로"
-                className="p-1 rounded hover:bg-bg-primary/50 text-text-tertiary hover:text-text-primary disabled:opacity-30 disabled:hover:bg-transparent">
+                className="p-1 rounded hover:bg-bg-primary text-text-tertiary hover:text-text-primary disabled:opacity-30 disabled:hover:bg-transparent">
                 <ChevronUp size={12} />
               </button>
               <button onClick={() => move(item.view, 1)} disabled={isLast}
                 aria-label="아래로"
-                className="p-1 rounded hover:bg-bg-primary/50 text-text-tertiary hover:text-text-primary disabled:opacity-30 disabled:hover:bg-transparent">
+                className="p-1 rounded hover:bg-bg-primary text-text-tertiary hover:text-text-primary disabled:opacity-30 disabled:hover:bg-transparent">
                 <ChevronDown size={12} />
               </button>
               <label className="flex items-center gap-1 cursor-pointer ml-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-secondary">
@@ -1103,7 +1103,7 @@ function SidebarPrefsSection(): JSX.Element {
           )
         })}
       </div>
-      <div className="mt-2 pt-2 border-t border-bg-border/50 flex justify-end">
+      <div className="mt-2 pt-2 border-t border-bg-border flex justify-end">
         <button onClick={resetAll}
           className="flex items-center gap-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-primary px-2 py-1 rounded hover:bg-bg-surface-hover">
           <RotateCcw size={10} /> 기본값으로 초기화
@@ -1181,7 +1181,7 @@ function FontSettingsSection(): JSX.Element {
             return (
               <button key={f} onClick={() => setFamily(f)}
                 className={`px-3 py-2 rounded-md text-left transition-colors border ${
-                  active ? 'bg-clauday-blue/10 border-clauday-blue/40' : 'bg-bg-primary border-bg-border hover:border-bg-border-light'
+                  active ? 'bg-bg-active border-bg-border-light' : 'bg-bg-primary border-bg-border hover:border-bg-border-light'
                 }`}>
                 <span className={`block text-xs ${active ? 'text-clauday-blue font-medium' : 'text-text-primary'}`}>
                   {FONT_FAMILY_LABELS[f]}
@@ -1213,7 +1213,7 @@ function FontSettingsSection(): JSX.Element {
             <button key={p.value} onClick={() => setScale(p.value)}
               className={`px-2.5 py-1 rounded-md text-[calc(10px_*_var(--app-font-scale,1))] border transition-colors ${
                 Math.abs(settings.scale - p.value) < 0.01
-                  ? 'bg-clauday-blue/10 border-clauday-blue/40 text-clauday-blue font-medium'
+                  ? 'bg-bg-active border-bg-border-light text-clauday-blue font-medium'
                   : 'bg-bg-primary border-bg-border text-text-secondary hover:text-text-primary'
               }`}>
               {p.label} <span className="text-text-tertiary">{Math.round(p.value * 100)}%</span>

@@ -100,7 +100,7 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
         style={{ background: 'var(--bg-surface-raised)', border: '1px solid var(--bg-border)' }}>
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-bg-border flex-shrink-0">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-clauday-blue/10 border border-clauday-blue/30">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-bg-active border border-bg-border-light">
             <Sparkles size={15} className="text-clauday-blue" />
           </div>
           <div className="flex-1">
@@ -116,8 +116,8 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
         {mode === 'choose' && (
           <div className="p-6 grid grid-cols-2 gap-4">
             <button onClick={() => setMode('ai')}
-              className="group flex flex-col items-center gap-3 p-6 rounded-xl border border-bg-border bg-bg-surface hover:border-clauday-blue/50 hover:bg-clauday-blue/5 transition-all">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-gradient-to-br from-clauday-orange/15 to-clauday-blue/15 border border-clauday-blue/20 group-hover:scale-110 transition-transform">
+              className="group flex flex-col items-center gap-3 p-6 rounded-xl border border-bg-border bg-bg-surface hover:border-bg-border-strong hover:bg-bg-surface-hover transition-all">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-bg-surface-raised border border-bg-border-light group-hover:scale-110 transition-transform">
                 <Sparkles size={24} className="text-clauday-blue" />
               </div>
               <div className="text-center">
@@ -128,7 +128,7 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
               </div>
             </button>
             <button onClick={() => setMode('manual')}
-              className="group flex flex-col items-center gap-3 p-6 rounded-xl border border-bg-border bg-bg-surface hover:border-clauday-blue/50 hover:bg-clauday-blue/5 transition-all">
+              className="group flex flex-col items-center gap-3 p-6 rounded-xl border border-bg-border bg-bg-surface hover:border-bg-border-strong hover:bg-bg-surface-hover transition-all">
               <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-bg-subtle border border-bg-border group-hover:scale-110 transition-transform">
                 <Edit3 size={24} className="text-text-secondary" />
               </div>
@@ -181,7 +181,7 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
                       <button key={name} onClick={() => toggleMcp(name)}
                         className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[calc(11px_*_var(--app-font-scale,1))] border transition-colors ${
                           checked
-                            ? 'bg-clauday-blue/15 border-clauday-blue/40 text-clauday-blue font-medium'
+                            ? 'bg-bg-active border-bg-border-light text-clauday-blue font-medium'
                             : 'bg-bg-subtle border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light'
                         }`}>
                         <span className={`w-3 h-3 rounded border flex items-center justify-center flex-shrink-0 ${
@@ -204,8 +204,8 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
 
             {/* 생성 결과 미리보기 */}
             {generated && (
-              <div className="rounded-xl border border-clauday-blue/30 bg-clauday-blue/5 overflow-hidden">
-                <div className="flex items-center gap-2 px-3 py-2 border-b border-clauday-blue/20 bg-clauday-blue/10">
+              <div className="rounded-xl border border-bg-border-light bg-bg-active overflow-hidden">
+                <div className="flex items-center gap-2 px-3 py-2 border-b border-bg-border-light bg-bg-active">
                   <Check size={12} className="text-clauday-blue" />
                   <span className="text-xs font-semibold text-text-primary">{generated.name}</span>
                 </div>
@@ -265,12 +265,12 @@ function SkillCreateModal({ onClose, onCreated }: Props): JSX.Element {
               </button>
               {mode === 'ai' ? (
                 <button onClick={handleSaveAI} disabled={!generated}
-                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-clauday-blue hover:bg-clauday-blue/90 disabled:opacity-40">
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-clauday-blue hover:opacity-90 disabled:opacity-40">
                   <Check size={12} /> 저장하기
                 </button>
               ) : (
                 <button onClick={handleSaveManual} disabled={!manualName.trim()}
-                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-clauday-blue hover:bg-clauday-blue/90 disabled:opacity-40">
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-clauday-blue hover:opacity-90 disabled:opacity-40">
                   <Check size={12} /> 만들기
                 </button>
               )}

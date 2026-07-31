@@ -75,7 +75,7 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
           <h3 className="text-sm font-semibold text-text-primary leading-snug">{task.subject}</h3>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             {task.projectCode && (
-              <span className="text-[calc(10px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded bg-clauday-blue/10 text-clauday-blue font-mono">{task.projectCode}</span>
+              <span className="text-[calc(10px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded bg-bg-active text-clauday-blue font-mono">{task.projectCode}</span>
             )}
             <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">{wfName}</span>
             {task.dueDateAt && (
@@ -93,19 +93,19 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
       {/* 액션 버튼 */}
       <div className="flex gap-2 p-3 border-b border-bg-border flex-shrink-0">
         <button onClick={handleSummarize} disabled={summarizing}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-clauday-orange/20 to-clauday-blue/20 border border-clauday-orange/30 text-xs font-medium text-text-primary hover:from-clauday-orange/30 hover:to-clauday-blue/30 transition-all disabled:opacity-50">
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-surface-raised border border-bg-border-light text-xs font-medium text-text-primary hover:bg-bg-surface-hover transition-all disabled:opacity-50">
           <Sparkles size={12} className={`text-clauday-orange ${summarizing ? 'animate-pulse' : ''}`} />
           {summarizing ? 'AI 분석 중...' : 'AI 분석'}
         </button>
         <a href={`https://nhnent.dooray.com/project/posts/${task.id}`} target="_blank" rel="noopener noreferrer"
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-clauday-blue/10 border border-clauday-blue/30 text-xs text-clauday-blue hover:bg-clauday-blue/20 transition-all">
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-c-blue-bg border border-bg-border text-xs text-c-blue-fg hover:bg-bg-surface-hover transition-all">
           <ExternalLink size={12} /> 두레이에서 보기
         </a>
       </div>
 
       {/* AI 요약 */}
       {summary && (
-        <div className="mx-3 mt-3 p-3 rounded-lg bg-gradient-to-r from-clauday-orange/5 to-clauday-blue/5 border border-clauday-orange/20 flex-shrink-0">
+        <div className="mx-3 mt-3 p-3 rounded-lg bg-bg-surface-raised border border-bg-border-light flex-shrink-0">
           <div className="flex items-center gap-1.5 mb-2">
             <Sparkles size={12} className="text-clauday-orange" />
             <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-clauday-orange">AI 분석</span>

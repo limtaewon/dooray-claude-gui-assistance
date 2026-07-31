@@ -99,7 +99,7 @@ function renderMentions(text: string, terms: string[]): JSX.Element {
         if (MENTION_RE.test(p)) {
           MENTION_RE.lastIndex = 0
           return (
-            <span key={i} className="px-1 rounded bg-clauday-blue/15 text-clauday-blue font-medium text-[calc(11.5px_*_var(--app-font-scale,1))]">
+            <span key={i} className="px-1 rounded bg-bg-active text-clauday-blue font-medium text-[calc(11.5px_*_var(--app-font-scale,1))]">
               {p}
             </span>
           )
@@ -123,7 +123,7 @@ function renderHighlight(text: string, terms: string[]): JSX.Element {
       <>
         {parts.map((p, i) =>
           re.test(p) ? (
-            <mark key={i} className="bg-clauday-orange/30 text-clauday-orange-light font-semibold px-0.5 rounded">{p}</mark>
+            <mark key={i} className="bg-bg-active text-clauday-orange-light font-semibold px-0.5 rounded">{p}</mark>
           ) : (
             <span key={i}>{p}</span>
           )
@@ -177,7 +177,7 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
   if (messages.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6">
-        <Clock size={32} className="text-text-tertiary/60" />
+        <Clock size={32} className="text-text-tertiary" />
         <div className="text-center">
           <p className="text-sm font-medium text-text-primary">수집된 메시지가 없습니다</p>
           <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mt-1 leading-relaxed">
@@ -218,8 +218,8 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
                 <div key={m.id}
                   className={`group relative flex gap-3 px-4 py-3 rounded-xl border transition-all ${
                     m.read
-                      ? 'bg-bg-surface/50 border-bg-border hover:border-bg-border-light'
-                      : 'bg-bg-surface border-clauday-orange/50 shadow-[0_2px_8px_rgba(251,146,60,0.08)]'
+                      ? 'bg-bg-surface border-bg-border hover:border-bg-border-light'
+                      : 'bg-bg-surface border-bg-border-light shadow-[0_2px_8px_rgba(251,146,60,0.08)]'
                   }`}>
                   {!m.read && (
                     <Circle size={6} className="absolute top-3 left-1 text-clauday-orange fill-clauday-orange" />
@@ -236,7 +236,7 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
                     {/* Meta row */}
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-xs font-semibold text-text-primary">{m.authorName}</span>
-                      <span className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary px-1.5 py-0.5 rounded bg-bg-primary/60">
+                      <span className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary px-1.5 py-0.5 rounded bg-bg-primary">
                         <Hash size={9} />
                         {m.channelName}
                       </span>
@@ -262,11 +262,11 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
 
                     {/* Matched terms chips */}
                     {m.matchedTerms.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1 mt-2 pt-2 border-t border-bg-border/40">
+                      <div className="flex flex-wrap items-center gap-1 mt-2 pt-2 border-t border-bg-border">
                         <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary leading-none">매치:</span>
                         {m.matchedTerms.slice(0, 6).map((t, i) => (
                           <span key={i}
-                            className="inline-flex items-center h-[14px] px-1.5 rounded-full bg-clauday-orange/15 text-clauday-orange font-medium text-[calc(9px_*_var(--app-font-scale,1))] leading-none">
+                            className="inline-flex items-center h-[14px] px-1.5 rounded-full bg-bg-active text-clauday-orange font-medium text-[calc(9px_*_var(--app-font-scale,1))] leading-none">
                             {t}
                           </span>
                         ))}

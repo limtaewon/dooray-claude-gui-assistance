@@ -35,7 +35,7 @@ const TaskRow = memo(function TaskRow({ task, isSelected, currentTagFilter, onSe
       // content-visibility: 뷰포트 밖에 있을 때 렌더 스킵 (브라우저 내장 가상화)
       style={{ contentVisibility: 'auto', containIntrinsicSize: '0 60px' }}
       className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
-        isSelected ? 'bg-clauday-blue/5' : 'hover:bg-bg-surface-hover'
+        isSelected ? 'bg-bg-active' : 'hover:bg-bg-surface-hover'
       }`}
     >
       <Icon size={14} className={`flex-shrink-0 ${color}`} />

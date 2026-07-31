@@ -171,7 +171,7 @@ function KeybindingSettings(): JSX.Element {
           <h3 className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary uppercase tracking-wide mb-1.5">
             {group}
           </h3>
-          <div className="ds-card flat divide-y divide-bg-border/60">
+          <div className="ds-card flat divide-y divide-bg-border">
             {defs.map((def) => {
               const bindings = effectiveBindings(def.id, platform, overrides)
               const isModified = Boolean(overrides[def.id])

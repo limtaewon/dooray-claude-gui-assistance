@@ -250,7 +250,7 @@ function WikiManager(): JSX.Element {
                 <div key={d.id} className="flex items-center group">
                   <button onClick={() => setSelectedDomain(d)}
                     className={`flex-1 flex items-center gap-2 px-3 py-1.5 text-left transition-colors ${
-                      isSelected ? 'bg-clauday-blue/10 text-clauday-blue border-r-2 border-clauday-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
+                      isSelected ? 'bg-bg-active text-clauday-blue border-r-2 border-clauday-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
                     }`}>
                     <FolderOpen size={11} className={`flex-shrink-0 ${isSelected ? 'text-clauday-blue' : 'text-text-tertiary'}`} />
                     <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-medium truncate min-w-0">{d.name}</span>
@@ -320,7 +320,7 @@ function WikiManager(): JSX.Element {
                 ].map((a) => (
                   <button key={a.key} onClick={() => runAi(a.key)} disabled={aiLoading || !pageContent} title={a.desc}
                     className={`flex items-center gap-1 px-2 py-1 rounded-md border text-[calc(10px_*_var(--app-font-scale,1))] transition-colors disabled:opacity-40 ${
-                      aiAction === a.key && aiResult ? 'bg-clauday-orange/10 border-clauday-orange/30 text-clauday-orange' : 'bg-bg-surface border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light'
+                      aiAction === a.key && aiResult ? 'bg-bg-active border-bg-border-light text-clauday-orange' : 'bg-bg-surface border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light'
                     }`}>
                     <Sparkles size={9} className="text-clauday-orange" /> {a.label}
                   </button>
@@ -346,7 +346,7 @@ function WikiManager(): JSX.Element {
               {(aiResult || aiLoading) && (
                 <div className="w-1/2 overflow-y-auto flex flex-col">
                   {/* 결과 도구바 */}
-                  <div className="flex items-center justify-between px-4 py-2 border-b border-bg-border bg-bg-surface/50 flex-shrink-0">
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-bg-border bg-bg-surface flex-shrink-0">
                     <div className="flex items-center gap-1.5">
                       <Sparkles size={12} className="text-clauday-orange" />
                       <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-clauday-orange">
@@ -357,7 +357,7 @@ function WikiManager(): JSX.Element {
                       {canPush && (
                         <>
                           <button onClick={() => { if (editMode) setEditMode(false); else { setEditContent(aiResult || ''); setEditMode(true) } }}
-                            className={`flex items-center gap-1 px-2 py-1 rounded text-[calc(10px_*_var(--app-font-scale,1))] ${editMode ? 'bg-clauday-blue/10 text-clauday-blue' : 'text-text-secondary hover:text-text-primary'}`}>
+                            className={`flex items-center gap-1 px-2 py-1 rounded text-[calc(10px_*_var(--app-font-scale,1))] ${editMode ? 'bg-bg-active text-clauday-blue' : 'text-text-secondary hover:text-text-primary'}`}>
                             {editMode ? <><Eye size={9} /> 미리보기</> : <><Edit3 size={9} /> 편집</>}
                           </button>
                           <button onClick={pushToWiki} disabled={pushing}
@@ -418,7 +418,7 @@ const TreeRow = memo(function TreeRow({ node, depth, isSelected, onToggle, onSel
       <div
         style={{ paddingLeft: `${depth * 14 + 6}px`, contentVisibility: 'auto', containIntrinsicSize: '0 24px' }}
         className={`flex items-center gap-1 py-1 cursor-pointer transition-colors rounded ${
-          isSelected ? 'bg-clauday-blue/10 text-clauday-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
+          isSelected ? 'bg-bg-active text-clauday-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
         }`}
       >
         <button onClick={(e) => { e.stopPropagation(); onToggle(node.page.id) }} className="flex-shrink-0 w-4 h-4 flex items-center justify-center">

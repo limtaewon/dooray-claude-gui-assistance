@@ -237,7 +237,7 @@ function ThemePicker(): JSX.Element {
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-clauday-blue/10 border border-clauday-blue/30">
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-bg-active border border-bg-border-light">
           <PaletteIcon size={14} className="text-clauday-blue" />
         </div>
         <div>

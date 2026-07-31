@@ -54,7 +54,7 @@ function SkillCard({
       className={`ds-card group cursor-pointer relative transition-all ${
         selectable
           ? ''
-          : 'hover:border-clauday-blue/40'
+          : 'hover:border-bg-border-strong'
       }`}
       style={{
         padding: '12px 14px',
@@ -71,7 +71,7 @@ function SkillCard({
         </div>
       )}
       <div className="flex items-start gap-2.5">
-        <div className="w-7 h-7 rounded-[6px] flex-none flex items-center justify-center bg-clauday-blue/10">
+        <div className="w-7 h-7 rounded-[6px] flex-none flex items-center justify-center bg-bg-active">
           <Sparkles size={15} className="text-brand-claude" />
         </div>
         <div className="flex-1 min-w-0">
@@ -112,7 +112,7 @@ function SkillCard({
         )}
       </div>
 
-      <div className="flex items-center mt-2.5 pt-2 border-t border-bg-border/60">
+      <div className="flex items-center mt-2.5 pt-2 border-t border-bg-border">
         <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">업데이트 {formatRelative(skill.updatedAt)}</span>
         <div className="flex-1" />
         {onRun && (

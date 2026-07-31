@@ -83,8 +83,8 @@ function MessengerAssistant(): JSX.Element {
       <div className="w-72 flex-shrink-0 border-r border-bg-border flex flex-col">
         <div className="px-4 pt-4 pb-3 border-b border-bg-border flex-shrink-0">
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-clauday-blue/10 border border-clauday-blue/30">
-              <MessageCircle size={14} className="text-clauday-blue" />
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-brand-dooray-bg border border-bg-border">
+              <MessageCircle size={14} className="text-brand-dooray" />
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-sm font-bold text-text-primary leading-tight">메신저</h2>
@@ -114,14 +114,14 @@ function MessengerAssistant(): JSX.Element {
                 return (
                   <button key={c.id} onClick={() => setSelectedId(c.id)}
                     className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors ${
-                      active ? 'bg-clauday-blue/10 border-l-2 border-clauday-blue' : 'hover:bg-bg-surface border-l-2 border-transparent'
+                      active ? 'bg-bg-active border-l-2 border-brand-dooray' : 'hover:bg-bg-surface border-l-2 border-transparent'
                     }`}>
-                    <Icon size={12} className={active ? 'text-clauday-blue' : 'text-text-tertiary'} />
+                    <Icon size={12} className={active ? 'text-brand-dooray' : 'text-text-tertiary'} />
                     <span className={`flex-1 min-w-0 truncate text-xs ${active ? 'text-clauday-blue font-medium' : 'text-text-primary'}`}>
                       {c.displayName || c.title}
                     </span>
                     {!!c.unreadCount && c.unreadCount > 0 && (
-                      <span className="px-1.5 py-0.5 rounded-full text-[calc(9px_*_var(--app-font-scale,1))] bg-clauday-orange/20 text-clauday-orange font-bold">
+                      <span className="px-1.5 py-0.5 rounded-full text-[calc(9px_*_var(--app-font-scale,1))] bg-bg-active text-clauday-orange font-bold">
                         {c.unreadCount}
                       </span>
                     )}
@@ -135,10 +135,10 @@ function MessengerAssistant(): JSX.Element {
       {/* 작성 영역 */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* 전역 스킬 바 — 모든 채널에 공통 적용됨을 명시 */}
-        <div className="px-5 py-2 border-b border-bg-border bg-bg-surface/40 flex items-center gap-2 flex-shrink-0">
+        <div className="px-5 py-2 border-b border-bg-border bg-bg-surface flex items-center gap-2 flex-shrink-0">
           <Sparkles size={11} className="text-clauday-orange" />
           <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">AI 메시지 작성 스킬</span>
-          <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary/70">(모든 채널 공통 적용)</span>
+          <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">(모든 채널 공통 적용)</span>
           <div className="ml-auto">
             <SkillQuickToggle target="messenger" />
           </div>
@@ -158,7 +158,7 @@ function MessengerAssistant(): JSX.Element {
               {/* Step 1: Instruction */}
               <div className="flex flex-col flex-shrink-0">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-5 h-5 rounded-full bg-clauday-blue/15 text-clauday-blue text-[calc(10px_*_var(--app-font-scale,1))] font-bold flex items-center justify-center">1</div>
+                  <div className="w-5 h-5 rounded-full bg-brand-dooray-bg text-brand-dooray text-[calc(10px_*_var(--app-font-scale,1))] font-bold flex items-center justify-center">1</div>
                   <label className="text-xs font-semibold text-text-primary">무엇을 전달할까요?</label>
                   <div className="ml-auto">
                     <button onClick={handleCompose} disabled={composing || !instruction.trim()}
@@ -177,7 +177,7 @@ function MessengerAssistant(): JSX.Element {
               {/* Step 2: Composed message — flex-1로 남은 공간 전부 차지 */}
               <div className="flex flex-col flex-1 min-h-0">
                 <div className="flex items-center gap-2 mb-2 flex-shrink-0">
-                  <div className="w-5 h-5 rounded-full bg-clauday-blue/15 text-clauday-blue text-[calc(10px_*_var(--app-font-scale,1))] font-bold flex items-center justify-center">2</div>
+                  <div className="w-5 h-5 rounded-full bg-brand-dooray-bg text-brand-dooray text-[calc(10px_*_var(--app-font-scale,1))] font-bold flex items-center justify-center">2</div>
                   <label className="text-xs font-semibold text-text-primary">발송할 메시지</label>
                   <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
                     {composing ? '(AI 작업 중 — 필요시 웹 조사)' : '(검토 후 수정 가능)'}
@@ -210,12 +210,12 @@ function MessengerAssistant(): JSX.Element {
               )}
             </div>
 
-            <div className="px-5 py-3 border-t border-bg-border bg-bg-surface/50 flex items-center justify-between flex-shrink-0">
+            <div className="px-5 py-3 border-t border-bg-border bg-bg-surface flex items-center justify-between flex-shrink-0">
               <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
                 {composed.length > 0 ? `${composed.length}자` : '메시지를 입력하세요'}
               </span>
               <button onClick={handleSend} disabled={sending || !composed.trim() || !selectedId}
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-clauday-blue hover:bg-clauday-blue/90 disabled:opacity-40 transition-opacity">
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-clauday-blue hover:opacity-90 disabled:opacity-40 transition-opacity">
                 {sending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
                 {sending ? '전송 중...' : '전송'}
               </button>

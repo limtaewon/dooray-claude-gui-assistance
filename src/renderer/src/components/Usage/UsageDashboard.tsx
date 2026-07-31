@@ -136,7 +136,7 @@ function UsageDashboard(): JSX.Element {
       {/* AI 인사이트 리포트 */}
       {insightReport && (
         <div className="mb-6 bg-bg-surface border border-bg-border rounded-xl overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-bg-border bg-gradient-to-r from-clauday-orange/10 to-clauday-blue/10">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-bg-border bg-bg-surface-raised">
             <div className="flex items-center gap-1.5">
               <Sparkles size={13} className="text-clauday-orange" />
               <span className="text-xs font-semibold text-text-primary">AI 사용 인사이트 (한국어)</span>
@@ -240,7 +240,7 @@ function UsageDashboard(): JSX.Element {
             </thead>
             <tbody>
               {modelData.map((m, i) => (
-                <tr key={m.name} className="border-b border-bg-border/50 hover:bg-bg-surface-hover">
+                <tr key={m.name} className="border-b border-bg-border hover:bg-bg-surface-hover">
                   <td className="py-2 px-3 font-mono flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
                     {m.name}

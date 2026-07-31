@@ -39,7 +39,7 @@ function MCPCard({
       }}
     >
       <div className="flex items-start gap-3">
-        <div className="w-8 h-8 rounded-[6px] flex-none flex items-center justify-center bg-clauday-blue/10">
+        <div className="w-8 h-8 rounded-[6px] flex-none flex items-center justify-center bg-bg-active">
           {isRemote
             ? <Globe size={16} className="text-clauday-blue" />
             : <Server size={16} className="text-clauday-blue" />}

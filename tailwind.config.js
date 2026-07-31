@@ -9,7 +9,22 @@ module.exports = {
         brand: {
           claude: 'var(--brand-claude)',
           dooray: 'var(--brand-dooray)',
-          terminal: 'var(--brand-terminal)'
+          terminal: 'var(--brand-terminal)',
+          // tint 배경은 이 짝을 쓴다 — `bg-brand-dooray/10` 처럼 불투명도를 붙이면 규칙이 드롭된다.
+          'claude-bg': 'var(--brand-claude-bg)',
+          'dooray-bg': 'var(--brand-dooray-bg)',
+          'terminal-bg': 'var(--brand-terminal-bg)'
+        },
+        /** 링크 — 행동 유도가 본질이라 크롬 무채색화 대상이 아니다. */
+        link: 'var(--link)',
+        /** 의미색 페어. 배경(-bg)과 전경(-fg)을 항상 짝으로 쓴다. */
+        c: {
+          'blue-bg': 'var(--c-blue-bg)', 'blue-fg': 'var(--c-blue-fg)', 'blue-solid': 'var(--c-blue-solid)',
+          'red-bg': 'var(--c-red-bg)', 'red-fg': 'var(--c-red-fg)', 'red-solid': 'var(--c-red-solid)',
+          'orange-bg': 'var(--c-orange-bg)', 'orange-fg': 'var(--c-orange-fg)', 'orange-solid': 'var(--c-orange-solid)',
+          'emerald-bg': 'var(--c-emerald-bg)', 'emerald-fg': 'var(--c-emerald-fg)', 'emerald-solid': 'var(--c-emerald-solid)',
+          'violet-bg': 'var(--c-violet-bg)', 'violet-fg': 'var(--c-violet-fg)',
+          'neutral-bg': 'var(--c-neutral-bg)', 'neutral-fg': 'var(--c-neutral-fg)'
         },
         // 소스 제어 — 파일 상태 색. 그래프 레인 색은 SVG 에서 var() 로 직접 읽는다.
         git: {

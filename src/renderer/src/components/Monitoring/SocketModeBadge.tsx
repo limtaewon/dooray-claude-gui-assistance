@@ -82,7 +82,7 @@ export default function SocketModeBadge(): JSX.Element {
       : isStandby
         ? { dot: 'bg-amber-400', text: 'text-amber-400', label: 'STANDBY', desc: '다른 세션 활성 — 대기 중' }
         : !domain
-          ? { dot: 'bg-text-tertiary/40', text: 'text-text-tertiary', label: '폴링만', desc: '도메인 설정 시 실시간 모드' }
+          ? { dot: 'bg-text-tertiary', text: 'text-text-tertiary', label: '폴링만', desc: '도메인 설정 시 실시간 모드' }
           : { dot: 'bg-red-400', text: 'text-red-400', label: '연결 안 됨', desc: status?.lastError || '에러' }
 
   return (
@@ -143,7 +143,7 @@ export default function SocketModeBadge(): JSX.Element {
               {isConnecting && <><Loader2 size={10} className="text-[color:var(--c-blue-fg)] animate-spin" /><span className="text-[color:var(--c-blue-fg)] font-semibold">CONNECTING</span></>}
               {isStandby && <><AlertCircle size={10} className="text-amber-400" /><span className="text-amber-400 font-semibold">STANDBY</span></>}
               {!isActive && !isConnecting && !isStandby && (
-                <><span className="w-1.5 h-1.5 rounded-full bg-text-tertiary/40" /><span className="text-text-tertiary">DISCONNECTED</span></>
+                <><span className="w-1.5 h-1.5 rounded-full bg-text-tertiary" /><span className="text-text-tertiary">DISCONNECTED</span></>
               )}
               <span className="text-text-tertiary ml-auto">{tone.desc}</span>
             </div>
@@ -174,7 +174,7 @@ export default function SocketModeBadge(): JSX.Element {
 
             <div className="flex items-center gap-1.5 mt-2">
               <button onClick={save} disabled={saving || !hasApiToken}
-                className="flex-1 px-2 py-1 rounded text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-white bg-clauday-orange hover:bg-clauday-orange/80 disabled:opacity-40">
+                className="flex-1 px-2 py-1 rounded text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-white bg-clauday-orange hover:opacity-90 disabled:opacity-40">
                 {saving ? '연결 중...' : domain ? '재연결' : '연결'}
               </button>
               {domain && (

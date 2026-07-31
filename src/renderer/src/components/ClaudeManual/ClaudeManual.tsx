@@ -1355,7 +1355,7 @@ function ClaudeManual(): JSX.Element {
             return (
               <button key={s.id} onClick={() => setActiveSection(s.id)}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors ${
-                  activeSection === s.id ? 'bg-clauday-blue/10 text-clauday-blue border-r-2 border-clauday-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
+                  activeSection === s.id ? 'bg-bg-active text-clauday-blue border-r-2 border-clauday-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
                 }`}>
                 <Icon size={13} className={activeSection === s.id ? 'text-clauday-blue' : 'text-text-tertiary'} />
                 <span className="text-xs font-medium">{s.title}</span>

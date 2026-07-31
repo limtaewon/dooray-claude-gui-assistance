@@ -196,7 +196,7 @@ function Sidebar({ activeView, onViewChange, expanded = true }: SidebarProps): J
         />
       ))}
       <div className="flex-1" />
-      <div className="w-7 h-px bg-bg-border/60 my-1" />
+      <div className="w-7 h-px bg-bg-border my-1" />
       {STANDALONE_ITEMS.map((item) => (
         <NavButton
           key={item.view}

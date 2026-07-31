@@ -407,7 +407,7 @@ function MCPManager(): JSX.Element {
   return (
     <div className="h-full overflow-y-auto">
       {uploadProgress && (
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-2xl border border-clauday-blue/40"
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-2xl border border-bg-border-light"
           style={{ background: 'var(--bg-surface-raised)' }}>
           <RefreshCw size={14} className="animate-spin text-clauday-blue" />
           <div className="flex flex-col">
@@ -492,7 +492,7 @@ function MCPManager(): JSX.Element {
 
         {/* 다중 선택 액션바 — local + wiki 둘 다 */}
         {selectMode && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-clauday-orange/8 border border-clauday-orange/30">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-active border border-bg-border-light">
             <span className="text-xs text-text-primary font-medium">{selected.size}개 선택됨</span>
             <button
               type="button"
@@ -599,7 +599,7 @@ function MCPManager(): JSX.Element {
                   <div
                     key={item.pageId}
                     onClick={selectMode ? () => toggleSelected(item.pageId) : () => setPreviewItem(item)}
-                    className={`ds-card transition-all cursor-pointer hover:border-clauday-blue/40`}
+                    className={`ds-card transition-all cursor-pointer hover:border-bg-border-strong`}
                     style={{
                       padding: '12px 14px',
                       ...(isSelected
@@ -608,7 +608,7 @@ function MCPManager(): JSX.Element {
                     }}
                   >
                     <div className="flex items-start gap-2.5">
-                      <div className="w-8 h-8 rounded-[6px] flex-none flex items-center justify-center bg-clauday-blue/10">
+                      <div className="w-8 h-8 rounded-[6px] flex-none flex items-center justify-center bg-bg-active">
                         {isRemote
                           ? <Globe size={16} className="text-clauday-blue" />
                           : <Server size={16} className="text-brand-claude" />}
@@ -674,14 +674,14 @@ function MCPManager(): JSX.Element {
                       </div>
                     )}
                     {!selectMode && (
-                      <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-bg-border/60">
+                      <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-bg-border">
                         <div className="flex-1" />
                         <button onClick={(e) => { e.stopPropagation(); handleDownloadFromWiki(item) }}
                           className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:text-clauday-blue">
                           <Download size={11} /> 적용
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); handleDeleteFromWiki(item) }}
-                          className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:text-red-400">
+                          className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-c-red-fg hover:text-c-red-solid">
                           <Trash2 size={11} /> 삭제
                         </button>
                       </div>

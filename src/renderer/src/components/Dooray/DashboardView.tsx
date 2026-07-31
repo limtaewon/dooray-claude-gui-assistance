@@ -430,7 +430,7 @@ JSON 형태로만 응답:
 
               {/* 2) AI 자동작성 패널 — 자연어 지시(textarea) + 이미지 첨부 (drop/paste) + 태그 자동 선택 */}
               <div
-                className={`rounded-lg bg-clauday-orange/5 px-3 py-2.5 flex flex-col gap-2 transition-colors ${aiDropActive ? 'ring-2 ring-clauday-orange' : ''}`}
+                className={`rounded-lg bg-bg-active px-3 py-2.5 flex flex-col gap-2 transition-colors ${aiDropActive ? 'ring-2 ring-clauday-orange' : ''}`}
                 onDragOver={(e) => { e.preventDefault(); setAiDropActive(true) }}
                 onDragLeave={() => setAiDropActive(false)}
                 onDrop={handleAiDrop}
@@ -501,7 +501,7 @@ JSON 형태로만 응답:
                         <span className="font-mono truncate max-w-[180px]" title={p}>{p.split(/[/\\]/).pop()}</span>
                         <button
                           onClick={() => setAiImages((prev) => prev.filter((_, idx) => idx !== i))}
-                          className="text-text-tertiary hover:text-red-400"
+                          className="text-c-red-fg hover:text-c-red-solid"
                           title="첨부 제거"
                         >
                           <X size={10} />

@@ -458,7 +458,7 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
                           <button key={name} onClick={() => toggleMcp(name)}
                             className={`flex items-center gap-1 px-2 py-1 rounded-md text-[calc(10px_*_var(--app-font-scale,1))] border transition-colors ${
                               checked
-                                ? 'bg-clauday-blue/15 border-clauday-blue/40 text-clauday-blue font-medium'
+                                ? 'bg-bg-active border-bg-border-light text-clauday-blue font-medium'
                                 : 'bg-bg-primary border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light'
                             }`}>
                             <span className={`w-3 h-3 rounded border flex items-center justify-center flex-shrink-0 ${
@@ -558,7 +558,7 @@ function SkillQuickToggle({ target, size = 'md', feature }: SkillQuickToggleProp
                         <span className="text-[calc(8px_*_var(--app-font-scale,1))] px-1 py-0.5 rounded bg-purple-500/15 text-purple-300 font-medium flex-shrink-0">전체</span>
                       )}
                       <button onClick={() => startEdit(skill)} className="p-1 rounded text-text-tertiary hover:text-text-secondary" title="편집"><Edit3 size={11} /></button>
-                      <button onClick={() => deleteSkill(skill.id)} className="p-1 rounded text-text-tertiary hover:text-red-400" title="삭제"><Trash2 size={11} /></button>
+                      <button onClick={() => deleteSkill(skill.id)} className="p-1 rounded text-c-red-fg hover:text-c-red-solid" title="삭제"><Trash2 size={11} /></button>
                     </div>
                   ))
                 )}

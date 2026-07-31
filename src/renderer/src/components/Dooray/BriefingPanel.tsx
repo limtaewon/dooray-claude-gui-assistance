@@ -240,7 +240,7 @@ function BriefingPanel(): JSX.Element {
             )}
 
             {briefing.focus.length > 0 && (
-              <Section icon={Target} iconColor="text-blue-700 dark:text-clauday-blue" title="오늘 집중" count={briefing.focus.length} bgColor="from-clauday-blue/15 to-transparent border-clauday-blue">
+              <Section icon={Target} iconColor="text-blue-700 dark:text-link" title="오늘 집중" count={briefing.focus.length} bgColor=" to-transparent border-clauday-blue">
                 {briefing.focus.map((item, i) => <TaskItem key={i} taskId={item.taskId} subject={item.subject} detail={item.reason} />)}
               </Section>
             )}
@@ -333,7 +333,7 @@ function linkifyText(text: string): React.ReactNode {
     } catch { /* keep raw */ }
     parts.push(
       <a key={`url-${i++}`} href={url} target="_blank" rel="noopener noreferrer"
-        className="inline-flex items-center gap-0.5 mx-0.5 px-1.5 py-0.5 rounded border border-bg-border-strong bg-bg-surface text-text-secondary hover:text-clauday-blue hover:border-clauday-blue text-[calc(10px_*_var(--app-font-scale,1))] font-mono align-baseline"
+        className="inline-flex items-center gap-0.5 mx-0.5 px-1.5 py-0.5 rounded border border-bg-border-strong bg-bg-surface text-text-secondary hover:text-link hover:border-link text-[calc(10px_*_var(--app-font-scale,1))] font-mono align-baseline"
         title={url}>
         {label}
       </a>
@@ -395,7 +395,7 @@ function RecommendationItem({ text, index }: { text: string; index: number }): J
         {taskIds.map((id, i) => (
           <a key={`${id}-${i}`} href={`https://nhnent.dooray.com/project/posts/${id}`}
              target="_blank" rel="noopener noreferrer"
-             className="inline-flex items-center gap-0.5 ml-1 px-1.5 py-0.5 rounded border border-bg-border-strong bg-bg-surface text-text-secondary hover:text-clauday-blue hover:border-clauday-blue text-[calc(10px_*_var(--app-font-scale,1))] font-mono align-middle"
+             className="inline-flex items-center gap-0.5 ml-1 px-1.5 py-0.5 rounded border border-bg-border-strong bg-bg-surface text-text-secondary hover:text-link hover:border-link text-[calc(10px_*_var(--app-font-scale,1))] font-mono align-middle"
              title={`두레이에서 ${id} 열기`}>
             #{id.slice(-4)}
           </a>
@@ -414,7 +414,7 @@ function TaskItem({ taskId, subject, detail }: { taskId?: string; subject: strin
     return (
       <div className="text-xs px-1.5 -mx-1.5 py-1 rounded hover:bg-bg-surface-hover transition-colors">
         <a href={`https://nhnent.dooray.com/project/posts/${taskId}`} target="_blank" rel="noopener noreferrer"
-          className="text-text-primary hover:text-clauday-blue cursor-pointer"
+          className="text-text-primary hover:text-link cursor-pointer"
           title="두레이에서 열기">
           {subject}
         </a>
@@ -456,7 +456,7 @@ function BriefingFeedback(): JSX.Element {
   }
 
   return (
-    <div className="pt-3 border-t border-bg-border/50">
+    <div className="pt-3 border-t border-bg-border">
       {feedback === null ? (
         <div className="flex items-center justify-center gap-3 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
           이번 브리핑 어땠나요?
@@ -478,7 +478,7 @@ function BriefingFeedback(): JSX.Element {
           <div className="flex justify-end gap-2">
             <button onClick={() => setFeedback(null)} className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-secondary">취소</button>
             <button onClick={() => submit('down', comment)}
-              className="px-3 py-1 rounded-md bg-clauday-blue text-white text-[calc(10px_*_var(--app-font-scale,1))] font-medium hover:bg-clauday-blue/80">
+              className="px-3 py-1 rounded-md bg-clauday-blue text-white text-[calc(10px_*_var(--app-font-scale,1))] font-medium hover:opacity-90">
               제출
             </button>
           </div>

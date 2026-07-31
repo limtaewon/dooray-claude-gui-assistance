@@ -299,7 +299,7 @@ function SessionRow({
 
   if (isRenaming) {
     return (
-      <div className={`px-3 py-2 border-l-2 ${isActive ? 'bg-clauday-orange/10 border-clauday-orange' : 'border-transparent'}`}>
+      <div className={`px-3 py-2 border-l-2 ${isActive ? 'bg-bg-active border-clauday-orange' : 'border-transparent'}`}>
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <input
             autoFocus
@@ -331,7 +331,7 @@ function SessionRow({
       onClick={onOpen}
       className={`group cursor-pointer px-3 py-2 transition-colors border-l-2 ${
         isActive
-          ? 'bg-clauday-orange/10 border-clauday-orange'
+          ? 'bg-bg-active border-clauday-orange'
           : 'border-transparent hover:bg-bg-surface-hover'
       }`}
     >

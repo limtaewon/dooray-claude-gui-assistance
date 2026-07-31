@@ -490,7 +490,7 @@ function RecentViewsPalette({ open, items, index, onHover, onPick, onClose }: {
                 onMouseEnter={() => onHover(i)}
                 onClick={() => onPick(i)}
                 className={`w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors ${
-                  hi ? 'bg-clauday-blue/15' : 'hover:bg-bg-surface-hover'
+                  hi ? 'bg-bg-active' : 'hover:bg-bg-surface-hover'
                 }`}
               >
                 <span className={hi ? 'text-clauday-blue' : isCurrent ? 'text-text-tertiary' : 'text-text-secondary'}>

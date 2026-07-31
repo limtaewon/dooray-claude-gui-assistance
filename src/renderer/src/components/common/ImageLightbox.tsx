@@ -60,7 +60,7 @@ function ImageLightbox(): JSX.Element | null {
     >
       {/* 툴바 */}
       <div
-        className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-bg-surface/90 backdrop-blur rounded-xl px-2 py-1.5 border border-bg-border shadow-xl"
+        className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-bg-surface backdrop-blur rounded-xl px-2 py-1.5 border border-bg-border shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <button onClick={() => setZoom((z) => Math.max(z - 0.25, 0.25))}
@@ -90,13 +90,13 @@ function ImageLightbox(): JSX.Element | null {
 
       {/* 파일명 */}
       {state.alt && (
-        <div className="absolute top-4 right-4 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary bg-bg-surface/90 backdrop-blur rounded-lg px-3 py-1.5 border border-bg-border max-w-xs truncate">
+        <div className="absolute top-4 right-4 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary bg-bg-surface backdrop-blur rounded-lg px-3 py-1.5 border border-bg-border max-w-xs truncate">
           {state.alt}
         </div>
       )}
 
       {/* 키보드 단축키 안내 */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary bg-bg-surface/80 backdrop-blur rounded-lg px-3 py-1.5 border border-bg-border/50">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary bg-bg-surface backdrop-blur rounded-lg px-3 py-1.5 border border-bg-border">
         <span><kbd className="font-mono">Esc</kbd> 닫기</span>
         <span><kbd className="font-mono">+/-</kbd> 확대/축소</span>
         <span><kbd className="font-mono">R</kbd> 회전</span>

@@ -66,7 +66,7 @@ function ClaudeMdCatalogView(): JSX.Element {
         기존 파일이 있으면 덮어쓸지 한 번 확인합니다.
       </p>
 
-      <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg border border-clauday-orange/30 bg-clauday-orange/5">
+      <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg border border-bg-border-light bg-bg-active">
         <AlertCircle size={12} className="text-clauday-orange flex-shrink-0" />
         <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary">
           템플릿은 시작점일 뿐 — 적용 후 본인 프로젝트에 맞게 수정해서 사용하세요.
@@ -85,7 +85,7 @@ function ClaudeMdCatalogView(): JSX.Element {
             const busy = applyingId === t.id
             return (
               <div key={t.id}
-                className="ds-card p-4 flex flex-col gap-2 hover:border-clauday-blue/40 transition-colors">
+                className="ds-card p-4 flex flex-col gap-2 hover:border-bg-border-strong transition-colors">
                 <div className="flex items-start gap-2">
                   <FileCode size={16} className="text-clauday-blue mt-0.5 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
@@ -111,7 +111,7 @@ function ClaudeMdCatalogView(): JSX.Element {
         </div>
       )}
 
-      <div className="flex items-start gap-2 mt-6 px-3 py-2.5 rounded-lg bg-bg-surface/60 border border-bg-border">
+      <div className="flex items-start gap-2 mt-6 px-3 py-2.5 rounded-lg bg-bg-surface border border-bg-border">
         <Check size={12} className="text-emerald-400 mt-0.5 flex-shrink-0" />
         <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary leading-relaxed">
           새 템플릿 제안은 <code className="font-mono text-text-secondary px-1 bg-bg-primary rounded">src/main/claudeMdCatalog.ts</code> 에 객체 하나 추가하면 됩니다.

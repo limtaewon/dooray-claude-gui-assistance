@@ -132,7 +132,7 @@ function WikiStoragePicker({
     <div className="relative inline-flex">
       <button
         onClick={() => setMode(mode === 'closed' ? 'switcher' : 'closed')}
-        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-bg-border bg-bg-surface hover:border-clauday-blue/40 text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary"
+        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-bg-border bg-bg-surface hover:border-bg-border-strong text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary"
         type="button"
         title="위키 저장소 전환"
       >
@@ -177,7 +177,7 @@ function WikiStoragePicker({
                       onClick={() => handleSelectActive(w.wikiId)}
                       className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[calc(11px_*_var(--app-font-scale,1))] transition-colors ${
                         isActive
-                          ? 'bg-clauday-blue/15 text-text-primary font-medium'
+                          ? 'bg-bg-active text-text-primary font-medium'
                           : 'text-text-secondary hover:bg-bg-surface-hover'
                       }`}
                       type="button"

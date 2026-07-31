@@ -110,8 +110,8 @@ function SkillEditor({ filename, content, onChange }: SkillEditorProps): JSX.Ele
           disabled={aiPanel === 'loading'}
           className={`flex items-center gap-1 px-2 py-0.5 text-[calc(11px_*_var(--app-font-scale,1))] rounded-md border transition-colors ${
             aiPanel
-              ? 'bg-clauday-orange/15 text-clauday-orange border-clauday-orange/40'
-              : 'text-text-tertiary border-transparent hover:text-clauday-blue hover:border-clauday-blue/30'
+              ? 'bg-bg-active text-clauday-orange border-bg-border-light'
+              : 'text-text-tertiary border-transparent hover:text-clauday-blue hover:border-bg-border-strong'
           }`}
           title="AI로 스킬 개선"
         >
@@ -125,7 +125,7 @@ function SkillEditor({ filename, content, onChange }: SkillEditorProps): JSX.Ele
             onClick={() => setMode('edit')}
             className={`flex items-center gap-1 px-2 py-0.5 text-[calc(11px_*_var(--app-font-scale,1))] transition-colors ${
               mode === 'edit'
-                ? 'bg-clauday-blue/15 text-clauday-blue'
+                ? 'bg-bg-active text-clauday-blue'
                 : 'text-text-tertiary hover:text-text-primary'
             }`}
           >
@@ -136,7 +136,7 @@ function SkillEditor({ filename, content, onChange }: SkillEditorProps): JSX.Ele
             onClick={() => setMode('preview')}
             className={`flex items-center gap-1 px-2 py-0.5 text-[calc(11px_*_var(--app-font-scale,1))] border-l border-bg-border transition-colors ${
               mode === 'preview'
-                ? 'bg-clauday-blue/15 text-clauday-blue'
+                ? 'bg-bg-active text-clauday-blue'
                 : 'text-text-tertiary hover:text-text-primary'
             }`}
           >
@@ -195,7 +195,7 @@ function SkillEditor({ filename, content, onChange }: SkillEditorProps): JSX.Ele
                 <Check size={12} className="text-emerald-500" />
                 <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">AI 개선 완료 — 검토 후 적용하세요</span>
               </div>
-              <div className="rounded-lg border border-clauday-blue/30 bg-clauday-blue/5 p-3 space-y-1.5 text-xs">
+              <div className="rounded-lg border border-bg-border-light bg-bg-active p-3 space-y-1.5 text-xs">
                 <div>
                   <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary">이름</span>
                   <p className="text-text-primary mt-0.5">{aiResult.name}</p>
@@ -214,7 +214,7 @@ function SkillEditor({ filename, content, onChange }: SkillEditorProps): JSX.Ele
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleApplyAI}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-clauday-blue hover:bg-clauday-blue/90"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-clauday-blue hover:opacity-90"
                 >
                   <Check size={11} /> 에디터에 적용
                 </button>

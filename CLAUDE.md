@@ -121,6 +121,20 @@ npm run icons        # scripts/generate-icons.mjs
 - v1.5.4: raw stdout fallback (stream-json 못 받아도 본문 살림)
 - v1.5.5: Windows 한정 `--append-system-prompt` → stdin combine (이 가이드 작성 계기)
 
+## 색 사용 원칙 (v2.0 확정)
+
+1. **크롬(배경·테두리·일반 텍스트·폼 포커스·탭·아이콘 버튼)은 무채색.** `--bg-*` / `--text-*` 만 쓴다. 선택 상태도 `--bg-active` 면으로 표현한다.
+2. **색은 "정보가 있다"는 신호일 때만.** 카운트 배지, 상태 칩, 링크, 파괴적 동작, 도메인 진입점. 장식으로 쓰지 않는다 — 장식색이 늘면 진짜 신호가 묻힌다.
+3. **도메인 식별색은 뷰 안까지 이어진다.** Claude=`brand-claude`(주황), 두레이=`brand-dooray`(파랑), 터미널=`brand-terminal`(초록). 사이드바에서 파란 항목을 눌렀으면 그 뷰의 대표 아이콘도 파랑이다. 단 뷰 안의 **범용 크롬 액션(새로고침·닫기·설정)에는 도메인색을 주지 않는다.**
+4. ⚠️ **CSS 변수 색에 `/10` 같은 불투명도 수정자를 절대 붙이지 않는다.** Tailwind 3 은 `var(--x)` 색의 알파를 합성하지 못해 **그 유틸리티 규칙을 통째로 생성하지 않는다** — 조용히 무시되는 정도가 아니라 CSS 에 아예 없다. `bg-x/10` 은 배경이 사라지고, `border border-x/30` 은 브라우저 기본 회색 테두리가 드러나며, hover 변형은 반응 자체가 없다. tint 가 필요하면 미리 정의된 **`-bg`/`-fg` 페어**를 쓴다: `bg-c-blue-bg text-c-blue-fg`, `bg-brand-dooray-bg text-brand-dooray`. `src/renderer/src/hooks/cssVarAlpha.guard.test.ts` 가 이 규칙을 강제한다.
+5. **하드코딩 Tailwind 팔레트(`text-red-400`) 금지.** 컴파일은 되지만 테마를 따르지 않는다. 위험/성공/경고는 `c-red-*` / `c-emerald-*` / `c-orange-*`, 두레이 상태는 `--wf-*`, git 은 `--git-*`.
+6. **파괴적 동작은 hover 전에 이미 붉어야 한다.** rest 상태부터 `c-red-fg`(= `.ds-btn.danger`). hover 에서야 색이 나타나면 실수 클릭을 막지 못한다.
+7. **링크는 `text-link` 하나로 통일.** 외부 이동은 아이콘(`ExternalLink`)과 색을 함께 준다 — 하나만으로는 어포던스가 부족하다.
+
+> 새 컴포넌트를 만들 때 자문: **"이 색이 사라지면 사용자가 잃는 정보가 있는가?"** 없으면 무채색이 정답이다.
+>
+> `clauday-blue` / `clauday-orange` 는 다크에서 **회색으로 중성화된 크롬 토큰**이다(이름과 달리 파랑·주황이 아니다). 새 코드에서는 쓰지 말고 `bg-*`/`text-*` 또는 `brand-*` 를 쓴다.
+
 ## 코드 컨벤션
 
 - TypeScript strict, 타입은 `shared/types/` 에 우선 정의 후 main/renderer 양쪽에서 import.

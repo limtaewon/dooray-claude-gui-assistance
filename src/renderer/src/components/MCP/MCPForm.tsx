@@ -222,7 +222,7 @@ function MCPForm({ editName, editConfig, onSave, onCancel }: MCPFormProps): JSX.
           </button>
           <button
             onClick={handleSubmit}
-            className="px-4 py-1.5 rounded text-sm bg-clauday-blue text-white hover:bg-clauday-blue/80 transition-colors"
+            className="px-4 py-1.5 rounded text-sm bg-clauday-blue text-white hover:opacity-90 transition-colors"
           >
             {isEdit ? '수정' : '추가'}
           </button>

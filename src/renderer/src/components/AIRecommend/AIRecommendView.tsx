@@ -103,7 +103,7 @@ function ItemCard({ item, category }: { item: AIRecommendItem; category: Categor
         </div>
         <button
           type="button"
-          className="flex-none flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-clauday-blue hover:text-clauday-blue/80"
+          className="flex-none flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-clauday-blue hover:text-text-primary"
           title="두레이에서 열기"
           onClick={(e) => { e.stopPropagation(); window.open(item.url, '_blank', 'noopener,noreferrer') }}
         >
@@ -775,7 +775,7 @@ function AIRecommendView(): JSX.Element {
           <>
             <div className="ds-card flex items-center justify-center" style={{ padding: '14px 16px' }}>
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-[8px] flex-none flex items-center justify-center bg-clauday-blue/10">
+                <div className="w-8 h-8 rounded-[8px] flex-none flex items-center justify-center bg-bg-active">
                   <Sparkles size={16} className="text-brand-claude" />
                 </div>
                 <div className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary leading-relaxed text-center">
