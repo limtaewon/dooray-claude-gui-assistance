@@ -4,6 +4,10 @@ import type { RepoRegistryEntry, WorkspaceSettings as WorkspaceSettingsShape } f
 import { DEFAULT_BRANCH_TEMPLATE, buildBranchName } from '@shared/workspace/branchName'
 import { Button, Chip, FieldLabel, Input, LoadingView, useToast } from '../common/ds'
 import ProjectFilter from '../common/ProjectFilter'
+import ProjectRuleCard from './ProjectRuleCard'
+import { resolveProjectConfig, withProjectOverride } from '@shared/workspace/projectConfig'
+import { renderTaskDropPrompt } from '@shared/workspace/taskDropPrompt'
+import type { DoorayProject } from '@shared/types/dooray'
 import { SettingsRow, SettingsSegmentedControl, SettingsSwitchRow } from './controls'
 import { TASK_DROP_PLACEHOLDERS } from '@shared/workspace/taskDropPrompt'
 
@@ -19,6 +23,19 @@ function WorkspaceSettings(): JSX.Element {
   const [repos, setRepos] = useState<RepoRegistryEntry[]>([])
   const [settings, setSettings] = useState<WorkspaceSettingsShape | null>(null)
   const [loading, setLoading] = useState(true)
+  const [pinnedProjects, setPinnedProjects] = useState<DoorayProject[]>([])
+
+  /** 작업 패널에 띄우기로 고른 프로젝트만 규칙 카드로 보여준다. */
+  const loadProjects = useCallback(async (): Promise<void> => {
+    const ids = ((await window.api.settings.get(TASK_PROJECTS_KEY)) as string[] | null) ?? []
+    if (ids.length === 0) {
+      setPinnedProjects([])
+      return
+    }
+    const all = await window.api.dooray.projects.list().catch(() => [] as DoorayProject[])
+    const byId = new Map(all.map((p) => [p.id, p]))
+    setPinnedProjects(ids.map((id) => byId.get(id) ?? ({ id, code: id } as DoorayProject)))
+  }, [])
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true)
@@ -35,9 +52,10 @@ function WorkspaceSettings(): JSX.Element {
 
   useEffect(() => {
     void load()
-  }, [load])
+    void loadProjects()
+  }, [load, loadProjects])
 
-  const patch = async (next: Partial<WorkspaceSettingsShape>): Promise<void> => {
+  const patchSettings = async (next: Partial<WorkspaceSettingsShape>): Promise<void> => {
     try {
       setSettings(await window.api.workspace.settings.set(next))
     } catch (err) {
@@ -111,7 +129,7 @@ function WorkspaceSettings(): JSX.Element {
           control={
             <SettingsSegmentedControl
               value={settings.taskDropStartIn}
-              onChange={(v) => void patch({ taskDropStartIn: v })}
+              onChange={(v) => void patchSettings({ taskDropStartIn: v })}
               ariaLabel="업무 드롭 시작 폴더"
               options={[
                 { value: 'current' as const, label: '현재 터미널' },
@@ -126,43 +144,7 @@ function WorkspaceSettings(): JSX.Element {
           description="그 폴더에서 이 업무로 쓰던 claude 세션이 있으면 --resume 으로 이어갑니다."
           searchKeywords={['resume', '세션']}
           checked={settings.taskDropResume}
-          onChange={() => void patch({ taskDropResume: !settings.taskDropResume })}
-        />
-
-        <SettingsRow
-          label="첫 지시 문구"
-          description="claude 를 띄운 뒤 자동으로 보낼 메시지입니다. 비우면 아무것도 보내지 않고 지시는 직접 합니다."
-          searchKeywords={['prompt', '프롬프트', '지시', '템플릿']}
-          alignTop
-          control={
-            <div className="w-[340px] max-w-full flex flex-col gap-1.5">
-              <textarea
-                value={settings.taskDropPromptTemplate}
-                onChange={(e) => void patch({ taskDropPromptTemplate: e.target.value })}
-                rows={2}
-                placeholder="비우면 지시를 보내지 않습니다"
-                aria-label="첫 지시 문구"
-                className="ds-input resize-none text-[calc(11.5px_*_var(--app-font-scale,1))]"
-              />
-              <div className="flex flex-wrap gap-1">
-                {TASK_DROP_PLACEHOLDERS.map((p) => (
-                  <button
-                    key={p.token}
-                    type="button"
-                    title={p.label}
-                    onClick={() =>
-                      void patch({
-                        taskDropPromptTemplate: `${settings.taskDropPromptTemplate} ${p.token}`.trim()
-                      })
-                    }
-                    className="ds-chip neutral cursor-pointer font-mono"
-                  >
-                    {p.token}
-                  </button>
-                ))}
-              </div>
-            </div>
-          }
+          onChange={() => void patchSettings({ taskDropResume: !settings.taskDropResume })}
         />
 
         <SettingsSwitchRow
@@ -170,25 +152,54 @@ function WorkspaceSettings(): JSX.Element {
           description="--dangerously-skip-permissions 로 실행합니다. claude 가 파일 수정·명령 실행을 묻지 않고 바로 합니다."
           searchKeywords={['permission', '권한', 'dangerously']}
           checked={settings.taskDropSkipPermissions}
-          onChange={() => void patch({ taskDropSkipPermissions: !settings.taskDropSkipPermissions })}
+          onChange={() => void patchSettings({ taskDropSkipPermissions: !settings.taskDropSkipPermissions })}
         />
       </section>
 
       <section className="ds-card">
-        <h3 className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary mb-1">
-          두레이 프로젝트
-        </h3>
-        <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mb-3">
-          터미널 작업 패널의 '업무' 탭에 어떤 프로젝트의 내 업무를 띄울지 고릅니다. 고르지 않으면 비어 있습니다.
-        </p>
-        <ProjectFilter settingsKey={TASK_PROJECTS_KEY} />
+        <div className="flex items-start justify-between gap-3 mb-1">
+          <div className="min-w-0">
+            <h3 className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary">
+              프로젝트별 규칙
+            </h3>
+            <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
+              작업 패널 &lsquo;업무&rsquo; 탭에 띄울 두레이 프로젝트를 고르고, 프로젝트마다 저장소·브랜치 규칙·첫 지시 문구를
+              따로 정합니다. 비워두면 아래 기본값을 씁니다.
+            </p>
+          </div>
+          <div className="flex-none">
+            <ProjectFilter settingsKey={TASK_PROJECTS_KEY} onChanged={() => void loadProjects()} />
+          </div>
+        </div>
+
+        {pinnedProjects.length === 0 ? (
+          <p className="mt-3 text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-secondary">
+            아직 고른 프로젝트가 없습니다. 오른쪽 위 버튼으로 프로젝트를 고르세요.
+          </p>
+        ) : (
+          <div className="mt-3 flex flex-col gap-2">
+            {pinnedProjects.map((project) => (
+              <ProjectRuleCard
+                key={project.id}
+                project={project}
+                repos={repos}
+                config={resolveProjectConfig(settings, project.id)}
+                onChange={(patch) =>
+                  void patchSettings({
+                    projectOverrides: withProjectOverride(settings.projectOverrides, project.id, patch)
+                  })
+                }
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="ds-card">
         <h3 className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary mb-1">저장소</h3>
         <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mb-3">
-          업무 카드를 터미널에 끌어다 놓으면 여기 등록한 저장소로 <code>cd</code> 합니다. 목록의 첫 저장소가 기본이며,
-          워크트리 생성은 &lsquo;브랜치 작업&rsquo; 뷰가 담당합니다.
+          여기 등록한 폴더를 위 프로젝트 규칙에서 고를 수 있습니다. 등록만으로는 아무 일도 일어나지 않습니다 —
+          업무 드롭은 기본적으로 <strong>지금 터미널이 있는 폴더</strong>에서 시작합니다.
         </p>
 
         <div className="flex flex-col gap-2">
@@ -240,13 +251,17 @@ function WorkspaceSettings(): JSX.Element {
       </section>
 
       <section className="ds-card">
-        <h3 className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary mb-2">
-          브랜치 이름 템플릿
+        <h3 className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary mb-1">
+          기본값
         </h3>
+        <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mb-3">
+          프로젝트에서 따로 정하지 않았을 때 쓰는 값입니다.
+        </p>
+        <FieldLabel>브랜치 이름 템플릿</FieldLabel>
         <Input
           value={settings.branchTemplate}
           onChange={(e) => setSettings({ ...settings, branchTemplate: e.target.value })}
-          onBlur={(e) => void patch({ branchTemplate: e.target.value.trim() || DEFAULT_BRANCH_TEMPLATE })}
+          onBlur={(e) => void patchSettings({ branchTemplate: e.target.value.trim() || DEFAULT_BRANCH_TEMPLATE })}
           className="font-mono"
           aria-label="브랜치 이름 템플릿"
         />
@@ -272,6 +287,35 @@ function WorkspaceSettings(): JSX.Element {
           taskNumber 가 없으면 taskId 뒤 6자리로 대체됩니다. 같은 이름이 이미 있으면 <code>-2</code>, <code>-3</code> 이
           붙습니다.
         </p>
+
+        <div className="mt-4">
+          <FieldLabel>첫 지시 문구</FieldLabel>
+          <textarea
+            defaultValue={settings.taskDropPromptTemplate}
+            onBlur={(e) => void patchSettings({ taskDropPromptTemplate: e.target.value })}
+            rows={2}
+            placeholder="비우면 지시를 보내지 않고 claude 만 띄웁니다"
+            aria-label="기본 첫 지시 문구"
+            className="ds-input resize-none text-[calc(11.5px_*_var(--app-font-scale,1))]"
+          />
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {TASK_DROP_PLACEHOLDERS.map((t) => (
+              <span key={t.token} title={t.label} className="ds-chip neutral font-mono">
+                {t.token}
+              </span>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary truncate">
+            보낼 메시지{' '}
+            <code className="text-text-secondary">
+              {renderTaskDropPrompt(settings.taskDropPromptTemplate, {
+                title: 'AI 유의어 사전 - 신규 메뉴 개발',
+                number: 6793,
+                projectCode: 'NEON'
+              }) ?? '(보내지 않음)'}
+            </code>
+          </p>
+        </div>
       </section>
 
       <section className="ds-card">
@@ -284,7 +328,7 @@ function WorkspaceSettings(): JSX.Element {
               type="checkbox"
               className="accent-[var(--text-secondary)]"
               checked={settings.autoApproveDefault}
-              onChange={(e) => void patch({ autoApproveDefault: e.target.checked })}
+              onChange={(e) => void patchSettings({ autoApproveDefault: e.target.checked })}
             />
             권한 자동 승인 (<span className="font-mono">--dangerously-skip-permissions</span>)
           </label>
@@ -293,7 +337,7 @@ function WorkspaceSettings(): JSX.Element {
               type="checkbox"
               className="accent-[var(--text-secondary)]"
               checked={settings.transitionDoorayDefault}
-              onChange={(e) => void patch({ transitionDoorayDefault: e.target.checked })}
+              onChange={(e) => void patchSettings({ transitionDoorayDefault: e.target.checked })}
             />
             두레이 상태를 &lsquo;진행중&rsquo; 으로 변경
           </label>
@@ -302,7 +346,7 @@ function WorkspaceSettings(): JSX.Element {
               type="checkbox"
               className="accent-[var(--text-secondary)]"
               checked={settings.commentBranchDefault}
-              onChange={(e) => void patch({ commentBranchDefault: e.target.checked })}
+              onChange={(e) => void patchSettings({ commentBranchDefault: e.target.checked })}
             />
             브랜치명 댓글 남기기
           </label>
@@ -314,7 +358,7 @@ function WorkspaceSettings(): JSX.Element {
               min={1}
               max={8}
               value={settings.maxConcurrentRuns}
-              onChange={(e) => void patch({ maxConcurrentRuns: Number(e.target.value) || 1 })}
+              onChange={(e) => void patchSettings({ maxConcurrentRuns: Number(e.target.value) || 1 })}
               className="w-20 flex-none"
               aria-label="동시 실행 상한"
             />

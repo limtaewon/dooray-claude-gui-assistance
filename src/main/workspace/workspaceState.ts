@@ -29,6 +29,7 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   commentBranchDefault: false,
   // 업무 드롭 기본값: 지금 터미널이 있는 폴더에서, 이전 세션이 있으면 이어가고, 제목만 전달.
   // (미리 지정한 폴더로 cd 하지 않는다 — 1 업무 N 저장소가 현실이라 폴더는 사용자가 정한다)
+  projectOverrides: {},
   taskDropStartIn: 'current',
   taskDropResume: true,
   taskDropPromptTemplate: DEFAULT_TASK_DROP_PROMPT,

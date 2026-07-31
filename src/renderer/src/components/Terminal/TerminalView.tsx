@@ -55,6 +55,7 @@ import {
   templateNeedsBody
 } from '@shared/workspace/taskDropPrompt'
 import { workspaceKey } from '@shared/workspace/workspaceKey'
+import { resolveProjectConfig } from '@shared/workspace/projectConfig'
 import type { TaskDropTarget, TaskSessionLink } from '@shared/types/workspace'
 import TerminalEmptyState from './TerminalEmptyState'
 import { tabNameFromCwd, tabNameFromTitle } from './tabAutoName'
@@ -401,7 +402,10 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       return
     }
 
-    const template = settings?.taskDropPromptTemplate ?? DEFAULT_TASK_DROP_PROMPT
+    // 프로젝트마다 지시 문구가 다를 수 있다 — 없으면 전역 기본으로 떨어진다.
+    const template = settings
+      ? resolveProjectConfig(settings, task.projectId).promptTemplate
+      : DEFAULT_TASK_DROP_PROMPT
     let body: string | undefined
     if (!target.claudeSessionId && templateNeedsBody(template)) {
       body = await window.api.dooray.tasks

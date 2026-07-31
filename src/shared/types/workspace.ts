@@ -109,6 +109,14 @@ export interface WorkspaceLastStartOptions {
  */
 export type TaskDropStartIn = 'current' | 'mapped'
 
+/** 두레이 프로젝트 하나에만 적용할 값. 비어 있는 항목은 전역 기본을 따른다. */
+export interface ProjectOverride {
+  /** 이 프로젝트가 쓰는 저장소들 — 한 프로젝트가 여러 저장소에 걸친다 */
+  repoIds?: string[]
+  branchTemplate?: string
+  promptTemplate?: string
+}
+
 export interface WorkspaceSettings {
   branchTemplate: string
   defaultBaseBranch?: string
@@ -117,6 +125,12 @@ export interface WorkspaceSettings {
   transitionDoorayDefault: boolean
   commentBranchDefault: boolean
   lastStart?: WorkspaceLastStartOptions
+
+  /**
+   * 프로젝트별 덮어쓰기. 저장소 10여 개 × 두레이 프로젝트 N 개가 보통이라
+   * 전역 값 하나로는 맞출 수 없다 — 값이 없는 항목만 전역 기본을 쓴다.
+   */
+  projectOverrides: Record<string, ProjectOverride>
 
   /** 업무 드롭 — 시작 폴더 */
   taskDropStartIn: TaskDropStartIn

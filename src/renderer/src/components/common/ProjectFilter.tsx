@@ -155,11 +155,12 @@ function ProjectFilter({ settingsKey = 'pinnedProjects', useWikiDomains = false,
   return (
     <div className="relative">
       <button ref={anchorRef} onClick={() => setOpen(!open)}
-        className={`ds-btn icon sm relative ${pinnedCount > 0 ? 'text-text-primary' : ''}`}
-        title="표시할 프로젝트 설정">
-        <Settings size={14} />
+        className="ds-btn secondary sm"
+        title="표시할 프로젝트 선택">
+        <Settings size={13} />
+        프로젝트 선택
         {pinnedCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-badge-bg text-badge-fg text-[calc(8px_*_var(--app-font-scale,1))] flex items-center justify-center font-bold">
+          <span className="ml-0.5 px-1.5 rounded-full bg-brand-dooray text-white text-[calc(9px_*_var(--app-font-scale,1))] font-semibold">
             {pinnedCount}
           </span>
         )}
