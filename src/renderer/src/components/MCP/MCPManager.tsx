@@ -427,6 +427,7 @@ function MCPManager(): JSX.Element {
             · {entries.length}개 · 활성 {activeCount}
           </span>
           <SegTabs<Tab>
+            data-tour="mcp-tabs"
             value={tab}
             onChange={(t) => { setTab(t); exitSelectMode() }}
             items={[
@@ -450,16 +451,17 @@ function MCPManager(): JSX.Element {
                 새로고침
               </Button>
               <Button
+                data-tour="mcp-select"
                 variant={selectMode ? 'orange' : 'secondary'}
                 onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
                 leftIcon={selectMode ? <X size={13} /> : <CheckSquare size={13} />}
               >
                 {selectMode ? '선택 종료' : '선택'}
               </Button>
-              <Button variant="secondary" onClick={handleImport} leftIcon={<Upload size={13} />}>
+              <Button data-tour="mcp-import" variant="secondary" onClick={handleImport} leftIcon={<Upload size={13} />}>
                 가져오기
               </Button>
-              <Button variant="primary" onClick={() => setFormState({ mode: 'add' })} leftIcon={<Plus size={12} />}>
+              <Button data-tour="mcp-add" variant="primary" onClick={() => setFormState({ mode: 'add' })} leftIcon={<Plus size={12} />}>
                 서버 추가
               </Button>
             </>

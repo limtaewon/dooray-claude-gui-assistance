@@ -468,6 +468,7 @@ function SkillsManager(): JSX.Element {
             {tab === 'mine' ? `${skills.length}개` : `${wikiItems.length}개 공유됨`}
           </span>
           <SegTabs<FilterTab>
+            data-tour="skills-tabs"
             value={tab}
             onChange={(t) => { setTab(t); exitSelectMode() }}
             items={[
@@ -497,10 +498,10 @@ function SkillsManager(): JSX.Element {
               >
                 {selectMode ? '선택 종료' : '선택'}
               </Button>
-              <Button variant="secondary" onClick={handleImport} leftIcon={<Upload size={13} />}>
+              <Button data-tour="skills-import" variant="secondary" onClick={handleImport} leftIcon={<Upload size={13} />}>
                 가져오기
               </Button>
-              <Button variant="primary" onClick={() => setCreating(true)} leftIcon={<Plus size={13} />}>
+              <Button data-tour="skills-add" variant="primary" onClick={() => setCreating(true)} leftIcon={<Plus size={13} />}>
                 스킬 추가
               </Button>
             </>
@@ -518,7 +519,7 @@ function SkillsManager(): JSX.Element {
               >
                 {selectMode ? '선택 종료' : '선택'}
               </Button>
-              <Button variant="primary" onClick={() => { setPickerSelected(new Set()); setPickerSearch(''); setSharePickerOpen(true) }} leftIcon={<Upload size={13} />}>
+              <Button data-tour="skills-share" variant="primary" onClick={() => { setPickerSelected(new Set()); setPickerSearch(''); setSharePickerOpen(true) }} leftIcon={<Upload size={13} />}>
                 내 스킬 공유하기
               </Button>
             </>

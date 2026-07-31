@@ -19,6 +19,21 @@ describe('TOURS', () => {
     }
   })
 
+  it('설명이 한 줄짜리로 얄팍하지 않다 — 무엇을 어떻게 하는지까지 적는다', () => {
+    for (const [view, steps] of Object.entries(TOURS)) {
+      for (const step of steps) {
+        expect(step.body.length, `${view} / ${step.title}`).toBeGreaterThan(30)
+      }
+    }
+  })
+
+  it('설치·공유가 헷갈리는 메뉴는 충분히 설명한다', () => {
+    // MCP·스킬은 로컬/공유 구분과 등록 방법을 모르면 쓸 수 없다.
+    expect(tourLength('mcp')).toBeGreaterThanOrEqual(8)
+    expect(tourLength('skills')).toBeGreaterThanOrEqual(7)
+    expect(tourLength('terminal')).toBeGreaterThanOrEqual(8)
+  })
+
   it('앵커 이름은 중복되지 않는다 — 같은 값이면 엉뚱한 요소를 비춘다', () => {
     const anchors = Object.values(TOURS).flat().map((s) => s.anchor).filter(Boolean)
     expect(new Set(anchors).size).toBe(anchors.length)
