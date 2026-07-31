@@ -234,6 +234,13 @@ export function createMockWindowApi(): Record<string, unknown> {
       scm: {
         status: vi.fn().mockResolvedValue({ entries: [], conflictOperation: 'none' }),
         history: vi.fn().mockResolvedValue({ items: [], hasMore: false, limit: 50, skip: 0 }),
+        branchDiff: vi.fn().mockResolvedValue({
+          baseRef: 'origin/main',
+          baseOid: 'a'.repeat(40),
+          headRef: 'feature/neon-6774',
+          ahead: 0,
+          files: []
+        }),
         commitDetail: vi.fn().mockResolvedValue({ commitOid: '', files: [] }),
         fileDiff: vi.fn().mockResolvedValue({
           path: '',

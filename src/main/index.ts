@@ -1669,6 +1669,10 @@ ${data}`,
     const { repoPath, commitOid } = args as { repoPath: string; commitOid: string }
     return gitScmService.commitDetail(repoPath, commitOid)
   })
+  gitHandle(IPC_CHANNELS.GIT_SCM_BRANCH_DIFF, (args) => {
+    const { repoPath, baseRef } = args as { repoPath: string; baseRef?: string }
+    return gitScmService.branchDiff(repoPath, baseRef)
+  })
   gitHandle(IPC_CHANNELS.GIT_SCM_FILE_DIFF, (params) =>
     gitScmService.fileDiff(params as GitFileDiffParams)
   )

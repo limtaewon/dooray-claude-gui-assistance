@@ -40,6 +40,7 @@ import { matchesBinding } from '@shared/keybindings/binding'
 import TaskDrawer, { TASK_DRAG_MIME, type TaskDragPayload } from './TaskDrawer'
 import SideDrawer, { type DrawerTab } from './SideDrawer'
 import SourceControlPanel from '../Git/scm/SourceControlPanel'
+import BranchDiffPanel from '../Git/scm/BranchDiffPanel'
 import GitHistoryPanel from '../Git/scm/GitHistoryPanel'
 import BranchesPanel from '../Git/scm/BranchesPanel'
 import DiffView, { diffTabId, type DiffRequest } from '../Git/scm/DiffView'
@@ -864,7 +865,15 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     void window.api.settings
       .get('terminalDrawerTab')
       .then((v) => {
-        if (v === 'tasks' || v === 'changes' || v === 'history' || v === 'branches') setDrawerTab(v)
+        if (
+          v === 'tasks' ||
+          v === 'changes' ||
+          v === 'branchDiff' ||
+          v === 'history' ||
+          v === 'branches'
+        ) {
+          setDrawerTab(v)
+        }
       })
       .catch(() => undefined)
     void window.api.settings
@@ -1386,6 +1395,8 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
           <DrawerRepoEmptyState tab={drawerTab} cwd={focusedCwd ?? undefined} resolving={repoResolving} />
         ) : drawerTab === 'changes' ? (
           <SourceControlPanel repoPath={scmRepo} onOpenDiff={openDiffTab} onRepoChanged={notifyRepoChanged} />
+        ) : drawerTab === 'branchDiff' ? (
+          <BranchDiffPanel repoPath={scmRepo} onOpenDiff={openDiffTab} />
         ) : drawerTab === 'history' ? (
           <GitHistoryPanel repoPath={scmRepo} onOpenDiff={openDiffTab} />
         ) : (

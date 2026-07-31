@@ -6,6 +6,8 @@ export type GitDiffSource =
   | { kind: 'staged' }
   | { kind: 'unstaged' }
   | { kind: 'commit'; commitOid: string; parentOid?: string }
+  /** 기준 커밋 대비 지금 작업 트리 — '이 브랜치가 바꾼 것 전부'(커밋 + 아직 안 한 변경) */
+  | { kind: 'range'; baseOid: string }
 
 export interface GitFileDiffParams {
   repoPath: string
@@ -41,6 +43,24 @@ export interface GitCommitFileChange {
 export interface GitCommitDetail {
   commitOid: string
   parentOid?: string
+  files: GitCommitFileChange[]
+}
+
+/**
+ * 브랜치가 기준(base)에서 갈라진 뒤 바꾼 파일들.
+ *
+ * 작업 트리까지 포함해 비교한다 — '이 브랜치가 최종적으로 무엇을 바꾸는가' 가 알고 싶은 것이라
+ * 커밋한 것만 보여주면 반쪽이다. 추적되지 않는 새 파일은 여기 안 나온다(변경사항 탭에서 본다).
+ */
+export interface GitBranchDiff {
+  /** 비교 기준으로 쓴 ref (`origin/main` 등) */
+  baseRef: string
+  /** merge-base 커밋 — diff 요청에 그대로 쓴다 */
+  baseOid: string
+  /** 현재 브랜치 이름 (detached 면 짧은 해시) */
+  headRef: string
+  /** 기준 이후 이 브랜치의 커밋 수 */
+  ahead: number
   files: GitCommitFileChange[]
 }
 

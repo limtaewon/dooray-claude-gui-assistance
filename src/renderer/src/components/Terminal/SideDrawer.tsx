@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { ChevronsRight, ClipboardList, FileDiff, GitBranch, History, type LucideIcon } from 'lucide-react'
+import { ChevronsRight, ClipboardList, FileDiff, GitBranch, GitCompare, History, type LucideIcon } from 'lucide-react'
 import { clampDrawerWidth } from './drawerWidth'
 
-export type DrawerTab = 'tasks' | 'changes' | 'history' | 'branches'
+export type DrawerTab = 'tasks' | 'changes' | 'branchDiff' | 'history' | 'branches'
 
 export const DRAWER_TABS: {
   id: DrawerTab
@@ -13,6 +13,7 @@ export const DRAWER_TABS: {
 }[] = [
   { id: 'tasks', icon: ClipboardList, label: '업무', accent: 'var(--brand-dooray)' },
   { id: 'changes', icon: FileDiff, label: '변경사항' },
+  { id: 'branchDiff', icon: GitCompare, label: '브랜치 변경' },
   { id: 'history', icon: History, label: '히스토리' },
   { id: 'branches', icon: GitBranch, label: '브랜치' }
 ]

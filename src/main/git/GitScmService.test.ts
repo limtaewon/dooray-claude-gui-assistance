@@ -517,3 +517,92 @@ describe('브랜치', () => {
     expect(runGit.mock.calls[0][0]).toEqual(['rebase', '--abort'])
   })
 })
+
+describe('GitScmService.branchDiff', () => {
+  it('merge-base 기준으로 바뀐 파일을 준다 — base 가 앞서가도 그쪽 커밋이 섞이지 않는다', async () => {
+    routeGit([
+      [(a) => a[0] === 'symbolic-ref', 'origin/develop'],
+      [(a) => a[0] === 'merge-base', `${HASH_A}\n`],
+      [(a) => a.includes('--name-status'), `M\u0000src/a.ts\u0000A\u0000src/b.ts\u0000`],
+      [(a) => a.includes('--numstat'), `10\t2\tsrc/a.ts\u00005\t0\tsrc/b.ts\u0000`],
+      [(a) => a.includes('--abbrev-ref'), 'feature/neon-6774'],
+      [(a) => a[0] === 'rev-list', '3']
+    ])
+
+    const diff = await service.branchDiff('/repo')
+
+    expect(diff).toMatchObject({
+      baseRef: 'origin/develop',
+      baseOid: HASH_A,
+      headRef: 'feature/neon-6774',
+      ahead: 3
+    })
+    expect(diff.files).toEqual([
+      { path: 'src/a.ts', status: 'modified', added: 10, removed: 2 },
+      { path: 'src/b.ts', status: 'added', added: 5, removed: 0 }
+    ])
+    // 오른쪽에 rev 를 주지 않는다 = 작업 트리까지 비교 (아직 커밋 안 한 변경 포함)
+    const nameStatusCall = runGit.mock.calls.find((c) => (c[0] as string[]).includes('--name-status'))
+    expect((nameStatusCall?.[0] as string[]).at(-1)).toBe(HASH_A)
+  })
+
+  it('기준 브랜치를 지정하면 그것을 쓴다', async () => {
+    routeGit([
+      [(a) => a[0] === 'merge-base', `${HASH_A}\n`],
+      [(a) => a.includes('--abbrev-ref'), 'feature/x']
+    ])
+
+    const diff = await service.branchDiff('/repo', 'origin/release')
+
+    expect(diff.baseRef).toBe('origin/release')
+    expect(runGit.mock.calls.some((c) => (c[0] as string[]).join(' ').includes('origin/release'))).toBe(true)
+  })
+
+  it('origin/HEAD 가 없으면 흔한 이름을 찾는다', async () => {
+    routeGit([
+      [(a) => a[0] === 'symbolic-ref', ''],
+      [(a) => a[0] === 'rev-parse' && a.includes('origin/main'), ''],
+      [(a) => a[0] === 'rev-parse' && a.includes('origin/master'), HASH_B],
+      [(a) => a[0] === 'merge-base', `${HASH_A}\n`],
+      [(a) => a.includes('--abbrev-ref'), 'feature/x']
+    ])
+
+    expect((await service.branchDiff('/repo')).baseRef).toBe('origin/master')
+  })
+
+  it('기준을 못 찾으면 그렇게 말한다 — 조용히 빈 목록을 주지 않는다', async () => {
+    routeGit([[(a) => a[0] === 'symbolic-ref', '']])
+    await expect(service.branchDiff('/repo')).rejects.toThrow('기준 브랜치를 찾지 못했습니다')
+  })
+
+  it('공통 조상을 못 찾으면 실패한다', async () => {
+    routeGit([
+      [(a) => a[0] === 'symbolic-ref', 'origin/main'],
+      [(a) => a[0] === 'merge-base', '']
+    ])
+    await expect(service.branchDiff('/repo')).rejects.toThrow('공통 조상')
+  })
+})
+
+describe('GitScmService.fileDiff — range', () => {
+  it('기준 커밋의 내용과 지금 작업 파일을 비교한다', async () => {
+    writeFileSync(join(repoDir, 'a.ts'), 'now')
+    routeGit([[(a) => a[0] === 'show', 'before']])
+    runGitBuffer.mockResolvedValue(Buffer.from('before'))
+
+    const diff = await service.fileDiff({
+      repoPath: repoDir,
+      path: 'a.ts',
+      source: { kind: 'range', baseOid: HASH_A }
+    })
+
+    expect(diff.original).toBe('before')
+    expect(diff.modified).toBe('now')
+  })
+
+  it('기준 커밋 id 가 온전하지 않으면 거부한다', async () => {
+    await expect(
+      service.fileDiff({ repoPath: repoDir, path: 'a.ts', source: { kind: 'range', baseOid: 'abc' } })
+    ).rejects.toThrow('유효하지 않은 기준 커밋')
+  })
+})

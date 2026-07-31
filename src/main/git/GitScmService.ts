@@ -34,6 +34,7 @@ import type {
 import type { GitHistoryOptions, GitHistoryResult } from '../../shared/git/historyTypes'
 import type {
   GitAuthorInfo,
+  GitBranchDiff,
   GitCommitDetail,
   GitCommitFileChange,
   GitCommitParams,
@@ -118,6 +119,29 @@ function parseNumstat(stdout: string): Map<string, NumstatRow> {
     })
   }
   return result
+}
+
+/** `diff -z --name-status` 출력 → 파일 목록. R/C 는 뒤에 old·new 두 경로가 온다. */
+function parseNameStatus(stdout: string, stats: Map<string, NumstatRow>): GitCommitFileChange[] {
+  const files: GitCommitFileChange[] = []
+  const fields = [...iterateNulDelimitedFields(stdout)].filter((f) => f !== '')
+  for (let i = 0; i < fields.length; i += 1) {
+    const code = fields[i]
+    if (!code) continue
+    const statusChar = code[0]
+    if (statusChar === 'R' || statusChar === 'C') {
+      const oldPath = decodeGitCQuotedPath(fields[i + 1] ?? '')
+      const path = decodeGitCQuotedPath(fields[i + 2] ?? '')
+      i += 2
+      files.push({ path, oldPath, status: statusCharToFileStatus(statusChar), ...(stats.get(path) ?? {}) })
+      continue
+    }
+    const path = decodeGitCQuotedPath(fields[i + 1] ?? '')
+    i += 1
+    if (!path) continue
+    files.push({ path, status: statusCharToFileStatus(statusChar), ...(stats.get(path) ?? {}) })
+  }
+  return files
 }
 
 function statusCharToFileStatus(char: string): GitStatusEntry['status'] {
@@ -284,26 +308,7 @@ export class GitScmService {
       runGit(numstatArgs, repoPath).catch(() => ({ stdout: '', stderr: '' }))
     ])
 
-    const stats = parseNumstat(numstat.stdout)
-    const files: GitCommitFileChange[] = []
-    const fields = [...iterateNulDelimitedFields(nameStatus.stdout)].filter((f) => f !== '')
-    for (let i = 0; i < fields.length; i += 1) {
-      const code = fields[i]
-      if (!code) continue
-      const statusChar = code[0]
-      // R/C 는 뒤에 old, new 두 경로가 온다.
-      if (statusChar === 'R' || statusChar === 'C') {
-        const oldPath = decodeGitCQuotedPath(fields[i + 1] ?? '')
-        const path = decodeGitCQuotedPath(fields[i + 2] ?? '')
-        i += 2
-        files.push({ path, oldPath, status: statusCharToFileStatus(statusChar), ...(stats.get(path) ?? {}) })
-        continue
-      }
-      const path = decodeGitCQuotedPath(fields[i + 1] ?? '')
-      i += 1
-      if (!path) continue
-      files.push({ path, status: statusCharToFileStatus(statusChar), ...(stats.get(path) ?? {}) })
-    }
+    const files = parseNameStatus(nameStatus.stdout, parseNumstat(numstat.stdout))
 
     return { commitOid, parentOid, files }
   }
@@ -333,6 +338,59 @@ export class GitScmService {
     return [...byKey.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
   }
 
+  /**
+   * 이 브랜치가 기준(base)에서 갈라진 뒤 바꾼 파일들.
+   *
+   * 비교 기준은 `merge-base(base, HEAD)` 다 — base 가 그 뒤로 앞서갔더라도 그쪽 커밋이
+   * '내가 바꾼 것' 으로 섞이지 않게. 오른쪽은 작업 트리라 아직 커밋 안 한 변경도 포함된다.
+   */
+  async branchDiff(repoPath: string, baseRef?: string): Promise<GitBranchDiff> {
+    const base = baseRef?.trim() || (await this.resolveBaseRef(repoPath))
+    if (!isSafeGitRef(base)) throw new Error(`유효하지 않은 기준 브랜치: ${base}`)
+
+    const { stdout: mergeBase } = await runGit(
+      ['merge-base', '--end-of-options', base, 'HEAD'],
+      repoPath
+    )
+    const baseOid = mergeBase.trim()
+    if (!isFullObjectId(baseOid)) throw new Error(`${base} 와의 공통 조상을 찾지 못했습니다`)
+
+    const [nameStatus, numstat, headRef, ahead] = await Promise.all([
+      runGit(['-c', 'core.quotePath=false', 'diff', '-z', '--name-status', '-M', '-C', baseOid], repoPath),
+      runGit(['-c', 'core.quotePath=false', 'diff', '-z', '--numstat', '-M', '-C', baseOid], repoPath)
+        .catch(() => ({ stdout: '', stderr: '' })),
+      runGit(['rev-parse', '--abbrev-ref', 'HEAD'], repoPath)
+        .then((r) => r.stdout.trim())
+        .catch(() => ''),
+      runGit(['rev-list', '--count', '--end-of-options', `${baseOid}..HEAD`], repoPath)
+        .then((r) => Number.parseInt(r.stdout.trim(), 10) || 0)
+        .catch(() => 0)
+    ])
+
+    return {
+      baseRef: base,
+      baseOid,
+      headRef: headRef && headRef !== 'HEAD' ? headRef : baseOid.slice(0, 7),
+      ahead,
+      files: parseNameStatus(nameStatus.stdout, parseNumstat(numstat.stdout))
+    }
+  }
+
+  /** 기준 브랜치 추정 — origin/HEAD → 흔한 이름 순. 네트워크는 타지 않는다. */
+  private async resolveBaseRef(repoPath: string): Promise<string> {
+    const head = await runGit(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], repoPath)
+      .then((r) => r.stdout.trim())
+      .catch(() => '')
+    if (head) return head
+    for (const candidate of ['origin/main', 'origin/master', 'main', 'master']) {
+      const found = await runGit(['rev-parse', '--verify', '--quiet', candidate], repoPath)
+        .then((r) => r.stdout.trim())
+        .catch(() => '')
+      if (found) return candidate
+    }
+    throw new Error('기준 브랜치를 찾지 못했습니다 (origin/HEAD·main·master 없음)')
+  }
+
   // ───────────────────────── diff ─────────────────────────
 
   /** 파일 diff — Monaco 가 계산하도록 양쪽 전문을 준다. */
@@ -347,6 +405,12 @@ export class GitScmService {
     if (source.kind === 'staged') {
       original = await this.readBlob(repoPath, 'HEAD', oldPath)
       modified = await this.readBlob(repoPath, '', path)
+    } else if (source.kind === 'range') {
+      if (!isFullObjectId(source.baseOid)) {
+        throw new Error(`유효하지 않은 기준 커밋: ${source.baseOid}`)
+      }
+      original = await this.readBlob(repoPath, source.baseOid, oldPath)
+      modified = await this.readWorkingFile(repoPath, path)
     } else if (source.kind === 'unstaged') {
       original = await this.readBlob(repoPath, '', oldPath)
       modified = await this.readWorkingFile(repoPath, path)

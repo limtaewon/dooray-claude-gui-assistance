@@ -1,7 +1,7 @@
-import { FileDiff, FolderGit2, GitBranch, History, Terminal as TerminalIcon } from 'lucide-react'
+import { FileDiff, FolderGit2, GitBranch, History, Terminal as TerminalIcon, GitCompare } from 'lucide-react'
 import { LoadingView, OnboardingView } from '../../common/ds'
 
-type RepoTab = 'changes' | 'history' | 'branches'
+type RepoTab = 'changes' | 'branchDiff' | 'history' | 'branches'
 
 const TAB_COPY: Record<RepoTab, { icon: typeof FileDiff; title: string; description: string; steps: { title: string; body: string }[] }> = {
   changes: {
@@ -12,6 +12,16 @@ const TAB_COPY: Record<RepoTab, { icon: typeof FileDiff; title: string; descript
       { title: '파일을 클릭하면 diff 가 열립니다', body: '좌우 비교 뷰로 바뀐 줄을 확인합니다.' },
       { title: '행에 마우스를 올리면 올리기/내리기/되돌리기', body: '섹션 헤더에서는 전체를 한 번에 처리합니다.' },
       { title: '터미널에서 git 을 써도 반영됩니다', body: '명령이 끝나면 목록을 다시 읽습니다.' }
+    ]
+  },
+  branchDiff: {
+    icon: GitCompare,
+    title: '브랜치 변경',
+    description: '이 브랜치가 기준 브랜치에서 갈라진 뒤 바꾼 파일을 모아 봅니다.',
+    steps: [
+      { title: '커밋한 것까지 함께 봅니다', body: '‘변경사항’ 탭은 아직 커밋 안 한 것만 보여줍니다.' },
+      { title: '기준은 origin/HEAD 를 씁니다', body: '없으면 main·master 를 차례로 찾습니다.' },
+      { title: '파일을 클릭하면 기준 대비 diff', body: '업무 워크트리에서 결과를 확인할 때 씁니다.' }
     ]
   },
   history: {

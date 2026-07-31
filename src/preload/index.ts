@@ -166,6 +166,7 @@ import type { GitStatusResult } from '../shared/git/statusTypes'
 import type { GitHistoryOptions, GitHistoryResult } from '../shared/git/historyTypes'
 import type {
   GitAuthorInfo,
+  GitBranchDiff,
   GitCommitDetail,
   GitCommitParams,
   GitCreateBranchParams,
@@ -662,6 +663,9 @@ const api = {
         ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_HISTORY, { repoPath, options }),
       commitDetail: (repoPath: string, commitOid: string): Promise<GitCommitDetail> =>
         ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_COMMIT_DETAIL, { repoPath, commitOid }),
+      /** 이 브랜치가 기준(base) 대비 바꾼 파일들 — 커밋 + 아직 커밋 안 한 변경 */
+      branchDiff: (repoPath: string, baseRef?: string): Promise<GitBranchDiff> =>
+        ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_BRANCH_DIFF, { repoPath, baseRef }),
       fileDiff: (params: GitFileDiffParams): Promise<GitFileDiffContent> =>
         ipcRenderer.invoke(IPC_CHANNELS.GIT_SCM_FILE_DIFF, params),
       stage: (repoPath: string, paths: string[]): Promise<void> =>
