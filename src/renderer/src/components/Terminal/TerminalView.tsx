@@ -354,14 +354,21 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       setTimeout(() => setDropBusy(null), 2500)
       return
     }
+    // pane.cwd 는 PTY 생성 시점 값이라 `cd` 이후를 못 따라간다 — 실측값을 우선 쓴다.
+    const liveCwd =
+      (await window.api.terminal.sessionCwd?.(pane.sessionId).catch(() => null)) ?? pane.cwd
+
     // 드롭한 pane 이 이미 있는 폴더에 이 업무의 세션이 있으면 그걸 이어간다 —
     // 업무 하나가 여러 저장소에 걸치므로 "지금 이 자리" 가 어느 세션인지를 가른다.
+    // 저장소를 등록하지 않았어도 이 폴더에서 시작할 수 있게 cwd 를 함께 넘긴다.
     const target = await window.api.workspace.taskDrop
-      .resolve(task.projectId, task.taskId, pane.cwd)
+      .resolve(task.projectId, task.taskId, liveCwd ?? undefined)
       .catch(() => null)
     if (!target) {
-      setDropBusy('저장소가 등록되어 있지 않습니다 — 설정 → 워크스페이스')
-      setTimeout(() => setDropBusy(null), 4000)
+      toast.error(
+        '이 업무를 시작할 폴더를 찾지 못했습니다',
+        '터미널을 프로젝트 폴더로 옮기거나, 설정 → 워크스페이스에서 저장소를 등록하세요'
+      )
       return
     }
 
@@ -384,7 +391,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
           .catch(() => undefined)
       }, 8000)
     }
-  }, [])
+  }, [toast])
 
   // createTab 은 아래에서 선언되므로 ref 로 우회한다 (선언 순서 의존 제거)
   const createTabRef = useRef<((opts?: { cwd?: string; initialCommand?: string }) => Promise<void>) | null>(null)
@@ -402,16 +409,26 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     await runTaskInPane({ projectId: task.projectId, taskId: task.id, subject: task.subject }, pane)
   }, [runTaskInPane])
 
-  const onTaskDrop = useCallback(async (e: React.DragEvent, tabId: string): Promise<void> => {
+  const onTaskDrop = useCallback(async (e: React.DragEvent): Promise<void> => {
     const payload = readTaskPayload(e)
     setDropHint(null)
     if (!payload) return
     e.preventDefault()
-    const tab = tabsRef.current.find((t) => t.tabId === tabId)
+
+    // 터미널 탭이 하나도 없으면 만들어서 거기서 시작한다 — 드롭을 그냥 삼키지 않는다.
+    let tab = tabsRef.current.find((t) => t.tabId === activeTabIdRef.current && t.kind !== 'diff')
+    if (!tab) {
+      await createTabRef.current?.()
+      await new Promise((r) => setTimeout(r, 400))
+      tab = tabsRef.current.find((t) => t.tabId === activeTabIdRef.current && t.kind !== 'diff')
+    }
     const pane = tab?.panes[tab.focusedLeafId]
-    if (!pane) return
+    if (!pane) {
+      toast.error('업무를 시작할 터미널이 없습니다')
+      return
+    }
     await runTaskInPane({ projectId: payload.projectId, taskId: payload.taskId, subject: payload.subject }, pane)
-  }, [runTaskInPane])
+  }, [runTaskInPane, toast])
 
   const setFocusedLeaf = useCallback((tabId: string, leafId: string) => {
     setTabs((prev) => prev.map((t) => (
@@ -994,7 +1011,18 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
         </div>
       </DndContext>
 
-      <div className="flex-1 relative">
+      {/*
+        드롭 핸들러는 여기(포털의 React 조상)에 붙인다. xterm 은 `createPortal` 로 렌더되는데
+        React 이벤트는 DOM 트리가 아니라 **React 트리**를 따라 전파된다 — 탭 div 는 포털의
+        조상이 아니라 형제라서, 터미널 위에서 발생한 드래그 이벤트가 거기까지 오지 않는다.
+        (이것 때문에 업무를 터미널에 놓아도 아무 반응이 없었다)
+      */}
+      <div
+        className="flex-1 relative"
+        onDragOver={onTaskDragOver}
+        onDragLeave={onTaskDragLeave}
+        onDrop={(e) => void onTaskDrop(e)}
+      >
         {/* v2.0 B-4: xterm 은 트리 밖에서 산다 — 모든 탭의 leaf 를 leafId 키로 한 번씩만 portal 로
             붙인다. 트리 모양이 바뀌어도 이 목록은 collectLeafIds 순서로만 바뀌므로 TerminalPane 이
             리마운트되지 않는다(ADR-v2-terminal-p2-02 §4, 함정 #8). */}
@@ -1045,9 +1073,6 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
             <div
               key={tab.tabId}
               className={`absolute inset-0 ${tab.tabId === activeTabId ? 'z-10' : 'z-0 pointer-events-none invisible'}`}
-              onDragOver={tab.tabId === activeTabId ? onTaskDragOver : undefined}
-              onDragLeave={tab.tabId === activeTabId ? onTaskDragLeave : undefined}
-              onDrop={tab.tabId === activeTabId ? (e) => void onTaskDrop(e, tab.tabId) : undefined}
             >
               {tab.kind === 'diff' && tab.diff ? (
                 <DiffView request={tab.diff} />

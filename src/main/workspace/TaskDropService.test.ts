@@ -82,10 +82,32 @@ describe('TaskDropService', () => {
       expect(target).toEqual({ cwd: '/work/ios', repoName: 'ios-dooray' })
     })
 
-    it('등록된 저장소가 없으면 null', async () => {
+    it('등록된 저장소가 없으면 지금 터미널이 있는 폴더에서 시작한다', async () => {
+      store.removeRepo('a')
+      store.removeRepo('b')
+      // 저장소 사전 등록을 요구하면 드래그&드롭이 통째로 동작하지 않는다.
+      // 이미 프로젝트 폴더에 있는 터미널에 놓았다면 "여기서 시작" 이 자연스러운 해석이다.
+      expect(await make().resolve('proj-1', 'task-1', '/Users/me/Desktop/2NEON')).toEqual({
+        cwd: '/Users/me/Desktop/2NEON',
+        repoName: '2NEON'
+      })
+    })
+
+    it('저장소도 없고 터미널 폴더도 모르면 null', async () => {
       store.removeRepo('a')
       store.removeRepo('b')
       expect(await make().resolve('proj-1', 'task-1')).toBeNull()
+    })
+
+    it('없는 폴더는 폴백 대상이 아니다', async () => {
+      store.removeRepo('a')
+      store.removeRepo('b')
+      expect(await make({ exists: () => false }).resolve('proj-1', 'task-1', '/gone')).toBeNull()
+    })
+
+    it('등록된 저장소가 있으면 그쪽이 우선이다 — 명시적 설정이 폴백보다 강하다', async () => {
+      const target = await make().resolve('proj-1', 'task-1', '/somewhere/else')
+      expect(target?.cwd).toBe('/work/ios')
     })
   })
 

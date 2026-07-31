@@ -34,15 +34,21 @@ export class TaskDropService {
    * 드롭한 태스크를 어디서 열지 결정한다.
    *
    * 우선순위: ① 드롭한 pane 이 이미 있는 폴더의 링크(같은 자리에서 이어가는 게 자연스럽다)
-   * ② 가장 최근에 쓴 링크 중 폴더가 살아 있는 것 ③ 프로젝트에 매핑된 저장소(없으면 첫 저장소).
-   * 저장소가 하나도 없으면 null.
+   * ② 가장 최근에 쓴 링크 중 폴더가 살아 있는 것 ③ 프로젝트에 매핑된 저장소(없으면 첫 저장소)
+   * ④ **드롭한 터미널이 지금 있는 폴더**.
+   *
+   * ④ 가 없으면 저장소를 미리 등록하지 않은 사용자에게는 드래그&드롭이 통째로 동작하지 않는다.
+   * 이미 프로젝트 폴더에 있는 터미널에 놓았다면 "여기서 시작" 이 가장 자연스러운 해석이다.
    */
   async resolve(projectId: string, taskId: string, preferCwd?: string): Promise<TaskDropTarget | null> {
     const key = workspaceKey(projectId, taskId)
     const links = this.store.listTaskSessionLinks(key).filter((l) => this.pathExists(l.cwd))
     const repos = this.store.listRepos()
     const nameOf = (cwd: string, fallback?: string): string =>
-      repos.find((r) => r.path === cwd)?.name ?? fallback ?? cwd
+      repos.find((r) => r.path === cwd)?.name ??
+      fallback ??
+      cwd.split(/[/\\]/).filter(Boolean).pop() ??
+      cwd
 
     const preferred = preferCwd ? links.find((l) => l.cwd === preferCwd) : undefined
     const chosen = preferred ?? links[0]
@@ -56,8 +62,13 @@ export class TaskDropService {
 
     const mappedId = this.store.getState().projectRepoMap[projectId]
     const repo = repos.find((r) => r.id === mappedId) ?? repos[0]
-    if (!repo) return null
-    return { cwd: repo.path, repoName: repo.name }
+    if (repo) return { cwd: repo.path, repoName: repo.name }
+
+    // 등록된 저장소가 없으면 지금 터미널이 있는 폴더에서 시작한다.
+    if (preferCwd && this.pathExists(preferCwd)) {
+      return { cwd: preferCwd, repoName: nameOf(preferCwd) }
+    }
+    return null
   }
 
   /** 이 업무가 폴더별로 쓰던 세션 목록 (최근 사용순). */

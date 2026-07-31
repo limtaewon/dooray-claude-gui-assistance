@@ -86,6 +86,80 @@ function makeSnapshotWithTabs(count: number): TerminalWorkspaceSnapshotV2 {
   return { version: 2, savedAt: Date.now(), activeTabId: tabs[0]?.tabId ?? null, tabs }
 }
 
+describe('TerminalView — 업무 드래그&드롭', () => {
+  beforeEach(() => {
+    installMockWindowApi()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    resetMockWindowApi()
+    vi.clearAllMocks()
+  })
+
+  /** 업무 카드가 만드는 것과 같은 형태의 드래그 페이로드. */
+  function taskTransfer(): DataTransfer {
+    const payload = JSON.stringify({
+      projectId: 'p1',
+      taskId: 't1',
+      subject: '유의어 사전 개발',
+      linked: false
+    })
+    return {
+      types: ['application/x-clauday-task'],
+      getData: (type: string) => (type === 'application/x-clauday-task' ? payload : ''),
+      setData: () => {},
+      dropEffect: 'copy',
+      effectAllowed: 'copy',
+      files: []
+    } as unknown as DataTransfer
+  }
+
+  it('터미널 위에 놓아도 드롭이 처리된다 — xterm 은 포털이라 React 이벤트가 탭 div 로 오지 않는다', async () => {
+    vi.mocked(window.api.workspace.taskDrop.resolve).mockResolvedValue({
+      cwd: '/repo',
+      repoName: 'repo'
+    })
+    renderWithDs(<TerminalView active />)
+    await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+    const pane = await screen.findByTestId(/^term-pane-/)
+
+    fireEvent.dragOver(pane, { dataTransfer: taskTransfer() })
+    fireEvent.drop(pane, { dataTransfer: taskTransfer() })
+
+    // sessionCwd 를 모르면 undefined 로 넘어간다 — main 이 등록 저장소로 판단한다
+    await waitFor(() =>
+      expect(window.api.workspace.taskDrop.resolve).toHaveBeenCalledWith('p1', 't1', undefined)
+    )
+    // cd → claude 순서로 PTY 에 입력이 들어간다
+    await waitFor(() => {
+      const sent = vi.mocked(window.api.terminal.input).mock.calls.map((c) => c[1]).join('')
+      expect(sent).toContain('cd ')
+    })
+  })
+
+  it('드롭 대상 터미널의 실제 cwd 를 넘긴다 — 저장소를 등록하지 않아도 거기서 시작할 수 있게', async () => {
+    vi.mocked(window.api.terminal.sessionCwd).mockResolvedValue('/Users/me/Desktop/2NEON')
+    vi.mocked(window.api.workspace.taskDrop.resolve).mockResolvedValue({
+      cwd: '/Users/me/Desktop/2NEON',
+      repoName: '2NEON'
+    })
+    renderWithDs(<TerminalView active />)
+    await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+    const pane = await screen.findByTestId(/^term-pane-/)
+
+    fireEvent.drop(pane, { dataTransfer: taskTransfer() })
+
+    await waitFor(() =>
+      expect(window.api.workspace.taskDrop.resolve).toHaveBeenCalledWith(
+        'p1',
+        't1',
+        '/Users/me/Desktop/2NEON'
+      )
+    )
+  })
+})
+
 describe('TerminalView — diff 탭 (v2.0 소스 제어)', () => {
   beforeEach(() => {
     installMockWindowApi()
