@@ -250,6 +250,7 @@ export const IPC_CHANNELS = {
   GIT_IS_REPO: 'git:is-repo',
   GIT_REPO_ROOT: 'git:repo-root',
   GIT_MAIN_REPO_ROOT: 'git:main-repo-root',
+  GIT_WORKTREE_USAGE: 'git:worktree-usage',
   GIT_BRANCHES: 'git:branches',
   GIT_WORKTREES: 'git:worktrees',
   GIT_WORKTREE_CREATE: 'git:worktree-create',

@@ -14,6 +14,7 @@ import {
 import type { GitBranch as GitBranchInfo, GitWorktree } from '@shared/types/git'
 import type { GitStashEntry } from '@shared/git/scmTypes'
 import { Button, Input, useToast } from '../../common/ds'
+import WorktreeCleanupModal from './WorktreeCleanupModal'
 
 interface BranchesPanelProps {
   repoPath: string
@@ -36,6 +37,7 @@ function BranchesPanel({ repoPath, onOpenInTerminal, onRepoChanged }: BranchesPa
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [creating, setCreating] = useState<Creating>('none')
+  const [cleanup, setCleanup] = useState(false)
   const [draft, setDraft] = useState('')
   const toast = useToast()
 
@@ -205,6 +207,11 @@ function BranchesPanel({ repoPath, onOpenInTerminal, onRepoChanged }: BranchesPa
           count={worktrees.length}
           actionLabel="새 워크트리"
           onAction={() => { setCreating('worktree'); setDraft('') }}
+          extraAction={
+            worktrees.length > 1
+              ? { label: '정리…', title: '안 쓰는 워크트리 정리', onClick: () => setCleanup(true) }
+              : undefined
+          }
         />
         {worktrees.map((worktree) => (
           <div key={worktree.path} className="group flex items-center gap-1.5 h-6 pl-5 pr-2 hover:bg-bg-surface-hover">
@@ -286,6 +293,17 @@ function BranchesPanel({ repoPath, onOpenInTerminal, onRepoChanged }: BranchesPa
           </div>
         ))}
       </div>
+
+      {cleanup && (
+        <WorktreeCleanupModal
+          repoPath={repoPath}
+          onClose={() => setCleanup(false)}
+          onRemoved={() => {
+            void refresh()
+            onRepoChanged?.()
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -294,12 +312,15 @@ function SectionHeader({
   title,
   count,
   actionLabel,
-  onAction
+  onAction,
+  extraAction
 }: {
   title: string
   count: number
   actionLabel: string
   onAction: () => void
+  /** 아이콘 버튼 왼쪽에 붙는 글자 버튼 (워크트리 정리 등) */
+  extraAction?: { label: string; title: string; onClick: () => void }
 }): JSX.Element {
   return (
     <div className="group flex items-center gap-1 px-2 h-6 mt-1 hover:bg-bg-surface-hover">
@@ -307,9 +328,18 @@ function SectionHeader({
         {title}
       </span>
       <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">{count}</span>
+      {extraAction && (
+        <button
+          onClick={extraAction.onClick}
+          className="ml-auto opacity-0 group-hover:opacity-100 focus:opacity-100 flex-none px-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-primary"
+          title={extraAction.title}
+        >
+          {extraAction.label}
+        </button>
+      )}
       <button
         onClick={onAction}
-        className="ds-btn ghost icon ml-auto opacity-0 group-hover:opacity-100 focus:opacity-100 flex-none"
+        className={`ds-btn ghost icon ${extraAction ? '' : 'ml-auto'} opacity-0 group-hover:opacity-100 focus:opacity-100 flex-none`}
         title={actionLabel}
         aria-label={actionLabel}
       >

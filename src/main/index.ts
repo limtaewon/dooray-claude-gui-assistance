@@ -1620,6 +1620,9 @@ ${data}`,
   gitHandle(IPC_CHANNELS.GIT_WORKTREES, (repoPath) =>
     gitService.listWorktrees(repoPath as string)
   )
+  gitHandle(IPC_CHANNELS.GIT_WORKTREE_USAGE, (repoPath) =>
+    gitService.getWorktreeUsage(repoPath as string)
+  )
   gitHandle(IPC_CHANNELS.GIT_WORKTREE_CREATE, (params) =>
     gitService.createWorktree(params as GitWorktreeCreateParams)
   )

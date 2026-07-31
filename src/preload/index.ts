@@ -154,6 +154,7 @@ import type {
 } from '../shared/types/terminal'
 import type {
   GitWorktree,
+  GitWorktreeUsage,
   GitWorktreeStatus,
   GitBranch,
   GitDiffResult,
@@ -629,6 +630,9 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.GIT_BRANCHES, repoPath),
     worktrees: (repoPath: string): Promise<GitWorktree[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_WORKTREES, repoPath),
+    /** 워크트리별 용량·변경 파일 수 — 정리 화면용. du 를 돌리므로 필요할 때만 부른다. */
+    worktreeUsage: (repoPath: string): Promise<GitWorktreeUsage[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_WORKTREE_USAGE, repoPath),
     createWorktree: (params: GitWorktreeCreateParams): Promise<GitWorktree> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_WORKTREE_CREATE, params),
     removeWorktree: (params: GitWorktreeRemoveParams): Promise<void> =>

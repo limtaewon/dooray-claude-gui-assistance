@@ -220,6 +220,7 @@ export function createMockWindowApi(): Record<string, unknown> {
       mainRepoRoot: vi.fn().mockResolvedValue(null),
       branches: vi.fn().mockResolvedValue([]),
       worktrees: vi.fn().mockResolvedValue([]),
+      worktreeUsage: vi.fn().mockResolvedValue([]),
       createWorktree: vi.fn().mockResolvedValue(null),
       removeWorktree: vi.fn().mockResolvedValue(undefined),
       worktreeStatus: vi.fn().mockResolvedValue({ ahead: 0, behind: 0, dirty: false }),

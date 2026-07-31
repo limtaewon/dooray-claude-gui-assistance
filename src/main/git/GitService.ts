@@ -1,5 +1,5 @@
 import { execFile } from 'child_process'
-import { existsSync, readFileSync, mkdirSync } from 'fs'
+import { existsSync, readFileSync, mkdirSync, statSync } from 'fs'
 import { join, basename, dirname, isAbsolute, resolve as resolvePath } from 'path'
 import { decodeProcessText } from '../utils/procText'
 import { writeFileAtomic } from '../utils/atomicWrite'
@@ -14,7 +14,8 @@ import type {
   GitDiffResult,
   GitWorktreeCreateParams,
   GitWorktreeRemoveParams,
-  GitFileCompare
+  GitFileCompare,
+  GitWorktreeUsage
 } from '../../shared/types/git'
 
 function git(args: string[], cwd: string): Promise<string> {
@@ -30,6 +31,33 @@ function git(args: string[], cwd: string): Promise<string> {
       }
     })
   })
+}
+
+/** `du -sk` 로 폴더 용량(바이트). Windows·실패 시 null. */
+async function measureDirSize(path: string): Promise<number | null> {
+  if (process.platform === 'win32' || !existsSync(path)) return null
+  return new Promise((resolve) => {
+    execFile('du', ['-sk', path], { timeout: 20000, encoding: 'buffer' }, (err, stdoutBuf) => {
+      if (err) return resolve(null)
+      const kb = Number.parseInt(decodeProcessText(stdoutBuf as Buffer).trim().split(/\s+/)[0], 10)
+      resolve(Number.isFinite(kb) ? kb * 1024 : null)
+    })
+  })
+}
+
+/** 커밋되지 않은 변경 파일 수 (untracked 포함). 실패하면 0 — 정리를 막을 근거로는 쓰지 않는다. */
+async function countDirtyFiles(path: string): Promise<number> {
+  if (!existsSync(path)) return 0
+  const out = await git(['status', '--porcelain'], path).catch(() => '')
+  return out.split('\n').filter((line) => line.trim().length > 0).length
+}
+
+function statMtimeMs(path: string): number | null {
+  try {
+    return statSync(path).mtimeMs
+  } catch {
+    return null
+  }
 }
 
 /** git ref 이름 검증 (커맨드 인젝션 방지 + git ref 문법). 규칙은 `isSafeGitRef` 가 단독 소유. */
@@ -178,6 +206,26 @@ export class GitService {
       parsed = this.parseWorktrees(raw2)
     }
     return parsed
+  }
+
+  /**
+   * 워크트리별 용량·변경 파일 수 — 정리 화면에서 무엇을 지워도 되는지 판단할 재료.
+   *
+   * 용량은 `du` 로 잰다(작업 파일만. `.git` 오브젝트는 워크트리끼리 공유라 중복되지 않는다).
+   * Windows 에는 `du` 가 없어 null 로 두고 화면에서 '—' 로 보여준다.
+   */
+  async getWorktreeUsage(repoPath: string): Promise<GitWorktreeUsage[]> {
+    const worktrees = await this.listWorktrees(repoPath)
+    return Promise.all(
+      worktrees.map(async (worktree) => ({
+        path: worktree.path,
+        branch: worktree.branch,
+        isMain: worktree.isMain,
+        sizeBytes: await measureDirSize(worktree.path),
+        dirtyFiles: await countDirtyFiles(worktree.path),
+        mtimeMs: statMtimeMs(worktree.path)
+      }))
+    )
   }
 
   /** 워크트리 생성 */
