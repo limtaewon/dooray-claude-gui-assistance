@@ -79,7 +79,7 @@ function UsageInsights(): JSX.Element {
 
   if (loading || !summary) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
+      <div>
         <div className="flex items-center gap-2 text-text-secondary text-sm py-10 justify-center">
           <RefreshCw size={14} className="animate-spin" /> 인사이트 집계 중...
         </div>
@@ -109,15 +109,12 @@ function UsageInsights(): JSX.Element {
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-4">
+    <div className="space-y-4">
       {/* 헤더 */}
       <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-text-primary">내 사용 인사이트</h3>
-          <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5 flex items-center gap-1">
-            <Shield size={10} /> 로컬에만 저장 · 외부 전송 없음
-          </p>
-        </div>
+        <p className="text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-tertiary flex items-center gap-1">
+          <Shield size={10} /> 로컬에만 저장 · 외부 전송 없음
+        </p>
         <div className="flex items-center gap-1.5">
           <select value={days} onChange={(e) => setDays(Number(e.target.value))}
             className="px-2 py-1 bg-bg-surface border border-bg-border rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary focus:outline-none">

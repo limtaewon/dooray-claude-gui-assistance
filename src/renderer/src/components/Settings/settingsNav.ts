@@ -99,7 +99,7 @@ export const SETTINGS_SECTION_META: Record<
   },
   models: {
     title: 'AI 모델',
-    description: '기능별로 어떤 Claude 모델을 쓸지 정합니다. 짧은 요약은 빠른 모델, 설계는 강한 모델이 낫습니다.'
+    description: '기능마다 쓸 Claude 모델을 정합니다. Haiku 는 빠르고 저렴, Opus 는 품질이 가장 좋습니다 — 짧은 요약은 Haiku, 설계는 Opus 가 낫습니다.'
   },
   insights: {
     title: '사용 인사이트',

@@ -261,14 +261,7 @@ function ModelSettings(): JSX.Element {
   const resetAll = (): void => { setConfig({}); setSaved(false) }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <div className="mb-4">
-        <h3 className="text-sm font-semibold text-text-primary">기능별 AI 모델</h3>
-        <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
-          각 기능마다 원하는 모델을 선택하세요. Haiku는 빠르고 저렴, Opus는 품질 최상.
-        </p>
-      </div>
-
+    <div>
       <div className="grid grid-cols-3 gap-2 mb-4">
         {(Object.keys(MODEL_INFO) as AIModelName[]).map((m) => {
           const info = MODEL_INFO[m]
@@ -378,7 +371,7 @@ function DoorayTokenSettings(): JSX.Element {
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
+    <div>
       <div className="mb-4">
         <h3 className="text-sm font-semibold text-text-primary">두레이 API 토큰</h3>
         <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">
@@ -688,7 +681,7 @@ function CalDAVSettings(): JSX.Element {
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
+    <div>
       <div className="mb-4">
         <h3 className="text-sm font-semibold text-text-primary">두레이 캘린더 (CalDAV)</h3>
         <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">

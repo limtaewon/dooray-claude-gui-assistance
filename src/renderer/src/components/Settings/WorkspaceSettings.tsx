@@ -89,7 +89,7 @@ function WorkspaceSettings(): JSX.Element {
   if (loading || !settings) return <LoadingView label="워크스페이스 설정을 불러오는 중" />
 
   return (
-    <div className="p-6 max-w-3xl mx-auto flex flex-col gap-5">
+    <div className="flex flex-col gap-5">
       <section className="ds-card">
         <h3 className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary mb-1">
           두레이 프로젝트

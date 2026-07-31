@@ -55,7 +55,7 @@ describe('SettingsView (integration)', () => {
     await waitFor(() => {
       expect(window.api.ai.getModelConfig).toHaveBeenCalled()
     })
-    expect(screen.getByText('기능별 AI 모델')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'AI 모델' })).toBeInTheDocument()
   })
 
   it('saves AI model config when 저장 button is clicked', async () => {
