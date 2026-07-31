@@ -1,90 +1,108 @@
 {
-  "name": "orca",
-  "version": "1.4.148-rc.1",
-  "description": "Next-gen IDE for parallel agentic development",
-  "homepage": "https://github.com/stablyai/orca",
-  "author": "stablyai",
-  "bin": {
-    "orca": "./out/cli/index.js",
-    "orca-dev": "./config/scripts/orca-dev.mjs"
-  },
+  "name": "clauday",
+  "version": "1.7.2",
+  "description": "Claude Code CLI GUI wrapper with Dooray integration",
   "main": "./out/main/index.js",
-  "dependencies": {
-    "@electron-toolkit/preload": "^3.0.2",
-    "@electron-toolkit/utils": "^4.0.0",
-    "@floating-ui/dom": "1.7.6",
-    "@linear/sdk": "^82.1.0",
-    "@parcel/watcher": "^2.5.6",
-    "@xterm/addon-serialize": "0.15.0-beta.287",
-    "@xterm/headless": "6.1.0-beta.287",
-    "agent-browser": "~0.27.0",
-    "electron-updater": "^6.8.3",
-    "i18next": "^26.3.1",
-    "jsonc-parser": "^3.3.1",
-    "node-pty": "^1.1.0",
-    "posthog-node": "^5.33.3",
-    "qrcode": "^1.5.4",
-    "react-i18next": "^17.0.8",
-    "serve-sim": "^0.1.40",
-    "sherpa-onnx": "1.12.37",
-    "ssh2": "^1.17.0",
-    "tweetnacl": "^1.0.3",
-    "ws": "^8.21.0",
-    "yaml": "^2.8.4",
-    "zod": "~4.4.3"
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "postinstall": "electron-rebuild -f -w node-pty,keytar",
+    "icons": "node scripts/generate-icons.mjs",
+    "dist": "electron-vite build && electron-builder --mac",
+    "dist:win": "electron-vite build && electron-builder --win",
+    "dist:all": "electron-vite build && electron-builder --mac --win",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
-  "optionalDependencies": {
-    "sherpa-onnx-darwin-arm64": "1.12.37",
-    "sherpa-onnx-darwin-x64": "1.12.37",
-    "sherpa-onnx-linux-arm64": "1.12.37",
-    "sherpa-onnx-linux-x64": "1.12.37",
-    "sherpa-onnx-win-x64": "1.12.37",
-    "windows-native-registry": "3.2.2"
-  },
-  "lint-staged": {
-    "*.{ts,tsx,js,jsx,mjs,mts,cts}": [
-      "oxlint",
-      "oxlint --config config/oxlint-react-doctor.json",
-      "oxfmt --write"
-    ],
-    "*.{json,css}": [
-      "oxfmt --write"
-    ]
-  },
-  "engines": {
-    "node": "24"
-  },
-  "packageManager": "pnpm@10.24.0+sha512.01ff8ae71b4419903b65c60fb2dc9d34cf8bb6e06d03bde112ef38f7a34d6904c424ba66bea5cdcf12890230bf39f9580473140ed9c946fef328b6e5238a345a",
-  "pnpm": {
-    "overrides": {
-      "monaco-editor>dompurify": "3.4.11"
+  "build": {
+    "appId": "com.clauday.app",
+    "productName": "Clauday",
+    "directories": {
+      "output": "release"
     },
-    "supportedArchitectures": {
-      "os": [
-        "current"
+    "files": [
+      "out/**/*",
+      "node_modules/**/*",
+      "!node_modules/.cache"
+    ],
+    "asarUnpack": [
+      "node_modules/node-pty/**/*",
+      "node_modules/keytar/**/*"
+    ],
+    "mac": {
+      "target": [
+        "dmg"
       ],
-      "cpu": [
-        "current"
-      ]
+      "icon": "build/icon.icns",
+      "category": "public.app-category.developer-tools",
+      "identity": "-"
     },
-    "onlyBuiltDependencies": [
-      "@parcel/watcher",
-      "cpu-features",
-      "esbuild",
-      "node-pty",
-      "sherpa-onnx"
-    ],
-    "patchedDependencies": {
-      "node-pty@1.1.0": "config/patches/node-pty@1.1.0.patch",
-      "@xterm/addon-ligatures@0.11.0-beta.287": "config/patches/@xterm__addon-ligatures@0.11.0-beta.287.patch",
-      "@xterm/addon-webgl@0.20.0-beta.286": "config/patches/@xterm__addon-webgl@0.20.0-beta.286.patch",
-      "@xterm/addon-serialize@0.15.0-beta.287": "config/patches/@xterm__addon-serialize@0.15.0-beta.287.patch",
-      "@xterm/xterm@6.1.0-beta.287": "config/patches/@xterm__xterm@6.1.0-beta.287.patch"
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
   },
-  "reactDoctor": {
-    "rules": {
-      "react-doctor/js-combine-iterations": "off"
-    }
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@monaco-editor/react": "^4.6.0",
+    "@types/ws": "^8.18.1",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/addon-search": "^0.15.0",
+    "@xterm/addon-serialize": "^0.14.0",
+    "@xterm/addon-unicode11": "^0.8.0",
+    "@xterm/addon-web-links": "^0.12.0",
+    "@xterm/addon-webgl": "^0.19.0",
+    "@xterm/xterm": "^5.5.0",
+    "@xyflow/react": "^12.11.0",
+    "chokidar": "^3.6.0",
+    "electron-store": "^8.2.0",
+    "keytar": "^7.9.0",
+    "lucide-react": "^0.460.0",
+    "node-pty": "^1.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^6.28.0",
+    "recharts": "^2.13.3",
+    "rehype-raw": "^7.0.0",
+    "remark-gfm": "^4.0.1",
+    "tsdav": "^2.2.1",
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "@electron-toolkit/preload": "^3.0.1",
+    "@electron-toolkit/utils": "^3.0.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^2.1.9",
+    "autoprefixer": "^10.4.20",
+    "electron": "^33.2.0",
+    "electron-builder": "^26.8.1",
+    "electron-rebuild": "^3.2.9",
+    "electron-vite": "^2.3.0",
+    "jsdom": "^25.0.1",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.15",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.9"
   }
 }
