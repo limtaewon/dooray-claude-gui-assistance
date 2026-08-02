@@ -10,12 +10,23 @@ export function samePath(a: string | undefined, b: string | undefined): boolean 
   return normalize(a) === normalize(b)
 }
 
+/** 워크트리를 만들 저장소 — 브랜치 이름 템플릿 치환에 필요한 값까지 함께 나른다. */
+export interface TaskDropRepoRef {
+  path: string
+  name: string
+  baseBranch?: string
+  /** 브랜치 템플릿의 `{prefix}` (repo.branchPrefix) */
+  branchPrefix?: string
+}
+
 export interface TaskDropCandidate {
   repoId: string
   name: string
   path: string
   /** 새 브랜치를 딸 기준 브랜치 (repo.defaultBaseBranch) */
   baseBranch?: string
+  /** 브랜치 템플릿의 `{prefix}` (repo.branchPrefix) */
+  branchPrefix?: string
   /** 그 저장소에서 이 업무로 쓰던 claude 세션 (있으면 이어간다) */
   sessionId?: string
   /** 그 세션이 있던 폴더 — 워크트리에서 하던 것이면 저장소 경로와 다르다 */
@@ -35,7 +46,7 @@ export type TaskDropPlan =
       sessionId?: string
       needsCd: boolean
       /** 이 업무를 진행할 저장소 — 있으면 여기에 업무용 워크트리를 만들어 그리로 간다 */
-      repo?: { path: string; name: string; baseBranch?: string }
+      repo?: TaskDropRepoRef
     }
   /** 어느 저장소에서 할지 물어야 한다. */
   | { kind: 'choose'; candidates: TaskDropCandidate[] }
@@ -54,8 +65,14 @@ export interface TaskDropPlanInput {
   links: TaskSessionLink[]
 }
 
-function repoOf(repo: RepoRegistryEntry): { path: string; name: string; baseBranch?: string } {
-  return { path: repo.path, name: repo.name, baseBranch: repo.defaultBaseBranch }
+function repoOf(repo: RepoRegistryEntry): TaskDropRepoRef {
+  return {
+    path: repo.path,
+    name: repo.name,
+    baseBranch: repo.defaultBaseBranch,
+    // 브랜치 템플릿의 `{prefix}` 가 이 값을 쓴다 — 여기서 안 실으면 그 토큰이 조용히 빈칸이 된다.
+    branchPrefix: repo.branchPrefix
+  }
 }
 
 /** 그 폴더에서 이 업무로 쓰던 세션 — 세션은 (업무 × 폴더) 로 기억한다. */
@@ -146,6 +163,7 @@ export function resolveTaskDropPlan(input: TaskDropPlanInput): TaskDropPlan {
           name: repo.name,
           path: repo.path,
           baseBranch: repo.defaultBaseBranch,
+          branchPrefix: repo.branchPrefix,
           sessionId: previous?.sessionId,
           sessionCwd: previous?.cwd
         }
@@ -182,6 +200,11 @@ export function planFromCandidate(
     repoName: candidate.name,
     sessionId: candidate.sessionId,
     needsCd: !samePath(currentCwd, cwd),
-    repo: { path: candidate.path, name: candidate.name, baseBranch: candidate.baseBranch }
+    repo: {
+      path: candidate.path,
+      name: candidate.name,
+      baseBranch: candidate.baseBranch,
+      branchPrefix: candidate.branchPrefix
+    }
   }
 }

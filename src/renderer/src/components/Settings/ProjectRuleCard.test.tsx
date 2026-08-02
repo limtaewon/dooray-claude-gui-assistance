@@ -100,6 +100,60 @@ describe('ProjectRuleCard — 저장소', () => {
   })
 })
 
+/**
+ * 미리보기가 실제 치환과 다르면 "설정은 했는데 안 먹는다" 로 읽힌다.
+ * 미리보기에서 값을 안 넘긴 토큰은 빈칸으로 그려지므로, 실제 경로가 채우는 값은 여기서도 채운다.
+ */
+describe('ProjectRuleCard — 미리보기가 실제 치환과 같다', () => {
+  function configWith(patch: Partial<ResolvedProjectConfig>): ResolvedProjectConfig {
+    return { ...config([]), ...patch }
+  }
+
+  it('{subject} 가 브랜치 미리보기에 반영된다', () => {
+    renderWithDs(
+      <ProjectRuleCard
+        project={PROJECT}
+        repos={REPOS}
+        config={configWith({ branchTemplate: 'feature/{taskNumber}-{subject}' })}
+        onChange={() => {}}
+      />
+    )
+
+    // 한글은 git ref 로 못 써 `-` 로 접히지만, 영문 부분은 남아야 한다.
+    expect(screen.getByText(/feature\/6793-AI/)).toBeInTheDocument()
+  })
+
+  it('{prefix} 는 이 프로젝트에 넣은 저장소의 값을 쓴다', () => {
+    const repos: RepoRegistryEntry[] = [
+      { id: 'r1', path: '/Users/me/Desktop/2NEON', name: '2NEON', branchPrefix: 'team-a' }
+    ]
+    renderWithDs(
+      <ProjectRuleCard
+        project={PROJECT}
+        repos={repos}
+        config={configWith({ repoIds: ['r1'], branchTemplate: '{prefix}/{taskNumber}' })}
+        onChange={() => {}}
+      />
+    )
+
+    expect(screen.getByText('team-a/6793')).toBeInTheDocument()
+  })
+
+  it('{url} 과 {body} 도 첫 지시 미리보기에 나온다', () => {
+    renderWithDs(
+      <ProjectRuleCard
+        project={PROJECT}
+        repos={REPOS}
+        config={configWith({ promptTemplate: '{url} / {body}' })}
+        onChange={() => {}}
+      />
+    )
+
+    expect(screen.getByText(/nhnent\.dooray\.com\/project\/posts/)).toBeInTheDocument()
+    expect(screen.getByText(/업무 본문이 여기 들어갑니다/)).toBeInTheDocument()
+  })
+})
+
 describe('ProjectRuleCard — 토큰 칩', () => {
   function stubClipboard(writeText: () => Promise<void>): void {
     Object.defineProperty(navigator, 'clipboard', {

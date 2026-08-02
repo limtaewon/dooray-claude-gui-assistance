@@ -420,7 +420,9 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       template: resolveProjectConfig(settings, task.projectId).branchTemplate,
       projectCode: task.projectCode,
       taskNumber: task.number,
-      taskId: task.taskId
+      taskId: task.taskId,
+      subject: task.subject,
+      prefix: repo.branchPrefix
     })
 
     setDropBusy({ label: '워크트리 준비 중…', where: `${repo.name} · ${branch}` })

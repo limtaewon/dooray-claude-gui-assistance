@@ -13,8 +13,19 @@ import type { ResolvedProjectConfig } from '@shared/workspace/projectConfig'
 import { Input } from '../common/ds'
 import { anchoredMenuPosition, type AnchoredMenuPosition } from '../common/anchoredMenu'
 
-/** 미리보기용 샘플 업무 — 실제 값이 어떻게 나오는지 눈으로 확인시킨다. */
-const SAMPLE = { taskNumber: 6793, taskId: 'a1b2c39f3a2c', title: 'AI 유의어 사전 - 신규 메뉴 개발' }
+/**
+ * 미리보기용 샘플 업무 — 실제 값이 어떻게 나오는지 눈으로 확인시킨다.
+ *
+ * 여기서 넘기지 않은 값은 그 토큰이 빈칸으로 그려진다. 실제 치환 경로와 같은 항목을 채워야
+ * 미리보기가 결과와 어긋나지 않는다(`{subject}` 가 미리보기에서만 사라지는 식).
+ */
+const SAMPLE = {
+  taskNumber: 6793,
+  taskId: 'a1b2c39f3a2c',
+  title: 'AI 유의어 사전 - 신규 메뉴 개발',
+  url: 'https://nhnent.dooray.com/project/posts/a1b2c39f3a2c',
+  body: '(업무 본문이 여기 들어갑니다)'
+}
 
 interface ProjectRuleCardProps {
   project: DoorayProject
@@ -30,15 +41,20 @@ interface ProjectRuleCardProps {
  * 그 사실을 각 항목에 표시해 "여긴 안 정했다" 를 눈으로 알 수 있게 한다.
  */
 function ProjectRuleCard({ project, repos, config, onChange }: ProjectRuleCardProps): JSX.Element {
+  // `{prefix}` 는 저장소마다 다르다 — 이 프로젝트에 넣은 첫 저장소의 값으로 보여준다.
+  const samplePrefix = repos.find((repo) => repo.id === config.repoIds[0])?.branchPrefix
+
   const branchPreview = useMemo(
     () =>
       buildBranchName({
         template: config.branchTemplate,
         projectCode: project.code || project.id,
         taskNumber: SAMPLE.taskNumber,
-        taskId: SAMPLE.taskId
+        taskId: SAMPLE.taskId,
+        subject: SAMPLE.title,
+        prefix: samplePrefix
       }),
-    [config.branchTemplate, project.code, project.id]
+    [config.branchTemplate, project.code, project.id, samplePrefix]
   )
 
   const promptPreview = useMemo(
@@ -46,7 +62,9 @@ function ProjectRuleCard({ project, repos, config, onChange }: ProjectRuleCardPr
       renderTaskDropPrompt(config.promptTemplate, {
         title: SAMPLE.title,
         number: SAMPLE.taskNumber,
-        projectCode: project.code
+        projectCode: project.code,
+        url: SAMPLE.url,
+        body: SAMPLE.body
       }),
     [config.promptTemplate, project.code]
   )

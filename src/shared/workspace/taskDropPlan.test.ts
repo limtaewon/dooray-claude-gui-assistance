@@ -9,6 +9,49 @@ function link(cwd: string, sessionId: string): TaskSessionLink {
   return { cwd, claudeSessionId: sessionId, lastUsedAt: 1 }
 }
 
+/**
+ * 브랜치 템플릿의 `{prefix}` 는 저장소별 값이라 계획에 실려야 치환된다.
+ * 안 실으면 사용자가 설정에 넣은 토큰이 조용히 빈칸이 된다 — 설정은 되는데 결과에만 없다.
+ */
+describe('taskDropPlan — 브랜치 prefix 를 실어 나른다', () => {
+  const PREFIXED: RepoRegistryEntry = { ...NEON, branchPrefix: 'team-a' }
+
+  it('저장소가 하나면 계획의 repo 에 담는다', () => {
+    const plan = resolveTaskDropPlan({
+      currentCwd: '/tmp/elsewhere',
+      mappedRepos: [PREFIXED],
+      links: []
+    })
+
+    expect(plan).toMatchObject({ kind: 'start', repo: { branchPrefix: 'team-a' } })
+  })
+
+  it('여럿이면 후보마다 담고, 고른 뒤 계획까지 이어진다', () => {
+    const plan = resolveTaskDropPlan({
+      currentCwd: '/tmp/elsewhere',
+      mappedRepos: [PREFIXED, AI],
+      links: []
+    })
+    if (plan.kind !== 'choose') throw new Error('여러 저장소면 고르게 해야 한다')
+
+    expect(plan.candidates[0]).toMatchObject({ branchPrefix: 'team-a' })
+    expect(planFromCandidate(plan.candidates[0])).toMatchObject({
+      repo: { branchPrefix: 'team-a' }
+    })
+  })
+
+  it('prefix 를 안 정한 저장소는 undefined 그대로 — 빈 문자열로 채우지 않는다', () => {
+    const plan = resolveTaskDropPlan({
+      currentCwd: '/tmp/elsewhere',
+      mappedRepos: [NEON],
+      links: []
+    })
+
+    expect(plan).toMatchObject({ kind: 'start' })
+    expect((plan as { repo?: { branchPrefix?: string } }).repo?.branchPrefix).toBeUndefined()
+  })
+})
+
 describe('samePath', () => {
   it('뒤 슬래시 차이는 같은 폴더', () => {
     expect(samePath('/a/b', '/a/b/')).toBe(true)
