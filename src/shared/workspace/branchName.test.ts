@@ -66,17 +66,28 @@ describe('buildBranchName — 한글/특수문자 subject sanitize (AC4-④)', (
     expect(isSafeGitRef(result)).toBe(true)
   })
 
-  it('순수 한글 subject 는 세그먼트가 통째로 탈락해도 결과에 빈 세그먼트/후행 슬래시가 남지 않는다', () => {
+  /**
+   * 한글은 git ref 로 쓸 수 있다. 예전에는 영숫자만 남겨서 사용자가 템플릿에 적은 이름이
+   * 조용히 사라졌다 (`feature/MIS-경영정보서비스/…` → `feature/MIS/…`).
+   */
+  it('한글 subject 는 그대로 살아남는다 — 공백만 `-` 로 접는다', () => {
     const result = buildBranchName(
       input({ template: 'feature/{subject}', subject: '메일 목록 디자인 개선', taskId: 'abcdef000002' })
     )
-    expect(result).toBe('feature')
-    expect(result.endsWith('/')).toBe(false)
+    expect(result).toBe('feature/메일-목록-디자인-개선')
     expect(isSafeGitRef(result)).toBe(true)
   })
 
-  it('subject 가 전부 탈락해 전체 결과가 비면 task-{taskId6} 로 폴백', () => {
-    const result = buildBranchName(input({ template: '{subject}', subject: '한글만 있음', taskId: 'abcdef000003' }))
+  it('템플릿에 적은 한글 조각도 유지된다', () => {
+    const result = buildBranchName(
+      input({ template: 'feature/MIS-경영정보서비스/1705-qa-{taskNumber}', taskNumber: 6793, taskId: 'abcdef000004' })
+    )
+    expect(result).toBe('feature/MIS-경영정보서비스/1705-qa-6793')
+    expect(isSafeGitRef(result)).toBe(true)
+  })
+
+  it('쓸 수 있는 문자가 하나도 안 남으면 task-{taskId6} 로 폴백', () => {
+    const result = buildBranchName(input({ template: '{subject}', subject: '~^:?*', taskId: 'abcdef000003' }))
     expect(result).toBe('task-000003')
   })
 })

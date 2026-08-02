@@ -22,8 +22,17 @@ export interface BranchNameInput {
   prefix?: string
 }
 
-const ALLOWED_CHARS_RE = /[^A-Za-z0-9._/-]+/g
+/**
+ * git ref 로 못 쓰는 문자만 골라 막는다 — 나머지(한글 등 유니코드)는 그대로 둔다.
+ *
+ * 예전에는 영숫자·`._/-` 만 남기는 화이트리스트였다. 그래서 `feature/MIS-경영정보서비스/...` 가
+ * `feature/MIS/...` 로 줄어, 사용자가 템플릿에 적어 넣은 이름이 조용히 사라졌다.
+ * git 자체는 UTF-8 ref 를 허용하므로 막을 이유가 없다(check-ref-format 금지 문자 + 셸 메타문자만 제거).
+ */
+const FORBIDDEN_CHARS_RE = /[\s\x00-\x1f\x7f~^:?*[\]\\{}()<>;|&$`'"!]+/g
 const REPEATED_DASH_RE = /-{2,}/g
+/** `..` 는 git 이 ref 에서 금지한다 — 하나로 접는다. */
+const REPEATED_DOT_RE = /\.{2,}/g
 const TRIM_EDGE_RE = /^[-._]+|[-._]+$/g
 const TOKEN_RE = /\{(\w+)\}/g
 
@@ -31,11 +40,12 @@ function taskId6Of(taskId: string): string {
   return taskId.slice(-6)
 }
 
-/** 세그먼트(경로 `/` 로 나뉜 한 조각) sanitize — 허용 문자 외 `-` 로 접고, 연속 `-`/가장자리 `-._` 를 정리한다. */
+/** 세그먼트(경로 `/` 로 나뉜 한 조각) sanitize — 못 쓰는 문자를 `-` 로 접고, 연속 `-`/`.`/가장자리 `-._` 를 정리한다. */
 function sanitizeSegment(segment: string): string {
   return segment
-    .replace(ALLOWED_CHARS_RE, '-')
+    .replace(FORBIDDEN_CHARS_RE, '-')
     .replace(REPEATED_DASH_RE, '-')
+    .replace(REPEATED_DOT_RE, '.')
     .replace(TRIM_EDGE_RE, '')
 }
 
