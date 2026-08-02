@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ClipboardList, RefreshCw, Search, X } from 'lucide-react'
+import { ClipboardList, FolderGit2, RefreshCw, Search, Settings, X } from 'lucide-react'
 import type { DoorayTask } from '@shared/types/dooray'
-import type { TaskSessionLink } from '@shared/types/workspace'
+import type { RepoRegistryEntry, TaskSessionLink, WorkspaceSettings } from '@shared/types/workspace'
 import { workspaceKey } from '@shared/workspace/workspaceKey'
-import { Button, Input, LoadingView } from '../common/ds'
+import { Button, EmptyView, Input, LoadingView } from '../common/ds'
 import ProjectFilter from '../common/ProjectFilter'
 import TaskCard from '../Workspace/TaskCard'
 import TaskDetailOverlay from '../Workspace/TaskDetailOverlay'
@@ -20,6 +20,7 @@ import {
   type TaskFilterState,
   type TaskScope
 } from './taskFilter'
+import { resolveTaskSetupState, type TaskSetupState } from './taskSetupState'
 
 /** 드래그 페이로드 — pane 의 dragover/drop 이 이 타입으로 식별한다. */
 export const TASK_DRAG_MIME = 'application/x-clauday-task'
@@ -60,18 +61,23 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<TaskFilterState>(EMPTY_TASK_FILTER)
   const [selected, setSelected] = useState<DoorayTask | null>(null)
+  /** 목록이 비었을 때 "설정이 덜 됐다" 와 "정말 업무가 없다" 를 가르는 근거. */
+  const [setup, setSetup] = useState<TaskSetupState>({ stage: 'ready', projectsWithoutRepo: [] })
 
   const load = useCallback(async (force = false): Promise<void> => {
     setLoading(true)
     try {
       const projectIds = ((await window.api.settings.get(PROJECTS_SETTINGS_KEY)) as string[] | null) ?? []
-      const [list, linkMap] = await Promise.all([
+      const [list, linkMap, settings, repos] = await Promise.all([
         // 프로젝트를 고르지 않았으면 목록을 비운다 — 수백 건을 쏟아붓지 않는다
         projectIds.length > 0 ? window.api.dooray.tasks.list(projectIds, force) : Promise.resolve([]),
-        window.api.workspace.taskDrop.linked().catch(() => ({}) as Record<string, TaskSessionLink[]>)
+        window.api.workspace.taskDrop.linked().catch(() => ({}) as Record<string, TaskSessionLink[]>),
+        window.api.workspace.settings.get().catch(() => null as WorkspaceSettings | null),
+        window.api.workspace.repos.list().catch(() => [] as RepoRegistryEntry[])
       ])
       setTasks(list)
       setLinks(linkMap)
+      setSetup(resolveTaskSetupState({ projectIds, settings, repos }))
     } catch {
       setTasks([])
     } finally {
@@ -175,28 +181,44 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
           )}
         </div>
 
+        {/* 목록은 떴지만 저장소가 없으면 드롭이 조용히 다르게 동작한다 — 놓기 전에 알린다. */}
+        {!loading && tasks.length > 0 && setup.stage === 'project-without-repo' && (
+          <button
+            type="button"
+            onClick={gotoWorkspaceSettings}
+            className="flex-none flex items-center gap-1.5 mx-3 mb-2 px-2 py-1.5 rounded-md bg-c-orange-bg text-left hover:opacity-90"
+          >
+            <FolderGit2 size={11} className="flex-none text-c-orange-fg" />
+            <span className="flex-1 min-w-0 text-[calc(10px_*_var(--app-font-scale,1))] text-c-orange-fg leading-relaxed">
+              저장소를 정하지 않아 워크트리 없이 시작합니다 — 설정에서 정하기
+            </span>
+          </button>
+        )}
+
         <div className="flex-1 min-h-0 overflow-y-auto border-t border-bg-border">
           {loading ? (
             <LoadingView label="업무 불러오는 중" />
           ) : filtered.length === 0 ? (
-            <div className="p-4 flex flex-col items-start gap-2">
-              <p className="text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-tertiary leading-relaxed">
-                {tasks.length === 0
-                  ? '위의 프로젝트 선택에서 작업할 두레이 프로젝트를 고르면 내 업무가 여기 표시됩니다.'
-                  : chips.length > 0
+            tasks.length === 0 ? (
+              <TaskSetupGuide setup={setup} />
+            ) : (
+              <div className="p-4 flex flex-col items-start gap-2">
+                <p className="text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-tertiary leading-relaxed">
+                  {chips.length > 0
                     ? '상세 검색까지 걸린 조건에 맞는 업무가 없습니다.'
                     : '조건에 맞는 업무가 없습니다.'}
-              </p>
-              {tasks.length > 0 && chips.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setFilter((f) => clearDetailFilters(f))}
-                  className="text-[calc(11px_*_var(--app-font-scale,1))] text-link hover:underline"
-                >
-                  상세 검색 지우기
-                </button>
-              )}
-            </div>
+                </p>
+                {chips.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setFilter((f) => clearDetailFilters(f))}
+                    className="text-[calc(11px_*_var(--app-font-scale,1))] text-link hover:underline"
+                  >
+                    상세 검색 지우기
+                  </button>
+                )}
+              </div>
+            )
           ) : (
             filtered.map((task) => {
               const key = workspaceKey(task.projectId, task.id)
@@ -255,6 +277,72 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
         />
       )}
     </>
+  )
+}
+
+/** 설정 화면(워크스페이스 탭)으로 보낸다 — 좁은 패널에서 저장소·규칙을 다룰 수는 없다. */
+function gotoWorkspaceSettings(): void {
+  window.dispatchEvent(new CustomEvent('goto-settings', { detail: { tab: 'workspace' } }))
+}
+
+/**
+ * 목록이 빈 이유가 설정 때문일 때 무엇을 해야 하는지 알린다.
+ *
+ * 전에는 회색 문구 한 줄이라 "업무가 안 뜬다" 로 읽혔다 — 프로젝트를 고르라는 말이 어디를
+ * 가리키는지도 분명하지 않았다. 단계별로 다음 한 걸음만 제시한다.
+ */
+function TaskSetupGuide({ setup }: { setup: TaskSetupState }): JSX.Element {
+  if (setup.stage === 'no-project') {
+    return (
+      <EmptyView
+        icon={ClipboardList}
+        title="볼 프로젝트를 아직 안 골랐습니다"
+        body="어느 두레이 프로젝트의 업무를 여기 띄울지 먼저 고르세요. 고르면 내 담당 업무가 이 목록에 나옵니다."
+        action={
+          <button type="button" onClick={gotoWorkspaceSettings} className="ds-btn secondary xs">
+            <Settings size={11} /> 프로젝트 고르기
+          </button>
+        }
+      />
+    )
+  }
+
+  if (setup.stage === 'no-repo-registered') {
+    return (
+      <EmptyView
+        icon={FolderGit2}
+        title="저장소를 아직 등록하지 않았습니다"
+        body="업무를 터미널에 놓으면 그 저장소에 워크트리를 만들어 시작합니다. 작업할 폴더를 먼저 등록하세요."
+        action={
+          <button type="button" onClick={gotoWorkspaceSettings} className="ds-btn secondary xs">
+            <Settings size={11} /> 저장소 등록하기
+          </button>
+        }
+      />
+    )
+  }
+
+  if (setup.stage === 'project-without-repo') {
+    return (
+      <EmptyView
+        icon={FolderGit2}
+        title="이 프로젝트에 쓸 저장소를 정하지 않았습니다"
+        body="지금 상태로 업무를 놓으면 워크트리 없이 터미널이 있는 폴더에서 그냥 시작합니다."
+        action={
+          <button type="button" onClick={gotoWorkspaceSettings} className="ds-btn secondary xs">
+            <Settings size={11} /> 저장소 정하기
+          </button>
+        }
+      />
+    )
+  }
+
+  return (
+    <EmptyView
+      icon={ClipboardList}
+      title="담당한 업무가 없습니다"
+      body="고른 프로젝트에서 나에게 배정된 업무가 없습니다. 두레이에서 담당자를 확인해 보세요."
+    />
   )
 }
 
