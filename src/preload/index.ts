@@ -313,7 +313,7 @@ const api = {
       uploadFile: (params: { projectId: string; postId: string; filename: string; mime: string; data: ArrayBuffer }): Promise<{ id: string }> =>
         ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_UPLOAD_FILE, params),
       /** 태스크 본문 업데이트 */
-      updateBody: (params: { projectId: string; postId: string; subject: string; body: string }): Promise<void> =>
+      updateBody: (params: { projectId: string; postId: string; subject: string; body: string; mimeType?: string }): Promise<void> =>
         ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_UPDATE_BODY, params),
       /** 댓글 본문 수정 */
       updateComment: (params: { projectId: string; postId: string; logId: string; content: string }): Promise<void> =>

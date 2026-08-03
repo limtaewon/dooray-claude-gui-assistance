@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { renderWithDs } from '../../../../../test/helpers/renderWithDs'
 import { installMockWindowApi, resetMockWindowApi } from '../../../../../test/helpers/mockWindowApi'
 import TaskDetailOverlay from './TaskDetailOverlay'
@@ -87,6 +88,79 @@ describe('TaskDetailOverlay — 첨부 이미지', () => {
         expect.objectContaining({ projectId: 'proj-9', postId: 'post-77' })
       )
     )
+  })
+
+  it('편집을 열면 원문이 그대로 들어오고, 저장하면 mimeType 을 유지한 채 보낸다', async () => {
+    vi.mocked(window.api.dooray.tasks.detail).mockResolvedValue({
+      ...TASK,
+      body: { mimeType: 'text/html', content: '<p>원래 내용</p>' }
+    })
+
+    renderWithDs(<TaskDetailOverlay task={TASK} onClose={() => {}} promptText={() => ''} />)
+
+    await userEvent.click(await screen.findByRole('button', { name: '본문 편집' }))
+    const editor = screen.getByRole('textbox', { name: '업무 본문' })
+    expect(editor).toHaveValue('<p>원래 내용</p>')
+
+    await userEvent.clear(editor)
+    await userEvent.type(editor, '<p>고친 내용</p>')
+    await userEvent.click(screen.getByRole('button', { name: '두레이에 저장' }))
+
+    // 마크다운으로 저장하면 두레이 웹에서 만든 표·체크박스가 평문으로 깨진다.
+    await waitFor(() =>
+      expect(window.api.dooray.tasks.updateBody).toHaveBeenCalledWith({
+        projectId: 'proj-9',
+        postId: 'post-77',
+        subject: TASK.subject,
+        body: '<p>고친 내용</p>',
+        mimeType: 'text/html'
+      })
+    )
+  })
+
+  it('취소하면 저장하지 않고 원래 본문으로 돌아간다', async () => {
+    vi.mocked(window.api.dooray.tasks.detail).mockResolvedValue(detailWith('원래 내용'))
+
+    renderWithDs(<TaskDetailOverlay task={TASK} onClose={() => {}} promptText={() => ''} />)
+
+    await userEvent.click(await screen.findByRole('button', { name: '본문 편집' }))
+    await userEvent.type(screen.getByRole('textbox', { name: '업무 본문' }), '덧붙임')
+    await userEvent.click(screen.getByRole('button', { name: '취소' }))
+
+    expect(window.api.dooray.tasks.updateBody).not.toHaveBeenCalled()
+    expect(screen.getByText('원래 내용')).toBeInTheDocument()
+  })
+
+  /** 쓰던 글이 창이 닫히며 통째로 날아가면 안 된다. */
+  it('편집 중 Esc 는 창을 닫지 않고 편집만 접는다', async () => {
+    const onClose = vi.fn()
+    vi.mocked(window.api.dooray.tasks.detail).mockResolvedValue(detailWith('원래 내용'))
+
+    renderWithDs(<TaskDetailOverlay task={TASK} onClose={onClose} promptText={() => ''} />)
+
+    await userEvent.click(await screen.findByRole('button', { name: '본문 편집' }))
+    await userEvent.keyboard('{Escape}')
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.queryByRole('textbox', { name: '업무 본문' })).not.toBeInTheDocument()
+
+    // 편집을 접은 뒤에는 Esc 가 다시 창을 닫는다.
+    await userEvent.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('저장에 실패하면 편집 내용을 지우지 않고 이유를 알린다', async () => {
+    vi.mocked(window.api.dooray.tasks.detail).mockResolvedValue(detailWith('원래 내용'))
+    vi.mocked(window.api.dooray.tasks.updateBody).mockRejectedValue(new Error('권한이 없습니다'))
+
+    renderWithDs(<TaskDetailOverlay task={TASK} onClose={() => {}} promptText={() => ''} />)
+
+    await userEvent.click(await screen.findByRole('button', { name: '본문 편집' }))
+    await userEvent.type(screen.getByRole('textbox', { name: '업무 본문' }), ' 고침')
+    await userEvent.click(screen.getByRole('button', { name: '두레이에 저장' }))
+
+    await waitFor(() => expect(screen.getByText('본문 저장 실패')).toBeInTheDocument())
+    expect(screen.getByRole('textbox', { name: '업무 본문' })).toHaveValue('원래 내용 고침')
   })
 
   it('외부 URL 이미지는 그대로 쓴다 — 인증이 필요 없다', async () => {

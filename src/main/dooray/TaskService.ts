@@ -683,12 +683,18 @@ export class TaskService {
     return this.client.uploadFile(params)
   }
 
-  /** 태스크 본문(제목+body)만 업데이트 — 이미지 업로드 후 링크 치환에 사용 */
+  /**
+   * 태스크 본문(제목+body) 업데이트 — 이미지 업로드 후 링크 치환, 상세 화면의 본문 편집에 쓴다.
+   *
+   * `mimeType` 은 **읽어온 값을 그대로 돌려보내야** 한다. 두레이 웹에서 쓴 글은 대개
+   * `text/html` 인데 마크다운으로 저장하면 표·체크박스 같은 서식이 평문으로 깨진다.
+   */
   async updateTaskBody(params: {
     projectId: string
     postId: string
     subject: string
     body: string
+    mimeType?: string
   }): Promise<void> {
     await this.client.request(
       `/project/v1/projects/${params.projectId}/posts/${params.postId}`,
@@ -696,7 +702,7 @@ export class TaskService {
         method: 'PUT',
         body: JSON.stringify({
           subject: params.subject,
-          body: { mimeType: 'text/x-markdown', content: params.body }
+          body: { mimeType: params.mimeType || 'text/x-markdown', content: params.body }
         })
       }
     )

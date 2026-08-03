@@ -719,7 +719,7 @@ function registerIpcHandlers(): void {
   // 본문 업데이트 (이미지 업로드 후 링크 치환에 사용)
   ipcMain.handle(
     IPC_CHANNELS.DOORAY_TASK_UPDATE_BODY,
-    (_, params: { projectId: string; postId: string; subject: string; body: string }) =>
+    (_, params: { projectId: string; postId: string; subject: string; body: string; mimeType?: string }) =>
       taskService.updateTaskBody(params)
   )
   // 댓글 본문 수정

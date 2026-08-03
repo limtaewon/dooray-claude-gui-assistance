@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Copy, ExternalLink, Hash, Play, Send, Terminal as TerminalIcon, TerminalSquare, X } from 'lucide-react'
+import { Copy, ExternalLink, Hash, Pencil, Play, Send, Terminal as TerminalIcon, TerminalSquare, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -37,12 +37,16 @@ function TaskDetailOverlay({ task, onClose, onRunInTerminal, promptText }: TaskD
   const [loading, setLoading] = useState(true)
   const [comment, setComment] = useState('')
   const [sending, setSending] = useState(false)
+  /** 본문 편집 중인 원문. null 이면 읽기 모드. */
+  const [draft, setDraft] = useState<string | null>(null)
+  const [savingBody, setSavingBody] = useState(false)
 
   useEffect(() => {
     let alive = true
     setLoading(true)
     setDetail(null)
     setComments([])
+    setDraft(null)
     void (async () => {
       try {
         const d = await window.api.dooray.tasks.detail(task.projectId, task.id)
@@ -63,18 +67,19 @@ function TaskDetailOverlay({ task, onClose, onRunInTerminal, promptText }: TaskD
     }
   }, [task.projectId, task.id])
 
-  // Esc 로 닫기 — 오버레이는 모달성이므로 전역 단축키보다 먼저 소비한다
+  // Esc 로 닫기 — 오버레이는 모달성이므로 전역 단축키보다 먼저 소비한다.
+  // 편집 중이면 편집만 접는다 — 쓰던 글이 창이 닫히며 통째로 날아가면 안 된다.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        e.stopPropagation()
-        onClose()
-      }
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      e.stopPropagation()
+      if (draft !== null) setDraft(null)
+      else onClose()
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [onClose])
+  }, [onClose, draft])
 
   const copy = async (text: string, label: string): Promise<void> => {
     await navigator.clipboard.writeText(text)
@@ -96,6 +101,41 @@ function TaskDetailOverlay({ task, onClose, onRunInTerminal, promptText }: TaskD
       setSending(false)
     }
   }
+
+  /**
+   * 본문 저장 — 읽어온 mimeType 을 그대로 돌려보낸다.
+   * 두레이 웹에서 쓴 글은 대개 `text/html` 인데 마크다운으로 저장하면 서식이 평문으로 깨진다.
+   */
+  const saveBody = async (): Promise<void> => {
+    if (draft === null) return
+    setSavingBody(true)
+    try {
+      await window.api.dooray.tasks.updateBody({
+        projectId: task.projectId,
+        postId: task.id,
+        subject: detail?.subject ?? task.subject,
+        body: draft,
+        mimeType: detail?.body?.mimeType
+      })
+      // 서버가 본문을 정규화할 수 있으므로 저장 결과를 되읽는다. 못 읽으면 방금 쓴 값을 그대로 둔다.
+      const fresh = await window.api.dooray.tasks.detail(task.projectId, task.id).catch(() => null)
+      if (fresh) setDetail(fresh)
+      else {
+        setDetail((prev) =>
+          prev ? { ...prev, body: { mimeType: prev.body?.mimeType ?? '', content: draft } } : prev
+        )
+      }
+      setDraft(null)
+      toast.success('본문 저장됨')
+    } catch (err) {
+      toast.error('본문 저장 실패', err instanceof Error ? err.message : undefined)
+    } finally {
+      setSavingBody(false)
+    }
+  }
+
+  const bodyMime = detail?.body?.mimeType ?? ''
+  const isHtmlBody = bodyMime.includes('html')
 
   const ref = task.projectCode ? `${task.projectCode}/${task.number ?? ''}` : String(task.number ?? '')
 
@@ -134,6 +174,17 @@ function TaskDetailOverlay({ task, onClose, onRunInTerminal, promptText }: TaskD
             </Button>
           )}
           {/* 액션은 아이콘 버튼으로 헤더에 둔다 — 별도 레일을 두면 폭만 잡아먹는다 */}
+          {draft === null && detail && (
+            <button
+              type="button"
+              title="본문 편집 — 두레이에 그대로 저장됩니다"
+              aria-label="본문 편집"
+              onClick={() => setDraft(detail.body?.content ?? '')}
+              className="ds-btn ghost icon"
+            >
+              <Pencil size={15} />
+            </button>
+          )}
           <button
             type="button"
             title="업무 번호 복사"
@@ -178,6 +229,29 @@ function TaskDetailOverlay({ task, onClose, onRunInTerminal, promptText }: TaskD
 
             {loading ? (
               <LoadingView label="업무 정보를 불러오는 중" />
+            ) : draft !== null ? (
+              <div className="flex flex-col gap-2">
+                <textarea
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  autoFocus
+                  spellCheck={false}
+                  aria-label="업무 본문"
+                  className="ds-input w-full min-h-[320px] resize-y font-mono text-[calc(12px_*_var(--app-font-scale,1))] leading-relaxed"
+                />
+                <div className="flex items-center gap-2">
+                  <Button variant="primary" onClick={() => void saveBody()} disabled={savingBody}>
+                    {savingBody ? '저장 중…' : '두레이에 저장'}
+                  </Button>
+                  <Button variant="ghost" onClick={() => setDraft(null)} disabled={savingBody}>
+                    취소
+                  </Button>
+                  {/* 무엇을 편집 중인지 밝힌다 — HTML 을 마크다운처럼 고치면 서식이 깨진다. */}
+                  <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+                    {isHtmlBody ? 'HTML 원문' : '마크다운'}으로 저장합니다 · Esc 로 편집 취소
+                  </span>
+                </div>
+              </div>
             ) : detail?.body?.content ? (
               <div className="markdown-body text-[calc(13px_*_var(--app-font-scale,1))]">
                 <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>
