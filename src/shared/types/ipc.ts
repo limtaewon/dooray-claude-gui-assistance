@@ -451,7 +451,15 @@ export const IPC_CHANNELS = {
   GIT_SCM_STASH_ACTION: 'git:scm:stash-action',
   GIT_SCM_CREATE_BRANCH: 'git:scm:create-branch',
   GIT_SCM_CHECKOUT: 'git:scm:checkout',
-  GIT_SCM_ABORT: 'git:scm:abort'
+  GIT_SCM_ABORT: 'git:scm:abort',
+
+  // 앱 업데이트 (v2.0.4) — Windows 는 재시작 설치까지, macOS 는 dmg 열기까지
+  UPDATE_CHECK: 'update:check',
+  UPDATE_DOWNLOAD: 'update:download',
+  UPDATE_INSTALL: 'update:install',
+  UPDATE_OPEN_RELEASE: 'update:open-release',
+  /** main → renderer push 전용. ipcMain.handle 등록 금지. */
+  UPDATE_STATUS: 'update:status'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]

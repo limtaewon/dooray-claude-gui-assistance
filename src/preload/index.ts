@@ -110,6 +110,7 @@ import type {
 } from '../shared/types/harness-edit'
 import type { Skill, SkillSaveRequest, SkillDeleteManyResult } from '../shared/types/skills'
 import type { UsageQueryParams, UsageSummary } from '../shared/types/usage'
+import type { UpdateState } from '../shared/types/update'
 import type {
   DoorayProject,
   DoorayTask,
@@ -1125,6 +1126,23 @@ const api = {
        */
       restore: (path: string, backupDir: string): Promise<{ restored: string[]; model: HarnessModel }> =>
         ipcRenderer.invoke(IPC_CHANNELS.HARNESS_RESTORE_BACKUP, { path, backupDir })
+    }
+  },
+
+  /**
+   * 앱 업데이트. Windows 는 install() 이 재시작하며 설치까지 하고,
+   * macOS 는 받아 둔 dmg 를 Finder 에서 연다 (마지막 드래그는 사용자 몫).
+   */
+  update: {
+    check: (): Promise<UpdateState> => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_CHECK),
+    download: (): Promise<UpdateState> => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_DOWNLOAD),
+    install: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_INSTALL),
+    openReleasePage: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_OPEN_RELEASE),
+    /** 진행 상태 구독. 반환된 함수를 unmount 에서 호출해 해제한다. */
+    onStatus: (cb: (state: UpdateState) => void): (() => void) => {
+      const listener = (_: unknown, state: UpdateState): void => cb(state)
+      ipcRenderer.on(IPC_CHANNELS.UPDATE_STATUS, listener)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.UPDATE_STATUS, listener)
     }
   },
 

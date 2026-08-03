@@ -52,7 +52,14 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "limtaewon",
+        "repo": "dooray-claude-gui-assistance"
+      }
+    ]
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -69,6 +76,7 @@
     "@xyflow/react": "^12.11.0",
     "chokidar": "^3.6.0",
     "electron-store": "^8.2.0",
+    "electron-updater": "^6.8.9",
     "keytar": "^7.9.0",
     "lucide-react": "^0.460.0",
     "node-pty": "^1.0.0",
@@ -100,6 +108,7 @@
     "electron-vite": "^2.3.0",
     "jsdom": "^25.0.1",
     "postcss": "^8.4.49",
+    "sharp": "^0.35.3",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.9.3",
     "vite": "^5.4.11",
