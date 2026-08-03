@@ -42,7 +42,8 @@ function findOffenders(files: string[], patterns: RegExp[]): string[] {
       const matches = content.match(new RegExp(pattern.source, 'g'))
       if (matches) matches.forEach((m) => hits.add(m))
     }
-    if (hits.size > 0) offenders.push(`${file.replace(RENDERER_SRC, '')}: ${[...hits].join(', ')}`)
+    // 경로 구분자는 POSIX 로 통일 — Windows 에서도 같은 메시지가 나오게
+    if (hits.size > 0) offenders.push(`${file.replace(RENDERER_SRC, '').replace(/\\/g, '/')}: ${[...hits].join(', ')}`)
   }
   return offenders
 }

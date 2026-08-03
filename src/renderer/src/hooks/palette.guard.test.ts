@@ -82,11 +82,16 @@ function collectSourceFiles(dir: string, acc: string[] = []): string[] {
   return acc
 }
 
+/** BASELINE 키는 POSIX 구분자로 적혀 있다 — Windows 의 `\` 를 맞춰 주지 않으면 전부 매칭에 실패한다. */
+function toKey(file: string): string {
+  return file.replace(RENDERER_SRC, '').replace(/\\/g, '/')
+}
+
 function countByFile(): Record<string, number> {
   const counts: Record<string, number> = {}
   for (const file of collectSourceFiles(RENDERER_SRC)) {
     const matches = readFileSync(file, 'utf-8').match(OFFENDER_RE)
-    if (matches) counts[file.replace(RENDERER_SRC, '')] = matches.length
+    if (matches) counts[toKey(file)] = matches.length
   }
   return counts
 }
@@ -148,7 +153,7 @@ describe('이름이 오해를 부르는 토큰 가드', () => {
     const offenders: string[] = []
     for (const file of collectSourceFiles(RENDERER_SRC)) {
       const matches = readFileSync(file, 'utf-8').match(MISLEADING_RE)
-      if (matches) offenders.push(`${file.replace(RENDERER_SRC, '')}: ${[...new Set(matches)].join(', ')}`)
+      if (matches) offenders.push(`${toKey(file)}: ${[...new Set(matches)].join(', ')}`)
     }
     expect(
       offenders,
