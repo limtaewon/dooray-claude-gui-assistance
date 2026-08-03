@@ -1277,34 +1277,36 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
         onDragEnd={endDrag}
         onDragCancel={handleDragCancel}
       >
-        <div className="ds-tabbar">
-          <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
-            {tabs.map((tab, idx) => (
-              <Fragment key={tab.tabId}>
-                {insertionIndex === idx && <TabDropIndicator />}
-                <SortableTabLabel
-                  tabId={tab.tabId}
-                  name={tab.name}
-                  kind={tab.kind ?? 'terminal'}
-                  paneCount={isDiffTab(tab) ? 0 : collectLeafIds(tab.tree).length}
-                  isActive={activeTabId === tab.tabId}
-                  isExited={allPanesExited(tab)}
-                  isDone={Object.values(tab.panes).some((pane) => doneSessions.has(pane.sessionId))}
-                  onSelect={() => activateTab(tab.tabId)}
-                  onClose={() => closeTabEntry(tab.tabId)}
-                  onRename={(newName) => renameTab(tab.tabId, newName)}
-                />
-              </Fragment>
-            ))}
-          </SortableContext>
-          {insertionIndex === tabs.length && <TabDropIndicator />}
-          <button onClick={() => createTab()}
-            data-tour="terminal-new-tab"
-            className="w-7 h-7 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover flex-shrink-0"
-            title="새 터미널 (⌘T)">
-            <Plus size={14} />
-          </button>
-          <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+        <div className="ds-tabbar split">
+          <div className="ds-tabbar-scroll">
+            <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
+              {tabs.map((tab, idx) => (
+                <Fragment key={tab.tabId}>
+                  {insertionIndex === idx && <TabDropIndicator />}
+                  <SortableTabLabel
+                    tabId={tab.tabId}
+                    name={tab.name}
+                    kind={tab.kind ?? 'terminal'}
+                    paneCount={isDiffTab(tab) ? 0 : collectLeafIds(tab.tree).length}
+                    isActive={activeTabId === tab.tabId}
+                    isExited={allPanesExited(tab)}
+                    isDone={Object.values(tab.panes).some((pane) => doneSessions.has(pane.sessionId))}
+                    onSelect={() => activateTab(tab.tabId)}
+                    onClose={() => closeTabEntry(tab.tabId)}
+                    onRename={(newName) => renameTab(tab.tabId, newName)}
+                  />
+                </Fragment>
+              ))}
+            </SortableContext>
+            {insertionIndex === tabs.length && <TabDropIndicator />}
+            <button onClick={() => createTab()}
+              data-tour="terminal-new-tab"
+              className="w-7 h-7 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover flex-shrink-0"
+              title="새 터미널 (⌘T)">
+              <Plus size={14} />
+            </button>
+          </div>
+          <div className="flex items-center gap-2 flex-none pl-2">
             {/* 분할은 자주 쓰는데 단축키를 모르면 길이 없다 — 탭바에 버튼으로 둔다. */}
             <div className="flex items-center">
               <button

@@ -507,6 +507,16 @@ textarea.ds-input { height: auto; padding: 6px 10px; resize: vertical; line-heig
   flex: none;
   overflow-x: auto;
 }
+/* 탭이 계속 늘어나는 탭바(터미널). 탭바 전체가 스크롤되면 오른쪽 액션(분할·작업 패널)까지
+   스크롤 밖으로 밀려 화면이 좁을 때 누를 수 없다 — 탭 목록만 스크롤하고 액션은 고정한다. */
+.ds-tabbar.split { overflow: hidden; }
+.ds-tabbar.split .ds-tabbar-scroll {
+  display: flex; align-items: center; gap: 2px;
+  flex: 1 1 auto; min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ds-tabbar.split .ds-tabbar-scroll::-webkit-scrollbar { display: none; }
 .ds-tab {
   display: flex; align-items: center; gap: 6px;
   font-size: 12.5px; font-weight: 500;

@@ -429,6 +429,26 @@ describe('TerminalView (integration)', () => {
     vi.clearAllMocks()
   })
 
+  /**
+   * 화면이 좁고 탭이 많으면 탭바 전체가 스크롤돼 오른쪽 액션(분할·작업 패널 토글)이 스크롤 밖으로
+   * 밀려 누를 수 없었다. 탭 목록만 스크롤되고 액션은 탭바에 고정돼야 한다.
+   */
+  it('탭이 늘어나도 오른쪽 액션은 탭 스크롤 영역 밖에 남는다', async () => {
+    renderWithDs(<TerminalView />)
+    await screen.findByText('터미널')
+
+    const drawerToggle = screen.getByTitle('작업 패널 (⌘⇧T)')
+    const scroller = document.querySelector('.ds-tabbar-scroll')
+
+    expect(scroller).not.toBeNull()
+    // 액션이 스크롤 영역 안에 있으면 탭이 늘어날 때 함께 밀려난다.
+    expect(scroller!.contains(drawerToggle)).toBe(false)
+    expect(drawerToggle.closest('.ds-tabbar')).not.toBeNull()
+
+    // 새 탭 버튼은 반대로 탭들과 함께 스크롤돼야 한다.
+    expect(scroller!.contains(screen.getByTitle('새 터미널 (⌘T)'))).toBe(true)
+  })
+
   it('renders empty state when no saved sessions exist', async () => {
     renderWithDs(<TerminalView />)
 
