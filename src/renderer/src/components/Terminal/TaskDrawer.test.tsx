@@ -126,6 +126,43 @@ describe('TaskDrawer — 설정이 덜 됐을 때의 안내', () => {
   })
 })
 
+/**
+ * 프로젝트 선택은 이 패널에서 조회 전용이다 — 고른 뒤 정할 규칙(저장소·브랜치·첫 지시)이
+ * 설정에만 있어서, 여기서 고르게 하면 규칙 없는 프로젝트가 남는다(커밋 7fd0c84).
+ * 이 검사가 없어서 `readOnly` 를 빠뜨린 채 편집 가능한 팝오버가 나간 적이 있다.
+ */
+describe('TaskDrawer — 프로젝트 선택은 조회 전용', () => {
+  beforeEach(() => {
+    installMockWindowApi()
+    pickedProjects(['p1'])
+    vi.mocked(window.api.dooray.projects.list).mockResolvedValue([
+      { id: 'p1', code: 'NEON' },
+      { id: 'p2', code: 'Clauday' }
+    ] as never)
+    vi.mocked(window.api.dooray.tasks.list).mockResolvedValue([TASK])
+    vi.mocked(window.api.workspace.repos.list).mockResolvedValue([REPO])
+    vi.mocked(window.api.workspace.settings.get).mockResolvedValue(
+      settingsWith({ p1: { repoIds: ['r1'] } })
+    )
+  })
+
+  afterEach(() => {
+    resetMockWindowApi()
+  })
+
+  it('체크박스를 그리지 않고 어디서 고치는지 알린다', async () => {
+    renderWithDs(<TaskDrawer />)
+
+    await userEvent.click(await screen.findByRole('button', { name: /표시 중인 프로젝트/ }))
+
+    expect(await screen.findByText(/고르는 곳은 설정입니다/)).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    // 켜둔 것만 보인다 — 여기서 새로 켤 수 없으므로 안 고른 프로젝트를 권하지 않는다.
+    expect(screen.queryByText('Clauday')).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('프로젝트 검색...')).not.toBeInTheDocument()
+  })
+})
+
 /** 이슈 #35 — 정렬 · 변경 감지 · 태그. */
 describe('TaskDrawer — 정렬과 변경 감지', () => {
   const OLD: DoorayTask = { ...TASK, id: 'old', subject: '오래된 업무', updatedAt: '2026-08-01T00:00:00Z' }

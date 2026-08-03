@@ -48,9 +48,38 @@ describe('ProjectFilter', () => {
     // 고른 것만 나오고, 그 행은 눌러도 바뀌지 않는다
     expect(await screen.findByText('NEON')).toBeInTheDocument()
     expect(screen.queryByText('Clauday')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /NEON/ })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /NEON/ })).not.toBeInTheDocument()
     expect(screen.queryByPlaceholderText('프로젝트 검색...')).not.toBeInTheDocument()
     expect(screen.queryByText(/프로젝트 수동 추가/)).not.toBeInTheDocument()
+  })
+
+  /**
+   * "수정이 안 된다" 제보의 원인 — 체크박스를 그려놓고 disabled 만 걸어서 고장난 것처럼 보였다.
+   * 못 고치는 자리라면 고칠 수 있는 것처럼 보이지 않아야 한다.
+   */
+  it('조회 전용에서는 체크박스를 아예 그리지 않고, 고치러 갈 곳을 가리킨다', async () => {
+    renderWithDs(<ProjectFilter readOnly showSettingsLink />)
+    await userEvent.click(screen.getByRole('button', { name: /표시 중인 프로젝트/ }))
+
+    await screen.findByText('NEON')
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.getByText(/고르는 곳은 설정입니다/)).toBeInTheDocument()
+    expect(screen.getByText(/설정에서 프로젝트 고르기/)).toBeInTheDocument()
+  })
+
+  it('고를 수 있는 자리에서는 체크박스로 상태를 알린다', async () => {
+    renderWithDs(<ProjectFilter />)
+    await userEvent.click(screen.getByRole('button', { name: /프로젝트 선택/ }))
+
+    const row = await screen.findByRole('checkbox', { name: /Clauday/ })
+    expect(row).toHaveAttribute('aria-checked', 'false')
+
+    await userEvent.click(row)
+
+    expect(window.api.settings.set).toHaveBeenCalledWith(
+      'pinnedProjects',
+      expect.arrayContaining(['p2'])
+    )
   })
 
   it('링크를 켜지 않으면 나오지 않는다', async () => {
