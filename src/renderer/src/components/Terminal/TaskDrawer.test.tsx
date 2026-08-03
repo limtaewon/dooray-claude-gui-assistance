@@ -125,3 +125,149 @@ describe('TaskDrawer — 설정이 덜 됐을 때의 안내', () => {
     expect(screen.queryByText(/워크트리 없이 시작합니다/)).not.toBeInTheDocument()
   })
 })
+
+/** 이슈 #35 — 정렬 · 변경 감지 · 태그. */
+describe('TaskDrawer — 정렬과 변경 감지', () => {
+  const OLD: DoorayTask = { ...TASK, id: 'old', subject: '오래된 업무', updatedAt: '2026-08-01T00:00:00Z' }
+  const FRESH: DoorayTask = {
+    ...TASK,
+    id: 'fresh',
+    subject: '방금 댓글 달린 업무',
+    updatedAt: '2026-08-03T10:56:31Z'
+  }
+
+  /** 프로젝트 · 정렬 · 확인기준선 세 저장값에 각각 답한다. */
+  function storedSettings(over: { sort?: unknown; seen?: unknown } = {}): void {
+    vi.mocked(window.api.settings.get).mockImplementation(async (key: string) => {
+      if (key === 'terminalTaskProjects') return ['p1']
+      if (key === 'terminalTaskSort') return over.sort ?? null
+      if (key === 'terminalTaskSeen') return over.seen ?? null
+      return null
+    })
+  }
+
+  beforeEach(() => {
+    installMockWindowApi()
+    storedSettings()
+    vi.mocked(window.api.dooray.tasks.list).mockResolvedValue([OLD, FRESH])
+    vi.mocked(window.api.workspace.repos.list).mockResolvedValue([REPO])
+    vi.mocked(window.api.workspace.settings.get).mockResolvedValue(
+      settingsWith({ p1: { repoIds: ['r1'] } })
+    )
+  })
+
+  afterEach(() => {
+    resetMockWindowApi()
+  })
+
+  it('기본은 최근 변경순 — 댓글이 달린 업무가 위로 온다', async () => {
+    renderWithDs(<TaskDrawer />)
+
+    await waitFor(() => expect(screen.getByText('오래된 업무')).toBeInTheDocument())
+    // getAllByText 는 문서 순서로 준다 — 카드가 실제로 놓인 차례가 그대로 나온다.
+    const subjects = screen
+      .getAllByText(/^(방금 댓글 달린 업무|오래된 업무)$/)
+      .map((el) => el.textContent)
+    expect(subjects).toEqual(['방금 댓글 달린 업무', '오래된 업무'])
+  })
+
+  it('첫 실행(기준선 없음)에는 변경 배지를 붙이지 않고 기준선만 저장한다', async () => {
+    renderWithDs(<TaskDrawer />)
+
+    await waitFor(() => expect(screen.getByText('오래된 업무')).toBeInTheDocument())
+    expect(screen.queryByLabelText('지난번에 본 뒤 변경됨')).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(window.api.settings.set).toHaveBeenCalledWith('terminalTaskSeen', {
+        old: '2026-08-01T00:00:00Z',
+        fresh: '2026-08-03T10:56:31Z'
+      })
+    )
+  })
+
+  it('지난번에 본 뒤 updatedAt 이 바뀐 업무에만 배지를 붙인다', async () => {
+    storedSettings({ seen: { old: '2026-08-01T00:00:00Z', fresh: '2026-08-02T00:00:00Z' } })
+
+    renderWithDs(<TaskDrawer />)
+
+    await waitFor(() => expect(screen.getByText('방금 댓글 달린 업무')).toBeInTheDocument())
+    expect(screen.getAllByLabelText('지난번에 본 뒤 변경됨')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: /모두 읽음/ })).toBeInTheDocument()
+  })
+
+  it('모두 읽음을 누르면 배지가 사라지고 기준선이 저장된다', async () => {
+    storedSettings({ seen: { old: '2026-08-01T00:00:00Z', fresh: '2026-08-02T00:00:00Z' } })
+    renderWithDs(<TaskDrawer />)
+    await waitFor(() => expect(screen.getByText('방금 댓글 달린 업무')).toBeInTheDocument())
+
+    await userEvent.click(screen.getByRole('button', { name: /모두 읽음/ }))
+
+    expect(screen.queryByLabelText('지난번에 본 뒤 변경됨')).not.toBeInTheDocument()
+    expect(window.api.settings.set).toHaveBeenCalledWith('terminalTaskSeen', {
+      old: '2026-08-01T00:00:00Z',
+      fresh: '2026-08-03T10:56:31Z'
+    })
+  })
+
+  it('저장된 정렬이 오염돼 있어도 기본값으로 떨어져 목록이 뜬다', async () => {
+    storedSettings({ sort: '없는정렬' })
+
+    renderWithDs(<TaskDrawer />)
+
+    await waitFor(() => expect(screen.getByText('방금 댓글 달린 업무')).toBeInTheDocument())
+  })
+})
+
+describe('TaskDrawer — 카드의 태그', () => {
+  const TAGGED: DoorayTask = {
+    ...TASK,
+    id: 'tagged',
+    subject: '태그 붙은 업무',
+    tags: [{ id: 'g1', name: 'QA', color: 'ff8800' }]
+  }
+  const PLAIN: DoorayTask = { ...TASK, id: 'plain', subject: '태그 없는 업무' }
+
+  beforeEach(() => {
+    installMockWindowApi()
+    pickedProjects(['p1'])
+    vi.mocked(window.api.dooray.tasks.list).mockResolvedValue([TAGGED, PLAIN])
+    vi.mocked(window.api.workspace.repos.list).mockResolvedValue([REPO])
+    vi.mocked(window.api.workspace.settings.get).mockResolvedValue(
+      settingsWith({ p1: { repoIds: ['r1'] } })
+    )
+  })
+
+  afterEach(() => {
+    resetMockWindowApi()
+  })
+
+  it('카드에 태그를 보여준다 — 전에는 필터로만 고를 수 있고 눈에 안 보였다', async () => {
+    renderWithDs(<TaskDrawer />)
+
+    expect(await screen.findByRole('button', { name: /태그 QA 로 좁히기/ })).toBeInTheDocument()
+  })
+
+  it('태그를 누르면 그 태그의 업무만 남고, 다시 누르면 풀린다', async () => {
+    renderWithDs(<TaskDrawer />)
+    const chip = await screen.findByRole('button', { name: /태그 QA 로 좁히기/ })
+
+    await userEvent.click(chip)
+
+    expect(screen.queryByText('태그 없는 업무')).not.toBeInTheDocument()
+    expect(screen.getByText('태그 붙은 업무')).toBeInTheDocument()
+
+    // 걸린 뒤에는 뺄 수 있는 자리가 둘이다 — 검색창 아래 칩과 카드의 태그. 둘 다 같은 동작이다.
+    const removers = screen.getAllByRole('button', { name: /태그 QA 필터 빼기/ })
+    expect(removers.length).toBeGreaterThanOrEqual(2)
+    await userEvent.click(removers[0])
+
+    expect(await screen.findByText('태그 없는 업무')).toBeInTheDocument()
+  })
+
+  it('태그 칩 클릭이 상세 오버레이를 열지 않는다 — 좁히려다 창이 뜨면 안 된다', async () => {
+    renderWithDs(<TaskDrawer />)
+
+    await userEvent.click(await screen.findByRole('button', { name: /태그 QA 로 좁히기/ }))
+
+    expect(screen.queryByRole('dialog', { name: '태그 붙은 업무' })).not.toBeInTheDocument()
+  })
+})

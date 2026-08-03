@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest'
 import {
   DEFAULT_TASK_DROP_PROMPT,
   foldPrompt,
+  formatImagePaths,
   renderTaskDropPrompt,
-  templateNeedsBody
+  templateNeedsBody,
+  templateNeedsImages
 } from './taskDropPrompt'
 
 const VARS = {
@@ -67,6 +69,35 @@ describe('templateNeedsBody', () => {
   it('본문 치환자를 쓸 때만 true — 본문 조회는 비용이 있어 필요할 때만 한다', () => {
     expect(templateNeedsBody('{title} {body}')).toBe(true)
     expect(templateNeedsBody(DEFAULT_TASK_DROP_PROMPT)).toBe(false)
+  })
+})
+
+describe('첨부 이미지 치환자', () => {
+  /**
+   * 기본 템플릿은 건드리지 않는다. 저장된 설정이 기본값을 덮으므로 기본 문자열을 바꿔봐야
+   * 신규 설치에만 닿고, 켜지는 순간 드롭마다 본문·댓글 조회가 붙어 시작이 느려진다.
+   */
+  it('기본 템플릿은 이미지를 쓰지 않는다 — 원하는 사람만 치환자를 넣는다', () => {
+    expect(templateNeedsImages(DEFAULT_TASK_DROP_PROMPT)).toBe(false)
+    expect(templateNeedsImages('{title} {images}')).toBe(true)
+  })
+
+  it('이미지가 있으면 claude 가 읽을 로컬 경로를 따옴표로 감싸 붙인다', () => {
+    const rendered = renderTaskDropPrompt('{title} {images}', {
+      title: '제목',
+      imagePaths: ['/tmp/task-images/p1-t1/재현화면-42.png']
+    })
+    expect(rendered).toBe(
+      '제목 첨부 이미지(로컬 경로, 반드시 읽어볼 것): "/tmp/task-images/p1-t1/재현화면-42.png"'
+    )
+  })
+
+  it('여러 장이면 경로를 모두 넘긴다', () => {
+    expect(formatImagePaths(['/a/1.png', '/a/2.png'])).toContain('"/a/1.png" "/a/2.png"')
+  })
+
+  it('빈 목록은 빈 문자열 — 안내 문구만 덩그러니 남으면 안 된다', () => {
+    expect(formatImagePaths([])).toBe('')
   })
 })
 

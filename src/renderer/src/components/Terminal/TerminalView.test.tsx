@@ -130,6 +130,72 @@ describe('TerminalView — 업무 드래그&드롭', () => {
     })
   })
 
+  /**
+   * 이슈 #35 — QA 업무는 재현 스크린샷이 본문의 절반이라, 글자만 넘기면 claude 가 반쪽만 본다.
+   * 기본 템플릿은 그대로 두었으므로(기본값을 바꾸면 신규 설치에만 닿는다) `{images}` 를 넣은
+   * 사용자를 재현한다.
+   */
+  it('템플릿에 {images} 를 넣으면 첨부 이미지를 내려받아 첫 지시에 로컬 경로로 붙인다', async () => {
+    vi.mocked(window.api.workspace.settings.get).mockResolvedValue({
+      taskDropPromptTemplate: '{title} {images}'
+    } as never)
+    vi.mocked(window.api.dooray.tasks.images).mockResolvedValue([
+      { fileId: '111', path: '/tmp/task-images/p1-t1/재현화면-111.png' }
+    ])
+    renderWithDs(<TerminalView active />)
+    await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+    const pane = await screen.findByTestId(/^term-pane-/)
+
+    fireEvent.drop(pane, { dataTransfer: taskTransfer() })
+
+    // 첫 지시는 claude 가 뜨기를 기다렸다 들어간다(기본 3초) — 그 뒤까지 봐야 경로가 보인다.
+    await waitFor(
+      () => {
+        const sent = vi.mocked(window.api.terminal.input).mock.calls.map((c) => c[1]).join('')
+        expect(sent).toContain('/tmp/task-images/p1-t1/재현화면-111.png')
+      },
+      { timeout: 6000 }
+    )
+    expect(window.api.dooray.tasks.images).toHaveBeenCalledWith('p1', 't1')
+  })
+
+  it('이미지 조회가 실패해도 업무는 그대로 시작된다', async () => {
+    vi.mocked(window.api.workspace.settings.get).mockResolvedValue({
+      taskDropPromptTemplate: '{title} {images}'
+    } as never)
+    vi.mocked(window.api.dooray.tasks.images).mockRejectedValue(new Error('두레이 API 실패'))
+    renderWithDs(<TerminalView active />)
+    await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+    const pane = await screen.findByTestId(/^term-pane-/)
+
+    fireEvent.drop(pane, { dataTransfer: taskTransfer() })
+
+    await waitFor(() => {
+      const sent = vi.mocked(window.api.terminal.input).mock.calls.map((c) => c[1]).join('')
+      expect(sent).toContain('claude')
+    })
+    expect(window.api.dooray.tasks.images).toHaveBeenCalled()
+  })
+
+  /**
+   * 기본 드롭은 API 호출 없이 시작한다 — 그게 이 동선의 값어치다.
+   * 기본 템플릿에 {images} 를 넣으면 이미지가 없는 업무도 매번 본문·댓글을 조회하게 된다.
+   */
+  it('기본 템플릿에서는 이미지를 받아오지 않는다 — 드롭이 느려지면 안 된다', async () => {
+    renderWithDs(<TerminalView active />)
+    await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+    const pane = await screen.findByTestId(/^term-pane-/)
+
+    fireEvent.drop(pane, { dataTransfer: taskTransfer() })
+
+    await waitFor(() => {
+      const sent = vi.mocked(window.api.terminal.input).mock.calls.map((c) => c[1]).join('')
+      expect(sent).toContain('claude')
+    })
+    expect(window.api.dooray.tasks.images).not.toHaveBeenCalled()
+    expect(window.api.dooray.tasks.detail).not.toHaveBeenCalled()
+  })
+
   it('기본값은 지금 터미널이 있는 폴더에서 시작한다 — cd 로 옮기지 않는다', async () => {
     // 1 업무 N 저장소가 현실이라 폴더는 사용자가 정한다. 미리 지정한 곳으로 cd 하면 그 선택을 덮는다.
     vi.mocked(window.api.terminal.sessionCwd).mockResolvedValue('/Users/me/Desktop/neon-ai')

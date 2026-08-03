@@ -62,6 +62,7 @@ export function createMockWindowApi(): Record<string, unknown> {
         detail: vi.fn().mockResolvedValue(null),
         update: vi.fn().mockResolvedValue(undefined),
         comments: vi.fn().mockResolvedValue([]),
+        images: vi.fn().mockResolvedValue([]),
         onPartial: vi.fn().mockReturnValue(noopUnsub),
         create: vi.fn().mockResolvedValue({ id: '' }),
         tags: vi.fn().mockResolvedValue([]),

@@ -141,6 +141,8 @@ export const IPC_CHANNELS = {
   // Dooray Task Detail
   DOORAY_TASK_DETAIL: 'dooray:task:detail',
   DOORAY_TASK_COMMENTS: 'dooray:task:comments',
+  /** 업무 본문·댓글의 첨부 이미지를 로컬 파일로 내려받아 경로를 돌려준다 */
+  DOORAY_TASK_IMAGES: 'dooray:task:images',
 
   // Terminal
   TERMINAL_CREATE: 'terminal:create',

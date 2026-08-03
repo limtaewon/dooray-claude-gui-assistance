@@ -37,6 +37,24 @@ export class TaskService {
 
   /** 동시 API 호출 개수 제한 (두레이 Rate Limiter 보호) */
   private static MAX_CONCURRENT = 4
+  /**
+   * 내 업무 조회 정렬. 페이지를 2장(200건)까지만 받으므로 **무엇을 먼저 받는지가 곧 무엇을
+   * 보게 되는지**다. 등록순(`-createdAt`)이면 오래된 프로젝트에서 지금 활발한 업무가
+   * 잘려나간다 — 댓글·상태 변경이 최근인 것부터 받아야 작업 패널의 쓸모가 산다.
+   *
+   * ⚠️ 트레이드오프: 이 정렬의 **꼬리는 "가장 오래 손 안 댄 업무"** 이고, 그게 바로 브리핑의
+   * `stale`(방치/장기) 카테고리가 찾는 대상이다. 한 사람이 한 프로젝트에서 200건을 넘게
+   * 담당하면 stale 후보가 창 밖으로 잘린다. 200 이하에서는 두 정렬이 같은 집합을 가져오므로
+   * 차이가 없다(도입 시점 실측: 대상 프로젝트 32건·0건).
+   *
+   * 정렬 자체는 브리핑에 영향을 주지 않는다 — `runListMyTasks` 가 합친 뒤 워크플로우 그룹 +
+   * 생성 최신순으로 다시 세우고, `AIService` 의 50건 slice 도 그 위에서 일어난다.
+   * 영향이 생기는 건 오직 위의 200건 창뿐이다.
+   *
+   * 호출자마다 정렬을 다르게 하고 싶어지면 `taskCache` 키에 order 를 넣어야 한다 —
+   * 지금은 `projectId` 만으로 잡고 있어서 먼저 부른 쪽 결과를 다른 쪽이 그대로 받는다.
+   */
+  private static MY_TASKS_ORDER = '-postUpdatedAt'
   /** in-flight listMyTasks promise dedupe (같은 key로 동시 요청 시 한 번만 실행) */
   private inFlightListMyTasks: Map<string, Promise<DoorayTask[]>> = new Map()
 
@@ -221,7 +239,7 @@ export class TaskService {
       this.loadWorkflows(projectId),
       this.projectCodeOf(projectId),
       this.client.request<DoorayListResponse<DoorayTask>>(
-        `/project/v1/projects/${projectId}/posts?toMemberIds=${memberId}&size=${size}&page=0&order=-createdAt`
+        `/project/v1/projects/${projectId}/posts?toMemberIds=${memberId}&size=${size}&page=0&order=${TaskService.MY_TASKS_ORDER}`
       ).catch(() => ({ header: { resultCode: 0, isSuccessful: false }, result: [], totalCount: 0 }))
     ])
     const tFirst = Date.now()
@@ -271,7 +289,7 @@ export class TaskService {
     const remainingResults = await Promise.all(
       remainingPages.map((page) =>
         this.client.request<DoorayListResponse<DoorayTask>>(
-          `/project/v1/projects/${projectId}/posts?toMemberIds=${memberId}&size=${size}&page=${page}&order=-createdAt`
+          `/project/v1/projects/${projectId}/posts?toMemberIds=${memberId}&size=${size}&page=${page}&order=${TaskService.MY_TASKS_ORDER}`
         ).catch(() => ({ header: { resultCode: 0, isSuccessful: false }, result: [], totalCount: 0 }))
       )
     )

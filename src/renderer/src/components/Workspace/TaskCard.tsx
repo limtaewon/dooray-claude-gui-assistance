@@ -2,8 +2,11 @@ import { memo } from 'react'
 import { Play } from 'lucide-react'
 import type { DoorayTask } from '@shared/types/dooray'
 import type { AgentRunStatus, TaskSessionLink } from '@shared/types/workspace'
-import { getWorkflowName } from '../Dooray/taskStyles'
+import { getWorkflowName, tagStyle } from '../Dooray/taskStyles'
 import { runStatusDotClass } from './runStatus'
+
+/** 카드에 그대로 보여줄 태그 수 — 넘치면 `+N` 으로 접는다(좁은 패널에서 줄이 터진다). */
+const MAX_VISIBLE_TAGS = 3
 
 export interface TaskCardProps {
   task: DoorayTask
@@ -19,6 +22,15 @@ export interface TaskCardProps {
   /** 저장소 배지를 눌렀을 때 — 그 폴더의 세션을 이어서 연다 */
   onResumeSession?: (link: TaskSessionLink) => void
   onSelect?: (task: DoorayTask) => void
+  /** 지난번에 본 뒤로 댓글·상태가 바뀐 업무 — 점으로 알린다 */
+  changed?: boolean
+  /**
+   * 태그 칩을 눌렀을 때 — 그 태그로 목록을 좁힌다.
+   * 주면 태그를 그리고, 안 주면 그리지 않는다(태그 필터가 없는 화면에서 누를 데가 생기면 안 된다).
+   */
+  onToggleTag?: (tagName: string) => void
+  /** 지금 걸려 있는 태그 — 눌린 상태로 보인다 */
+  activeTags?: string[]
   /** 드래그 가능 카드로 만들 때 */
   draggableProps?: {
     draggable: true
@@ -57,10 +69,16 @@ const TaskCard = memo(function TaskCard({
   sessions,
   onResumeSession,
   onSelect,
+  changed = false,
+  onToggleTag,
+  activeTags,
   draggableProps,
   children
 }: TaskCardProps): JSX.Element {
   const ref = task.projectCode ? `${task.projectCode}/${task.number ?? ''}` : String(task.number ?? '')
+  const tags = onToggleTag ? (task.tags ?? []) : []
+  const visibleTags = tags.slice(0, MAX_VISIBLE_TAGS)
+  const hiddenTags = tags.slice(MAX_VISIBLE_TAGS)
   return (
     <div
       {...draggableProps}
@@ -71,8 +89,21 @@ const TaskCard = memo(function TaskCard({
         selected ? 'bg-bg-active' : 'hover:bg-bg-hover'
       }`}
     >
-      {ref && (
-        <div className="font-mono text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-tertiary mb-1">{ref}</div>
+      {(ref || changed) && (
+        <div className="flex items-center gap-1.5 mb-1">
+          {/* 점 하나로 "지난번 이후 뭔가 있었다" 만 알린다 — 무엇이 바뀌었는지는 열어야 안다. */}
+          {changed && (
+            <span
+              role="img"
+              aria-label="지난번에 본 뒤 변경됨"
+              title="지난번에 본 뒤 댓글이나 상태가 바뀌었습니다"
+              className="flex-none w-1.5 h-1.5 rounded-full bg-c-blue-solid"
+            />
+          )}
+          {ref && (
+            <span className="font-mono text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-tertiary">{ref}</span>
+          )}
+        </div>
       )}
       <div className="text-[calc(13px_*_var(--app-font-scale,1))] text-text-primary leading-snug line-clamp-2">
         {task.subject}
@@ -83,6 +114,42 @@ const TaskCard = memo(function TaskCard({
           <span className="inline-flex items-center gap-1.5 font-mono text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
             <span className={`w-1.5 h-1.5 rounded-full flex-none ${runStatusDotClass(runStatus)}`} />
             {branch}
+          </span>
+        )}
+        {/* 태그는 눌러서 바로 목록을 좁힌다 — 상세 검색 팝오버까지 가지 않아도 되는 지름길. */}
+        {visibleTags.map((tag) => {
+          const name = tag.name || tag.id
+          const active = activeTags?.includes(name) ?? false
+          return (
+            <button
+              key={tag.id}
+              type="button"
+              aria-pressed={active}
+              // 칩 글자는 태그 이름뿐이라 그것만으로는 "누르면 무슨 일이 나는지" 가 안 읽힌다.
+              aria-label={active ? `태그 ${name} 필터 빼기` : `태그 ${name} 로 좁히기`}
+              title={active ? `태그 ${name} 필터 빼기` : `태그 ${name} 로 좁히기`}
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleTag?.(name)
+              }}
+              // 색 없는 태그(두레이 기본 흰색)는 tagStyle 이 빈 값을 준다 — 무채색 기본을
+              // 깔아두지 않으면 브라우저 기본 테두리가 드러난다. 인라인 style 이 이겨서 색 있는
+              // 태그는 그대로 자기 색을 쓴다.
+              style={tagStyle(tag.color)}
+              className={`inline-flex items-center max-w-[120px] px-1.5 py-0.5 rounded-full border cursor-pointer text-[calc(11px_*_var(--app-font-scale,1))] bg-bg-surface border-bg-border text-text-secondary ${
+                active ? 'ring-1 ring-bg-border-strong' : ''
+              }`}
+            >
+              <span className="truncate">{name}</span>
+            </button>
+          )
+        })}
+        {hiddenTags.length > 0 && (
+          <span
+            title={hiddenTags.map((t) => t.name || t.id).join(', ')}
+            className="px-1.5 py-0.5 rounded-full bg-bg-surface border border-bg-border text-text-tertiary text-[calc(11px_*_var(--app-font-scale,1))]"
+          >
+            +{hiddenTags.length}
           </span>
         )}
         {!branch &&
