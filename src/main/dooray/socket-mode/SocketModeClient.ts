@@ -9,6 +9,7 @@ import {
   SESSION_LIMIT_CLOSE_CODE,
   SESSION_LIMIT_CLOSE_REASON,
   STANDBY_RETRY_INTERVAL_MS,
+  CLOSE_GRACE_MS,
   reconnectDelayMs,
   PING_INTERVAL_MS,
   WS_PATH,
@@ -50,7 +51,6 @@ export class SocketModeClient extends EventEmitter {
 
   private ws: WebSocket | null = null
   private pingTimer: NodeJS.Timeout | null = null
-  private standbyTimer: NodeJS.Timeout | null = null
   private state: ConnectionState = 'DISCONNECTED'
   private tokenInfo: SocketModeTokenInfo | null = null
 
@@ -58,7 +58,12 @@ export class SocketModeClient extends EventEmitter {
   private inStandbyLoop = false
   /** 연속 실패 횟수 — 붙는 순간 0 으로 돌아간다(백오프 리셋) */
   private reconnectAttempt = 0
-  private reconnectTimer: NodeJS.Timeout | null = null
+  /**
+   * 대기 중인 sleep 을 즉시 끝내는 함수들.
+   * 타이머를 clearTimeout 하는 것만으로는 그 Promise 가 영영 resolve 되지 않아 루프가 그 자리에
+   * 매달린 채 남는다 — disconnect() 가 루프를 빠져나가게 하려면 깨워야 한다.
+   */
+  private pendingWaits = new Set<() => void>()
   private lastCloseCode: number | null = null
   private lastCloseReason: string | null = null
 
@@ -88,20 +93,16 @@ export class SocketModeClient extends EventEmitter {
     await this.runOnce()
   }
 
-  /** 정상 종료. 재연결 루프도 멈춤. */
+  /** 정상 종료. 재연결 루프도 멈춤. 소켓이 실제로 닫힐 때까지(짧게) 기다린다. */
   async disconnect(): Promise<void> {
     this.shouldReconnect = false
     this.reconnectAttempt = 0
+    this.inStandbyLoop = false
     this.setState('DISCONNECTED')
     this.clearTimers()
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer)
-      this.reconnectTimer = null
-    }
-    if (this.ws) {
-      try { this.ws.close(1000, 'client_disconnect') } catch { /* ok */ }
-      this.ws = null
-    }
+    // 재연결/standby 대기 중이면 그 자리에서 깨워 루프를 끝낸다.
+    this.wakeAllWaits()
+    await this.closeSocket()
   }
 
   // ===== 내부: 연결/재연결 루프 =====
@@ -144,17 +145,56 @@ export class SocketModeClient extends EventEmitter {
       this.setState('CONNECTING')
       // 토큰은 만료됐을 수 있으므로 버리고 다시 받는다.
       this.tokenInfo = null
-      await this.waitBeforeReconnect(delay)
+      await this.wait(delay)
     }
   }
 
-  /** 재연결 대기 — disconnect() 가 오면 즉시 깨어나 루프를 빠져나간다. */
-  private waitBeforeReconnect(delay: number): Promise<void> {
+  /** disconnect() 가 오면 즉시 깨어나는 대기 — 타이머만 지우면 Promise 가 영영 안 끝난다. */
+  private wait(ms: number): Promise<void> {
     return new Promise<void>((resolve) => {
-      this.reconnectTimer = setTimeout(() => {
-        this.reconnectTimer = null
+      const done = (): void => {
+        clearTimeout(timer)
+        this.pendingWaits.delete(done)
         resolve()
-      }, delay)
+      }
+      const timer = setTimeout(done, ms)
+      this.pendingWaits.add(done)
+    })
+  }
+
+  private wakeAllWaits(): void {
+    for (const done of Array.from(this.pendingWaits)) done()
+  }
+
+  /**
+   * 소켓을 닫고 close 프레임이 서버에 닿을 시간을 준다.
+   *
+   * 닫자마자 새로 붙으면 서버가 아직 옛 세션을 들고 있어 '세션 중복' 으로 거절하고, 그러면
+   * STANDBY 로 빠져 15초를 더 기다린다 — 재연결 버튼이 눌러도 바로 안 붙던 원인.
+   */
+  private closeSocket(): Promise<void> {
+    const ws = this.ws
+    this.ws = null
+    if (!ws) return Promise.resolve()
+
+    return new Promise<void>((resolve) => {
+      let settled = false
+      const finish = (): void => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        this.pendingWaits.delete(finish)
+        resolve()
+      }
+      const timer = setTimeout(finish, CLOSE_GRACE_MS)
+      // disconnect 가 연달아 오면 여기서도 즉시 깨어난다.
+      this.pendingWaits.add(finish)
+      try {
+        ws.once?.('close', finish)
+        ws.close(1000, 'client_disconnect')
+      } catch {
+        finish()
+      }
     })
   }
 
@@ -406,12 +446,7 @@ export class SocketModeClient extends EventEmitter {
       )
     }
     this.inStandbyLoop = true
-    await new Promise<void>((resolve) => {
-      this.standbyTimer = setTimeout(() => {
-        this.standbyTimer = null
-        resolve()
-      }, STANDBY_RETRY_INTERVAL_MS)
-    })
+    await this.wait(STANDBY_RETRY_INTERVAL_MS)
   }
 
   private setState(next: ConnectionState): void {
@@ -428,7 +463,6 @@ export class SocketModeClient extends EventEmitter {
 
   private clearTimers(): void {
     this.clearPing()
-    if (this.standbyTimer) { clearTimeout(this.standbyTimer); this.standbyTimer = null }
   }
 }
 
