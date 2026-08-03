@@ -250,7 +250,7 @@ function WikiManager(): JSX.Element {
                 <div key={d.id} className="flex items-center group">
                   <button onClick={() => setSelectedDomain(d)}
                     className={`flex-1 flex items-center gap-2 px-3 py-1.5 text-left transition-colors ${
-                      isSelected ? 'bg-bg-active text-text-primary border-r-2 border-clauday-blue' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
+                      isSelected ? 'bg-bg-active text-text-primary border-r-2 border-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
                     }`}>
                     <FolderOpen size={11} className={`flex-shrink-0 ${isSelected ? 'text-text-primary' : 'text-text-tertiary'}`} />
                     <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-medium truncate min-w-0">{d.name}</span>
@@ -291,12 +291,12 @@ function WikiManager(): JSX.Element {
               <div className="relative">
                 <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary" />
                 <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="페이지 검색..."
-                  className="w-full pl-6 pr-2 py-1 bg-bg-primary border border-bg-border rounded text-[calc(10px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue" />
+                  className="w-full pl-6 pr-2 py-1 bg-bg-primary border border-bg-border rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary ds-focus" />
               </div>
             </div>
             <div className="flex-1 overflow-y-auto py-1">
-              {loadingPages ? <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">로딩...</div>
-                : filteredNodes.length === 0 ? <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">{searchQuery ? '검색 결과 없음' : '페이지 없음'}</div>
+              {loadingPages ? <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">로딩...</div>
+                : filteredNodes.length === 0 ? <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">{searchQuery ? '검색 결과 없음' : '페이지 없음'}</div>
                 : renderTree(filteredNodes, 0)}
             </div>
           </>
@@ -311,7 +311,7 @@ function WikiManager(): JSX.Element {
             <div className="px-4 py-3 border-b border-bg-border flex-shrink-0">
               <h3 className="text-sm font-semibold text-text-primary mb-2">{pageTitle(selectedPage)}</h3>
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mr-1">AI (Opus):</span>
+                <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mr-1">AI (Opus):</span>
                 {[
                   { key: 'proofread', label: '교정', desc: '맞춤법·문법 교정' },
                   { key: 'improve', label: '개선', desc: '가독성·구조 개선' },
@@ -319,7 +319,7 @@ function WikiManager(): JSX.Element {
                   { key: 'structure', label: '구조 분석', desc: '구조 개선 제안' }
                 ].map((a) => (
                   <button key={a.key} onClick={() => runAi(a.key)} disabled={aiLoading || !pageContent} title={a.desc}
-                    className={`flex items-center gap-1 px-2 py-1 rounded-md border text-[calc(10px_*_var(--app-font-scale,1))] transition-colors disabled:opacity-40 ${
+                    className={`flex items-center gap-1 px-2 py-1 rounded-md border text-[calc(11px_*_var(--app-font-scale,1))] transition-colors disabled:opacity-40 ${
                       aiAction === a.key && aiResult ? 'bg-bg-active border-bg-border-strong text-clauday-orange' : 'bg-bg-surface border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light'
                     }`}>
                     <Sparkles size={9} className="text-clauday-orange" /> {a.label}
@@ -357,24 +357,24 @@ function WikiManager(): JSX.Element {
                       {canPush && (
                         <>
                           <button onClick={() => { if (editMode) setEditMode(false); else { setEditContent(aiResult || ''); setEditMode(true) } }}
-                            className={`flex items-center gap-1 px-2 py-1 rounded text-[calc(10px_*_var(--app-font-scale,1))] ${editMode ? 'bg-bg-active text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}>
+                            className={`flex items-center gap-1 px-2 py-1 rounded text-[calc(11px_*_var(--app-font-scale,1))] ${editMode ? 'bg-bg-active text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}>
                             {editMode ? <><Eye size={9} /> 미리보기</> : <><Edit3 size={9} /> 편집</>}
                           </button>
                           <button onClick={pushToWiki} disabled={pushing}
-                            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-[calc(10px_*_var(--app-font-scale,1))] text-emerald-400 font-medium hover:bg-emerald-500/30 disabled:opacity-40">
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-[calc(11px_*_var(--app-font-scale,1))] text-emerald-400 font-medium hover:bg-emerald-500/30 disabled:opacity-40">
                             {pushing ? <Loader2 size={9} className="animate-spin" /> : <Upload size={9} />}
                             {pushing ? '반영 중...' : '위키에 반영'}
                           </button>
                         </>
                       )}
-                      <button onClick={copyResult} className="flex items-center gap-1 px-2 py-1 rounded text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary hover:text-text-primary">
+                      <button onClick={copyResult} className="flex items-center gap-1 px-2 py-1 rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:text-text-primary">
                         {copied ? <Check size={9} className="text-emerald-400" /> : <Copy size={9} />}
                         {copied ? '복사됨' : '복사'}
                       </button>
                     </div>
                   </div>
                   {pushResult && (
-                    <div className={`px-4 py-1.5 text-[calc(10px_*_var(--app-font-scale,1))] ${pushResult.includes('실패') ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                    <div className={`px-4 py-1.5 text-[calc(11px_*_var(--app-font-scale,1))] ${pushResult.includes('실패') ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
                       {pushResult}
                     </div>
                   )}
@@ -383,7 +383,7 @@ function WikiManager(): JSX.Element {
                       <AIProgressIndicator progress={aiProgress} showStreamPreview />
                     ) : editMode ? (
                       <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)}
-                        className="w-full min-h-[400px] bg-bg-primary border border-bg-border rounded-lg p-3 text-xs text-text-primary font-mono focus:outline-none focus:border-clauday-blue resize-y" />
+                        className="w-full min-h-[400px] bg-bg-primary border border-bg-border rounded-lg p-3 text-xs text-text-primary font-mono ds-focus resize-y" />
                     ) : (
                       <div className="markdown-body text-xs leading-relaxed">
                         <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>{aiResult || ''}</ReactMarkdown>

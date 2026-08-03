@@ -84,9 +84,9 @@ export function ViewExplainer({
       {/* 제목 행 */}
       <div className="flex items-center gap-2">
         {Icon ? (
-          <Icon size={16} className="text-[color:var(--clauday-blue)] flex-none" />
+          <Icon size={16} className="text-brand-claude flex-none" />
         ) : (
-          <Info size={16} className="text-[color:var(--clauday-blue)] flex-none" />
+          <Info size={16} className="text-brand-claude flex-none" />
         )}
         <span className="text-sm font-semibold text-[color:var(--text-primary)]">{title}</span>
         {hasExplainApi && (

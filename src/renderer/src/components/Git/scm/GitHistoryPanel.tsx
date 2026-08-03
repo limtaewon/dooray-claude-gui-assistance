@@ -195,7 +195,7 @@ function GitHistoryPanel({ repoPath, onOpenDiff }: GitHistoryPanelProps): JSX.El
       />
 
       <div className="px-3 pb-1.5 flex items-baseline gap-1.5 flex-none">
-        <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-text-tertiary">
+        <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-text-tertiary">
           커밋 {items.length}
           {meta?.hasMore ? '+' : ''}
         </span>
@@ -300,7 +300,7 @@ function CommitRow({ viewModel, repoPath, expanded, showGraph, onToggle, onOpenD
 
       {expanded && (
         <div className="pl-6 pr-2 pb-1.5">
-          <div className="flex items-center gap-2 py-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+          <div className="flex items-center gap-2 py-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
             <span className="font-mono">{commit.displayId}</span>
             {commit.author && <span className="truncate">{commit.author}</span>}
           </div>
@@ -366,7 +366,7 @@ function RefBadge({ refItem }: { refItem: GitHistoryItemRef }): JSX.Element {
   const color = refItem.color ? `var(--${refItem.color})` : 'var(--text-tertiary)'
   return (
     <span
-      className="px-1 h-[15px] inline-flex items-center rounded-[3px] border text-[calc(9px_*_var(--app-font-scale,1))] max-w-[90px] truncate"
+      className="px-1 h-[15px] inline-flex items-center rounded-[3px] border text-[calc(11px_*_var(--app-font-scale,1))] max-w-[90px] truncate"
       style={{ color, borderColor: color }}
       title={refItem.id}
     >

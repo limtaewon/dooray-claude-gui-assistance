@@ -130,7 +130,7 @@ function UsageInsights(): JSX.Element {
 
       {/* 요약 카드 */}
       <div className="grid grid-cols-4 gap-2">
-        <SummaryCard icon={Activity} label="총 이벤트" value={`${summary.totalEvents}`} color="text-clauday-blue" />
+        <SummaryCard icon={Activity} label="총 이벤트" value={`${summary.totalEvents}`} color="text-c-blue-fg" />
         <SummaryCard icon={Zap} label="AI 호출" value={Object.values(summary.aiUsage).reduce((s, v) => s + v.count, 0).toString()} color="text-clauday-orange" />
         <SummaryCard icon={ThumbsUp} label="만족도" value={feedbackTotal > 0 ? `${positiveRate}%` : '-'} color="text-emerald-400" />
         <SummaryCard icon={TrendingUp} label="스킬" value={`${summary.skills.totalCreated}`} color="text-violet-400" />
@@ -164,10 +164,10 @@ function UsageInsights(): JSX.Element {
               const pct = (item.count / max) * 100
               return (
                 <div key={item.feature} className={`flex items-center gap-3 px-4 py-2.5 ${i > 0 ? 'border-t border-bg-border' : ''}`}>
-                  <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary font-mono w-5">#{i + 1}</span>
+                  <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary font-mono w-5">#{i + 1}</span>
                   <span className="text-xs text-text-primary w-28 flex-shrink-0">{label(item.feature)}</span>
                   <div className="flex-1 h-2 bg-bg-primary rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-clauday-blue to-clauday-orange" style={{ width: `${pct}%` }} />
+                    <div className="h-full bg-[color:var(--chart-1)]" style={{ width: `${pct}%` }} />
                   </div>
                   <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary font-mono w-10 text-right">{item.count}</span>
                 </div>
@@ -188,7 +188,7 @@ function UsageInsights(): JSX.Element {
               .map(([view, sec]) => (
                 <div key={view} className="flex items-center justify-between px-3 py-2 bg-bg-surface border border-bg-border rounded-lg">
                   <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary">{label(`view.${view}`)}</span>
-                  <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary font-mono">{formatDwell(sec)}</span>
+                  <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary font-mono">{formatDwell(sec)}</span>
                 </div>
               ))}
           </div>
@@ -200,7 +200,7 @@ function UsageInsights(): JSX.Element {
         <section>
           <h4 className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-secondary mb-2">AI 기능별 성과</h4>
           <div className="bg-bg-surface border border-bg-border rounded-xl overflow-hidden">
-            <div className="grid grid-cols-[1fr_60px_80px_60px] gap-2 px-4 py-2 bg-bg-primary border-b border-bg-border text-[calc(9px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary uppercase">
+            <div className="grid grid-cols-[1fr_60px_80px_60px] gap-2 px-4 py-2 bg-bg-primary border-b border-bg-border text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary uppercase">
               <span>기능</span>
               <span className="text-right">호출</span>
               <span className="text-right">평균 시간</span>
@@ -242,16 +242,16 @@ function UsageInsights(): JSX.Element {
       {/* 데이터 관리 */}
       <section className="pt-3 border-t border-bg-border">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+          <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
             데이터는 <code className="text-text-secondary">~/Library/Application Support/Clauday/analytics/</code>에만 저장됩니다.
           </p>
           <div className="flex gap-1.5">
             <button onClick={handleExport}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-bg-surface border border-bg-border text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary hover:text-text-primary">
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-bg-surface border border-bg-border text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:text-text-primary">
               <Download size={10} /> 내보내기
             </button>
             <button onClick={handleClear}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500/10 text-red-400 text-[calc(10px_*_var(--app-font-scale,1))] hover:bg-red-500/20">
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500/10 text-red-400 text-[calc(11px_*_var(--app-font-scale,1))] hover:bg-red-500/20">
               <Trash2 size={10} /> 초기화
             </button>
           </div>
@@ -266,7 +266,7 @@ function SummaryCard({ icon: Icon, label, value, color }: {
 }): JSX.Element {
   return (
     <div className="p-3 bg-bg-surface border border-bg-border rounded-xl">
-      <div className="flex items-center gap-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mb-1">
+      <div className="flex items-center gap-1.5 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mb-1">
         <Icon size={11} className={color} /> {label}
       </div>
       <div className={`text-lg font-semibold ${color}`}>{value}</div>

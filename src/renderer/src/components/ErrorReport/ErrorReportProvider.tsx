@@ -135,7 +135,7 @@ function ErrorReportProvider({ children }: { children: ReactNode }): JSX.Element
               Claude CLI 호출 진단 + 시스템 정보를 묶어서 보냅니다. 민감정보가 있으면 직접 지우고 보내주세요.
               <br />
               <span className="text-text-tertiary">
-                로그 파일: <code className="text-[calc(10px_*_var(--app-font-scale,1))]">{logPath}</code>
+                로그 파일: <code className="text-[calc(11px_*_var(--app-font-scale,1))]">{logPath}</code>
               </span>
             </div>
 
@@ -178,7 +178,7 @@ function ErrorReportProvider({ children }: { children: ReactNode }): JSX.Element
               />
             </label>
 
-            <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary flex items-center gap-1">
+            <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary flex items-center gap-1">
               <ExternalLink size={10} />
               "커뮤니티에 게시" 누르면 Clauday 두레이 커뮤니티 채널에 본인 계정으로 글이 등록됩니다.
             </div>

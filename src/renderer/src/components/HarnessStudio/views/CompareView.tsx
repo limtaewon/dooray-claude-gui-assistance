@@ -457,7 +457,7 @@ function SelectTargetView({
   return (
     <div className="flex flex-col gap-4 p-4">
       <div className="flex items-center gap-2">
-        <GitCompare size={14} className="text-[color:var(--clauday-blue)]" />
+        <GitCompare size={14} className="text-brand-claude" />
         <p className="text-sm font-semibold text-[color:var(--text-primary)]">비교할 하네스 선택</p>
       </div>
       <p className="text-xs text-[color:var(--text-secondary)]">
@@ -598,7 +598,7 @@ export function CompareView({ model, cachedList }: CompareViewProps): JSX.Elemen
           <p className="text-xs font-semibold text-[color:var(--text-secondary)] mb-1">한 줄 요약</p>
           {summaryLines.map((line, i) => (
             <div key={i} className="flex items-start gap-2 text-sm text-[color:var(--text-primary)]">
-              <span className="flex-none mt-1 w-1.5 h-1.5 rounded-full bg-[color:var(--clauday-blue)]" />
+              <span className="flex-none mt-1 w-1.5 h-1.5 rounded-full bg-text-tertiary" />
               <span>{line.text}</span>
             </div>
           ))}
@@ -608,7 +608,7 @@ export function CompareView({ model, cachedList }: CompareViewProps): JSX.Elemen
       {/* 헤더 — 비교 대상 표시 */}
       <section>
         <div className="flex items-center gap-2 p-3 rounded-lg border border-[color:var(--bg-border)] bg-[color:var(--bg-surface)] flex-wrap">
-          <GitCompare size={14} className="text-[color:var(--clauday-blue)] flex-none" />
+          <GitCompare size={14} className="text-brand-claude flex-none" />
           <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap">
             <span className="text-sm font-semibold text-[color:var(--text-primary)] truncate">{diff.leftName}</span>
             <ArrowRight size={12} className="text-[color:var(--text-tertiary)] flex-none" />

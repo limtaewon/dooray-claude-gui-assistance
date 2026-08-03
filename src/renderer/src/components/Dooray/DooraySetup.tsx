@@ -85,7 +85,7 @@ function DooraySetup({ onConfigured }: DooraySetupProps): JSX.Element {
       <div className="w-[420px] bg-bg-surface border border-bg-border rounded-xl p-8">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-lg bg-bg-active flex items-center justify-center">
-            <KeyRound size={20} className="text-clauday-blue" />
+            <KeyRound size={20} className="text-brand-dooray" />
           </div>
           <div>
             <h2 className="text-base font-semibold text-text-primary">두레이 연결 설정</h2>
@@ -104,7 +104,7 @@ function DooraySetup({ onConfigured }: DooraySetupProps): JSX.Element {
             </ol>
             <button
               onClick={openTokenPage}
-              className="flex items-center gap-1.5 text-[calc(11px_*_var(--app-font-scale,1))] text-clauday-blue hover:text-text-primary transition-colors"
+              className="flex items-center gap-1.5 text-[calc(11px_*_var(--app-font-scale,1))] text-brand-dooray hover:text-text-primary transition-colors"
             >
               <ExternalLink size={11} />
               두레이 토큰 설정 페이지 열기
@@ -118,7 +118,7 @@ function DooraySetup({ onConfigured }: DooraySetupProps): JSX.Element {
               value={token}
               onChange={(e) => { setToken(e.target.value); setError(null) }}
               placeholder="두레이 개인 API 토큰 입력"
-              className="w-full px-3 py-2.5 bg-bg-primary border border-bg-border rounded-lg text-sm text-text-primary placeholder-text-secondary focus:outline-none focus:border-clauday-blue"
+              className="w-full px-3 py-2.5 bg-bg-primary border border-bg-border rounded-lg text-sm text-text-primary placeholder-text-secondary ds-focus"
               onKeyDown={(e) => e.key === 'Enter' && handleSave()}
             />
           </div>
@@ -137,14 +137,14 @@ function DooraySetup({ onConfigured }: DooraySetupProps): JSX.Element {
             </div>
           )}
 
-          <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary leading-relaxed">
+          <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary leading-relaxed">
             토큰은 macOS 키체인에 안전하게 저장됩니다.
           </p>
 
           <button
             onClick={handleSave}
             disabled={!token.trim() || loading}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-clauday-blue text-white text-sm font-medium hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="ds-btn primary w-full"
           >
             {loading ? (
               '연결 중...'

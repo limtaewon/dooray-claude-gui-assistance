@@ -177,7 +177,7 @@ export default function ClaudeCodeSessionsView({ active = true }: { active?: boo
               </button>
             )}
           </div>
-          <div className="px-3 mt-2 mb-1.5 flex items-center gap-1.5 text-[calc(10px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-text-tertiary">
+          <div className="px-3 mt-2 mb-1.5 flex items-center gap-1.5 text-[calc(11px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-text-tertiary">
             <History size={10} />
             이전 세션 {sessions.length > 0 && (q ? `(${filteredSessions.length}/${sessions.length})` : `(${sessions.length})`)}
             <div className="flex-1" />
@@ -198,7 +198,7 @@ export default function ClaudeCodeSessionsView({ active = true }: { active?: boo
               <>
                 {starredSessions.length > 0 && (
                   <>
-                    <div className="px-3 pt-1 pb-1 flex items-center gap-1.5 text-[calc(10px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-clauday-orange">
+                    <div className="px-3 pt-1 pb-1 flex items-center gap-1.5 text-[calc(11px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-clauday-orange">
                       <Star size={10} className="fill-current" />
                       즐겨찾기 ({starredSessions.length})
                     </div>
@@ -223,7 +223,7 @@ export default function ClaudeCodeSessionsView({ active = true }: { active?: boo
                 {unstarredSessions.length > 0 && (
                   <>
                     {starredSessions.length > 0 && (
-                      <div className="px-3 pt-1 pb-1 flex items-center gap-1.5 text-[calc(10px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-text-tertiary">
+                      <div className="px-3 pt-1 pb-1 flex items-center gap-1.5 text-[calc(11px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-text-tertiary">
                         <History size={10} />
                         전체 ({unstarredSessions.length})
                       </div>
@@ -357,7 +357,7 @@ function SessionRow({
           <Edit3 size={12} />
         </button>
       </div>
-      <div className="flex items-center gap-2 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5 pl-6">
+      <div className="flex items-center gap-2 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5 pl-6">
         <span>{formatRelative(session.lastActivityAt)}</span>
         <span>·</span>
         <span>{session.messageCount}개</span>

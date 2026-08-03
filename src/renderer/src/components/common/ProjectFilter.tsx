@@ -183,7 +183,7 @@ function ProjectFilter({
         <Settings size={13} />
         {readOnly ? '표시 중인 프로젝트' : '프로젝트 선택'}
         {pinnedCount > 0 && (
-          <span className="ml-0.5 px-1.5 rounded-full bg-brand-dooray text-white text-[calc(9px_*_var(--app-font-scale,1))] font-semibold">
+          <span className="ml-0.5 px-1.5 rounded-full bg-brand-dooray text-white text-[calc(11px_*_var(--app-font-scale,1))] font-semibold">
             {pinnedCount}
           </span>
         )}
@@ -205,7 +205,7 @@ function ProjectFilter({
               <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">
                 {readOnly ? '표시 중인 프로젝트' : '표시할 프로젝트 선택'}
               </span>
-              <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary ml-2">{pinnedCount > 0 ? `${pinnedCount}개 선택` : '전체 표시'}</span>
+              <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary ml-2">{pinnedCount > 0 ? `${pinnedCount}개 선택` : '전체 표시'}</span>
             </div>
             {/* 검색 — 조회 전용일 때는 목록이 짧아 필요 없다 */}
             {!readOnly && (
@@ -231,9 +231,9 @@ function ProjectFilter({
             {/* 프로젝트 목록 */}
             <div className="flex-1 min-h-0 overflow-y-auto py-1">
               {loading ? (
-                <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">로딩...</div>
+                <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">로딩...</div>
               ) : filtered.length === 0 ? (
-                <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">
+                <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">
                   {readOnly ? '아직 고른 프로젝트가 없습니다' : '검색 결과 없음'}
                 </div>
               ) : filtered.map((p) => {
@@ -293,12 +293,12 @@ function ProjectFilter({
                       {adding ? '...' : '추가'}
                     </button>
                   </div>
-                  {addError && <div className="text-[calc(9px_*_var(--app-font-scale,1))] text-red-400 px-1">{addError}</div>}
-                  <div className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary px-1">예: 3787724725029315943 또는 Dooray URL</div>
+                  {addError && <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-red-400 px-1">{addError}</div>}
+                  <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary px-1">예: 3787724725029315943 또는 Dooray URL</div>
                 </div>
               ) : (
                 <button onClick={() => setShowAddForm(true)}
-                  className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-secondary hover:bg-bg-surface-hover transition-colors">
+                  className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-secondary hover:bg-bg-surface-hover transition-colors">
                   <Plus size={10} />
                   프로젝트 수동 추가 (ID/URL)
                 </button>

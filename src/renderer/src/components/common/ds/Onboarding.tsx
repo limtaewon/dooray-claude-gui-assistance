@@ -107,7 +107,7 @@ function OnboardingView({
                   {StepIcon ? (
                     <StepIcon size={9} className="text-text-tertiary" />
                   ) : (
-                    <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary tabular-nums">{index + 1}</span>
+                    <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary tabular-nums">{index + 1}</span>
                   )}
                 </span>
                 <div className="flex-1 min-w-0">

@@ -68,7 +68,7 @@ function TerminalSearchBar({
         style={{ width: 150 }}
       />
       <span
-        className={`text-[calc(10px_*_var(--app-font-scale,1))] font-mono min-w-[36px] text-center ${hasError ? 'text-red-400' : 'text-text-tertiary'}`}
+        className={`text-[calc(11px_*_var(--app-font-scale,1))] font-mono min-w-[36px] text-center ${hasError ? 'text-red-400' : 'text-text-tertiary'}`}
         aria-live="polite"
         title={hasError ? '정규식이 올바르지 않습니다' : undefined}
       >
@@ -120,7 +120,7 @@ function ToggleButton({
       onClick={onClick}
       title={title}
       aria-pressed={active}
-      className={`px-1.5 py-0.5 rounded text-[calc(10px_*_var(--app-font-scale,1))] font-mono font-bold border ${
+      className={`px-1.5 py-0.5 rounded text-[calc(11px_*_var(--app-font-scale,1))] font-mono font-bold border ${
         active
           ? 'text-text-primary bg-bg-active border-bg-border-strong'
           : 'text-text-tertiary border-transparent hover:bg-bg-surface-hover hover:text-text-secondary'

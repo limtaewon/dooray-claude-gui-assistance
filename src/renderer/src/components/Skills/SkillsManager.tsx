@@ -8,7 +8,7 @@ import SkillEditor from './SkillEditor'
 import SkillCreateModal from './SkillCreateModal'
 import type { Skill } from '../../../../shared/types/skills'
 import { sanitizeSkillFilename } from '@shared/utils/filename'
-import { Button, Modal, SegTabs, useToast } from '../common/ds'
+import { Button, Modal, SegTabs, TimeAgo, useToast } from '../common/ds'
 
 import { DEFAULT_WIKIS } from '../../../../shared/wiki-storage-defaults'
 import WikiStoragePicker from '../common/WikiStoragePicker'
@@ -36,14 +36,14 @@ function SkillsManager(): JSX.Element {
   const [creating, setCreating] = useState(false)
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<FilterTab>('mine')
-  // 공유 탭 — "내 스킬 공유하기" picker 모달 (로컬 스킬을 골라 위키에 업로드)
+  // 공유 탭 — "공유에 올리기" picker 모달 (로컬 스킬을 골라 위키에 업로드)
   const [sharePickerOpen, setSharePickerOpen] = useState(false)
   // picker 다중 선택 — filename Set
   const [pickerSelected, setPickerSelected] = useState<Set<string>>(new Set())
   // picker 내부 검색어
   const [pickerSearch, setPickerSearch] = useState('')
 
-  // 다중 선택 (내 스킬 탭 한정)
+  // 다중 선택 (로컬 탭 한정)
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
@@ -314,7 +314,7 @@ function SkillsManager(): JSX.Element {
     )
   }, [wikiItems, search])
 
-  // "내 스킬 공유하기" picker 내부 검색 — 이름/파일명 기준 필터
+  // "공유에 올리기" picker 내부 검색 — 이름/파일명 기준 필터
   const pickerVisibleSkills = useMemo(() => {
     const q = pickerSearch.trim().toLowerCase()
     if (!q) return skills
@@ -450,12 +450,12 @@ function SkillsManager(): JSX.Element {
       {uploadProgress && (
         <div className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-2xl border border-bg-border-light"
           style={{ background: 'var(--bg-surface-raised)' }}>
-          <Loader2 size={14} className="animate-spin text-clauday-blue" />
+          <Loader2 size={14} className="animate-spin text-text-secondary" />
           <div className="flex flex-col">
             <span className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary font-medium">
               {uploadProgress.wikiName} 에 업로드 중 ({uploadProgress.current}/{uploadProgress.total})
             </span>
-            <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary truncate max-w-[260px]">{uploadProgress.currentName}</span>
+            <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary truncate max-w-[260px]">{uploadProgress.currentName}</span>
           </div>
         </div>
       )}
@@ -472,7 +472,7 @@ function SkillsManager(): JSX.Element {
             value={tab}
             onChange={(t) => { setTab(t); exitSelectMode() }}
             items={[
-              { key: 'mine', label: '내 스킬' },
+              { key: 'mine', label: '로컬' },
               { key: 'wiki', label: '공유' }
             ]}
           />
@@ -520,7 +520,7 @@ function SkillsManager(): JSX.Element {
                 {selectMode ? '선택 종료' : '선택'}
               </Button>
               <Button data-tour="skills-share" variant="primary" onClick={() => { setPickerSelected(new Set()); setPickerSearch(''); setSharePickerOpen(true) }} leftIcon={<Upload size={13} />}>
-                내 스킬 공유하기
+                공유에 올리기
               </Button>
             </>
           )}
@@ -562,7 +562,7 @@ function SkillsManager(): JSX.Element {
             )}
             {tab === 'wiki' && (
               <>
-                <Button variant="success" onClick={handleBulkDownloadFromWiki} disabled={selected.size === 0} leftIcon={<Download size={13} />}>
+                <Button variant="primary" onClick={handleBulkDownloadFromWiki} disabled={selected.size === 0} leftIcon={<Download size={13} />}>
                   내려받기
                 </Button>
                 <Button variant="danger" onClick={handleBulkDeleteFromWiki} disabled={selected.size === 0} leftIcon={<Trash2 size={13} />}>
@@ -635,7 +635,7 @@ function SkillsManager(): JSX.Element {
             <div className="py-16 text-center">
               <Upload size={32} className="mx-auto text-text-tertiary mb-3" />
               <p className="text-sm font-medium text-text-primary mb-1">아직 공유된 스킬이 없습니다</p>
-              <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">'내 스킬 공유하기' 버튼으로 위키에 스킬을 업로드해보세요</p>
+              <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">'공유에 올리기' 버튼으로 위키에 스킬을 업로드해보세요</p>
             </div>
           ) : filteredWikiItems.length === 0 ? (
             <div className="py-12 text-center text-[calc(12px_*_var(--app-font-scale,1))] text-text-tertiary">
@@ -682,8 +682,8 @@ function SkillsManager(): JSX.Element {
                             {description}
                           </div>
                         ) : null}
-                        <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-1">
-                          {item.updatedAt ? new Date(item.updatedAt).toLocaleString('ko-KR') : '날짜 없음'}
+                        <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mt-1">
+                          {item.updatedAt ? <TimeAgo date={item.updatedAt} /> : '날짜 없음'}
                         </div>
                       </div>
                     </div>
@@ -691,7 +691,7 @@ function SkillsManager(): JSX.Element {
                       <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-bg-border">
                         <div className="flex-1" />
                         <button onClick={(e) => { e.stopPropagation(); handleDownloadFromWiki(item) }}
-                          className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:text-clauday-blue">
+                          className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:text-brand-claude">
                           <Download size={11} /> 내려받기
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); handleDeleteFromWiki(item) }}
@@ -712,13 +712,13 @@ function SkillsManager(): JSX.Element {
         <SkillCreateModal onClose={() => setCreating(false)} onCreated={handleCreated} />
       )}
 
-      {/* 공유 탭 — "내 스킬 공유하기" picker. 로컬 스킬을 (여러 개) 골라 위키에 업로드. */}
+      {/* 공유 탭 — "공유에 올리기" picker. 로컬 스킬을 (여러 개) 골라 위키에 업로드. */}
       <Modal
         open={sharePickerOpen}
         onClose={() => setSharePickerOpen(false)}
         width="min(560px, 92vw)"
-        icon={<Upload size={14} className="text-clauday-blue" />}
-        title="내 스킬 공유하기"
+        icon={<Upload size={14} className="text-brand-claude" />}
+        title="공유에 올리기"
         footer={skills.length > 0 ? (
           <div className="flex items-center justify-between w-full gap-2">
             <button
@@ -755,10 +755,10 @@ function SkillsManager(): JSX.Element {
       >
         <div className="p-4">
           <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mb-3">
-            위키에 공유할 내 스킬을 선택하세요. 여러 개를 한 번에 올릴 수 있습니다.
+            위키에 공유할 스킬을 선택하세요. 여러 개를 한 번에 올릴 수 있습니다.
           </p>
           {skills.length === 0 ? (
-            <div className="py-8 text-center text-xs text-text-secondary">공유할 내 스킬이 없습니다.</div>
+            <div className="py-8 text-center text-xs text-text-secondary">공유할 스킬이 없습니다.</div>
           ) : (
             <>
               {/* picker 내부 검색 */}
@@ -769,7 +769,7 @@ function SkillsManager(): JSX.Element {
                   value={pickerSearch}
                   onChange={(e) => setPickerSearch(e.target.value)}
                   placeholder="스킬 이름 검색..."
-                  className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-bg-surface border border-bg-border text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
+                  className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-bg-surface border border-bg-border text-sm text-text-primary placeholder-text-tertiary ds-focus"
                 />
                 {pickerSearch && (
                   <button onClick={() => setPickerSearch('')}
@@ -810,7 +810,7 @@ function SkillsManager(): JSX.Element {
         </div>
       </Modal>
 
-      {/* Editor modal (내 스킬 편집) */}
+      {/* Editor modal (로컬 스킬 편집) */}
       <Modal
         open={!!activeSkill}
         onClose={closeEditor}

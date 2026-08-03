@@ -93,7 +93,7 @@ function GateNode({ data, selected }: NodeProps): JSX.Element {
       {/* 설명 */}
       {description && (
         <p
-          className="text-[calc(10px_*_var(--app-font-scale,1))] mt-0.5 leading-snug line-clamp-2"
+          className="text-[calc(11px_*_var(--app-font-scale,1))] mt-0.5 leading-snug line-clamp-2"
           style={{ color: fgVar, opacity: 0.75 }}
           title={description}
         >

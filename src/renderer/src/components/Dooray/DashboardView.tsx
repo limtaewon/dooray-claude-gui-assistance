@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  LayoutDashboard, Plus, Loader2, RotateCcw, Target, ArrowRight, FileText,
+  LayoutDashboard, Plus, Loader2, RotateCcw, Target, ExternalLink, FileText,
   Wand2, ChevronRight, ChevronDown, Send, Timer, Image as ImageIcon, X
 } from 'lucide-react'
 import type { DoorayTask, DoorayProject } from '../../../../shared/types/dooray'
@@ -11,39 +11,52 @@ import {
   EmptyView, LoadingView, useToast, type ChipTone
 } from '../common/ds'
 import { useErrorReport } from '../ErrorReport/ErrorReportProvider'
+import { computeDashboardStats, selectFocusTasks } from './dashboardStats'
+import TaskDetailPanel from './TaskDetailPanel'
 
 const CREATE_EXPANDED_KEY = 'dashboard.createExpanded'
 
-/* Stat card 톤 매핑 — DS stat card 디자인 (색상 숫자 + 좌측 color dot) */
-type StatTone = 'neutral' | 'blue' | 'orange' | 'red' | 'emerald'
-const STAT_DOT: Record<Exclude<StatTone, 'neutral'>, string> = {
-  blue:    '#60A5FA',
-  orange:  '#FB923C',
-  red:     '#F87171',
-  emerald: '#22C55E'
+/* Stat card 톤 → 좌측 레일 색.
+   값 자체는 --text-primary 무채색으로 둔다. 숫자에 헥스를 직접 칠하면 라이트 테마에서
+   2.3~2.9:1 까지 떨어져 화면에서 가장 큰 글자가 가장 안 읽히게 된다. */
+type StatTone = 'neutral' | 'blue' | 'orange' | 'red'
+const STAT_RAIL: Record<StatTone, string> = {
+  neutral: 'var(--bg-border-strong)',
+  blue:    'var(--wf-working-dot)',
+  orange:  'var(--wf-registered-dot)',
+  red:     'var(--wf-overdue-dot)'
 }
-const STAT_VALUE_COLOR: Record<StatTone, string> = {
-  neutral: 'var(--text-primary)',
-  blue:    '#60A5FA',
-  orange:  '#FB923C',
-  red:     '#F87171',
-  emerald: '#22C55E'
+type StatHintTone = 'muted' | 'good' | 'warn'
+const STAT_HINT_CLS: Record<StatHintTone, string> = {
+  muted: 'text-text-secondary',
+  good:  'text-c-emerald-fg',
+  warn:  'text-c-orange-fg'
 }
 
-function StatCard({ label, value, tone = 'neutral', loading }: {
-  label: string; value: number; tone?: StatTone; loading?: boolean
+/** 대시보드 지표 카드. hint 는 숫자만으로 못 가르는 「0 이 좋은 신호인지」를 말해준다. */
+function StatCard({ label, value, tone = 'neutral', hint, hintTone = 'muted', loading }: {
+  label: string
+  value: number
+  tone?: StatTone
+  hint?: string
+  hintTone?: StatHintTone
+  loading?: boolean
 }): JSX.Element {
   return (
-    <Card className="flex flex-col gap-1">
-      <div className="flex items-center gap-1.5 text-[calc(9px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-text-secondary">
-        {tone !== 'neutral' && (
-          <span className="w-[10px] h-[10px] rounded-[2px] flex-none" style={{ background: STAT_DOT[tone] }} />
-        )}
+    <Card className="flex flex-col gap-2 border-l-[3px]" style={{ borderLeftColor: STAT_RAIL[tone] }}>
+      <div className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold tracking-wide text-text-secondary">
         {label}
       </div>
-      <div className="text-[calc(20px_*_var(--app-font-scale,1))] font-bold leading-none" style={{ color: STAT_VALUE_COLOR[tone] }}>
-        {loading ? <span className="text-sm text-text-tertiary">...</span> : value}
-      </div>
+      {loading ? (
+        <div className="h-6 w-14 rounded bg-bg-surface-hover animate-pulse" aria-label="불러오는 중" />
+      ) : (
+        <div className="flex items-baseline gap-2.5">
+          <span className="font-mono text-[calc(24px_*_var(--app-font-scale,1))] font-bold leading-none text-text-primary">
+            {value}
+          </span>
+          {hint && <span className={`text-[calc(11px_*_var(--app-font-scale,1))] ${STAT_HINT_CLS[hintTone]}`}>{hint}</span>}
+        </div>
+      )}
     </Card>
   )
 }
@@ -61,6 +74,7 @@ function DashboardView(): JSX.Element {
   const [tasks, setTasks] = useState<DoorayTask[]>([])
   const [projects, setProjects] = useState<DoorayProject[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedTask, setSelectedTask] = useState<DoorayTask | null>(null)
   const toast = useToast()
   const errorReport = useErrorReport()
 
@@ -154,31 +168,16 @@ function DashboardView(): JSX.Element {
     return () => { cancelled = true }
   }, [nlProject])
 
-  // 통계
-  const stats = useMemo(() => {
-    const byClass: Record<'backlog' | 'registered' | 'working' | 'closed', number> =
-      { backlog: 0, registered: 0, working: 0, closed: 0 }
-    for (const t of tasks) {
-      const cls = (t.workflowClass || 'registered') as keyof typeof byClass
-      if (cls in byClass) byClass[cls]++
-    }
-    const todayKey = new Date().toISOString().substring(0, 10)
-    const dueToday = tasks.filter((t) => t.dueDateAt?.substring(0, 10) === todayKey).length
-    return { ...byClass, total: tasks.length, dueToday }
-  }, [tasks])
+  // 통계 / 오늘 집중 태스크 — 계산은 순수 함수(dashboardStats)에 두고 여기서는 메모만 한다
+  const stats = useMemo(() => computeDashboardStats(tasks), [tasks])
+  const focus = useMemo(() => selectFocusTasks(tasks), [tasks])
 
-  // 오늘 집중 태스크
-  const focus = useMemo(() => {
-    const todayKey = new Date().toISOString().substring(0, 10)
-    const working = tasks.filter((t) => t.workflowClass === 'working')
-    const dueToday = tasks.filter((t) => t.dueDateAt?.substring(0, 10) === todayKey)
-    const seen = new Set<string>()
-    const merged: DoorayTask[] = []
-    for (const t of [...dueToday, ...working]) {
-      if (!seen.has(t.id)) { seen.add(t.id); merged.push(t) }
-    }
-    return merged.slice(0, 10)
-  }, [tasks])
+  /** 두레이 템플릿이 없는 프로젝트에서도 쓸 수 있는 최소 마크다운 골격 */
+  const insertBodySkeleton = (): void => {
+    setTemplateMenuOpen(false)
+    if (body.trim() && !window.confirm('편집 중인 본문이 있습니다. 기본 골격으로 덮어쓸까요?')) return
+    setBody('## 요약\n\n## 배경\n\n## 할 일\n- [ ] \n')
+  }
 
   // 템플릿 적용
   const applyTemplate = async (templateId: string, templateName: string): Promise<void> => {
@@ -340,7 +339,8 @@ JSON 형태로만 응답:
   const allProjectCodes = useMemo(() => projects.map((p) => p.code).join(' · '), [projects])
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full flex">
+      <div className="flex-1 min-w-0 overflow-y-auto">
       <div className="px-5 py-4 space-y-3">
         {/* Page head — 좁은 폭에서 chip 가 줄바꿈 될 수 있게 */}
         <div className="flex items-center gap-2 flex-wrap">
@@ -390,14 +390,46 @@ JSON 형태로만 응답:
           </Button>
         </div>
 
-        {/* Stat row — 좁은 폭에서 stack, 넓어지면 5열로 펼침 */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-          <StatCard label="전체 태스크" value={stats.total} loading={loading} />
-          <StatCard label="진행 중" value={stats.working} tone="blue" loading={loading} />
-          <StatCard label="등록됨" value={stats.registered} tone="orange" loading={loading} />
-          <StatCard label="오늘 마감" value={stats.dueToday} tone="red" loading={loading} />
-          <StatCard label="완료" value={stats.closed} tone="emerald" loading={loading} />
+        {/* Stat row — 조치가 필요한 3개만 카드로 남긴다.
+            전체·완료는 읽고 끝나는 숫자라 아래 진행률 한 줄로 강등했다. */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <StatCard
+            label="오늘 마감"
+            value={stats.dueToday}
+            tone="red"
+            loading={loading}
+            hint={stats.dueToday === 0 ? '마감 임박 없음 ✓' : '오늘 안에 처리'}
+            hintTone={stats.dueToday === 0 ? 'good' : 'muted'}
+          />
+          <StatCard
+            label="진행 중"
+            value={stats.working}
+            tone="blue"
+            loading={loading}
+            hint={stats.working === 0 ? '착수한 작업 없음' : undefined}
+          />
+          <StatCard
+            label="등록됨 · 착수 대기"
+            value={stats.registered}
+            tone="orange"
+            loading={loading}
+            hint={stats.longestWaitingDays > 0 ? `최장 ${stats.longestWaitingDays}일 대기` : undefined}
+            hintTone={stats.longestWaitingDays >= 30 ? 'warn' : 'muted'}
+          />
         </div>
+
+        {/* 전체 진척 — 카드에서 내려온 두 숫자 */}
+        {!loading && stats.total > 0 && (
+          <div className="flex items-center gap-2.5 px-0.5 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary">
+            <span>전체 <span className="font-mono text-text-primary">{stats.total}</span></span>
+            <span className="text-text-tertiary">·</span>
+            <span>완료 <span className="font-mono text-text-primary">{stats.closed}</span></span>
+            <div className="flex-1 max-w-[200px] h-1 rounded-full bg-bg-active overflow-hidden">
+              <div className="h-full bg-c-emerald-solid" style={{ width: `${stats.donePercent}%` }} />
+            </div>
+            <span className="text-text-tertiary">{stats.donePercent}%</span>
+          </div>
+        )}
 
         {/* Quick create (collapsible) */}
         <Card className="!p-0 overflow-visible">
@@ -407,9 +439,9 @@ JSON 형태로만 응답:
             {createExpanded
               ? <ChevronDown size={12} className="text-text-secondary" />
               : <ChevronRight size={12} className="text-text-secondary" />}
-            <Plus size={12} className="text-clauday-blue" />
+            <Plus size={12} className="text-brand-dooray" />
             <span className="text-[calc(12px_*_var(--app-font-scale,1))] font-semibold text-text-primary">빠른 태스크 생성</span>
-            <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">· 템플릿 · AI · 직접 입력 모두 가능</span>
+            <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">· 템플릿 · AI · 직접 입력 모두 가능</span>
             <div className="flex-1" />
             <Kbd>⌘N</Kbd>
           </div>
@@ -438,7 +470,7 @@ JSON 형태로만 응답:
                 <div className="flex items-center gap-2">
                   <Wand2 size={12} className="text-clauday-orange" />
                   <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">AI 자동작성</span>
-                  <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">자연어 + 이미지로 제목·본문·태그까지 한 번에</span>
+                  <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">자연어 + 이미지로 제목·본문·태그까지 한 번에</span>
                   <div className="flex-1" />
                   <AIToolsPopover feature="task" size="sm" />
                   <SkillQuickToggle target="task" />
@@ -455,9 +487,14 @@ JSON 형태로만 응답:
                       <>
                         <div className="fixed inset-0 z-30" onClick={() => setTemplateMenuOpen(false)} />
                         <div className="ds-menu" style={{ top: 'calc(100% + 4px)', right: 0, minWidth: 220 }}>
+                          <div className="ds-menu-item" onClick={insertBodySkeleton}>
+                            <FileText size={11} />
+                            <span className="truncate">기본 골격</span>
+                          </div>
+                          <div className="ds-menu-sep" />
                           {templates.length === 0 ? (
-                            <div className="px-3 py-2 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
-                              저장된 템플릿이 없습니다
+                            <div className="px-3 py-2 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
+                              이 프로젝트에 저장된 두레이 템플릿이 없습니다
                             </div>
                           ) : (
                             templates.map((t) => (
@@ -496,7 +533,7 @@ JSON 형태로만 응답:
                   <div className="flex flex-wrap gap-1.5">
                     {aiImages.map((p, i) => (
                       <div key={`${p}-${i}`}
-                        className="flex items-center gap-1 px-2 py-1 rounded bg-bg-surface border border-bg-border text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">
+                        className="flex items-center gap-1 px-2 py-1 rounded bg-bg-surface border border-bg-border text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary">
                         <ImageIcon size={10} className="text-clauday-orange" />
                         <span className="font-mono truncate max-w-[180px]" title={p}>{p.split(/[/\\]/).pop()}</span>
                         <button
@@ -512,7 +549,7 @@ JSON 형태로만 응답:
                 )}
 
                 <div className="flex items-center gap-2">
-                  <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary flex-1">
+                  <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary flex-1">
                     {aiImages.length > 0 ? `🖼 이미지 ${aiImages.length}장 첨부됨 — Vision 으로 함께 분석` : '⌘+Enter 로 실행 · 이미지는 paste/drop'}
                   </span>
                   <Button variant="ai" onClick={composeWithAI}
@@ -538,9 +575,9 @@ JSON 형태로만 응답:
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
                   <FieldLabel className="!mb-0">본문</FieldLabel>
-                  <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">· 마크다운</span>
+                  <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">· 마크다운</span>
                   {activeTemplateName && (
-                    <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">· 템플릿: <span className="text-text-secondary font-medium">{activeTemplateName}</span></span>
+                    <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">· 템플릿: <span className="text-text-secondary font-medium">{activeTemplateName}</span></span>
                   )}
                 </div>
 
@@ -548,7 +585,9 @@ JSON 형태로만 응답:
                   rows={12}
                   className="!font-mono"
                   style={{ fontSize: 11, resize: 'vertical' }}
-                  placeholder={'## 요약\n- [ ] 세션 만료 5분 → 30분\n\n## 배경\n'}
+                  /* 예시 마크다운을 placeholder 로 보여주면 이미 작성된 내용인지 구분이 안 된다.
+                     골격은 「템플릿 › 기본 골격」이 실제로 삽입한다. */
+                  placeholder="마크다운으로 작성합니다. 골격이 필요하면 위 「템플릿」 버튼을 쓰세요."
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                 />
@@ -567,7 +606,9 @@ JSON 형태로만 응답:
               <div className="flex items-center gap-2">
                 <div className="flex-1" />
                 <Button variant="ghost" onClick={reset}>취소</Button>
-                <Button variant="success"
+                {/* 주 액션은 primary — emerald 는 같은 화면의 「완료」 워크플로 칩과 같은 색이라
+                    실행 버튼이 완료 상태처럼 보인다. 성공은 실행 후 토스트가 알린다. */}
+                <Button variant="primary"
                   onClick={createOnDooray}
                   disabled={creating || !subject.trim()}
                   leftIcon={creating ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}>
@@ -579,12 +620,13 @@ JSON 형태로만 응답:
         </Card>
 
         {/* Today focus list */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2" data-tour="dashboard-focus-list">
           <div className="flex items-center gap-2">
             <Target size={13} className="text-text-secondary" />
             <span className="text-[calc(12px_*_var(--app-font-scale,1))] font-semibold text-text-primary">오늘 집중할 태스크</span>
-            <Chip tone="neutral">{focus.filter((t) => t.workflowClass !== 'closed').length}</Chip>
-            <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">진행 중 + 오늘 마감</span>
+            {/* 카운트와 아래 목록은 같은 배열을 본다 — 어긋나면 숫자와 줄 수가 달라진다 */}
+            <Chip tone="selected">{focus.length}</Chip>
+            <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary">진행 중 + 오늘 마감 · 종료 제외</span>
             <div className="flex-1" />
           </div>
 
@@ -606,37 +648,56 @@ JSON 형태로만 응답:
                 const dueStr = formatDue(t.dueDateAt)
                 const isDueToday = dueStr === '오늘'
                 return (
-                  <a
+                  /* 행 클릭은 앱 안의 상세 패널로 — 확인하려고 매번 앱을 벗어나지 않게 한다.
+                     두레이 원본으로 나가는 건 우측 ↗ 아이콘 하나로 분리했다. */
+                  <div
                     key={t.id}
-                    href={`https://nhnent.dooray.com/project/posts/${t.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-2 py-[5px] rounded-[5px] cursor-pointer hover:bg-bg-surface-hover transition-colors"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setSelectedTask(t)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTask(t) } }}
+                    className="flex items-center gap-2.5 min-h-[38px] px-2.5 rounded-[5px] cursor-pointer hover:bg-bg-surface-hover transition-colors"
                   >
                     <span title={`workflowClass: ${t.workflowClass}`} className="inline-flex">
                       <Chip tone={chip.tone}>{workflowLabel}</Chip>
                     </span>
-                    <span className="flex-1 text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary truncate">{t.subject}</span>
+                    <span className="flex-1 min-w-0 text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary truncate">{t.subject}</span>
                     {assigneeName && <Avatar name={assigneeName} size="sm" />}
                     {t.projectCode && (
-                      <span className="font-mono text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">{t.projectCode}</span>
+                      <span className="font-mono text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary flex-none">{t.projectCode}</span>
                     )}
                     {dueStr && (
-                      <span
-                        className="text-[calc(10px_*_var(--app-font-scale,1))] whitespace-nowrap"
-                        style={{ color: isDueToday ? '#F87171' : 'var(--text-tertiary)' }}
-                      >
-                        {dueStr}
-                      </span>
+                      /* 마감 임박만 칩으로 승격 — 나머지 날짜는 평문이라 「오늘」이 눈에 든다 */
+                      isDueToday
+                        ? <Chip tone="red" className="flex-none font-semibold">오늘</Chip>
+                        : <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary whitespace-nowrap flex-none">{dueStr}</span>
                     )}
-                    <ArrowRight size={11} className="text-text-tertiary flex-none" />
-                  </a>
+                    <a
+                      href={`https://nhnent.dooray.com/project/posts/${t.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      title="두레이에서 열기"
+                      aria-label={`${t.subject} 두레이에서 열기`}
+                      className="flex-none text-text-tertiary hover:text-link p-1 -mr-1"
+                    >
+                      <ExternalLink size={12} />
+                    </a>
+                  </div>
                 )
               })}
             </Card>
           )}
         </div>
       </div>
+      </div>
+
+      {/* 우측: 태스크 상세 — 목록에서 고른 건을 앱 안에서 바로 확인 */}
+      {selectedTask && (
+        <div className="w-[380px] flex-shrink-0 border-l border-bg-border">
+          <TaskDetailPanel task={selectedTask} onClose={() => setSelectedTask(null)} />
+        </div>
+      )}
     </div>
   )
 }
@@ -687,14 +748,14 @@ function TagPickerSection({ tags, selectedIds, onChange }: TagPickerSectionProps
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
         <FieldLabel className="!mb-0">태그</FieldLabel>
-        <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+        <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
           그룹별 1개씩 선택 권장 (프로젝트에 따라 일부 그룹은 필수)
         </span>
       </div>
       <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">
         {groups.map(([groupName, items]) => (
           <div key={groupName} className="flex items-start gap-2">
-            <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-text-secondary mt-0.5 min-w-[80px] max-w-[120px] truncate">
+            <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-secondary mt-0.5 min-w-[80px] max-w-[120px] truncate">
               {groupName}
             </span>
             <div className="flex flex-wrap gap-1 flex-1">
@@ -708,7 +769,7 @@ function TagPickerSection({ tags, selectedIds, onChange }: TagPickerSectionProps
                     key={tag.id}
                     type="button"
                     onClick={() => toggle(tag.id)}
-                    className="text-[calc(10px_*_var(--app-font-scale,1))] px-2 py-0.5 rounded-full border transition-colors"
+                    className="text-[calc(11px_*_var(--app-font-scale,1))] px-2 py-0.5 rounded-full border transition-colors"
                     style={{
                       background: selected
                         ? `color-mix(in oklab, ${hex} 35%, var(--bg-surface))`

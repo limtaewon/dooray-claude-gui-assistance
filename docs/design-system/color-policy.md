@@ -32,26 +32,42 @@
 - UI에서는 밝은 배경에 어두운 텍스트 (읽힘)
 - 다크 모드로 전환하면 같은 색이 모두 읽을 수 없음 (혼란)
 
-## 솔루션: color-mix로 Tint 생성
+## 솔루션: 색상만 살리고 명도는 우리가 고정한다
 
-**color-mix** 함수를 사용하여 외부 색을 디자인 시스템 토큰과 섞으면, 모드별로 자동 조정됩니다.
+> **표준은 `taskStyles.tagStyle()` 의 HSL 명도 고정 방식이다.** `color-mix` 는 그 다음 선택지다.
+> 두 방식이 공존하는 이유와 고르는 기준은 아래 "두 방식" 을 볼 것.
 
-### 기본 패턴
+외부 색에서 **색상(H)만 취하고 채도·명도는 테마별로 우리가 정한 값으로 덮으면** 어떤 원색이
+들어와도 대비가 보장된다. `color-mix` 는 원색이 이미 어두우면 어두운 표면과 섞여 그대로
+안 읽히는 tint 가 나올 수 있지만, 명도 고정에는 그런 하한 붕괴가 없다.
+
+### 표준 패턴 — `tagStyle()`
+
+`src/renderer/src/components/Dooray/taskStyles.ts` 한 곳에만 구현이 있다. 호출해서 쓴다.
 
 ```tsx
-// 외부 색
-const tagColor = '#FF6B6B' // 사용자 정의 빨강
+import { tagStyle } from './taskStyles'
 
-// tint 생성 (배경용)
-const bgColor = `color-mix(in oklab, ${tagColor} 20%, var(--bg-surface))`
-// 라이트: 배경이 흰색이므로 밝은 tint
-// 다크: 배경이 어두운색이므로 어두운 tint
-
-// 전경 텍스트는 원본 색 그대로 또는 saturate
-const fgColor = tagColor
+<span className="ds-chip" style={tagStyle(tag.color)}>{tag.name}</span>
 ```
 
-### 실제 예제: 두레이 태그
+내부 규칙 (H 는 원색에서, S 는 80% 로 상한, L 은 테마별 고정):
+
+| | 배경 L | 전경 L | 테두리 L |
+|---|---|---|---|
+| 라이트 | 94% | 25% | 75% |
+| 다크 | 18% | 80% | 40% |
+
+### 두 방식
+
+| 방식 | 쓰는 곳 | 언제 |
+|---|---|---|
+| **HSL 명도 고정** (`tagStyle`) | 태스크 태그 칩 전반 | **기본값.** 대비가 원색과 무관하게 보장돼야 할 때 |
+| `color-mix` | 대시보드 TagPicker | 원색 자체를 알아볼 수 있어야 하는 **색 선택 UI** |
+
+새 코드는 `tagStyle()` 을 쓴다. `color-mix` 를 쓸 거면 "왜 원색이 보여야 하는가"를 코멘트로 남긴다.
+
+### color-mix 를 쓸 때의 패턴
 
 ```tsx
 interface Tag {
@@ -80,7 +96,7 @@ function TagChip({ tag }: { tag: Tag }) {
 // - fgColor: #FF6B6B (원본, 읽힘)
 
 // 다크 모드:
-// - bgColor: #FF6B6B 20% + #1C2027 = 약간 어두운 분홍
+// - bgColor: #FF6B6B 20% + #1E1E1E = 약간 어두운 분홍
 // - fgColor: #FF6B6B (원본, 밝아서 읽힘)
 ```
 

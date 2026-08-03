@@ -189,7 +189,7 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
             className="flex-none flex items-center gap-1.5 mx-3 mb-2 px-2 py-1.5 rounded-md bg-c-orange-bg text-left hover:opacity-90"
           >
             <FolderGit2 size={11} className="flex-none text-c-orange-fg" />
-            <span className="flex-1 min-w-0 text-[calc(10px_*_var(--app-font-scale,1))] text-c-orange-fg leading-relaxed">
+            <span className="flex-1 min-w-0 text-[calc(11px_*_var(--app-font-scale,1))] text-c-orange-fg leading-relaxed">
               저장소를 정하지 않아 워크트리 없이 시작합니다 — 설정에서 정하기
             </span>
           </button>

@@ -86,7 +86,7 @@ function MentionAgentView(): JSX.Element {
             <Bot size={12} className="flex-shrink-0 opacity-70" />
             <span className="truncate max-w-[180px]">{session.name}</span>
             {exitInfo && (
-              <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">종료됨</span>
+              <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">종료됨</span>
             )}
             <X
               size={12}

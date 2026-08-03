@@ -247,7 +247,7 @@ function TaskDetailOverlay({ task, onClose, onRunInTerminal, promptText }: TaskD
                     취소
                   </Button>
                   {/* 무엇을 편집 중인지 밝힌다 — HTML 을 마크다운처럼 고치면 서식이 깨진다. */}
-                  <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+                  <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
                     {isHtmlBody ? 'HTML 원문' : '마크다운'}으로 저장합니다 · Esc 로 편집 취소
                   </span>
                 </div>
@@ -275,7 +275,7 @@ function TaskDetailOverlay({ task, onClose, onRunInTerminal, promptText }: TaskD
                           {c.creator?.member?.name ?? '알 수 없음'}
                         </span>
                         {c.createdAt && (
-                          <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+                          <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
                             {new Date(c.createdAt).toLocaleString('ko-KR', {
                               month: 'short',
                               day: 'numeric',
@@ -363,7 +363,7 @@ function TaskSessionList({ task }: { task: DoorayTask }): JSX.Element | null {
         <span className="text-[calc(11.5px_*_var(--app-font-scale,1))] font-semibold text-text-primary">
           진행 중인 작업
         </span>
-        <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+        <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
           {links.length}개 폴더
         </span>
       </div>

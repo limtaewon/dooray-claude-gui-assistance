@@ -187,7 +187,7 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
         </div>
         {onRefresh && (
           <button onClick={onRefresh} disabled={refreshing}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-clauday-orange to-clauday-blue disabled:opacity-40 hover:opacity-90">
+            className="ds-btn ai">
             <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
             {refreshing ? '수집 중...' : '지금 바로 수집하기'}
           </button>
@@ -205,8 +205,8 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
               칩 하나로 압축하고 wrapper 배경은 투명. 칩에 자체 배경+그림자만 부여. */}
           <div className="sticky top-0 z-10 mb-3 py-1 pointer-events-none">
             <div className="inline-flex items-center gap-1.5 h-5 px-2 rounded-full bg-bg-surface border border-bg-border shadow-sm">
-              <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-bold text-text-secondary leading-none">{g.label}</span>
-              <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary leading-none">{g.items.length}건</span>
+              <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-bold text-text-secondary leading-none">{g.label}</span>
+              <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary leading-none">{g.items.length}건</span>
             </div>
           </div>
 
@@ -236,11 +236,11 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
                     {/* Meta row */}
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-xs font-semibold text-text-primary">{m.authorName}</span>
-                      <span className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary px-1.5 py-0.5 rounded bg-bg-primary">
+                      <span className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary px-1.5 py-0.5 rounded bg-bg-primary">
                         <Hash size={9} />
                         {m.channelName}
                       </span>
-                      <span className="ml-auto text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">{formatTime(m.createdAt)}</span>
+                      <span className="ml-auto text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">{formatTime(m.createdAt)}</span>
                     </div>
 
                     {/* Body */}
@@ -254,7 +254,7 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
                       target="_blank"
                       rel="noreferrer"
                       title="이 채널을 두레이 메신저에서 열기"
-                      className="absolute bottom-2 right-3 inline-flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-clauday-blue opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute bottom-2 right-3 inline-flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-brand-dooray opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <ExternalLink size={10} />
                       채널 열기
@@ -263,10 +263,10 @@ function MessageTimeline({ messages, onRefresh, refreshing }: {
                     {/* Matched terms chips */}
                     {m.matchedTerms.length > 0 && (
                       <div className="flex flex-wrap items-center gap-1 mt-2 pt-2 border-t border-bg-border">
-                        <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary leading-none">매치:</span>
+                        <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary leading-none">매치:</span>
                         {m.matchedTerms.slice(0, 6).map((t, i) => (
                           <span key={i}
-                            className="inline-flex items-center h-[14px] px-1.5 rounded-full bg-bg-active text-clauday-orange font-medium text-[calc(9px_*_var(--app-font-scale,1))] leading-none">
+                            className="inline-flex items-center h-[14px] px-1.5 rounded-full bg-bg-active text-clauday-orange font-medium text-[calc(11px_*_var(--app-font-scale,1))] leading-none">
                             {t}
                           </span>
                         ))}

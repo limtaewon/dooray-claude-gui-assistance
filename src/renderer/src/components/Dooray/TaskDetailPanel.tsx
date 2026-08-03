@@ -75,11 +75,11 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
           <h3 className="text-sm font-semibold text-text-primary leading-snug">{task.subject}</h3>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             {task.projectCode && (
-              <span className="text-[calc(10px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded bg-bg-active text-text-primary font-mono">{task.projectCode}</span>
+              <span className="text-[calc(11px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded bg-bg-active text-text-primary font-mono">{task.projectCode}</span>
             )}
-            <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">{wfName}</span>
+            <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary">{wfName}</span>
             {task.dueDateAt && (
-              <span className="flex items-center gap-0.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">
+              <span className="flex items-center gap-0.5 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary">
                 <Clock size={9} /> {new Date(task.dueDateAt).toLocaleDateString('ko-KR')}
               </span>
             )}
@@ -139,7 +139,7 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
                 const name = u?.member?.name || u?.emailUser?.emailAddress || '알 수 없음'
                 const key = u?.member?.id || u?.emailUser?.emailAddress || `user-${i}`
                 return (
-                  <span key={key} className="text-[calc(10px_*_var(--app-font-scale,1))] px-2 py-0.5 rounded-full bg-bg-surface border border-bg-border text-text-primary">
+                  <span key={key} className="text-[calc(11px_*_var(--app-font-scale,1))] px-2 py-0.5 rounded-full bg-bg-surface border border-bg-border text-text-primary">
                     {name}
                   </span>
                 )
@@ -158,11 +158,11 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
               {comments.map((c) => (
                 <div key={c.id} className="bg-bg-surface rounded-lg p-3 border border-bg-border">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-text-primary">
+                    <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">
                       {c.creator?.member?.name || '알 수 없음'}
                     </span>
                     {c.createdAt && (
-                      <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">
+                      <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
                         {new Date(c.createdAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </span>
                     )}
@@ -178,7 +178,7 @@ function TaskDetailPanel({ task, onClose, onStartWork }: TaskDetailPanelProps): 
           </div>
         )}
         {loadingComments && (
-          <div className="mt-4 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center">댓글 로딩 중...</div>
+          <div className="mt-4 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary text-center">댓글 로딩 중...</div>
         )}
       </div>
     </div>

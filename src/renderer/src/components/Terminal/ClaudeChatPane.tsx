@@ -361,7 +361,7 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
               </div>
             )}
             {resultMeta && !busy && (
-              <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary pl-12">
+              <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary pl-12">
                 · {(resultMeta.durationMs / 1000).toFixed(1)}초 · ${resultMeta.costUsd.toFixed(4)}
               </div>
             )}
@@ -381,7 +381,7 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
                 style={{ background: 'var(--bg-primary)', border: '1px solid var(--bg-border)' }}
                 title={a.path}
               >
-                {a.isImage ? <ImageIcon size={11} className="text-clauday-orange" /> : <Paperclip size={11} className="text-clauday-blue" />}
+                {a.isImage ? <ImageIcon size={11} className="text-clauday-orange" /> : <Paperclip size={11} className="text-brand-claude" />}
                 <span className="text-text-secondary max-w-[180px] truncate">{a.name}</span>
                 <button onClick={() => removeAttachment(a.id)}
                   className="ml-0.5 text-text-tertiary hover:text-red-400">
@@ -398,7 +398,7 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
               className="absolute left-0 right-12 bottom-full mb-1 z-30 rounded-lg border border-bg-border shadow-2xl overflow-hidden"
               style={{ background: 'var(--bg-surface-raised)', maxHeight: 280 }}
             >
-              <div className="px-3 py-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary border-b border-bg-border bg-bg-subtle flex items-center justify-between">
+              <div className="px-3 py-1.5 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary border-b border-bg-border bg-bg-subtle flex items-center justify-between">
                 <span>스킬 — ↑↓ 이동, Enter 삽입, Esc 취소</span>
                 <span>{paletteSkills.length}개</span>
               </div>
@@ -420,9 +420,9 @@ function ClaudeChatPane({ isActive, cwd, chatId, initialSessionId, hideHistoryBu
                         : 'border-l-transparent hover:bg-bg-surface-hover'
                     }`}
                   >
-                    <Sparkles size={11} className={`flex-none ${isHi ? 'text-clauday-orange' : 'text-clauday-blue'}`} />
+                    <Sparkles size={11} className={`flex-none ${isHi ? 'text-clauday-orange' : 'text-brand-claude'}`} />
                     <span className={`text-[calc(12px_*_var(--app-font-scale,1))] truncate ${isHi ? 'text-text-primary font-semibold' : 'text-text-primary'}`}>{s.name}</span>
-                    <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary font-mono truncate flex-1 text-right">{s.filename}</span>
+                    <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary font-mono truncate flex-1 text-right">{s.filename}</span>
                   </div>
                   )
                 })}
@@ -614,9 +614,9 @@ function LinkChip({ target }: { target: string }): JSX.Element {
                 className="px-2 py-0.5 rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary hover:bg-bg-surface-hover"
               >
                 Open file
-                <span className="ml-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">⌘+클릭</span>
+                <span className="ml-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">⌘+클릭</span>
               </button>
-              <span className="text-text-tertiary text-[calc(10px_*_var(--app-font-scale,1))]">|</span>
+              <span className="text-text-tertiary text-[calc(11px_*_var(--app-font-scale,1))]">|</span>
               <button
                 onClick={(e) => { e.preventDefault(); handleReveal() }}
                 className="px-2 py-0.5 rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary hover:bg-bg-surface-hover"
@@ -766,7 +766,7 @@ function MessageRow({ msg }: { msg: ChatMessage }): JSX.Element {
       <div className="flex justify-start">
         <div className="max-w-[85%] flex gap-2 items-start">
           <span
-            className="inline-flex items-center gap-1 h-5 px-1.5 rounded-[4px] text-[calc(10px_*_var(--app-font-scale,1))] font-bold flex-none mt-1"
+            className="inline-flex items-center gap-1 h-5 px-1.5 rounded-[4px] text-[calc(11px_*_var(--app-font-scale,1))] font-bold flex-none mt-1"
             style={{ color: 'var(--c-violet-fg)', background: 'var(--c-violet-bg)' }}
           >
             <Wrench size={11} />
@@ -897,17 +897,17 @@ function SessionHistoryButton({
                       key={s.sessionId}
                       onClick={() => onSelect(s.sessionId, s.cwd)}
                       className={`w-full text-left px-3 py-2 hover:bg-bg-surface-hover transition-colors flex flex-col gap-0.5 ${
-                        isCurrent ? 'bg-bg-active border-l-2 border-clauday-blue' : ''
+                        isCurrent ? 'bg-bg-active border-l-2 border-text-primary' : ''
                       }`}
                     >
                       <span className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary line-clamp-2 font-medium">
                         {s.title}
                       </span>
-                      <div className="flex items-center gap-2 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+                      <div className="flex items-center gap-2 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
                         <span>{formatRelative(s.lastActivityAt)}</span>
                         <span>·</span>
                         <span>{s.messageCount}개 메시지</span>
-                        {isCurrent && <span className="text-clauday-blue">· 현재</span>}
+                        {isCurrent && <span className="text-brand-claude">· 현재</span>}
                       </div>
                     </button>
                   )
@@ -1054,10 +1054,10 @@ function TerminalDropdown({ sessionId, cwd }: { sessionId: string | undefined; c
               onClick={() => spawn(false)}
               className="w-full flex items-start gap-2.5 px-3 py-2 text-left hover:bg-bg-surface-hover transition-colors"
             >
-              <TerminalSquare size={13} className="text-clauday-blue mt-0.5 flex-shrink-0" />
+              <TerminalSquare size={13} className="text-brand-claude mt-0.5 flex-shrink-0" />
               <div className="flex flex-col gap-0.5 min-w-0">
                 <span className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary font-medium leading-tight">터미널에서 열기</span>
-                <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary leading-tight">권한 확인 살림 (기본)</span>
+                <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary leading-tight">권한 확인 살림 (기본)</span>
               </div>
             </button>
             <button
@@ -1067,7 +1067,7 @@ function TerminalDropdown({ sessionId, cwd }: { sessionId: string | undefined; c
               <Zap size={13} className="text-clauday-orange mt-0.5 flex-shrink-0" />
               <div className="flex flex-col gap-0.5 min-w-0">
                 <span className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary font-medium leading-tight">bypass 로 열기</span>
-                <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary leading-tight">--dangerously-skip-permissions · 권한 확인 건너뜀</span>
+                <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary leading-tight">--dangerously-skip-permissions · 권한 확인 건너뜀</span>
               </div>
             </button>
           </div>

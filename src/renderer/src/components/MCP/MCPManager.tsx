@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plus, RefreshCw, Server, Sparkles, Download, Trash2, Upload, X, CheckSquare, FolderOpen, Globe } from 'lucide-react'
 import MCPCard from './MCPCard'
 import MCPForm from './MCPForm'
+import ArgChips from './ArgChips'
 import type { McpServerConfig } from '../../../../shared/types/mcp'
 import { getMcpTransport } from '../../../../shared/types/mcp'
-import { Button, EmptyView, LoadingView, Modal, SegTabs, useToast } from '../common/ds'
+import { Button, EmptyView, LoadingView, Modal, SegTabs, TimeAgo, useToast } from '../common/ds'
 import { ViewOnboarding } from '../common/onboarding/viewOnboarding'
 import { DEFAULT_WIKIS } from '../../../../shared/wiki-storage-defaults'
 import WikiStoragePicker from '../common/WikiStoragePicker'
@@ -248,7 +249,7 @@ function MCPManager(): JSX.Element {
       } else {
         await window.api.mcp.add(item.name, config)
       }
-      toast.success(`"${item.name}" 적용됨`)
+      toast.success(`"${item.name}" 내려받음`)
       await loadServers()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '내려받기 실패')
@@ -322,7 +323,7 @@ function MCPManager(): JSX.Element {
         console.error('[MCP] bulk download failed:', item.name, err)
       }
     }
-    if (okCount > 0) toast.success(`${okCount}개 적용됨`)
+    if (okCount > 0) toast.success(`${okCount}개 내려받음`)
     if (failCount > 0) toast.error(`${failCount}개 실패`)
     exitSelectMode()
     await loadServers()
@@ -409,12 +410,12 @@ function MCPManager(): JSX.Element {
       {uploadProgress && (
         <div className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-2xl border border-bg-border-light"
           style={{ background: 'var(--bg-surface-raised)' }}>
-          <RefreshCw size={14} className="animate-spin text-clauday-blue" />
+          <RefreshCw size={14} className="animate-spin text-text-secondary" />
           <div className="flex flex-col">
             <span className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-primary font-medium">
               {uploadProgress.wikiName} 에 업로드 중 ({uploadProgress.current}/{uploadProgress.total})
             </span>
-            <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary truncate max-w-[260px]">{uploadProgress.currentName}</span>
+            <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary truncate max-w-[260px]">{uploadProgress.currentName}</span>
           </div>
         </div>
       )}
@@ -423,8 +424,9 @@ function MCPManager(): JSX.Element {
         <div className="flex items-center gap-3 flex-wrap">
           <Server size={18} className="text-brand-claude" />
           <h2 className="text-[calc(14px_*_var(--app-font-scale,1))] font-semibold text-text-primary">MCP 서버</h2>
-          <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
-            · {entries.length}개 · 활성 {activeCount}
+          {/* 지금 보고 있는 탭의 개수를 센다 — 공유 탭에서 로컬 개수를 보여주면 목록과 어긋난다 */}
+          <span className="ds-chip neutral">
+            {tab === 'local' ? `${entries.length}개 · 활성 ${activeCount}` : `${wikiItems.length}개 공유됨`}
           </span>
           <SegTabs<Tab>
             data-tour="mcp-tabs"
@@ -528,7 +530,7 @@ function MCPManager(): JSX.Element {
             )}
             {tab === 'wiki' && (
               <>
-                <Button variant="success" onClick={handleBulkDownloadFromWiki} disabled={selected.size === 0} leftIcon={<Download size={13} />}>
+                <Button variant="primary" onClick={handleBulkDownloadFromWiki} disabled={selected.size === 0} leftIcon={<Download size={13} />}>
                   내려받기
                 </Button>
                 <Button variant="danger" onClick={handleBulkDeleteFromWiki} disabled={selected.size === 0} leftIcon={<Trash2 size={13} />}>
@@ -612,7 +614,7 @@ function MCPManager(): JSX.Element {
                     <div className="flex items-start gap-2.5">
                       <div className="w-8 h-8 rounded-[6px] flex-none flex items-center justify-center bg-bg-active">
                         {isRemote
-                          ? <Globe size={16} className="text-clauday-blue" />
+                          ? <Globe size={16} className="text-brand-claude" />
                           : <Server size={16} className="text-brand-claude" />}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -620,7 +622,7 @@ function MCPManager(): JSX.Element {
                           <h3 className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary truncate">{item.name}</h3>
                           {transport && (
                             <span
-                              className="px-1.5 py-0.5 rounded-[4px] text-[calc(9px_*_var(--app-font-scale,1))] font-mono uppercase bg-bg-surface-hover text-text-tertiary border border-bg-border"
+                              className="px-1.5 py-0.5 rounded-[4px] text-[calc(11px_*_var(--app-font-scale,1))] font-mono uppercase bg-bg-surface-hover text-text-tertiary border border-bg-border"
                               style={{ flex: 'none' }}
                             >
                               {transport}
@@ -640,35 +642,24 @@ function MCPManager(): JSX.Element {
                               <>
                                 {config.command || <span className="text-text-tertiary">커맨드 없음</span>}
                                 {config.args && config.args.length > 0 && (
-                                  <span className="text-text-tertiary"> · {config.args.length}개 인자</span>
+                                  <span className="text-text-tertiary"> · 인자 {config.args.length}개</span>
                                 )}
                               </>
                             )}
                           </p>
                         )}
-                        <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-1">
-                          {item.updatedAt ? new Date(item.updatedAt).toLocaleString('ko-KR') : '날짜 없음'}
+                        <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mt-1">
+                          {item.updatedAt ? <TimeAgo date={item.updatedAt} /> : '날짜 없음'}
                         </div>
                       </div>
                     </div>
-                    {config && !isRemote && config.args && config.args.length > 0 && (
-                      <div className="mt-2.5 flex flex-wrap gap-1">
-                        {config.args.map((arg, i) => (
-                          <span
-                            key={i}
-                            className="px-1.5 py-0.5 rounded-[4px] text-[calc(10px_*_var(--app-font-scale,1))] font-mono bg-bg-surface-hover text-text-secondary border border-bg-border"
-                          >
-                            {arg}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                    {config && !isRemote && <ArgChips args={config.args} />}
                     {config && isRemote && headerCount > 0 && (
                       <div className="mt-2.5 flex flex-wrap gap-1">
                         {Object.keys(config.headers || {}).map((h) => (
                           <span
                             key={h}
-                            className="px-1.5 py-0.5 rounded-[4px] text-[calc(10px_*_var(--app-font-scale,1))] font-mono bg-bg-surface-hover text-text-secondary border border-bg-border"
+                            className="px-1.5 py-0.5 rounded-[4px] text-[calc(11px_*_var(--app-font-scale,1))] font-mono bg-bg-surface-hover text-text-secondary border border-bg-border"
                           >
                             {h}
                           </span>
@@ -679,8 +670,8 @@ function MCPManager(): JSX.Element {
                       <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-bg-border">
                         <div className="flex-1" />
                         <button onClick={(e) => { e.stopPropagation(); handleDownloadFromWiki(item) }}
-                          className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:text-clauday-blue">
-                          <Download size={11} /> 적용
+                          className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:text-brand-claude">
+                          <Download size={11} /> 내려받기
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); handleDeleteFromWiki(item) }}
                           className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-c-red-fg hover:text-c-red-solid">
@@ -703,7 +694,7 @@ function MCPManager(): JSX.Element {
         </div>
       </div>
 
-      {/* #1 MCP 공유 카드 상세 모달 — 본문(JSON config) 렌더 + 적용/삭제 */}
+      {/* #1 MCP 공유 카드 상세 모달 — 본문(JSON config) 렌더 + 내려받기/삭제 */}
       <Modal
         open={!!previewItem}
         onClose={() => setPreviewItem(null)}
@@ -729,7 +720,7 @@ function MCPManager(): JSX.Element {
                 }}
                 leftIcon={<Download size={12} />}
               >
-                적용
+                내려받기
               </Button>
             )}
           </>
@@ -773,7 +764,7 @@ function MCPManager(): JSX.Element {
                   className="w-full flex items-center gap-2 px-4 py-2 text-left text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary hover:bg-bg-surface-hover transition-colors"
                   type="button"
                 >
-                  <FolderOpen size={12} className="text-clauday-blue" />
+                  <FolderOpen size={12} className="text-brand-claude" />
                   <span className="flex-1">{w.wikiName || w.wikiId}</span>
                 </button>
               ))}

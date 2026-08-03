@@ -162,11 +162,11 @@ function EventEditModal({ event, calendars, onClose, onSaved }: Props): JSX.Elem
 
   const titleNode = (
     <span className="flex items-center gap-1.5">
-      <Edit2 size={13} className="text-clauday-blue flex-shrink-0" />
+      <Edit2 size={13} className="text-brand-dooray flex-shrink-0" />
       <span className="truncate max-w-[200px] text-text-primary font-medium text-[calc(13px_*_var(--app-font-scale,1))]">
         {isReadOnly ? event.summary : '일정 편집'}
       </span>
-      <span className={`ml-1 px-1.5 py-0.5 rounded text-[calc(9px_*_var(--app-font-scale,1))] font-medium flex-shrink-0 ${
+      <span className={`ml-1 px-1.5 py-0.5 rounded text-[calc(11px_*_var(--app-font-scale,1))] font-medium flex-shrink-0 ${
         event.source === 'local' ? 'bg-emerald-500/15 text-emerald-400'
           : event.source === 'caldav' ? 'bg-bg-active text-text-primary'
           : 'bg-rose-500/15 text-rose-400'
@@ -221,7 +221,7 @@ function EventEditModal({ event, calendars, onClose, onSaved }: Props): JSX.Elem
 
         {/* 캘린더 표시 (읽기 전용) */}
         <div className="flex items-center gap-2 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary">
-          <span className="text-text-tertiary uppercase tracking-wide text-[calc(9px_*_var(--app-font-scale,1))] font-semibold w-14 flex-shrink-0">캘린더</span>
+          <span className="text-text-tertiary uppercase tracking-wide text-[calc(11px_*_var(--app-font-scale,1))] font-semibold w-14 flex-shrink-0">캘린더</span>
           <span className="text-text-primary">{calendarName}</span>
         </div>
 
@@ -315,7 +315,7 @@ function EventEditModal({ event, calendars, onClose, onSaved }: Props): JSX.Elem
 function Field({ label, children }: { label: string; children: React.ReactNode }): JSX.Element {
   return (
     <div className="space-y-1">
-      <label className="block text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary uppercase tracking-wide font-semibold">{label}</label>
+      <label className="block text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary uppercase tracking-wide font-semibold">{label}</label>
       {children}
     </div>
   )

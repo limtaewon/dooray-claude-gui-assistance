@@ -677,7 +677,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
             <button onClick={() => jumpMonths(1)} className="ds-btn icon sm" title="다음 달"><ChevronRight size={14} /></button>
           </div>
         </div>
-        <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+        <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
           {loading ? '불러오는 중…' : error ? <span className="text-rose-400">{error}</span> : `${events.length}개 일정`}
         </span>
       </div>
@@ -686,7 +686,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
       <div className="grid grid-cols-7 border-b border-bg-border flex-shrink-0 bg-bg-surface">
         {WEEKDAYS.map((w, i) => (
           <div key={w}
-            className={`px-2 py-1.5 text-[calc(10px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-right ${
+            className={`px-2 py-1.5 text-[calc(11px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-right ${
               i === 0 ? 'text-rose-400' : i === 6 ? 'text-[color:var(--c-blue-fg)]' : 'text-text-secondary'
             }`}>{w}</div>
         ))}
@@ -718,7 +718,8 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                       <div className="absolute top-1 right-1.5 z-[1] flex items-center gap-0.5 pointer-events-none">
                         {isToday ? (
                           <>
-                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-clauday-blue text-white text-[calc(11px_*_var(--app-font-scale,1))] font-bold leading-none">{day.getDate()}</span>
+                            {/* 오늘은 정보다 — clauday-blue 는 다크에서 회색이 되는 크롬 토큰이라 쓰면 안 된다 */}
+                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-dooray text-white text-[calc(11px_*_var(--app-font-scale,1))] font-bold leading-none">{day.getDate()}</span>
                             <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-medium text-text-secondary">일</span>
                           </>
                         ) : (
@@ -737,7 +738,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                         <span
                           onMouseDown={(e) => e.stopPropagation()}
                           onClick={(e) => { e.stopPropagation(); setMoreDate(day) }}
-                          className="absolute bottom-1.5 left-2 right-2 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-clauday-blue text-left cursor-pointer">
+                          className="absolute bottom-1.5 left-2 right-2 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-brand-dooray text-left cursor-pointer">
                           +{hCount}개 더 보기
                         </span>
                       )}
@@ -755,7 +756,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                   return (
                     <div className="pointer-events-none absolute inset-0 grid grid-cols-7 z-20">
                       <div style={{ gridColumn: `${ds.col + 1} / span ${ds.span}` }}
-                        className={`m-0.5 ring-2 ring-clauday-blue bg-bg-active ${rL} ${rR}`} />
+                        className={`m-0.5 ring-2 ring-[color:var(--ring-selected-color)] bg-bg-active ${rL} ${rR}`} />
                     </div>
                   )
                 })()}
@@ -775,7 +776,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
                         className="row-start-1 px-[2px]">
                         <div
                           style={{ height: SLOT_H, backgroundColor: c.barBg, color: c.barText }}
-                          className={`flex items-center px-1.5 text-[calc(11px_*_var(--app-font-scale,1))] leading-none font-medium ring-2 ring-clauday-blue ${rL} ${rR}`}>
+                          className={`flex items-center px-1.5 text-[calc(11px_*_var(--app-font-scale,1))] leading-none font-medium ring-2 ring-[color:var(--ring-selected-color)] ${rL} ${rR}`}>
                           <span className="truncate">{barDrag.event.summary}</span>
                         </div>
                       </div>
@@ -877,7 +878,7 @@ function CalendarMonthView({ today, filterIds, colorOverrides }: Props): JSX.Ele
           <div className="flex items-center gap-1">
             <button
               onClick={() => { setEditingEvent(selected); setSelected(null) }}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[calc(11px_*_var(--app-font-scale,1))] text-clauday-blue hover:bg-bg-surface-hover transition-colors">
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[calc(11px_*_var(--app-font-scale,1))] text-brand-dooray hover:bg-bg-surface-hover transition-colors">
               <Edit2 size={12} />
               편집
             </button>
@@ -957,12 +958,12 @@ function EventDetailBody({ event, calendarName, colorBg }: {
       <div className="flex items-start gap-4">
         <h2 className="flex-1 text-[calc(17px_*_var(--app-font-scale,1))] font-semibold leading-snug text-text-primary break-words">
           {event.summary || '(제목 없음)'}
-          {statusBadge && <span className={`align-middle ml-2 px-1.5 py-0.5 rounded text-[calc(10px_*_var(--app-font-scale,1))] font-medium ${statusBadge.cls}`}>{statusBadge.label}</span>}
+          {statusBadge && <span className={`align-middle ml-2 px-1.5 py-0.5 rounded text-[calc(11px_*_var(--app-font-scale,1))] font-medium ${statusBadge.cls}`}>{statusBadge.label}</span>}
         </h2>
         <div className="flex items-center gap-1.5 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary flex-shrink-0 mt-1">
           <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colorBg }} />
           <span className="truncate max-w-[140px]">{calendarName}</span>
-          <span className={`px-1.5 py-0.5 rounded text-[calc(9px_*_var(--app-font-scale,1))] font-medium ${
+          <span className={`px-1.5 py-0.5 rounded text-[calc(11px_*_var(--app-font-scale,1))] font-medium ${
             event.source === 'local' ? 'bg-emerald-500/15 text-emerald-400'
               : event.source === 'caldav' ? 'bg-bg-active text-text-primary'
               : 'bg-rose-500/15 text-rose-400'
@@ -994,7 +995,7 @@ function EventDetailBody({ event, calendarName, colorBg }: {
         {event.organizer && (event.organizer.name || event.organizer.email) && (
           <DetailRow icon={<UserCheck size={14} />}>
             <span className="text-text-primary">{event.organizer.name || event.organizer.email}</span>
-            <span className="ml-2 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary px-1.5 py-0.5 rounded bg-bg-surface border border-bg-border">등록자</span>
+            <span className="ml-2 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary px-1.5 py-0.5 rounded bg-bg-surface border border-bg-border">등록자</span>
           </DetailRow>
         )}
 
@@ -1013,7 +1014,7 @@ function EventDetailBody({ event, calendarName, colorBg }: {
                   <li key={i} className="flex items-center gap-1 text-text-secondary">
                     <PartstatIcon partstat={a.partstat} />
                     <span className="truncate max-w-[180px]">{a.name || a.email || '(이름 없음)'}</span>
-                    {a.role === 'OPT-PARTICIPANT' && <span className="text-text-tertiary text-[calc(9px_*_var(--app-font-scale,1))]">선택</span>}
+                    {a.role === 'OPT-PARTICIPANT' && <span className="text-text-tertiary text-[calc(11px_*_var(--app-font-scale,1))]">선택</span>}
                   </li>
                 ))}
                 {event.attendees.length > 12 && (
@@ -1087,7 +1088,7 @@ function AttendeeSummary({ attendees }: { attendees: UnifiedEvent['attendees'] }
   if (tentative) parts.push(`임시 ${tentative}`)
   if (declined) parts.push(`거절 ${declined}`)
   if (pending) parts.push(`미응답 ${pending}`)
-  return <span className="text-text-tertiary text-[calc(10px_*_var(--app-font-scale,1))] font-normal">{parts.join(' · ')}</span>
+  return <span className="text-text-tertiary text-[calc(11px_*_var(--app-font-scale,1))] font-normal">{parts.join(' · ')}</span>
 }
 
 function PartstatIcon({ partstat }: { partstat?: string }): JSX.Element {
@@ -1187,7 +1188,7 @@ function NewEventModal({ range, calendars, onClose, onCreate }: {
   return (
     <Modal open onClose={onClose}
       width={420}
-      icon={<Plus size={14} className="text-clauday-blue" />}
+      icon={<Plus size={14} className="text-brand-dooray" />}
       title={title}
       footer={
         <div className="flex items-center justify-end gap-2 w-full">
@@ -1237,7 +1238,7 @@ function NewEventModal({ range, calendars, onClose, onCreate }: {
 function Field({ label, children }: { label: string; children: React.ReactNode }): JSX.Element {
   return (
     <div className="space-y-1">
-      <label className="block text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary uppercase tracking-wide font-semibold">{label}</label>
+      <label className="block text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary uppercase tracking-wide font-semibold">{label}</label>
       {children}
     </div>
   )

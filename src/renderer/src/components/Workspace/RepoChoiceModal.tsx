@@ -54,7 +54,7 @@ function RepoChoiceModal({
         ))}
       </div>
 
-      <p className="mt-3 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+      <p className="mt-3 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
         고른 저장소의 브랜치 워크트리에서 시작합니다. 이전 세션이 있으면 그 폴더에서 이어갑니다.
       </p>
     </Modal>

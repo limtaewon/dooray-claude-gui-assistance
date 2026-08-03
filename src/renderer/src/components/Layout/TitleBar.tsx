@@ -1,5 +1,7 @@
-import { Clover, Search, Moon, Sun, PanelLeft } from 'lucide-react'
+import { Search, Moon, Sun, PanelLeft } from 'lucide-react'
 import GlobalAIIndicator from '../common/GlobalAIIndicator'
+import UpdateButton from '../common/UpdateButton'
+import ClaudayMark from '../common/ClaudayMark'
 import { useTheme } from '../../hooks/useTheme'
 import { Kbd } from '../common/ds'
 
@@ -32,9 +34,9 @@ function TitleBar({ onOpenCommandPalette, sidebarExpanded, onToggleSidebar }: Ti
             <PanelLeft size={14} />
           </button>
         )}
-        <Clover size={15} className="text-clauday-orange" />
+        <ClaudayMark size={15} />
         <span className="text-[calc(12px_*_var(--app-font-scale,1))] font-semibold text-text-primary leading-none">Clauday</span>
-        <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary leading-none ml-0.5">Claude Code GUI</span>
+        <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary leading-none ml-0.5">Claude Code GUI</span>
       </div>
 
       {/* 중앙: 전역 AI 작업 인디케이터 */}
@@ -42,8 +44,9 @@ function TitleBar({ onOpenCommandPalette, sidebarExpanded, onToggleSidebar }: Ti
         <GlobalAIIndicator />
       </div>
 
-      {/* 우측: ⌘K + 테마 토글 */}
+      {/* 우측: 업데이트(있을 때만) + ⌘K + 테마 토글 */}
       <div className="flex items-center gap-1 no-drag relative z-10">
+        <UpdateButton />
         {onOpenCommandPalette && (
           <button
             onClick={onOpenCommandPalette}
@@ -54,13 +57,17 @@ function TitleBar({ onOpenCommandPalette, sidebarExpanded, onToggleSidebar }: Ti
             <Kbd>⌘K</Kbd>
           </button>
         )}
+        {/* 라벨과 아이콘 모두 '지금 어떤 테마인지'를 말한다.
+            목적지를 적으면(다크에서 「Light」) 화면 글자만 보는 사용자는 현재 테마 이름으로 읽는다.
+            할 동작은 title/aria-label 이 커맨드 팔레트와 같은 문구로 알린다. */}
         <button
           onClick={toggle}
-          title={theme === 'dark' ? '라이트 모드로' : '다크 모드로'}
+          title={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+          aria-label={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
           className="ds-btn ghost sm flex items-center gap-1"
         >
-          {theme === 'dark' ? <Sun size={12} /> : <Moon size={12} />}
-          <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
+          {theme === 'dark' ? <Moon size={12} /> : <Sun size={12} />}
+          <span>{theme === 'dark' ? '다크' : '라이트'}</span>
         </button>
       </div>
     </header>

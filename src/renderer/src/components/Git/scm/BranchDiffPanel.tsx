@@ -112,7 +112,7 @@ function BranchDiffPanel({ repoPath, onOpenDiff }: BranchDiffPanelProps): JSX.El
                 </span>
               )}
               <span
-                className={`flex-none w-3 text-center text-[calc(10px_*_var(--app-font-scale,1))] ${STATUS_COLORS[file.status]}`}
+                className={`flex-none w-3 text-center text-[calc(11px_*_var(--app-font-scale,1))] ${STATUS_COLORS[file.status]}`}
               >
                 {STATUS_LABELS[file.status]}
               </span>

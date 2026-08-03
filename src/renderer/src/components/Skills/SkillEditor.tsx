@@ -111,7 +111,7 @@ function SkillEditor({ filename, content, onChange }: SkillEditorProps): JSX.Ele
           className={`flex items-center gap-1 px-2 py-0.5 text-[calc(11px_*_var(--app-font-scale,1))] rounded-md border transition-colors ${
             aiPanel
               ? 'bg-bg-active text-clauday-orange border-bg-border-light'
-              : 'text-text-tertiary border-transparent hover:text-clauday-blue hover:border-bg-border-strong'
+              : 'text-text-tertiary border-transparent hover:text-brand-claude hover:border-bg-border-strong'
           }`}
           title="AI로 스킬 개선"
         >
@@ -153,7 +153,7 @@ function SkillEditor({ filename, content, onChange }: SkillEditorProps): JSX.Ele
               <div className="flex items-center gap-2">
                 <Sparkles size={12} className="text-clauday-orange" />
                 <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">AI로 스킬 개선</span>
-                <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">현재 스킬 내용을 바탕으로 AI가 개선안을 제시합니다</span>
+                <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">현재 스킬 내용을 바탕으로 AI가 개선안을 제시합니다</span>
               </div>
               <div className="flex items-center gap-2">
                 <input
@@ -162,13 +162,13 @@ function SkillEditor({ filename, content, onChange }: SkillEditorProps): JSX.Ele
                   onChange={(e) => setAiInstruction(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && aiInstruction.trim()) handleAIImprove() }}
                   placeholder="어떻게 개선할까요? 예) 단계를 더 구체적으로, 예시 추가, 한국어로"
-                  className="flex-1 px-3 py-1.5 rounded-lg bg-bg-surface border border-bg-border text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
+                  className="flex-1 px-3 py-1.5 rounded-lg bg-bg-surface border border-bg-border text-xs text-text-primary placeholder-text-tertiary ds-focus"
                   autoFocus
                 />
                 <button
                   onClick={handleAIImprove}
                   disabled={!aiInstruction.trim()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-clauday-orange to-clauday-blue disabled:opacity-40 hover:opacity-90"
+                  className="ds-btn ai sm"
                 >
                   <Sparkles size={11} /> 개선하기
                 </button>
@@ -185,7 +185,7 @@ function SkillEditor({ filename, content, onChange }: SkillEditorProps): JSX.Ele
           )}
           {aiPanel === 'loading' && (
             <div className="flex items-center gap-2 py-1 text-xs text-text-secondary">
-              <Loader2 size={13} className="animate-spin text-clauday-blue" />
+              <Loader2 size={13} className="animate-spin text-text-secondary" />
               AI가 스킬을 개선하는 중입니다... (모델: Opus, 15초~1분 소요)
             </div>
           )}
@@ -197,15 +197,15 @@ function SkillEditor({ filename, content, onChange }: SkillEditorProps): JSX.Ele
               </div>
               <div className="rounded-lg border border-bg-border-light bg-bg-active p-3 space-y-1.5 text-xs">
                 <div>
-                  <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary">이름</span>
+                  <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary">이름</span>
                   <p className="text-text-primary mt-0.5">{aiResult.name}</p>
                 </div>
                 <div>
-                  <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary">설명</span>
+                  <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary">설명</span>
                   <p className="text-text-secondary mt-0.5">{aiResult.description}</p>
                 </div>
                 <div>
-                  <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary">본문 미리보기</span>
+                  <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary">본문 미리보기</span>
                   <pre className="mt-0.5 text-[calc(11px_*_var(--app-font-scale,1))] font-mono text-text-primary bg-bg-subtle rounded p-2 whitespace-pre-wrap max-h-32 overflow-y-auto leading-relaxed">
                     {aiResult.content.slice(0, 400)}{aiResult.content.length > 400 ? '...' : ''}
                   </pre>
@@ -214,7 +214,7 @@ function SkillEditor({ filename, content, onChange }: SkillEditorProps): JSX.Ele
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleApplyAI}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-clauday-blue hover:opacity-90"
+                  className="ds-btn primary sm"
                 >
                   <Check size={11} /> 에디터에 적용
                 </button>

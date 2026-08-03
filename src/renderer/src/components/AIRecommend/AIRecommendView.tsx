@@ -103,7 +103,7 @@ function ItemCard({ item, category }: { item: AIRecommendItem; category: Categor
         </div>
         <button
           type="button"
-          className="flex-none flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-clauday-blue hover:text-text-primary"
+          className="flex-none flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-brand-claude hover:text-text-primary"
           title="두레이에서 열기"
           onClick={(e) => { e.stopPropagation(); window.open(item.url, '_blank', 'noopener,noreferrer') }}
         >
@@ -161,13 +161,13 @@ function PostCard({ post, onSelect }: { post: DoorayTask; onSelect: () => void }
     >
       <div className="flex gap-3">
         <div className="flex-shrink-0 flex flex-col items-center pt-0.5">
-          <div className="min-w-7 h-6 px-1.5 rounded-md flex items-center justify-center text-[calc(11px_*_var(--app-font-scale,1))] font-bold text-clauday-blue group-hover:bg-clauday-blue group-hover:text-white transition-colors"
+          <div className="min-w-7 h-6 px-1.5 rounded-md flex items-center justify-center text-[calc(11px_*_var(--app-font-scale,1))] font-bold text-c-blue-fg group-hover:bg-c-blue-solid group-hover:text-white transition-colors"
             style={{ background: 'var(--c-blue-bg)', border: '1px solid color-mix(in oklab, var(--c-blue-fg) 25%, transparent)' }}>
             {post.number ?? '·'}
           </div>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-text-primary group-hover:text-clauday-blue transition-colors leading-snug pr-2">{post.subject}</p>
+          <p className="text-sm font-semibold text-text-primary group-hover:text-brand-claude transition-colors leading-snug pr-2">{post.subject}</p>
           {preview && <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mt-1 line-clamp-2 leading-relaxed">{preview}</p>}
           <div className="flex items-center gap-3 mt-2">
             <div className="flex items-center gap-1.5">
@@ -175,17 +175,17 @@ function PostCard({ post, onSelect }: { post: DoorayTask; onSelect: () => void }
                 style={{ background: colors.bg, color: colors.text, border: `1px solid ${colors.ring}40` }}>
                 {initials}
               </span>
-              {authorName && <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary font-medium">{authorName}</span>}
+              {authorName && <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary font-medium">{authorName}</span>}
             </div>
-            <span className="text-text-tertiary text-[calc(10px_*_var(--app-font-scale,1))]">·</span>
-            <span className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+            <span className="text-text-tertiary text-[calc(11px_*_var(--app-font-scale,1))]">·</span>
+            <span className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
               <Clock size={9} />
               {timeAgo}
             </span>
           </div>
         </div>
         <div className="flex-shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity">
-          <ChevronLeft size={14} className="rotate-180 text-clauday-blue" />
+          <ChevronLeft size={14} className="rotate-180 text-brand-claude" />
         </div>
       </div>
     </button>
@@ -249,7 +249,7 @@ function PostDetail({ post, onBack }: { post: DoorayTask; onBack: () => void }):
           <ExternalLink size={11} />
           두레이
         </button>
-        <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">{formatTimeAgo(post.createdAt)}</span>
+        <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">{formatTimeAgo(post.createdAt)}</span>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -269,10 +269,10 @@ function PostDetail({ post, onBack }: { post: DoorayTask; onBack: () => void }):
                   <span className="text-xs font-semibold text-text-primary">{authorName || '알 수 없음'}</span>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <Clock size={9} className="text-text-tertiary" />
-                    <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">{formatTimeAgo(post.createdAt)}</span>
+                    <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">{formatTimeAgo(post.createdAt)}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 px-2 py-1 rounded-lg text-[calc(10px_*_var(--app-font-scale,1))] font-medium"
+                <div className="flex items-center gap-1 px-2 py-1 rounded-lg text-[calc(11px_*_var(--app-font-scale,1))] font-medium"
                   style={{ background: 'var(--c-orange-bg)', color: 'var(--c-orange-fg)', border: '1px solid color-mix(in oklab, var(--c-orange-fg) 30%, transparent)' }}>
                   <Hash size={9} />
                   AI 공유
@@ -301,7 +301,7 @@ function PostDetail({ post, onBack }: { post: DoorayTask; onBack: () => void }):
               <MessageSquare size={13} className="text-brand-claude" />
               <span className="text-xs font-bold text-text-primary">댓글</span>
               {comments.length > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full text-[calc(9px_*_var(--app-font-scale,1))] font-bold"
+                <span className="px-1.5 py-0.5 rounded-full text-[calc(11px_*_var(--app-font-scale,1))] font-bold"
                   style={{ background: 'var(--c-blue-bg)', color: 'var(--c-blue-fg)' }}>
                   {comments.length}
                 </span>
@@ -329,7 +329,7 @@ function PostDetail({ post, onBack }: { post: DoorayTask; onBack: () => void }):
                 return (
                   <div key={c.id} className="flex gap-2.5">
                     <div className="flex flex-col items-center flex-shrink-0">
-                      <span className="w-6 h-6 rounded-full flex items-center justify-center text-[calc(9px_*_var(--app-font-scale,1))] font-bold"
+                      <span className="w-6 h-6 rounded-full flex items-center justify-center text-[calc(11px_*_var(--app-font-scale,1))] font-bold"
                         style={{ background: commenterColors.bg, color: commenterColors.text, border: `1.5px solid ${commenterColors.ring}50` }}>
                         {commenterInitials}
                       </span>
@@ -342,7 +342,7 @@ function PostDetail({ post, onBack }: { post: DoorayTask; onBack: () => void }):
                         <div className="px-3 py-2 flex items-center gap-2"
                           style={{ borderBottom: c.body?.content ? '1px solid var(--bg-border)' : 'none', background: 'var(--bg-primary)' }}>
                           <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">{commenterName}</span>
-                          {c.createdAt && <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary ml-auto">{formatTimeAgo(c.createdAt)}</span>}
+                          {c.createdAt && <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary ml-auto">{formatTimeAgo(c.createdAt)}</span>}
                         </div>
                         {c.body?.content && (
                           <div className="px-3 py-2.5 markdown-body text-xs leading-relaxed text-text-secondary">
@@ -538,7 +538,7 @@ function CommentComposer({ postId, onPosted }: { postId: string; onPosted: () =>
         <div className="px-3 pb-2 flex flex-wrap gap-1.5">
           {images.map((img) => (
             <div key={img.tmpId}
-              className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-lg text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary"
+              className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-lg text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary"
               style={{ background: 'var(--bg-primary)', border: '1px solid var(--bg-border)' }}>
               <img src={img.dataUrl} alt="" className="w-5 h-5 object-cover rounded" />
               <span className="max-w-[100px] truncate">{img.filename}</span>
@@ -555,7 +555,7 @@ function CommentComposer({ postId, onPosted }: { postId: string; onPosted: () =>
 
       <div className="flex items-center justify-between px-3 py-2"
         style={{ borderTop: '1px solid var(--bg-border)' }}>
-        <p className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">⌘+Enter로 전송</p>
+        <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">⌘+Enter로 전송</p>
         <button
           onClick={submit}
           disabled={!text.trim() || posting}
@@ -788,7 +788,7 @@ function AIRecommendView(): JSX.Element {
 
             {analyzing && (
               <div className="ds-card flex items-center gap-3" style={{ padding: '12px 14px' }}>
-                <Loader2 size={16} className="animate-spin text-clauday-blue flex-none" />
+                <Loader2 size={16} className="animate-spin text-text-secondary flex-none" />
                 <div className="text-[calc(12px_*_var(--app-font-scale,1))] text-text-secondary flex-1">분석 중...</div>
               </div>
             )}

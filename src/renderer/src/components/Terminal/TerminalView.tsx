@@ -1349,7 +1349,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
             </button>
             {tabs.length >= 3 && (
               <button onClick={closeAll}
-                className="flex items-center gap-1 px-2 py-0.5 rounded text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-red-400 hover:bg-red-500/10 transition-colors"
                 title={`${tabs.length}개 터미널 모두 닫기`}>
                 <Trash2 size={10} /> 모두 닫기 ({tabs.length})
               </button>
@@ -1672,7 +1672,7 @@ function TabLabel({
             </span>
           )}
           {isExited && (
-            <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">종료됨</span>
+            <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">종료됨</span>
           )}
           {!isDiff && (
             <button onClick={(e) => { e.stopPropagation(); setEditing(true) }}

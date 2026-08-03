@@ -1,5 +1,7 @@
-import { Sparkles, Play, Pencil, Trash2, Loader2, FolderUp } from 'lucide-react'
+import { useState } from 'react'
+import { Sparkles, Play, Pencil, Trash2, Loader2, FolderUp, MoreHorizontal } from 'lucide-react'
 import type { Skill } from '../../../../shared/types/skills'
+import { TimeAgo } from '../common/ds'
 
 interface SkillCardProps {
   skill: Skill
@@ -30,22 +32,11 @@ function extractDescription(content: string): string {
   return (firstLine || '').trim().slice(0, 80)
 }
 
-function formatRelative(ts: number): string {
-  const diff = Date.now() - ts
-  const m = Math.floor(diff / 60000)
-  if (m < 1) return '방금 전'
-  if (m < 60) return `${m}분 전`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}시간 전`
-  const d = Math.floor(h / 24)
-  if (d < 30) return `${d}일 전`
-  return new Date(ts).toLocaleDateString('ko-KR')
-}
-
 function SkillCard({
   skill, uploading, onOpen, onRun, onDelete, onUploadToWiki,
   selectable, selected, onToggleSelect
 }: SkillCardProps): JSX.Element {
+  const [menuOpen, setMenuOpen] = useState(false)
   const description = extractDescription(skill.content)
 
   return (
@@ -59,12 +50,12 @@ function SkillCard({
       style={{
         padding: '12px 14px',
         ...(selectable && selected
-          ? { boxShadow: '0 0 0 2px var(--accent-orange, #FB923C)', borderColor: 'var(--accent-orange, #FB923C)' }
+          ? { boxShadow: 'var(--ring-selected)', borderColor: 'var(--ring-selected-color)' }
           : {})
       }}
     >
       {uploading && (
-        <div className="absolute top-1.5 right-8 inline-flex items-center gap-1 h-5 px-1.5 rounded-[4px] text-[calc(9px_*_var(--app-font-scale,1))] font-semibold"
+        <div className="absolute top-1.5 right-8 inline-flex items-center gap-1 h-5 px-1.5 rounded-[4px] text-[calc(11px_*_var(--app-font-scale,1))] font-semibold"
           style={{ background: 'var(--c-orange-bg)', color: 'var(--c-orange-fg)' }}>
           <Loader2 size={10} className="animate-spin" />
           업로드 중
@@ -80,13 +71,15 @@ function SkillCard({
             <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary truncate mt-0.5">{description}</div>
           )}
         </div>
-        {/* MCP 카드와 동일하게 인라인 액션 아이콘을 기본 노출 (편집/공유에 올리기/삭제) */}
+        {/* MCP 로컬 카드와 같은 배치 — 자주 쓰는 둘만 아이콘으로 두고 삭제는 ⋯ 안으로.
+            되돌릴 수 없는 동작이 편집 옆에 붙어 있으면 오클릭이 곧 사고가 된다. */}
         {!selectable && (
-          <div className="flex items-center gap-0.5 flex-none">
+          <div className="flex items-center gap-1 flex-none">
             <button
               onClick={(e) => { e.stopPropagation(); onOpen() }}
-              className="ds-btn icon sm"
+              className="ds-btn icon"
               title="편집"
+              aria-label={`${skill.name} 편집`}
             >
               <Pencil size={13} />
             </button>
@@ -94,31 +87,51 @@ function SkillCard({
               <button
                 onClick={(e) => { e.stopPropagation(); if (uploading) return; onUploadToWiki() }}
                 disabled={uploading}
-                className="ds-btn icon sm"
+                className="ds-btn icon"
                 title="공유에 올리기"
-                style={{ color: 'var(--c-blue-fg)' }}
+                aria-label={`${skill.name} 공유에 올리기`}
               >
                 {uploading ? <Loader2 size={13} className="animate-spin" /> : <FolderUp size={13} />}
               </button>
             )}
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete() }}
-              className="ds-btn icon sm"
-              title="삭제"
-            >
-              <Trash2 size={13} />
-            </button>
+            <span className="w-px h-5 bg-bg-border mx-1" />
+            <div className="relative">
+              <button
+                onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o) }}
+                className="ds-btn icon secondary"
+                title="더 보기"
+                aria-label={`${skill.name} 추가 작업`}
+                aria-expanded={menuOpen}
+              >
+                <MoreHorizontal size={14} />
+              </button>
+              {menuOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={(e) => { e.stopPropagation(); setMenuOpen(false) }} />
+                  <div className="ds-menu" style={{ top: 'calc(100% + 4px)', right: 0, minWidth: 180, zIndex: 40 }}>
+                    <div
+                      className="ds-menu-item danger"
+                      onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete() }}
+                    >
+                      <Trash2 size={12} />
+                      삭제…
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>
 
-      <div className="flex items-center mt-2.5 pt-2 border-t border-bg-border">
-        <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">업데이트 {formatRelative(skill.updatedAt)}</span>
+      <div className="flex items-center gap-1 mt-2.5 pt-2 border-t border-bg-border">
+        <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">업데이트</span>
+        <TimeAgo date={skill.updatedAt} />
         <div className="flex-1" />
         {onRun && (
           <button
             onClick={(e) => { e.stopPropagation(); onRun() }}
-            className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:text-clauday-blue"
+            className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary hover:text-text-primary"
           >
             <Play size={11} /> 실행
           </button>

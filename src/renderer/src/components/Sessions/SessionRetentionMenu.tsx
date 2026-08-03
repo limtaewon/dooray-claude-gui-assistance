@@ -149,7 +149,7 @@ function SessionRetentionMenu(): JSX.Element {
                 {unreadable ? (
                   <div className="flex items-start gap-1.5 rounded-md bg-c-red-bg px-2 py-1.5">
                     <AlertTriangle size={11} className="flex-none mt-0.5 text-c-red-fg" />
-                    <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-c-red-fg leading-relaxed">
+                    <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-c-red-fg leading-relaxed">
                       설정 파일을 읽지 못했습니다. 덮어쓰면 다른 설정이 날아가므로 저장을
                       막았습니다 — 파일을 고친 뒤 다시 열어주세요.
                     </p>
@@ -216,7 +216,7 @@ function SessionRetentionMenu(): JSX.Element {
                         type="button"
                         disabled={saving}
                         onClick={() => void save(null)}
-                        className="self-start text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-primary"
+                        className="self-start text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-primary"
                       >
                         기본값({DEFAULT_CLEANUP_PERIOD_DAYS}일)으로 되돌리기
                       </button>
@@ -225,13 +225,13 @@ function SessionRetentionMenu(): JSX.Element {
                 )}
 
                 {error && (
-                  <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-c-red-fg leading-relaxed">
+                  <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-c-red-fg leading-relaxed">
                     {error}
                   </p>
                 )}
 
                 {state?.settingsPath && (
-                  <p className="font-mono text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary truncate">
+                  <p className="font-mono text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary truncate">
                     {state.settingsPath}
                   </p>
                 )}

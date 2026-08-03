@@ -304,7 +304,7 @@ function ResizableInspector({
       {/* 리사이즈 핸들 — 왼쪽 가장자리 */}
       <div
         onMouseDown={onResizeStart}
-        className="flex-shrink-0 w-1.5 cursor-col-resize hover:bg-[color:var(--clauday-blue)] transition-colors"
+        className="flex-shrink-0 w-1.5 cursor-col-resize hover:bg-bg-border-strong transition-colors"
         style={{ background: 'var(--bg-border)' }}
         role="separator"
         aria-orientation="vertical"

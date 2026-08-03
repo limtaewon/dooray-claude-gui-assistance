@@ -151,7 +151,7 @@ function WeakAxesSection({ weakAxes }: { weakAxes: WeakAxisSummary[] }): JSX.Ele
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-1.5 rounded-full bg-[color:var(--bg-border)] overflow-hidden min-w-[48px]">
                         <div
-                          className="h-full rounded-full bg-[color:var(--clauday-blue)]"
+                          className="h-full rounded-full bg-[color:var(--chart-1)]"
                           style={{ width: `${axis.percent}%` }}
                         />
                       </div>
@@ -218,7 +218,7 @@ export function DoctorPanel({ model, sourcePath }: DoctorPanelProps): JSX.Elemen
       {/* 섹션 1 — 전체 요약 */}
       <section>
         <div className="flex items-center gap-3 flex-wrap p-3 rounded-lg border border-[color:var(--bg-border)] bg-[color:var(--bg-surface)]">
-          <Stethoscope size={16} className="text-[color:var(--clauday-blue)] flex-none" />
+          <Stethoscope size={16} className="text-brand-claude flex-none" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-semibold text-[color:var(--text-primary)]">

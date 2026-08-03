@@ -54,7 +54,7 @@ function AIProgressIndicator({
   const isLarge = size === 'large'
 
   return (
-    <div className={`rounded-xl bg-gradient-to-br to-transparent border border-bg-border-light ${isLarge ? 'p-5' : 'p-3'} ${className}`}>
+    <div className={`rounded-xl bg-bg-surface border border-bg-border-light ${isLarge ? 'p-5' : 'p-3'} ${className}`}>
       <div className="flex items-center gap-2.5">
         <div className="relative flex-shrink-0">
           <Sparkles size={isLarge ? 18 : 14} className="text-clauday-orange animate-pulse" />
@@ -65,7 +65,7 @@ function AIProgressIndicator({
         <span className={`font-medium text-text-primary flex-1 ${isLarge ? 'text-sm' : 'text-xs'}`}>
           {progress.message || STAGE_LABEL[progress.stage] || 'AI 작업 중...'}
         </span>
-        <span className={`flex items-center gap-1 text-text-tertiary font-mono ${isLarge ? 'text-xs' : 'text-[calc(10px_*_var(--app-font-scale,1))]'}`}>
+        <span className={`flex items-center gap-1 text-text-tertiary font-mono ${isLarge ? 'text-xs' : 'text-[calc(11px_*_var(--app-font-scale,1))]'}`}>
           <Clock size={isLarge ? 12 : 10} />
           {formatElapsed(progress.elapsedMs)}
         </span>
@@ -94,7 +94,7 @@ function AIProgressIndicator({
 
       {/* 스테이지 라벨 */}
       {isLarge && (
-        <div className="flex items-center gap-1 mt-1 text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">
+        <div className="flex items-center gap-1 mt-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
           {(['collecting', 'thinking', 'streaming', 'parsing'] as const).map((s) => (
             <span key={s} className="flex-1 text-center">{STAGE_LABEL[s]}</span>
           ))}
@@ -103,7 +103,7 @@ function AIProgressIndicator({
 
       {/* 예상 시간 안내 */}
       {expectedTime && isLarge && (
-        <div className="mt-3 flex items-center gap-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+        <div className="mt-3 flex items-center gap-1.5 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
           <Info size={10} /> {expectedTime}
         </div>
       )}
@@ -114,7 +114,7 @@ function AIProgressIndicator({
           ref={preRef}
           onScroll={handleScroll}
           className={`mt-3 text-text-secondary font-mono p-3 bg-bg-primary rounded-lg border border-bg-border whitespace-pre-wrap overflow-y-auto leading-relaxed ${
-            isLarge ? 'text-[calc(11px_*_var(--app-font-scale,1))] max-h-80' : 'text-[calc(10px_*_var(--app-font-scale,1))] max-h-24'
+            isLarge ? 'text-[calc(11px_*_var(--app-font-scale,1))] max-h-80' : 'text-[calc(11px_*_var(--app-font-scale,1))] max-h-24'
           }`}
         >
           {progress.streamedText.length > 2000

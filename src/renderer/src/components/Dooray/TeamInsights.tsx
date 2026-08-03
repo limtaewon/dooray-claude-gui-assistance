@@ -92,8 +92,8 @@ function TeamInsights(): JSX.Element {
 
       {/* 요약 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <StatCard label="전체 태스크" value={totalStats.total} icon={BarChart3} color="text-clauday-blue" />
-        <StatCard label="진행중" value={totalStats.working} icon={TrendingUp} color="text-clauday-blue" />
+        <StatCard label="전체 태스크" value={totalStats.total} icon={BarChart3} color="text-brand-dooray" />
+        <StatCard label="진행중" value={totalStats.working} icon={TrendingUp} color="text-brand-dooray" />
         <StatCard label="완료율" value={`${completionRate}%`} icon={Users} color="text-emerald-400" />
         <StatCard label="지연" value={totalStats.overdue} icon={AlertTriangle} color="text-red-400" />
       </div>
@@ -115,7 +115,7 @@ function TeamInsights(): JSX.Element {
                 title={`등록 ${totalStats.registered}`}
               />
               <div
-                className="bg-clauday-blue h-full transition-all"
+                className="bg-[color:var(--wf-working-dot)] h-full transition-all"
                 style={{ width: `${(totalStats.working / totalStats.total) * 100}%` }}
                 title={`진행중 ${totalStats.working}`}
               />
@@ -130,7 +130,7 @@ function TeamInsights(): JSX.Element {
         <div className="flex gap-4 mt-1.5">
           <Legend color="bg-gray-400" label="백로그" count={totalStats.backlog} />
           <Legend color="bg-clauday-orange" label="등록" count={totalStats.registered} />
-          <Legend color="bg-clauday-blue" label="진행중" count={totalStats.working} />
+          <Legend color="bg-[color:var(--wf-working-dot)]" label="진행중" count={totalStats.working} />
           <Legend color="bg-emerald-400" label="완료" count={totalStats.closed} />
         </div>
       </div>
@@ -146,10 +146,10 @@ function TeamInsights(): JSX.Element {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono font-semibold text-text-primary">{p.code}</span>
-                    <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">{p.total}개</span>
+                    <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">{p.total}개</span>
                   </div>
                   {p.overdueCount > 0 && (
-                    <span className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-red-400">
+                    <span className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-red-400">
                       <AlertTriangle size={10} />
                       지연 {p.overdueCount}
                     </span>
@@ -160,12 +160,12 @@ function TeamInsights(): JSX.Element {
                     <>
                       <div className="bg-gray-400 h-full" style={{ width: `${(p.backlog / activeTotal) * 100}%` }} />
                       <div className="bg-clauday-orange h-full" style={{ width: `${(p.registered / activeTotal) * 100}%` }} />
-                      <div className="bg-clauday-blue h-full" style={{ width: `${(p.working / activeTotal) * 100}%` }} />
+                      <div className="bg-[color:var(--wf-working-dot)] h-full" style={{ width: `${(p.working / activeTotal) * 100}%` }} />
                       <div className="bg-emerald-400 h-full" style={{ width: `${(p.closed / activeTotal) * 100}%` }} />
                     </>
                   )}
                 </div>
-                <div className="flex gap-3 mt-1.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+                <div className="flex gap-3 mt-1.5 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
                   <span>등록 {p.registered}</span>
                   <span>진행 {p.working}</span>
                   <span>완료 {p.closed}</span>
@@ -188,7 +188,7 @@ function StatCard({
     <div className="bg-bg-surface border border-bg-border rounded-lg p-3">
       <div className="flex items-center gap-1.5 mb-1">
         <Icon size={12} className={color} />
-        <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">{label}</span>
+        <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary">{label}</span>
       </div>
       <span className="text-xl font-bold text-text-primary">{value}</span>
     </div>
@@ -199,7 +199,7 @@ function Legend({ color, label, count }: { color: string; label: string; count: 
   return (
     <div className="flex items-center gap-1">
       <div className={`w-2 h-2 rounded-full ${color}`} />
-      <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary">{label} {count}</span>
+      <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary">{label} {count}</span>
     </div>
   )
 }

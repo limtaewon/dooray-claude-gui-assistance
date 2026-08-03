@@ -34,7 +34,7 @@ function Toggle({
   onChange: (v: boolean) => void
   tone?: 'blue' | 'orange'
 }): JSX.Element {
-  const on = tone === 'orange' ? 'bg-clauday-orange' : 'bg-clauday-blue'
+  const on = tone === 'orange' ? 'bg-c-orange-solid' : 'bg-c-blue-solid'
   return (
     <button
       type="button"
@@ -130,10 +130,10 @@ function StartWorkModal({
       open={open}
       onClose={onClose}
       width={560}
-      icon={<FolderGit2 size={16} className="text-clauday-blue" />}
+      icon={<FolderGit2 size={16} className="text-brand-dooray" />}
       title={
         <span className="flex items-center gap-2">
-          {task.number !== undefined && <span className="text-clauday-blue font-mono">#{task.number}</span>}
+          {task.number !== undefined && <span className="text-brand-dooray font-mono">#{task.number}</span>}
           <span className="truncate">{task.subject}</span>
           {task.projectCode && <Chip tone="neutral">{task.projectCode}</Chip>}
         </span>
@@ -212,7 +212,7 @@ function StartWorkModal({
               <Chip tone="red">사용할 수 없는 이름</Chip>
             )}
           </div>
-          <p className="mt-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+          <p className="mt-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
             템플릿 <span className="font-mono">{settings.branchTemplate}</span> — 수정 가능
           </p>
         </div>
@@ -233,7 +233,7 @@ function StartWorkModal({
           </div>
           <Textarea rows={5} value={prompt} onChange={(e) => setPrompt(e.target.value)} aria-label="에이전트 프롬프트" />
           {!prompt.trim() && (
-            <p className="mt-1 text-[calc(10px_*_var(--app-font-scale,1))] text-clauday-blue">
+            <p className="mt-1 text-[calc(11px_*_var(--app-font-scale,1))] text-brand-dooray">
               워크트리 생성 후 claude 만 실행됩니다 — 첫 지시는 터미널에서 직접 입력하세요
             </p>
           )}
@@ -244,7 +244,7 @@ function StartWorkModal({
             <div className="text-[calc(12px_*_var(--app-font-scale,1))] font-medium text-text-primary">
               권한 자동 승인 <span className="font-mono text-text-tertiary">--dangerously-skip-permissions</span>
             </div>
-            <div className="mt-0.5 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+            <div className="mt-0.5 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
               끄면 터미널에서 직접 승인하며 진행 상황에 개입합니다
             </div>
           </div>

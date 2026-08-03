@@ -86,7 +86,7 @@ function TaskFilterMenu({ facets, state, onChange }: TaskFilterMenuProps): JSX.E
       >
         <SlidersHorizontal size={12} />
         {count > 0 && (
-          <span className="min-w-[14px] px-1 rounded-full bg-c-blue-bg text-c-blue-fg text-center font-semibold text-[calc(9px_*_var(--app-font-scale,1))] leading-[14px]">
+          <span className="min-w-[14px] px-1 rounded-full bg-c-blue-bg text-c-blue-fg text-center font-semibold text-[calc(11px_*_var(--app-font-scale,1))] leading-[14px]">
             {count}
           </span>
         )}

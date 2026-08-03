@@ -33,7 +33,7 @@ function CostSummary({ totalCost, totalInput, totalOutput, byModel }: CostSummar
         </div>
         <div className="bg-bg-surface border border-bg-border rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <ArrowUpRight size={14} className="text-clauday-blue" />
+            <ArrowUpRight size={14} className="text-brand-claude" />
             <span className="text-xs text-text-secondary">입력 토큰</span>
           </div>
           <p className="text-xl font-semibold text-text-primary">{formatTokens(totalInput)}</p>

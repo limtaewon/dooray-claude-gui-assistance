@@ -1060,13 +1060,13 @@ function TerminalPaneInner(
           }}
         >
           <div className="px-3 py-2 border-b border-bg-border flex items-center gap-1.5">
-            <ImageIcon size={12} className="text-clauday-blue" />
+            <ImageIcon size={12} className="text-brand-terminal" />
             <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">최근 이미지</span>
-            <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">{recentImages.length}</span>
+            <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">{recentImages.length}</span>
             <div className="flex-1" />
             {recentImages.length > 0 && (
               <button onClick={() => setRecentImages([])}
-                className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-primary">
+                className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-primary">
                 지우기
               </button>
             )}
@@ -1075,7 +1075,7 @@ function TerminalPaneInner(
             <div className="flex-1 flex items-center justify-center px-3 text-center">
               <span className="text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-tertiary leading-relaxed">
                 터미널 출력에 이미지 경로가 보이면 여기 모입니다.
-                <br /><span className="text-[calc(10px_*_var(--app-font-scale,1))] opacity-70">예: ~/screenshots/foo.png</span>
+                <br /><span className="text-[calc(11px_*_var(--app-font-scale,1))] opacity-70">예: ~/screenshots/foo.png</span>
               </span>
             </div>
           ) : (
@@ -1157,7 +1157,7 @@ function ImageRow({ path }: { path: string }): JSX.Element {
         {dataUrl ? (
           <img src={dataUrl} alt={filename} className="w-full h-full object-cover" />
         ) : (
-          <ImageIcon size={13} className={failed ? 'text-text-tertiary' : 'text-clauday-blue'} />
+          <ImageIcon size={13} className={failed ? 'text-text-tertiary' : 'text-brand-terminal'} />
         )}
       </div>
       <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary truncate flex-1">{filename}</span>

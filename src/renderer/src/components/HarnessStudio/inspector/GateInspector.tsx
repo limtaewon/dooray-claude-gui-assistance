@@ -177,7 +177,7 @@ export function GateInspector({ gate, sourcePath, onClose }: GateInspectorProps)
                     {/* 그룹 소제목 */}
                     <div className="flex items-center gap-1">
                       <RuleGroupIcon category={group.category} />
-                      <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
+                      <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
                         {group.label}
                       </span>
                     </div>
@@ -211,7 +211,7 @@ export function GateInspector({ gate, sourcePath, onClose }: GateInspectorProps)
         {/* AI 설명 섹션 */}
         <Section
           label="AI 설명"
-          icon={<Sparkles size={10} style={{ color: 'var(--clauday-blue)' }} />}
+          icon={<Sparkles size={10} className="text-brand-claude" />}
         >
           {!explainMarkdown && !explainError && (
             <Button

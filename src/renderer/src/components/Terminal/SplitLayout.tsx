@@ -167,7 +167,7 @@ function SplitBranchView({
         }}
       >
         <div
-          className={`absolute bg-bg-border group-hover:bg-clauday-blue transition-colors pointer-events-none ${
+          className={`absolute bg-bg-border group-hover:bg-bg-border-strong transition-colors pointer-events-none ${
             isRow ? 'inset-y-0 left-1/2 -translate-x-1/2 w-px' : 'inset-x-0 top-1/2 -translate-y-1/2 h-px'
           }`}
         />
