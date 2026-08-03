@@ -51,7 +51,7 @@ describe('TaskImageService', () => {
       dir
     )
 
-    const files = await service.download('p1', 't1')
+    const { files } = await service.download('p1', 't1')
 
     expect(files.map((f) => f.fileId)).toEqual(['111', '222'])
     expect(await readFile(files[0].path, 'utf-8')).toBe('hello')
@@ -62,7 +62,7 @@ describe('TaskImageService', () => {
   it('이미지가 없으면 폴더도 만들지 않고 빈 배열', async () => {
     const fetchBinary = vi.fn()
     const service = new TaskImageService(clientWith(fetchBinary), tasksWith('그림 없는 본문'), dir)
-    expect(await service.download('p1', 't1')).toEqual([])
+    expect((await service.download('p1', 't1')).files).toEqual([])
     expect(fetchBinary).not.toHaveBeenCalled()
   })
 
@@ -76,7 +76,7 @@ describe('TaskImageService', () => {
       tasksWith('![a](/files/111) ![b](/files/222)'),
       dir
     )
-    const files = await service.download('p1', 't1')
+    const { files } = await service.download('p1', 't1')
     expect(files.map((f) => f.fileId)).toEqual(['222'])
   })
 
@@ -86,12 +86,12 @@ describe('TaskImageService', () => {
       tasksWith('![문서처럼보이는것](/files/111)'),
       dir
     )
-    expect(await service.download('p1', 't1')).toEqual([])
+    expect((await service.download('p1', 't1')).files).toEqual([])
   })
 
   it('두레이 조회가 실패하면 빈 배열 — 업무 시작 흐름을 막지 않는다', async () => {
     const service = new TaskImageService(clientWith(vi.fn()), failingTasks(), dir)
-    expect(await service.download('p1', 't1')).toEqual([])
+    expect((await service.download('p1', 't1')).files).toEqual([])
   })
 
   it('댓글을 못 읽어도 본문 그림은 살린다', async () => {
@@ -101,7 +101,7 @@ describe('TaskImageService', () => {
     } as unknown as TaskService
     const service = new TaskImageService(clientWith(vi.fn().mockResolvedValue(PNG)), tasks, dir)
 
-    const files = await service.download('p1', 't1')
+    const { files } = await service.download('p1', 't1')
 
     expect(files.map((f) => f.fileId)).toEqual(['111'])
   })
@@ -110,8 +110,19 @@ describe('TaskImageService', () => {
     const many = Array.from({ length: 12 }, (_, i) => `![a${i}](/files/${100 + i})`).join(' ')
     const fetchBinary = vi.fn().mockResolvedValue(PNG)
     const service = new TaskImageService(clientWith(fetchBinary), tasksWith(many), dir)
-    const files = await service.download('p1', 't1')
+    const { files, omitted } = await service.download('p1', 't1')
     expect(files).toHaveLength(8)
     expect(fetchBinary).toHaveBeenCalledTimes(8)
+    // 잘린 장수를 알려줘야 프롬프트가 "이게 전부" 라고 말하지 않는다.
+    expect(omitted).toBe(4)
+  })
+
+  it('상한에 안 걸리면 잘린 장수는 0', async () => {
+    const service = new TaskImageService(
+      clientWith(vi.fn().mockResolvedValue(PNG)),
+      tasksWith('![a](/files/111)'),
+      dir
+    )
+    expect((await service.download('p1', 't1')).omitted).toBe(0)
   })
 })

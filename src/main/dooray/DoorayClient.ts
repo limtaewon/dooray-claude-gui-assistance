@@ -214,12 +214,20 @@ export class DoorayClient {
       ]
 
       const errors: string[] = []
+      /**
+       * 화면에 보여줄 실패 원인. **첫 후보(=컨텍스트 경로)의 상태 코드**를 쓴다 — 그게 되어야
+       * 맞는 경로이고 나머지는 보험이다. 합친 메시지로 원인을 짐작하게 두면 안 되는 이유가 있다:
+       * 범용 후보 `/common/v1/files/{id}` 는 늘 404 라, 진짜 원인이 429 여도 메시지에 404 가
+       * 섞여 "파일이 없다" 로 읽힌다.
+       */
+      let cause: number | null = null
       for (const url of candidates) {
         try {
           return await this.fetchBinaryWithRetry(url, token)
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err)
           errors.push(msg.substring(0, 80))
+          if (cause === null && err instanceof DoorayHttpError) cause = err.status
           // 권한이 없는 파일(다른 프로젝트에서 복사해 온 본문)은 어느 경로로도 못 받는다 —
           // 남은 후보를 마저 두드리면 버킷만 축내고 결과는 같다.
           if (err instanceof DoorayHttpError && err.status === 403) break
@@ -227,7 +235,8 @@ export class DoorayClient {
       }
       const ctxStr = context ? `ctx=${JSON.stringify(context)}` : 'ctx=없음'
       throw new Error(
-        `파일 로드 실패 [${ctxStr}]\n시도: ${errors.length}개\n${errors.map((e, i) => `  ${i + 1}. ${e}`).join('\n')}`
+        `파일 로드 실패 [cause=${cause ?? 'unknown'}] [${ctxStr}]\n` +
+          `시도: ${errors.length}개\n${errors.map((e, i) => `  ${i + 1}. ${e}`).join('\n')}`
       )
     })
   }

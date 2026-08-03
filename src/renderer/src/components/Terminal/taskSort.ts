@@ -55,9 +55,14 @@ const COMPARATORS: Record<TaskSortKey, (a: DoorayTask, b: DoorayTask) => number>
   updated: (a, b) => time(b.updatedAt, 0) - time(a.updatedAt, 0) || stableTiebreak(a, b),
   created: (a, b) => time(b.createdAt, 0) - time(a.createdAt, 0) || stableTiebreak(a, b),
   // 마감이 없는 업무는 "급하지 않다" — 날짜가 있는 것들 뒤로 보낸다.
-  due: (a, b) =>
-    time(a.dueDateAt, Number.POSITIVE_INFINITY) - time(b.dueDateAt, Number.POSITIVE_INFINITY) ||
-    stableTiebreak(a, b),
+  // 둘 다 마감이 없으면 Infinity - Infinity = NaN 이 된다. NaN 이 falsy 라 `||` 로도 결과는
+  // 맞지만 그건 우연이다 — 누가 `??` 로 바꾸면 조용히 깨진다. 그래서 명시적으로 가른다.
+  due: (a, b) => {
+    const da = time(a.dueDateAt, Number.POSITIVE_INFINITY)
+    const db = time(b.dueDateAt, Number.POSITIVE_INFINITY)
+    if (da !== db) return da < db ? -1 : 1
+    return stableTiebreak(a, b)
+  },
   workflow: (a, b) =>
     (WORKFLOW_ORDER[a.workflowClass] ?? 9) - (WORKFLOW_ORDER[b.workflowClass] ?? 9) ||
     time(b.updatedAt, 0) - time(a.updatedAt, 0) ||

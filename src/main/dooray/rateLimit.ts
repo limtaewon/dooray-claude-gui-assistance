@@ -44,19 +44,25 @@ export function retryDelayMs(attempt: number, retryAfterHeader?: string | string
  * 동시 실행 개수를 묶는다. 넘치는 작업은 순서대로 줄을 서고, 앞이 끝나면 하나씩 들어간다.
  *
  * 작업이 던져도 자리는 반드시 돌려준다 — 안 그러면 실패 한 번에 줄이 영영 막힌다.
+ *
+ * ⚠️ 자리를 **비웠다가 넘기지 않는다.** 대기자는 마이크로태스크로 깨어나므로, 그 틈에 새 호출이
+ * 들어오면 빈 자리를 보고 들어와 버리고 뒤이어 대기자까지 들어와 상한을 넘는다. 그래서 줄이
+ * 있으면 `active` 를 그대로 둔 채 자리를 **인계**하고, 줄이 비었을 때만 하나 줄인다.
  */
 export function createLimiter(max: number): <T>(task: () => Promise<T>) => Promise<T> {
   let active = 0
   const waiting: Array<() => void> = []
 
   const release = (): void => {
-    active--
-    waiting.shift()?.()
+    const next = waiting.shift()
+    if (next) next()
+    else active--
   }
 
   return async function run<T>(task: () => Promise<T>): Promise<T> {
+    // 자리를 물려받은 경우 `active` 는 이미 내 몫을 세고 있다 — 여기서 또 올리면 이중 계산이다.
     if (active >= max) await new Promise<void>((resolve) => waiting.push(resolve))
-    active++
+    else active++
     try {
       return await task()
     } finally {

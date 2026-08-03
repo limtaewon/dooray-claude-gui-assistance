@@ -1123,7 +1123,7 @@ function registerIpcHandlers(): void {
         .download(projectId, taskId)
         .catch((err) => {
           console.warn('[TaskImages] 다운로드 실패:', err instanceof Error ? err.message : err)
-          return []
+          return { files: [], omitted: 0 }
         })
   )
 

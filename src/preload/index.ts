@@ -295,7 +295,7 @@ const api = {
       images: (
         projectId: string,
         taskId: string
-      ): Promise<Array<{ fileId: string; path: string; alt?: string }>> =>
+      ): Promise<{ files: Array<{ fileId: string; path: string; alt?: string }>; omitted: number }> =>
         ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_IMAGES, { projectId, taskId }),
       /** 프로젝트별 태스크 점진 로딩 이벤트 수신 */
       onPartial: (callback: (payload: { projectId: string; tasks: DoorayTask[]; done: boolean }) => void): (() => void) => {

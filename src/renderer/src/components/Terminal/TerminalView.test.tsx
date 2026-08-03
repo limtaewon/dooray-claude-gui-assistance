@@ -139,9 +139,10 @@ describe('TerminalView — 업무 드래그&드롭', () => {
     vi.mocked(window.api.workspace.settings.get).mockResolvedValue({
       taskDropPromptTemplate: '{title} {images}'
     } as never)
-    vi.mocked(window.api.dooray.tasks.images).mockResolvedValue([
-      { fileId: '111', path: '/tmp/task-images/p1-t1/재현화면-111.png' }
-    ])
+    vi.mocked(window.api.dooray.tasks.images).mockResolvedValue({
+      files: [{ fileId: '111', path: '/tmp/task-images/p1-t1/재현화면-111.png' }],
+      omitted: 0
+    })
     renderWithDs(<TerminalView active />)
     await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
     const pane = await screen.findByTestId(/^term-pane-/)

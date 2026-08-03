@@ -43,6 +43,15 @@ describe('sortTasks', () => {
     expect(ids(sortTasks(tasks, 'due'))).toEqual(['soon', 'later', 'none'])
   })
 
+  /** 둘 다 마감이 없으면 Infinity - Infinity = NaN 이다. 그 자리에서도 순서가 안정적이어야 한다. */
+  it('마감이 둘 다 없어도 순서가 흔들리지 않는다', () => {
+    const tasks = [task({ id: 'a', number: 1 }), task({ id: 'b', number: 2 })]
+    const once = ids(sortTasks(tasks, 'due'))
+    const twice = ids(sortTasks([...tasks].reverse(), 'due'))
+    expect(once).toEqual(twice)
+    expect(once).toHaveLength(2)
+  })
+
   it('상태순은 진행 중 → 할 일 → 대기 → 완료 순', () => {
     const tasks = [
       task({ id: 'closed', workflowClass: 'closed' }),

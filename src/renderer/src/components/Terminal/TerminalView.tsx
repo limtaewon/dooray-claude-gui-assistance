@@ -489,12 +489,14 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     }
     // 첨부 이미지는 내려받는 데 시간이 걸린다 — 템플릿이 실제로 쓸 때만 받는다.
     let imagePaths: string[] | undefined
+    let omittedImages = 0
     if (!sessionId && templateNeedsImages(template)) {
       setDropBusy({ label: '첨부 이미지 받는 중', where: plan.cwd })
-      imagePaths = await window.api.dooray.tasks
+      const picked = await window.api.dooray.tasks
         .images(task.projectId, task.taskId)
-        .then((files) => files.map((f) => f.path))
-        .catch(() => undefined)
+        .catch(() => null)
+      imagePaths = picked?.files.map((f) => f.path)
+      omittedImages = picked?.omitted ?? 0
     }
     const prompt = sessionId
       ? null
@@ -504,7 +506,8 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
         projectCode: task.projectCode,
         url: `https://nhnent.dooray.com/project/posts/${task.taskId}`,
         body,
-        imagePaths
+        imagePaths,
+        omittedImages
       })
 
     const since = Date.now()

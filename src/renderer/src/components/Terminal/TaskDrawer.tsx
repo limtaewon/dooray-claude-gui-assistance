@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ClipboardList, FolderGit2, RefreshCw, Search, Settings, X } from 'lucide-react'
 import type { DoorayTask } from '@shared/types/dooray'
 import type { RepoRegistryEntry, TaskSessionLink, WorkspaceSettings } from '@shared/types/workspace'
@@ -77,6 +77,8 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
   const [sort, setSort] = useState<TaskSortKey>(DEFAULT_TASK_SORT)
   /** 확인 기준선. 저장값을 읽기 전에 판정하면 전부 "변경됨" 으로 번쩍이므로 로드 전엔 비운다. */
   const [seen, setSeen] = useState<TaskSeenMap>({})
+  /** `load` 는 의존성이 비어 있어 state 를 못 본다 — 새로고침이 방금 지운 배지를 되살리지 않게 최신값을 따로 든다. */
+  const seenRef = useRef<TaskSeenMap>({})
   const [selected, setSelected] = useState<DoorayTask | null>(null)
   /** 목록이 비었을 때 "설정이 덜 됐다" 와 "정말 업무가 없다" 를 가르는 근거. */
   const [setup, setSetup] = useState<TaskSetupState>({ stage: 'ready', projectsWithoutRepo: [] })
@@ -101,8 +103,17 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
 
       // 기준선이 없던 첫 실행이면 이번 목록을 그대로 기준선으로 굳힌다 — 처음부터 전부
       // "변경됨" 으로 뜨면 배지가 신호 구실을 못 한다.
-      const stored = isTaskSeenMap(storedSeen) ? storedSeen : {}
+      //
+      // 이미 들고 있는 기준선이 있으면 **디스크 값보다 그쪽을 믿는다.** 업무를 열어 배지를 지운
+      // 직후(저장은 비동기) 새로고침이 겹치면, 방금 지운 배지가 옛 디스크 값으로 되살아난다.
+      const stored =
+        Object.keys(seenRef.current).length > 0
+          ? seenRef.current
+          : isTaskSeenMap(storedSeen)
+            ? storedSeen
+            : {}
       const baseline = ensureSeenBaseline(list, stored)
+      seenRef.current = baseline
       setSeen(baseline)
       if (baseline !== stored) void window.api.settings.set(SEEN_SETTINGS_KEY, baseline)
     } catch {
@@ -138,6 +149,7 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
   }
 
   const persistSeen = (next: TaskSeenMap): void => {
+    seenRef.current = next
     setSeen(next)
     void window.api.settings.set(SEEN_SETTINGS_KEY, next)
   }

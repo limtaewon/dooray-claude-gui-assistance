@@ -26,6 +26,8 @@ export interface TaskDropPromptVars {
   body?: string
   /** 내려받아 둔 첨부 이미지의 로컬 경로 — 템플릿이 `{images}` 를 쓸 때만 채운다 */
   imagePaths?: string[]
+  /** 상한에 걸려 못 받은 이미지 장수 — 잘렸다는 사실을 프롬프트에 밝히기 위해 */
+  omittedImages?: number
 }
 
 /** 템플릿이 이 치환자를 쓰면 본문을 미리 받아와야 한다. */
@@ -44,9 +46,11 @@ export function templateNeedsImages(template: string): boolean {
  * 경로에 공백이 없도록 저장 단계에서 이미 정리하지만, 그래도 따옴표로 감싸 붙인다 —
  * TUI 입력창은 한 줄이라 경로가 문장에 섞이면 어디까지가 경로인지 모호해진다.
  */
-export function formatImagePaths(paths: string[]): string {
+export function formatImagePaths(paths: string[], omitted = 0): string {
   if (paths.length === 0) return ''
-  return `첨부 이미지(로컬 경로, 반드시 읽어볼 것): ${paths.map((p) => `"${p}"`).join(' ')}`
+  const list = `첨부 이미지(로컬 경로, 반드시 읽어볼 것): ${paths.map((p) => `"${p}"`).join(' ')}`
+  // 상한에 걸려 잘랐으면 밝힌다 — 8장만 주면서 전부인 척하면 claude 가 "이게 다" 라고 가정한다.
+  return omitted > 0 ? `${list} (이 업무에는 이미지가 ${omitted}장 더 있습니다)` : list
 }
 
 /** 사람이 고르는 치환자 목록 — 설정 화면의 안내에 그대로 쓴다. */
@@ -89,7 +93,7 @@ export function renderTaskDropPrompt(
     '{ref}': ref,
     '{url}': vars.url ?? '',
     '{body}': vars.body ?? '',
-    '{images}': formatImagePaths(vars.imagePaths ?? [])
+    '{images}': formatImagePaths(vars.imagePaths ?? [], vars.omittedImages ?? 0)
   }
 
   const rendered = Object.entries(replacements).reduce(

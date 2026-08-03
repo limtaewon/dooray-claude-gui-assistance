@@ -98,4 +98,47 @@ describe('createLimiter', () => {
     const run = createLimiter(FILE_FETCH_CONCURRENCY)
     expect(await run(async () => 42)).toBe(42)
   })
+
+  /**
+   * 자리를 **비웠다가** 넘기면 상한이 깨진다.
+   *
+   * 대기자는 마이크로태스크로 깨어난다. 그 사이에 실행되는 다른 마이크로태스크가 `run()` 을
+   * 부르면 방금 빈 자리를 보고 그대로 들어가고, 뒤이어 대기자까지 들어와 둘이 동시에 돈다.
+   * 아래는 그 틈을 정확히 겨냥한다 — 끝나는 작업의 promise 에 이어 붙여, `release()` 직후이자
+   * 대기자가 깨어나기 직전에 새 호출을 끼워 넣는다.
+   */
+  it('자리를 반납하는 틈에 새 호출이 들어와도 상한을 넘지 않는다', async () => {
+    const run = createLimiter(1)
+    let active = 0
+    let peak = 0
+    const gateA = deferred()
+    // B·C 는 실제로 물려 있어야 겹침이 드러난다 — 바로 끝나면 동시에 돈 적이 없어 티가 안 난다.
+    const gateRest = deferred()
+    let inner!: Promise<void>
+
+    const track = async (wait: Promise<void>): Promise<void> => {
+      active++
+      peak = Math.max(peak, active)
+      await wait
+      active--
+    }
+
+    // A 가 자리를 쓰는 동안 B 는 줄을 선다.
+    const a = run(() => {
+      inner = track(gateA.promise)
+      return inner
+    })
+    const b = run(() => track(gateRest.promise))
+
+    // A 의 작업 promise 에 이어 붙인다 — limiter 의 finally(=release) 다음, 대기자 재개 앞이다.
+    const c = inner.then(() => run(() => track(gateRest.promise)))
+
+    gateA.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    gateRest.resolve()
+    await Promise.all([a, b, c])
+
+    expect(peak).toBe(1)
+  })
 })

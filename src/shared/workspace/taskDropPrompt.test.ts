@@ -99,6 +99,24 @@ describe('첨부 이미지 치환자', () => {
   it('빈 목록은 빈 문자열 — 안내 문구만 덩그러니 남으면 안 된다', () => {
     expect(formatImagePaths([])).toBe('')
   })
+
+  /** 8장 상한에 걸려 잘렸는데 전부인 척하면 claude 가 "이게 다" 라고 가정한다. */
+  it('상한에 걸려 잘렸으면 몇 장이 더 있는지 밝힌다', () => {
+    expect(formatImagePaths(['/a/1.png'], 4)).toContain('이미지가 4장 더 있습니다')
+  })
+
+  it('안 잘렸으면 군더더기를 붙이지 않는다', () => {
+    expect(formatImagePaths(['/a/1.png'], 0)).not.toContain('더 있습니다')
+  })
+
+  it('잘린 장수는 렌더된 지시에도 실린다', () => {
+    const rendered = renderTaskDropPrompt('{images}', {
+      title: 'x',
+      imagePaths: ['/a/1.png'],
+      omittedImages: 3
+    })
+    expect(rendered).toContain('이미지가 3장 더 있습니다')
+  })
 })
 
 describe('foldPrompt', () => {

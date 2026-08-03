@@ -16,6 +16,15 @@ export interface TaskImageFile {
   alt?: string
 }
 
+export interface TaskImageResult {
+  files: TaskImageFile[]
+  /**
+   * 상한에 걸려 못 받은 장수. 0 이 아니면 프롬프트에 그 사실을 밝힌다 —
+   * 8장만 주면서 전부인 것처럼 넘기면 claude 가 "이게 다" 라고 가정한다.
+   */
+  omitted: number
+}
+
 /** 한 업무에서 가져올 이미지 상한. 스크린샷 20 장짜리 업무를 통째로 내리지 않는다. */
 const MAX_IMAGES = 8
 
@@ -49,12 +58,13 @@ export class TaskImageService {
     return [detail?.body?.content, ...comments.map((c) => c.body?.content)]
   }
 
-  async download(projectId: string, taskId: string): Promise<TaskImageFile[]> {
+  async download(projectId: string, taskId: string): Promise<TaskImageResult> {
     const refs: TaskImageRef[] = extractTaskImageRefs(await this.collectSources(projectId, taskId))
-    if (refs.length === 0) return []
+    if (refs.length === 0) return { files: [], omitted: 0 }
 
     const targets = refs.slice(0, MAX_IMAGES)
-    if (refs.length > targets.length) {
+    const omitted = refs.length - targets.length
+    if (omitted > 0) {
       console.log(`[TaskImages] ${refs.length}개 중 ${targets.length}개만 내려받습니다`)
     }
 
@@ -62,7 +72,7 @@ export class TaskImageService {
     await mkdir(dir, { recursive: true })
 
     const saved = await Promise.all(targets.map((ref) => this.saveOne(dir, projectId, taskId, ref)))
-    return saved.filter((file): file is TaskImageFile => file !== null)
+    return { files: saved.filter((file): file is TaskImageFile => file !== null), omitted }
   }
 
   private async saveOne(
