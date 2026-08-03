@@ -269,7 +269,7 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
       <div className="flex flex-col h-full bg-[color:var(--bg-primary)]">
         {/* 헤더 */}
         <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[color:var(--bg-border)] bg-[color:var(--bg-surface)] flex-shrink-0">
-          <Workflow size={16} className="text-[color:var(--clauday-blue)]" />
+          <Workflow size={16} className="text-brand-claude" />
           <h1 className="text-sm font-semibold text-[color:var(--text-primary)]">Harness Studio</h1>
           <span className="ds-chip neutral ml-1">v1.7</span>
           <div className="ml-auto">
@@ -375,7 +375,7 @@ export default function HarnessStudioView({ active: _active = true }: HarnessStu
         >
           뒤로
         </Button>
-        <Workflow size={16} className="text-[color:var(--clauday-blue)]" />
+        <Workflow size={16} className="text-brand-claude" />
         <h1 className="text-sm font-semibold text-[color:var(--text-primary)]">
           {model.meta.name}
         </h1>

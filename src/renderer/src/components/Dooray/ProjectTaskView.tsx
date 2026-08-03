@@ -209,7 +209,8 @@ function ProjectTaskView(): JSX.Element {
         <>
           <div style={{ width: sidebarWidth }} className="flex-shrink-0 bg-bg-surface border-r border-bg-border flex flex-col">
             <div className="flex items-center justify-between px-3 py-2 border-b border-bg-border">
-              <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-secondary uppercase tracking-wide">프로젝트</span>
+              {/* nowrap 이 없으면 사이드바를 좁혔을 때 글자 단위로 세로로 쪼개진다 */}
+              <span className="flex-none whitespace-nowrap text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-secondary uppercase tracking-wide">프로젝트</span>
               <div className="flex items-center gap-0.5">
                 <ProjectFilter onChanged={loadProjects} />
                 <button onClick={loadProjects} className="p-1 rounded hover:bg-bg-surface-hover text-text-tertiary">
@@ -230,7 +231,7 @@ function ProjectTaskView(): JSX.Element {
                     value={projectQuery}
                     onChange={(e) => setProjectQuery(e.target.value)}
                     placeholder="프로젝트 검색"
-                    className="w-full pl-6 pr-6 py-1 bg-bg-primary border border-bg-border rounded text-[calc(10px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
+                    className="w-full pl-6 pr-6 py-1 bg-bg-primary border border-bg-border rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary ds-focus"
                   />
                   {projectQuery && (
                     <button onClick={() => setProjectQuery('')}
@@ -243,12 +244,12 @@ function ProjectTaskView(): JSX.Element {
             )}
             <div className="flex-1 overflow-y-auto py-1">
               {loadingProjects ? (
-                <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">로딩...</div>
+                <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">로딩...</div>
               ) : (() => {
                 const q = projectQuery.trim().toLowerCase()
                 const visible = q ? projects.filter((p) => p.code.toLowerCase().includes(q)) : projects
                 if (visible.length === 0) {
-                  return <div className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">검색 결과 없음</div>
+                  return <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary text-center py-4">검색 결과 없음</div>
                 }
                 return visible.map((p) => {
                   const isSelected = selectedProject?.id === p.id
@@ -258,7 +259,7 @@ function ProjectTaskView(): JSX.Element {
                       onClick={() => setSelectedProject(p)}
                       className={`w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors ${
                         isSelected
-                          ? 'bg-bg-active text-text-primary border-r-2 border-clauday-blue'
+                          ? 'bg-bg-active text-text-primary border-r-2 border-text-primary'
                           : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
                       }`}
                     >
@@ -306,7 +307,7 @@ function ProjectTaskView(): JSX.Element {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="업무 검색..."
-                  className="w-40 px-2.5 py-1 bg-bg-surface border border-bg-border rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
+                  className="w-40 px-2.5 py-1 bg-bg-surface border border-bg-border rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-primary placeholder-text-tertiary ds-focus"
                 />
 
                 {/* 상태 드롭다운 */}
@@ -314,7 +315,7 @@ function ProjectTaskView(): JSX.Element {
                   <button
                     onClick={() => { setShowWfDropdown(!showWfDropdown); setShowTagDropdown(false) }}
                     className={`flex items-center gap-1 px-2.5 py-1 rounded text-[calc(11px_*_var(--app-font-scale,1))] border transition-colors ${
-                      wfFilter !== '전체' ? 'bg-bg-active border-bg-border-strong text-clauday-blue' : 'bg-bg-surface border-bg-border text-text-secondary hover:border-bg-border-light'
+                      wfFilter !== '전체' ? 'bg-bg-active border-bg-border-strong text-brand-dooray' : 'bg-bg-surface border-bg-border text-text-secondary hover:border-bg-border-light'
                     }`}
                   >
                     상태: {wfFilter} <ChevronRight size={10} className={`transition-transform ${showWfDropdown ? 'rotate-90' : ''}`} />
@@ -332,7 +333,7 @@ function ProjectTaskView(): JSX.Element {
                           }`}>
                           <span className="flex items-center gap-1.5">
                             <span className={`w-1.5 h-1.5 rounded-full ${
-                              wf.cls === 'working' ? 'bg-clauday-blue' : wf.cls === 'registered' ? 'bg-clauday-orange' : wf.cls === 'closed' ? 'bg-emerald-400' : 'bg-gray-400'
+                              wf.cls === 'working' ? 'bg-[color:var(--wf-working-dot)]' : wf.cls === 'registered' ? 'bg-clauday-orange' : wf.cls === 'closed' ? 'bg-emerald-400' : 'bg-gray-400'
                             }`} />
                             {wf.name}
                           </span>
@@ -348,7 +349,7 @@ function ProjectTaskView(): JSX.Element {
                   <button
                     onClick={() => { setShowTagDropdown(!showTagDropdown); setShowWfDropdown(false) }}
                     className={`flex items-center gap-1 px-2.5 py-1 rounded text-[calc(11px_*_var(--app-font-scale,1))] border transition-colors ${
-                      tagFilter !== '전체' ? 'bg-bg-active border-bg-border-strong text-clauday-blue' : 'bg-bg-surface border-bg-border text-text-secondary hover:border-bg-border-light'
+                      tagFilter !== '전체' ? 'bg-bg-active border-bg-border-strong text-brand-dooray' : 'bg-bg-surface border-bg-border text-text-secondary hover:border-bg-border-light'
                     }`}
                   >
                     태그: {tagFilter} <ChevronRight size={10} className={`transition-transform ${showTagDropdown ? 'rotate-90' : ''}`} />
@@ -365,7 +366,7 @@ function ProjectTaskView(): JSX.Element {
                             tagFilter === tag.name ? 'bg-bg-active text-text-primary' : 'text-text-secondary hover:bg-bg-surface-hover'
                           }`}>
                           <span className="flex items-center gap-1.5">
-                            <span className="px-1.5 py-0.5 rounded text-[calc(9px_*_var(--app-font-scale,1))] border" style={tagStyle(tag.color)}>{tag.name}</span>
+                            <span className="px-1.5 py-0.5 rounded text-[calc(11px_*_var(--app-font-scale,1))] border" style={tagStyle(tag.color)}>{tag.name}</span>
                           </span>
                           <span className="text-text-tertiary">{tag.count}</span>
                         </button>
@@ -375,7 +376,7 @@ function ProjectTaskView(): JSX.Element {
                 </div>
 
                 {/* 결과 수 */}
-                <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary ml-auto">
+                <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary ml-auto">
                   {filteredTasks.length}/{tasks.length}
                 </span>
               </div>
@@ -405,7 +406,7 @@ function ProjectTaskView(): JSX.Element {
                     />
                   ))}
                   {renderCount < filteredTasks.length && (
-                    <div className="py-3 text-center text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+                    <div className="py-3 text-center text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
                       {visibleTasks.length} / {filteredTasks.length}개 표시 — 스크롤하면 더 불러옵니다
                     </div>
                   )}

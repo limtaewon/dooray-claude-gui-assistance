@@ -214,16 +214,16 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-sm font-bold text-text-primary leading-tight">모니터링</h2>
-              <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary leading-tight">실시간 수신 · 3일 보관</p>
+              <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary leading-tight">실시간 수신 · 3일 보관</p>
             </div>
             <button onClick={handleRefresh} disabled={refreshing}
               className="p-1.5 rounded-lg hover:bg-bg-surface text-text-tertiary hover:text-text-secondary disabled:opacity-40"
               title="새로고침">
-              <RefreshCw size={13} className={refreshing ? 'animate-spin text-clauday-blue' : ''} />
+              <RefreshCw size={13} className={refreshing ? 'animate-spin text-text-secondary' : ''} />
             </button>
           </div>
           <button onClick={() => setEditing('new')}
-            className="mt-3 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-clauday-orange to-clauday-blue hover:opacity-90 transition-opacity">
+            className="ds-btn ai sm mt-3 w-full">
             <Plus size={12} />
             새 와처
           </button>
@@ -272,12 +272,12 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
                       <div className={`text-xs font-medium truncate ${active ? 'text-clauday-orange' : 'text-text-primary'}`}>
                         {w.name}
                       </div>
-                      <div className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary truncate">
+                      <div className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary truncate">
                         {w.channelNames.length}개 채널 · {w.filter.description || '규칙 없음'}
                       </div>
                     </div>
                     {count > 0 && (
-                      <span className="px-1.5 py-0.5 rounded-full text-[calc(9px_*_var(--app-font-scale,1))] bg-clauday-orange text-white font-bold">
+                      <span className="px-1.5 py-0.5 rounded-full text-[calc(11px_*_var(--app-font-scale,1))] bg-clauday-orange text-white font-bold">
                         {count > 99 ? '99+' : count}
                       </span>
                     )}
@@ -298,7 +298,7 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
         </div>
 
         {watchers.length > 0 && (
-          <div className="px-4 py-2 border-t border-bg-border text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">
+          <div className="px-4 py-2 border-t border-bg-border text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">
             총 와처 {watchers.length} · 신규 {totalUnread}
           </div>
         )}
@@ -321,7 +321,7 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
               <Power size={14} className={selected.enabled ? 'text-emerald-400' : 'text-text-tertiary'} />
               <div className="flex-1 min-w-0">
                 <h3 className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary truncate leading-tight">{selected.name}</h3>
-                <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary truncate">
+                <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary truncate">
                   {selected.filter.description || '규칙 없음'} · 채널 {selected.channelNames.length}
                 </p>
               </div>
@@ -378,7 +378,7 @@ function MonitoringView({ active = true }: { active?: boolean } = {}): JSX.Eleme
             </div>
 
             {/* Stats row */}
-            <div className="px-5 py-1.5 border-b border-bg-border flex items-center gap-2 flex-shrink-0 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+            <div className="px-5 py-1.5 border-b border-bg-border flex items-center gap-2 flex-shrink-0 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
               <span>매치된 메시지 <span className="text-text-secondary font-semibold">{filteredMessages.length}</span>{messages.length !== filteredMessages.length && <span className="text-text-tertiary"> / {messages.length}</span>}</span>
               {newCount > 0 && <span>· 신규 <span className="text-clauday-orange font-semibold">{newCount}</span></span>}
               <span>· 마지막 스캔: {lastScanText}</span>

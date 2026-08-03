@@ -88,18 +88,18 @@ function MessengerAssistant(): JSX.Element {
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-sm font-bold text-text-primary leading-tight">메신저</h2>
-              <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary leading-tight">AI 메시지 작성 · 채널 발송</p>
+              <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary leading-tight">AI 메시지 작성 · 채널 발송</p>
             </div>
             <button onClick={() => load(true)} disabled={loading}
               className="p-1.5 rounded-lg hover:bg-bg-surface text-text-tertiary hover:text-text-secondary disabled:opacity-40">
-              <RefreshCw size={13} className={loading ? 'animate-spin text-clauday-blue' : ''} />
+              <RefreshCw size={13} className={loading ? 'animate-spin text-text-secondary' : ''} />
             </button>
           </div>
           <div className="relative">
             <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" />
             <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder="채널 검색..."
-              className="w-full pl-7 pr-3 py-1.5 rounded-lg text-xs bg-bg-surface border border-bg-border text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue"
+              className="w-full pl-7 pr-3 py-1.5 rounded-lg text-xs bg-bg-surface border border-bg-border text-text-primary placeholder-text-tertiary ds-focus"
             />
           </div>
         </div>
@@ -121,7 +121,7 @@ function MessengerAssistant(): JSX.Element {
                       {c.displayName || c.title}
                     </span>
                     {!!c.unreadCount && c.unreadCount > 0 && (
-                      <span className="px-1.5 py-0.5 rounded-full text-[calc(9px_*_var(--app-font-scale,1))] bg-bg-active text-clauday-orange font-bold">
+                      <span className="px-1.5 py-0.5 rounded-full text-[calc(11px_*_var(--app-font-scale,1))] bg-bg-active text-clauday-orange font-bold">
                         {c.unreadCount}
                       </span>
                     )}
@@ -137,8 +137,8 @@ function MessengerAssistant(): JSX.Element {
         {/* 전역 스킬 바 — 모든 채널에 공통 적용됨을 명시 */}
         <div className="px-5 py-2 border-b border-bg-border bg-bg-surface flex items-center gap-2 flex-shrink-0">
           <Sparkles size={11} className="text-clauday-orange" />
-          <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">AI 메시지 작성 스킬</span>
-          <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">(모든 채널 공통 적용)</span>
+          <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">AI 메시지 작성 스킬</span>
+          <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">(모든 채널 공통 적용)</span>
           <div className="ml-auto">
             <SkillQuickToggle target="messenger" />
           </div>
@@ -149,20 +149,20 @@ function MessengerAssistant(): JSX.Element {
         ) : (
           <div className="flex-1 flex flex-col overflow-hidden">
             <div className="px-5 py-3 border-b border-bg-border flex items-center gap-2 flex-shrink-0">
-              <Hash size={14} className="text-clauday-blue" />
+              <Hash size={14} className="text-brand-dooray" />
               <h3 className="text-sm font-semibold text-text-primary">{selected.displayName}</h3>
-              <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">· {selected.type || 'channel'}</span>
+              <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">· {selected.type || 'channel'}</span>
             </div>
 
             <div className="flex-1 flex flex-col px-5 py-4 gap-3 overflow-hidden">
               {/* Step 1: Instruction */}
               <div className="flex flex-col flex-shrink-0">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-5 h-5 rounded-full bg-brand-dooray-bg text-brand-dooray text-[calc(10px_*_var(--app-font-scale,1))] font-bold flex items-center justify-center">1</div>
+                  <div className="w-5 h-5 rounded-full bg-brand-dooray-bg text-brand-dooray text-[calc(11px_*_var(--app-font-scale,1))] font-bold flex items-center justify-center">1</div>
                   <label className="text-xs font-semibold text-text-primary">무엇을 전달할까요?</label>
                   <div className="ml-auto">
                     <button onClick={handleCompose} disabled={composing || !instruction.trim()}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-clauday-orange to-clauday-blue disabled:opacity-40 hover:opacity-90 transition-opacity">
+                      className="ds-btn ai sm">
                       {composing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
                       {composing ? 'AI 작성 중...' : 'AI로 정리하기'}
                     </button>
@@ -170,16 +170,16 @@ function MessengerAssistant(): JSX.Element {
                 </div>
                 <textarea value={instruction} onChange={(e) => setInstruction(e.target.value)}
                   placeholder="예) 오늘 배포 지연 사과, 원인 DB 마이그레이션 지연, 내일 오전 재시도 예정"
-                  className="w-full h-28 px-3 py-2.5 rounded-xl bg-bg-surface border border-bg-border text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue resize-none"
+                  className="w-full h-28 px-3 py-2.5 rounded-xl bg-bg-surface border border-bg-border text-sm text-text-primary placeholder-text-tertiary ds-focus resize-none"
                 />
               </div>
 
               {/* Step 2: Composed message — flex-1로 남은 공간 전부 차지 */}
               <div className="flex flex-col flex-1 min-h-0">
                 <div className="flex items-center gap-2 mb-2 flex-shrink-0">
-                  <div className="w-5 h-5 rounded-full bg-brand-dooray-bg text-brand-dooray text-[calc(10px_*_var(--app-font-scale,1))] font-bold flex items-center justify-center">2</div>
+                  <div className="w-5 h-5 rounded-full bg-brand-dooray-bg text-brand-dooray text-[calc(11px_*_var(--app-font-scale,1))] font-bold flex items-center justify-center">2</div>
                   <label className="text-xs font-semibold text-text-primary">발송할 메시지</label>
-                  <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+                  <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
                     {composing ? '(AI 작업 중 — 필요시 웹 조사)' : '(검토 후 수정 가능)'}
                   </span>
                 </div>
@@ -194,7 +194,7 @@ function MessengerAssistant(): JSX.Element {
                 ) : (
                   <textarea value={composed} onChange={(e) => setComposed(e.target.value)}
                     placeholder="AI가 정리한 메시지가 여기에 표시됩니다. 직접 작성도 가능합니다."
-                    className="w-full flex-1 min-h-0 px-3 py-2.5 rounded-xl bg-bg-surface border border-bg-border text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-clauday-blue resize-none font-mono leading-relaxed"
+                    className="w-full flex-1 min-h-0 px-3 py-2.5 rounded-xl bg-bg-surface border border-bg-border text-sm text-text-primary placeholder-text-tertiary ds-focus resize-none font-mono leading-relaxed"
                   />
                 )}
               </div>
@@ -211,11 +211,11 @@ function MessengerAssistant(): JSX.Element {
             </div>
 
             <div className="px-5 py-3 border-t border-bg-border bg-bg-surface flex items-center justify-between flex-shrink-0">
-              <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+              <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
                 {composed.length > 0 ? `${composed.length}자` : '메시지를 입력하세요'}
               </span>
               <button onClick={handleSend} disabled={sending || !composed.trim() || !selectedId}
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-clauday-blue hover:opacity-90 disabled:opacity-40 transition-opacity">
+                className="ds-btn primary sm">
                 {sending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
                 {sending ? '전송 중...' : '전송'}
               </button>

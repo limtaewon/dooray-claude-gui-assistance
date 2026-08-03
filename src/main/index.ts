@@ -58,6 +58,7 @@ import { ClaudeHookRouter } from './hooks/ClaudeHookRouter'
 import { MentionHookHandler, MENTION_HOOK_KIND } from './dooray/mention/MentionHookHandler'
 import { WatcherService } from './watcher/WatcherService'
 import { AiRecommendNotifier } from './ai-recommend/AiRecommendNotifier'
+import { UpdateService } from './update/UpdateService'
 import { cleanFirstMessage } from './claude/sessionPreview'
 import { AIService, setUserAnthropicApiKey, getClaudeBin } from './ai/AIService'
 import { claudeSpawnCommand } from './utils/claudeBin'
@@ -240,6 +241,8 @@ const claudeDoneNotifier = new ClaudeDoneNotifier({
   }),
   getWindow: () => BrowserWindow.getAllWindows()[0] ?? null
 })
+/** 앱 업데이트 — Windows 는 재시작 설치까지, macOS 는 dmg 열기까지 (UpdateService 주석 참고) */
+const updateService = new UpdateService(() => BrowserWindow.getAllWindows()[0] ?? null)
 terminalManager.addOutputListener((id, data) => claudeDoneNotifier.handleOutput(id, data))
 terminalManager.addExitListener((payload) => claudeDoneNotifier.forget(payload.id))
 // v2.0 M-A: 터미널 워크스페이스 스냅샷 저장소 — electron-store 를 SnapshotStorage 로 주입 (ADR-v2-terminal-p2-03).
@@ -506,6 +509,12 @@ function createWindow(): BrowserWindow {
 }
 
 function registerIpcHandlers(): void {
+  // ── 앱 업데이트 ──
+  ipcMain.handle(IPC_CHANNELS.UPDATE_CHECK, () => updateService.check())
+  ipcMain.handle(IPC_CHANNELS.UPDATE_DOWNLOAD, () => updateService.download())
+  ipcMain.handle(IPC_CHANNELS.UPDATE_INSTALL, () => updateService.install())
+  ipcMain.handle(IPC_CHANNELS.UPDATE_OPEN_RELEASE, () => updateService.openReleasePage())
+
   // MCP
   ipcMain.handle(IPC_CHANNELS.MCP_LIST, () => mcpConfigManager.list())
   ipcMain.handle(
@@ -2250,6 +2259,9 @@ app.whenReady().then(() => {
   // #7 AI 추천 새 글 폴러 시작 (1시간 주기, silent hours 22-9시).
   // 토큰 미설정 / 네트워크 실패는 알아서 다음 주기 재시도.
   aiRecommendNotifier.start().catch((e) => console.warn('[main] aiRecommendNotifier 시작 실패:', e))
+
+  // 업데이트 확인은 창이 뜨고 나서 — 시작을 늦추지 않는다. 실패는 UpdateService 가 조용히 삼킨다.
+  setTimeout(() => { void updateService.check() }, 5_000)
 
   // v2.0 M-A: 터미널 스냅샷 자동 저장 타이머는 렌더러로 이관됐다(스크롤백은 렌더러에만 있으므로 —
   // ADR-v2-terminal-p2-03 §3). main 은 더 이상 30초 interval 을 돌리지 않는다.

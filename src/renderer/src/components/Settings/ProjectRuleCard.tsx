@@ -111,7 +111,7 @@ function ProjectRuleCard({ project, repos, config, onChange }: ProjectRuleCardPr
                 <span className="flex-none text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-primary">
                   {repo.name}
                 </span>
-                <span className="flex-1 min-w-0 font-mono text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary truncate">
+                <span className="flex-1 min-w-0 font-mono text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary truncate">
                   {repo.path}
                 </span>
                 <button
@@ -229,7 +229,7 @@ function RepoAddMenu({
 
   if (options.length === 0) {
     return (
-      <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary px-0.5">
+      <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary px-0.5">
         등록된 저장소를 모두 넣었습니다.
       </p>
     )
@@ -271,7 +271,7 @@ function RepoAddMenu({
                   <span className="flex-none text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-primary">
                     {repo.name}
                   </span>
-                  <span className="flex-1 min-w-0 font-mono text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary truncate text-right">
+                  <span className="flex-1 min-w-0 font-mono text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary truncate text-right">
                     {repo.path}
                   </span>
                 </button>
@@ -367,7 +367,7 @@ function Field({
           ))}
       </div>
       {hint && (
-        <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">{hint}</p>
+        <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">{hint}</p>
       )}
       {children}
     </div>
@@ -377,7 +377,7 @@ function Field({
 /** 설정값이 실제로 어떻게 나오는지 한 줄로 — 템플릿은 눈으로 확인해야 이해된다. */
 function Preview({ label, value }: { label: string; value: string }): JSX.Element {
   return (
-    <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary truncate">
+    <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary truncate">
       {label} <code className="text-text-secondary">{value}</code>
     </p>
   )

@@ -23,8 +23,9 @@ module.exports = {
           'red-bg': 'var(--c-red-bg)', 'red-fg': 'var(--c-red-fg)', 'red-solid': 'var(--c-red-solid)',
           'orange-bg': 'var(--c-orange-bg)', 'orange-fg': 'var(--c-orange-fg)', 'orange-solid': 'var(--c-orange-solid)',
           'emerald-bg': 'var(--c-emerald-bg)', 'emerald-fg': 'var(--c-emerald-fg)', 'emerald-solid': 'var(--c-emerald-solid)',
-          'violet-bg': 'var(--c-violet-bg)', 'violet-fg': 'var(--c-violet-fg)',
-          'neutral-bg': 'var(--c-neutral-bg)', 'neutral-fg': 'var(--c-neutral-fg)'
+          'violet-bg': 'var(--c-violet-bg)', 'violet-fg': 'var(--c-violet-fg)', 'violet-solid': 'var(--c-violet-solid)',
+          'yellow-bg': 'var(--c-yellow-bg)', 'yellow-fg': 'var(--c-yellow-fg)', 'yellow-solid': 'var(--c-yellow-solid)',
+          'neutral-bg': 'var(--c-neutral-bg)', 'neutral-fg': 'var(--c-neutral-fg)', 'neutral-solid': 'var(--c-neutral-solid)'
         },
         // 소스 제어 — 파일 상태 색. 그래프 레인 색은 SVG 에서 var() 로 직접 읽는다.
         git: {

@@ -42,7 +42,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: release/*.exe
+          # latest.yml 은 앱 안의 자동 업데이트가 "최신 버전이 무엇인지" 읽는 메타파일이다.
+          # 이게 빠지면 exe 는 올라가도 기존 사용자는 새 버전을 영영 못 받는다.
+          files: |
+            release/*.exe
+            release/latest.yml
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -41,7 +41,8 @@ describe('MCPManager (integration)', () => {
     })
 
     // 활성 카운트 — 2개 등록 + 모두 enabled
-    expect(screen.getByText(/· 2개 · 활성 2/)).toBeInTheDocument()
+    // 헤더 카운트는 지금 보고 있는 탭(로컬)의 개수를 센다
+    expect(screen.getByText(/2개 · 활성 2/)).toBeInTheDocument()
   })
 
   it('shows onboarding when no servers are registered', async () => {
@@ -139,9 +140,10 @@ describe('MCPManager (integration)', () => {
     renderWithDs(<MCPManager />)
 
     await screen.findByText('demo')
-    // 활성 상태(disabled=false) → MCPCard 에 title="비활성화" 버튼 노출
-    const toggleBtn = await screen.findByRole('button', { name: '비활성화' })
-    await userEvent.click(toggleBtn)
+    // 전원·삭제는 되돌리기 어려워서 ⋯ 메뉴 안에 있다 — 메뉴를 먼저 연다
+    await userEvent.click(await screen.findByRole('button', { name: 'demo 추가 작업' }))
+    // 활성 상태(disabled=false) → 메뉴에 「비활성화」 항목 노출
+    await userEvent.click(await screen.findByText('비활성화'))
 
     await waitFor(() => {
       expect(window.api.mcp.update).toHaveBeenCalledWith(

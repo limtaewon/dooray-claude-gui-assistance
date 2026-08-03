@@ -53,8 +53,8 @@ function ScoreRadar({ model }: { model: HarnessModel }): JSX.Element {
         <Radar
           name="하네스 점수"
           dataKey="value"
-          stroke="var(--clauday-blue)"
-          fill="var(--clauday-blue)"
+          stroke="var(--chart-1)"
+          fill="var(--chart-1)"
           fillOpacity={0.25}
           strokeWidth={2}
         />
@@ -196,7 +196,7 @@ export function ScorePanel({ model, sourcePath }: ScorePanelProps): JSX.Element 
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-1.5 rounded-full bg-[color:var(--bg-border)] overflow-hidden min-w-[60px]">
                           <div
-                            className="h-full rounded-full bg-[color:var(--clauday-blue)]"
+                            className="h-full rounded-full bg-[color:var(--chart-1)]"
                             style={{ width: barWidth }}
                           />
                         </div>

@@ -121,7 +121,21 @@ npm run icons        # scripts/generate-icons.mjs
 - v1.5.4: raw stdout fallback (stream-json 못 받아도 본문 살림)
 - v1.5.5: Windows 한정 `--append-system-prompt` → stdin combine (이 가이드 작성 계기)
 
-## 색 사용 원칙 (v2.0 확정)
+## 색 사용 원칙 (v2.0 확정 · v2.0.4 보강)
+
+> **v2.0.4 에서 더해진 것** (외부 디자인 리뷰 반영):
+> 0. **어두운 면끼리는 밝기로 위계를 못 만든다.** `--bg-base` 와 `--bg-surface` 대비는 1.12:1 이 한계다.
+>    영역 구분은 `--bg-border`, 부상은 `--elev-2` + `--bg-border-light`, 선택은 `--bg-active` + `.ds-rail`.
+>    hover · raised · active 는 **반드시 서로 다른 값**이어야 한다.
+> 0b. **조판 하한 11px, 대비 하한 AA(4.5:1) — 두 테마 모두.** `--t-9`/`--t-10` 은 폐기했다.
+>    `--text-tertiary` 는 AA 를 넘지만 하한이라 "읽어야 하는 값"에는 쓰지 않는다(구분점·비활성 아이콘 전용).
+> 0c. **포커스 링은 불투명 2중 링.** 반투명은 어두운 면 위에서 1.6:1 까지 떨어진다.
+>    `outline: none` 으로 포커스를 없애는 예외는 없다.
+> 0d. 무채색 크롬 정책은 **라이트에도 똑같이** 적용한다 — 한쪽 테마에만 있으면 정책이 아니라 예외다.
+>
+> 가드: `contrast.guard.test.ts` · `typeScale.guard.test.ts` · `palette.guard.test.ts` · `cssVarAlpha.guard.test.ts`
+> (팔레트 가드는 잔존 213곳을 BASELINE 으로 두고 **증가만** 막는다 — 정리하면 BASELINE 도 함께 낮춘다)
+
 
 1. **크롬(배경·테두리·일반 텍스트·폼 포커스·탭·아이콘 버튼)은 무채색.** `--bg-*` / `--text-*` 만 쓴다.
    - **회색 면(`--bg-active`)으로 선택을 표현하는 건 좌측 사이드바·탭 같은 내비게이션에 한한다.**
@@ -171,4 +185,5 @@ npm run icons        # scripts/generate-icons.mjs
 - `README.md` — 사용자용 기능 소개 (스크린샷 포함)
 - `CHANGELOG.md` — 버전별 변경 이력
 - `handoff/` — 마이그레이션 / 핸드오프 노트
-- `docs/screenshots/` — README 용 스크린샷
+- `docs/readme/` — README 용 그래픽 (실제 화면을 디자인 토큰으로 재조판한 목업)
+- `docs/brand/` — 브랜드 마크 SVG 원본. `build/icon.svg` 와 `ClaudayMark.tsx` 가 같은 좌표를 공유한다

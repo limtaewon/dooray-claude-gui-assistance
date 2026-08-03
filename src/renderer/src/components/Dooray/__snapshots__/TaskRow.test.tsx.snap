@@ -39,7 +39,7 @@ exports[`TaskRow — 렌더 스냅샷 > isSelected=true 렌더 1`] = `
         class="flex items-center gap-1.5 mt-1 flex-wrap"
       >
         <span
-          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-[color:var(--wf-working-bg)] text-[color:var(--wf-working-fg)]"
+          class="text-[calc(11px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-[color:var(--wf-working-bg)] text-[color:var(--wf-working-fg)]"
         >
           working
         </span>
@@ -104,7 +104,7 @@ exports[`TaskRow — 렌더 스냅샷 > 기본 렌더 1`] = `
         class="flex items-center gap-1.5 mt-1 flex-wrap"
       >
         <span
-          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-[color:var(--wf-working-bg)] text-[color:var(--wf-working-fg)]"
+          class="text-[calc(11px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-[color:var(--wf-working-bg)] text-[color:var(--wf-working-fg)]"
         >
           working
         </span>
@@ -169,42 +169,42 @@ exports[`TaskRow — 렌더 스냅샷 > 태그 4개 + milestone + dueDateAt 렌�
         class="flex items-center gap-1.5 mt-1 flex-wrap"
       >
         <span
-          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-[color:var(--wf-working-bg)] text-[color:var(--wf-working-fg)]"
+          class="text-[calc(11px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-[color:var(--wf-working-bg)] text-[color:var(--wf-working-fg)]"
         >
           working
         </span>
         <span
-          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full border"
+          class="text-[calc(11px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full border"
           style="background-color: rgb(243, 237, 237); color: rgb(115, 13, 13); border-color: rgb(217, 166, 166);"
         >
           긴급
         </span>
         <span
-          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full border"
+          class="text-[calc(11px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full border"
           style="background-color: rgb(237, 243, 237); color: rgb(13, 115, 13); border-color: rgb(166, 217, 166);"
         >
           버그
         </span>
         <span
-          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full border"
+          class="text-[calc(11px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full border"
           style="background-color: rgb(237, 237, 243); color: rgb(13, 13, 115); border-color: rgb(166, 166, 217);"
         >
           문서
         </span>
         <span
-          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-bg-surface border border-bg-border text-text-tertiary cursor-default"
+          class="text-[calc(11px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-bg-surface border border-bg-border text-text-tertiary cursor-default"
           title="기타"
         >
           +
           1
         </span>
         <span
-          class="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-400"
+          class="text-[calc(11px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-400"
         >
           2026 Q1
         </span>
         <span
-          class="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary"
+          class="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary"
         >
           마감 
           8월 15일

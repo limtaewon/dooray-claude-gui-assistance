@@ -357,7 +357,7 @@ function SourceControlPanel({ repoPath, onOpenDiff, onRepoChanged }: SourceContr
           </div>
         </div>
         {hasConflicts && (
-          <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-git-deleted">
+          <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-git-deleted">
             충돌을 먼저 해결해야 커밋할 수 있습니다.
           </p>
         )}
@@ -420,10 +420,10 @@ function Section({
           aria-expanded={!isCollapsed}
         >
           {isCollapsed ? <ChevronRight size={11} className="text-text-tertiary" /> : <ChevronDown size={11} className="text-text-tertiary" />}
-          <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-text-tertiary truncate">
+          <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-text-tertiary truncate">
             {title}
           </span>
-          <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">{entries.length}</span>
+          <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">{entries.length}</span>
         </button>
       </div>
 
@@ -471,7 +471,7 @@ function EntryRow({ entry, busy, onOpenDiff, picked, onSelect, onDiscard }: Entr
       <button onClick={onOpenDiff} className="flex-1 min-w-0 flex items-baseline gap-1 text-left" title={entry.path}>
         <span className="text-[calc(11.5px_*_var(--app-font-scale,1))] text-text-primary truncate">{name}</span>
         {dir && (
-          <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary truncate">{dir}</span>
+          <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary truncate">{dir}</span>
         )}
       </button>
 
@@ -492,7 +492,7 @@ function EntryRow({ entry, busy, onOpenDiff, picked, onSelect, onDiscard }: Entr
           </span>
         )}
         <span
-          className={`text-[calc(10px_*_var(--app-font-scale,1))] font-semibold w-3 text-center ${STATUS_COLORS[entry.status]}`}
+          className={`text-[calc(11px_*_var(--app-font-scale,1))] font-semibold w-3 text-center ${STATUS_COLORS[entry.status]}`}
           title={entry.conflictKind ? CONFLICT_LABELS[entry.conflictKind] : undefined}
         >
           {entry.conflictKind ? '!' : STATUS_LABELS[entry.status]}

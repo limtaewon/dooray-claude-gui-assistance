@@ -125,7 +125,7 @@ function BranchesPanel({ repoPath, onOpenInTerminal, onRepoChanged }: BranchesPa
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="flex items-center gap-1 px-3 py-2 flex-none border-b border-bg-border">
-        <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-text-tertiary">
+        <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-text-tertiary">
           브랜치 · 워크트리
         </span>
         <Button variant="ghost" size="xs" className="ml-auto" onClick={() => void refresh()} aria-label="새로고침">
@@ -326,14 +326,14 @@ function SectionHeader({
 }): JSX.Element {
   return (
     <div className="group flex items-center gap-1 px-2 h-6 mt-1 hover:bg-bg-surface-hover">
-      <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-text-tertiary">
+      <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold uppercase tracking-wide text-text-tertiary">
         {title}
       </span>
-      <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">{count}</span>
+      <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">{count}</span>
       {extraAction && (
         <button
           onClick={extraAction.onClick}
-          className="ml-auto opacity-0 group-hover:opacity-100 focus:opacity-100 flex-none px-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-primary"
+          className="ml-auto opacity-0 group-hover:opacity-100 focus:opacity-100 flex-none px-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-primary"
           title={extraAction.title}
         >
           {extraAction.label}

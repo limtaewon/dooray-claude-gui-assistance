@@ -127,7 +127,7 @@ function AiExplainSection({ sourcePath }: { sourcePath: string }): JSX.Element {
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-center gap-2 mb-1">
-        <Sparkles size={14} className="text-[color:var(--clauday-blue)]" />
+        <Sparkles size={14} className="text-brand-claude" />
         <h2 className="text-xs font-semibold text-[color:var(--text-secondary)] uppercase tracking-wider">
           AI 심화 설명
         </h2>
@@ -196,7 +196,7 @@ export function OverviewPanel({ model, sourcePath, onNavigate }: OverviewPanelPr
       {/* 섹션 1 — 헤더 */}
       <section className="flex flex-col gap-2 p-4 rounded-lg border border-[color:var(--bg-border)] bg-[color:var(--bg-surface)]">
         <div className="flex items-start gap-2.5 flex-wrap">
-          <Workflow size={20} className="text-[color:var(--clauday-blue)] flex-none mt-0.5" />
+          <Workflow size={20} className="text-brand-claude flex-none mt-0.5" />
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-bold text-[color:var(--text-primary)] break-words">
               {model.meta.name}

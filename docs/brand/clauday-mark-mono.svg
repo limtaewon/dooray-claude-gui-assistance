@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 24 24">
+  <g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+    <line x1="15.5" y1="12" x2="22" y2="12"></line>
+    <line x1="15.03" y1="13.75" x2="20.66" y2="17"></line>
+    <line x1="13.75" y1="15.03" x2="17" y2="20.66"></line>
+    <line x1="12" y1="15.5" x2="12" y2="22"></line>
+    <line x1="10.25" y1="15.03" x2="7" y2="20.66"></line>
+    <line x1="8.97" y1="13.75" x2="3.34" y2="17"></line>
+    <line x1="8.5" y1="12" x2="2" y2="12"></line>
+    <line x1="8.97" y1="10.25" x2="3.34" y2="7"></line>
+    <line x1="10.25" y1="8.97" x2="7" y2="3.34"></line>
+    <line x1="12" y1="8.5" x2="12" y2="2"></line>
+    <line x1="13.75" y1="8.97" x2="17" y2="3.34"></line>
+    <line x1="15.03" y1="10.25" x2="20.66" y2="7"></line>
+  </g>
+</svg>

@@ -124,7 +124,7 @@ function ReportGenerator(): JSX.Element {
           {history.length > 0 && (
             <div className="relative">
               <button onClick={() => setShowHistory(!showHistory)}
-                className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-secondary px-1.5 py-0.5 rounded bg-bg-surface">
+                className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-text-secondary px-1.5 py-0.5 rounded bg-bg-surface">
                 <Clock size={10} /> 히스토리 {history.length}개
                 <ChevronDown size={10} className={`transition-transform ${showHistory ? 'rotate-180' : ''}`} />
               </button>
@@ -136,7 +136,7 @@ function ReportGenerator(): JSX.Element {
                       <div key={i} onClick={() => selectHistory(r)}
                         className="flex items-center justify-between px-3 py-2 hover:bg-bg-surface-hover cursor-pointer">
                         <div className="min-w-0">
-                          <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary font-mono">
+                          <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary font-mono">
                             {new Date(r.savedAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                           </p>
                           <p className="text-xs text-text-secondary truncate">{r.title}</p>
@@ -151,7 +151,7 @@ function ReportGenerator(): JSX.Element {
             </div>
           )}
           {report && (
-            <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">· {new Date(report.generatedAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 생성</span>
+            <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">· {new Date(report.generatedAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 생성</span>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -194,17 +194,17 @@ function ReportGenerator(): JSX.Element {
               <div className="flex items-center gap-2 flex-wrap">
                 <FileText size={14} className="text-clauday-orange" />
                 <span className="text-[calc(13px_*_var(--app-font-scale,1))] font-semibold text-text-primary">{report.title}</span>
-                <span className={`text-[calc(10px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full font-medium ${
+                <span className={`text-[calc(11px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full font-medium ${
                   reportType === 'daily' ? 'bg-bg-active text-text-primary' : 'bg-bg-active text-clauday-orange'
                 }`}>
                   {reportType === 'daily' ? '일일' : '주간'}
                 </span>
-                <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary ml-auto">
+                <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary ml-auto">
                   {new Date(report.generatedAt).toLocaleString('ko-KR')}
                 </span>
               </div>
               {report.sourceMeta && (
-                <div className="mt-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+                <div className="mt-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
                   <div>참고: 내 태스크 {report.sourceMeta.taskCount}개 · 일정 {report.sourceMeta.eventCount}개</div>
                   {report.sourceMeta.probes && report.sourceMeta.probes.length > 0 && (
                     <details className="mt-1">
@@ -230,7 +230,7 @@ function ReportGenerator(): JSX.Element {
               <button onClick={() => editMode ? setEditMode(false) : startEdit()}
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[calc(11px_*_var(--app-font-scale,1))] transition-colors border ${
                   editMode
-                    ? 'bg-bg-active border-bg-border-strong text-clauday-blue'
+                    ? 'bg-bg-active border-bg-border-strong text-brand-dooray'
                     : 'bg-bg-surface border-bg-border text-text-secondary hover:text-text-primary hover:border-bg-border-light'
                 }`}>
                 {editMode ? '미리보기' : '편집'}
@@ -251,7 +251,7 @@ function ReportGenerator(): JSX.Element {
               <div className="p-5">
                 {editMode ? (
                   <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)}
-                    className="w-full min-h-[400px] bg-bg-primary border border-bg-border rounded-lg p-4 text-xs text-text-primary font-mono focus:outline-none focus:border-clauday-blue resize-y" />
+                    className="w-full min-h-[400px] bg-bg-primary border border-bg-border rounded-lg p-4 text-xs text-text-primary font-mono ds-focus resize-y" />
                 ) : (
                   <div className="markdown-body text-sm leading-relaxed">
                     <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
@@ -272,7 +272,7 @@ function ReportGenerator(): JSX.Element {
             </div>
             <p className="text-sm font-medium text-text-primary">AI 업무 보고서</p>
             <p className="text-xs text-text-secondary mt-1">{reportType === 'daily' ? '일일' : '주간'} 보고서 유형을 선택하고 생성 버튼을 누르세요</p>
-            <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-2">두레이 태스크와 일정을 분석하여 보고서 초안을 자동 생성합니다</p>
+            <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mt-2">두레이 태스크와 일정을 분석하여 보고서 초안을 자동 생성합니다</p>
           </div>
         )}
       </div>

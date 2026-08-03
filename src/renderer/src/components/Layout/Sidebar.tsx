@@ -111,7 +111,7 @@ function NavButton({
         <span className="text-[calc(12px_*_var(--app-font-scale,1))] font-medium truncate">{label}</span>
       )}
       {badge !== undefined && badge > 0 && (
-        <span className={`min-w-[14px] h-[14px] px-[3px] rounded-full bg-badge-bg text-badge-fg text-[calc(9px_*_var(--app-font-scale,1))] font-bold flex items-center justify-center ${
+        <span className={`min-w-[14px] h-[14px] px-[3px] rounded-full bg-badge-bg text-badge-fg text-[calc(11px_*_var(--app-font-scale,1))] font-bold flex items-center justify-center ${
           expanded ? 'ml-auto flex-none' : 'absolute -top-0.5 -right-0.5 border-2 border-bg-sidebar'
         }`}>
           {badge > 99 ? '99+' : badge}

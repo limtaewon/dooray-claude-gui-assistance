@@ -306,7 +306,7 @@ function InputForm({
       <div className="flex-1 flex flex-col gap-4 p-5 max-w-2xl mx-auto w-full">
         {/* 헤더 설명 */}
         <div className="flex items-start gap-2.5 p-3 rounded-lg bg-[color:var(--bg-surface)] border border-[color:var(--bg-border)]">
-          <Info size={14} className="flex-none mt-0.5 text-[color:var(--clauday-blue)]" />
+          <Info size={14} className="flex-none mt-0.5 text-brand-claude" />
           <div>
             <p className="text-xs font-medium text-[color:var(--text-primary)]">
               Dry-run — {bundleName}
@@ -602,7 +602,7 @@ function RationaleCard({ result }: { result: DryRunResult }): JSX.Element {
         <ul className="flex flex-col gap-1">
           {result.answers.map((answer, idx) => (
             <li key={idx} className="flex items-start gap-2 text-xs text-[color:var(--text-primary)]">
-              <span className="mt-0.5 w-1 h-1 rounded-full bg-[color:var(--clauday-blue)] flex-none" />
+              <span className="mt-0.5 w-1 h-1 rounded-full bg-text-tertiary flex-none" />
               {answer}
             </li>
           ))}

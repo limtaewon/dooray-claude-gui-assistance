@@ -51,7 +51,8 @@ vi.mock('electron', () => {
       whenReady: vi.fn().mockResolvedValue(undefined),
       on: vi.fn(),
       quit: vi.fn(),
-      getPath: vi.fn((name: string) => `/tmp/mock-${name}`)
+      getPath: vi.fn((name: string) => `/tmp/mock-${name}`),
+      getVersion: vi.fn(() => '2.0.4')
     },
     BrowserWindow: MockBrowserWindow,
     ipcMain: {

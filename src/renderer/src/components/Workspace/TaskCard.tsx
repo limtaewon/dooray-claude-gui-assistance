@@ -80,7 +80,7 @@ const TaskCard = memo(function TaskCard({
       <div className="flex items-center gap-1.5 mt-2 flex-wrap">
         <span className={`ds-chip ${workflowChipClass(task)}`}>{getWorkflowName(task)}</span>
         {branch && runStatus && (
-          <span className="inline-flex items-center gap-1.5 font-mono text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+          <span className="inline-flex items-center gap-1.5 font-mono text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
             <span className={`w-1.5 h-1.5 rounded-full flex-none ${runStatusDotClass(runStatus)}`} />
             {branch}
           </span>

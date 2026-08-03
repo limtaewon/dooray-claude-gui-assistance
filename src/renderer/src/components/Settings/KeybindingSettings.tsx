@@ -157,7 +157,7 @@ function KeybindingSettings(): JSX.Element {
             {label}
           </button>
         ))}
-        <span className="ml-auto text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+        <span className="ml-auto text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
           {platform === 'darwin' ? 'macOS' : 'Windows / Linux'} 기준
         </span>
       </div>
@@ -168,7 +168,7 @@ function KeybindingSettings(): JSX.Element {
 
       {groups.map(([group, defs]) => (
         <section key={group}>
-          <h3 className="text-[calc(10px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary uppercase tracking-wide mb-1.5">
+          <h3 className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-tertiary uppercase tracking-wide mb-1.5">
             {group}
           </h3>
           <div className="ds-card flat divide-y divide-bg-border">
@@ -191,10 +191,10 @@ function KeybindingSettings(): JSX.Element {
                       )}
                     </div>
                     {def.note && (
-                      <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">{def.note}</p>
+                      <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary mt-0.5">{def.note}</p>
                     )}
                     {conflictWith && conflictWith.length > 0 && (
-                      <p className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-clauday-orange mt-0.5">
+                      <p className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-clauday-orange mt-0.5">
                         <AlertTriangle size={10} />
                         {conflictWith.map((id) => findDefinition(id)?.title ?? id).join(', ')} 와(과) 같은 조합입니다
                       </p>
@@ -237,7 +237,7 @@ function KeybindingSettings(): JSX.Element {
         </section>
       ))}
 
-      <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+      <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
         변경 사항은 즉시 저장됩니다. 자물쇠 표시는 셸 제어문자나 시스템 메뉴가 소유해 변경할 수 없는 항목입니다.
       </p>
     </div>

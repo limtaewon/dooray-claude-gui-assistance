@@ -28,8 +28,8 @@ CSS는 속성 선택자로 모드별 값을 정의합니다:
 
 /* 다크 모드 */
 [data-theme='dark'] {
-  --bg-surface: #1C2027;
-  --text-primary: #ECEEF2;
+  --bg-surface: #1E1E1E;
+  --text-primary: #F2F2F2;
 }
 ```
 
@@ -125,10 +125,10 @@ const selectPalette = (paletteId: string) => {
 
 | 요소 | 값 | 특징 |
 |------|-----|------|
-| 배경(bg-base) | #15181E (따뜻한 검정) | 순검정 #000000이 아님 |
-| 표면(bg-surface) | #1C2027 (약간 밝은) | elevation 구분 |
-| 텍스트 주요(text-primary) | #ECEEF2 (흐린 흰색) | 순백 #FFFFFF가 아님 |
-| 텍스트 보조(text-secondary) | #A9AEBA (밝은 회색) | 명도 대비 보장 |
+| 배경(bg-base) | #121212 (따뜻한 검정) | 순검정 #000000이 아님 |
+| 표면(bg-surface) | #1E1E1E (약간 밝은) | elevation 구분 |
+| 텍스트 주요(text-primary) | #F2F2F2 (흐린 흰색) | 순백 #FFFFFF가 아님 |
+| 텍스트 보조(text-secondary) | #A0A0A0 (밝은 회색) | 명도 대비 보장 |
 | 강조(c-blue-solid) | #3B82F6 (밝은 파랑) | 라이트보다 명도 높음 |
 
 ### Warmer Neutral (따뜻한 회색)
@@ -137,10 +137,10 @@ const selectPalette = (paletteId: string) => {
 
 ```css
 [data-theme='dark'] {
-  --bg-sidebar:     #0F1115;  /* 0-10% 밝기, 약간 따뜻함 */
-  --bg-base:        #15181E;  /* 8-10% 밝기 */
-  --bg-surface:     #1C2027;  /* 10-13% 밝기 */
-  --bg-surface-raised: #232831; /* 13-15% 밝기 */
+  --bg-sidebar:     #1C1C1C;  /* 0-10% 밝기, 약간 따뜻함 */
+  --bg-base:        #121212;  /* 8-10% 밝기 */
+  --bg-surface:     #1E1E1E;  /* 10-13% 밝기 */
+  --bg-surface-raised: #282828; /* 13-15% 밝기 */
 }
 ```
 
@@ -152,7 +152,7 @@ const selectPalette = (paletteId: string) => {
 
 ```css
 [data-theme='dark'] {
-  --text-primary: #ECEEF2;  /* 순백 #FFFFFF가 아님 */
+  --text-primary: #F2F2F2;  /* 순백 #FFFFFF가 아님 */
 }
 ```
 
@@ -197,7 +197,7 @@ const selectPalette = (paletteId: string) => {
 --code-text: #A14A10;  // 어두운 갈색
 
 // 다크 모드
---code-bg: #1C2027;    // 다크 배경
+--code-bg: #1E1E1E;    // 다크 배경
 --code-text: #FDBA74;  // 밝은 주황
 ```
 
@@ -269,8 +269,8 @@ background: var(--bg-surface);    // #FFFFFF
 color: var(--text-primary);       // #161A22
 
 // 다크: 어두운 배경 + 밝은 텍스트 (자동 조정)
-background: var(--bg-surface);    // #1C2027
-color: var(--text-primary);       // #ECEEF2
+background: var(--bg-surface);    // #1E1E1E
+color: var(--text-primary);       // #F2F2F2
 ```
 
 ## 성능

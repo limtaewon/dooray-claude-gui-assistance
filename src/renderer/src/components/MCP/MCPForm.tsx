@@ -123,7 +123,7 @@ function MCPForm({ editName, editConfig, onSave, onCancel }: MCPFormProps): JSX.
             onChange={(e) => setName(e.target.value)}
             disabled={isEdit}
             placeholder="my-server"
-            className="w-full px-3 py-2 bg-bg-primary border border-bg-border rounded text-sm text-text-primary placeholder-text-secondary focus:outline-none focus:border-clauday-blue disabled:opacity-50"
+            className="w-full px-3 py-2 bg-bg-primary border border-bg-border rounded text-sm text-text-primary placeholder-text-secondary ds-focus disabled:opacity-50"
           />
         </div>
         <div>
@@ -136,7 +136,7 @@ function MCPForm({ editName, editConfig, onSave, onCancel }: MCPFormProps): JSX.
                 onClick={() => setTransport(t)}
                 className={`px-3 py-1.5 rounded text-xs font-mono uppercase border transition-colors ${
                   transport === t
-                    ? 'bg-clauday-blue text-white border-clauday-blue'
+                    ? 'bg-bg-active text-text-primary border-bg-border-strong'
                     : 'bg-bg-primary text-text-secondary border-bg-border hover:text-text-primary'
                 }`}
               >
@@ -155,7 +155,7 @@ function MCPForm({ editName, editConfig, onSave, onCancel }: MCPFormProps): JSX.
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://example.com/mcp"
-                className="w-full px-3 py-2 bg-bg-primary border border-bg-border rounded text-sm text-text-primary placeholder-text-secondary focus:outline-none focus:border-clauday-blue font-mono"
+                className="w-full px-3 py-2 bg-bg-primary border border-bg-border rounded text-sm text-text-primary placeholder-text-secondary ds-focus font-mono"
               />
             </div>
             <div>
@@ -167,7 +167,7 @@ function MCPForm({ editName, editConfig, onSave, onCancel }: MCPFormProps): JSX.
                 onChange={(e) => setHeadersText(e.target.value)}
                 placeholder="Authorization: Bearer xxx"
                 rows={3}
-                className="w-full px-3 py-2 bg-bg-primary border border-bg-border rounded text-sm text-text-primary placeholder-text-secondary focus:outline-none focus:border-clauday-blue font-mono resize-none"
+                className="w-full px-3 py-2 bg-bg-primary border border-bg-border rounded text-sm text-text-primary placeholder-text-secondary ds-focus font-mono resize-none"
               />
             </div>
           </>
@@ -180,11 +180,11 @@ function MCPForm({ editName, editConfig, onSave, onCancel }: MCPFormProps): JSX.
                 value={command}
                 onChange={(e) => setCommand(e.target.value)}
                 placeholder="npx"
-                className="w-full px-3 py-2 bg-bg-primary border border-bg-border rounded text-sm text-text-primary placeholder-text-secondary focus:outline-none focus:border-clauday-blue font-mono"
+                className="w-full px-3 py-2 bg-bg-primary border border-bg-border rounded text-sm text-text-primary placeholder-text-secondary ds-focus font-mono"
               />
               {showWindowsWrapHint && (
                 <p className="mt-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
-                  Windows 에서는 npx/uvx 명령이 자동으로 <code className="text-clauday-blue">cmd /c</code> 로 저장됩니다
+                  Windows 에서는 npx/uvx 명령이 자동으로 <code className="text-brand-claude">cmd /c</code> 로 저장됩니다
                 </p>
               )}
             </div>
@@ -195,7 +195,7 @@ function MCPForm({ editName, editConfig, onSave, onCancel }: MCPFormProps): JSX.
                 onChange={(e) => setArgsText(e.target.value)}
                 placeholder={'-y\n@modelcontextprotocol/server-name'}
                 rows={3}
-                className="w-full px-3 py-2 bg-bg-primary border border-bg-border rounded text-sm text-text-primary placeholder-text-secondary focus:outline-none focus:border-clauday-blue font-mono resize-none"
+                className="w-full px-3 py-2 bg-bg-primary border border-bg-border rounded text-sm text-text-primary placeholder-text-secondary ds-focus font-mono resize-none"
               />
             </div>
             <div>
@@ -207,7 +207,7 @@ function MCPForm({ editName, editConfig, onSave, onCancel }: MCPFormProps): JSX.
                 onChange={(e) => setEnvText(e.target.value)}
                 placeholder="API_KEY=xxx"
                 rows={2}
-                className="w-full px-3 py-2 bg-bg-primary border border-bg-border rounded text-sm text-text-primary placeholder-text-secondary focus:outline-none focus:border-clauday-blue font-mono resize-none"
+                className="w-full px-3 py-2 bg-bg-primary border border-bg-border rounded text-sm text-text-primary placeholder-text-secondary ds-focus font-mono resize-none"
               />
             </div>
           </>
@@ -222,7 +222,7 @@ function MCPForm({ editName, editConfig, onSave, onCancel }: MCPFormProps): JSX.
           </button>
           <button
             onClick={handleSubmit}
-            className="px-4 py-1.5 rounded text-sm bg-clauday-blue text-white hover:opacity-90 transition-colors"
+            className="ds-btn primary sm"
           >
             {isEdit ? '수정' : '추가'}
           </button>

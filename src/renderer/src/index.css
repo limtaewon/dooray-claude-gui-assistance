@@ -59,9 +59,9 @@
   --font-ui:    'Inter', 'Pretendard Variable', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', system-ui, sans-serif;
   --font-mono:  'JetBrains Mono', ui-monospace, SFMono-Regular, 'Menlo', monospace;
 
-  /* type scale (px, 16px 기준) */
-  --t-9:  calc(9px * var(--app-font-scale, 1));
-  --t-10: calc(10px * var(--app-font-scale, 1));
+  /* type scale (px, 16px 기준)
+     하한은 11px. 9~10px 단계는 폐기했다 — 작은 글씨와 낮은 대비가 곱해지면
+     --app-font-scale 을 키우지 않은 기본 상태에서 읽히지 않는다. */
   --t-11: calc(11px * var(--app-font-scale, 1));
   --t-12: calc(12px * var(--app-font-scale, 1));
   --t-13: calc(13px * var(--app-font-scale, 1));
@@ -100,10 +100,11 @@
   --bg-border-light:   #C5C9D2;
   --bg-border-strong:  #A4ABB8;
 
-  /* 텍스트 (3단) */
+  /* 텍스트 (3단) — tertiary 도 캔버스(#F4F5F8) 위 4.8:1 로 AA 를 넘긴다.
+     대비 하한은 테마마다 따로 두지 않는다. */
   --text-primary:      #161A22;
   --text-secondary:    #525A6B;
-  --text-tertiary:     #8A91A0;
+  --text-tertiary:     #64748B;
 
   /* 액센트 — 라이트 컨텍스트 */
   --accent-blue:         var(--clauday-blue);
@@ -166,11 +167,11 @@
   --elev-2: var(--shadow-md);     /* dropdown, popover, sticky bar */
   --elev-3: var(--shadow-lg);     /* modal, command palette */
 
-  /* Focus / selection rings */
-  --ring-focus-color:    rgba(37,99,235,0.30);
-  --ring-focus:          0 0 0 3px var(--ring-focus-color);
-  --ring-error-color:    rgba(220,38,38,0.25);
-  --ring-error:          0 0 0 3px var(--ring-error-color);
+  /* Focus / selection rings — 표면색 오프셋 2px 를 끼운 뒤 불투명 링. 다크와 같은 구조. */
+  --ring-focus-color:    #2563EB;
+  --ring-focus:          0 0 0 2px var(--bg-surface), 0 0 0 4px var(--ring-focus-color);
+  --ring-error-color:    #DC2626;
+  --ring-error:          0 0 0 2px var(--bg-surface), 0 0 0 4px var(--ring-error-color);
   --ring-selected-color: rgba(234,88,12,0.65);
   --ring-selected:       0 0 0 2px var(--ring-selected-color);
 
@@ -238,25 +239,29 @@
 [data-theme='dark'] {
   /* 캔버스(터미널/에디터)만 가장 어둡고, 크롬(사이드바·패널·카드)은 한 톤 밝게 떠 있다.
      전부 같은 검정으로 눌러버리면 영역 구분이 사라진다 — Orca 대조 후 교정(2026-07-30). */
-  --bg-base:           #131313;   /* 앱 캔버스(빈 화면 등) — 가장 어두움 */
-  /* 터미널은 자체 표면을 갖는다 — 크롬(#1A1A1A)·캔버스(#131313)와 구분되게 한 톤 위 (Orca 참고) */
+  --bg-base:           #121212;   /* 앱 캔버스(빈 화면 등) — 가장 어두움 */
+  /* 터미널은 자체 표면을 갖는다 — 크롬(#1E1E1E)·캔버스(#121212)와 구분되게 한 톤 위 (Orca 참고) */
   --terminal-bg:       #202429;
   --terminal-fg:       #E8E8EA;
   --bg-primary:        var(--bg-base);
   --bg-sidebar:        #1C1C1C;   /* 크롬 — 캔버스보다 한 톤 밝게 떠 있다 */
-  --bg-surface:        #1A1A1A;   /* 패널·카드 */
-  --bg-surface-raised: #242424;   /* 모달·팝오버 */
-  --bg-surface-hover:  #242424;
-  --bg-subtle:         #171717;
-  --bg-hover:          #212121;
-  --bg-active:         #2C2C2C;
-  --bg-border:         #2B2B2B;
-  --bg-border-light:   #383838;
-  --bg-border-strong:  #484848;
+  --bg-surface:        #1E1E1E;   /* 패널·카드 */
+  /* 부상(모달·팝오버)은 면 밝기가 아니라 그림자 + 밝은 테두리(--bg-border-light)가 담당한다.
+     어두운 면끼리는 물리적으로 대비가 안 나와서, 밝기만으로 띄우면 hover 와 구분되지 않는다. */
+  --bg-surface-raised: #282828;
+  --bg-surface-hover:  #262626;   /* hover 는 미묘하게만 — 확정 상태(active)와 구분되어야 한다 */
+  --bg-subtle:         #1A1A1A;
+  --bg-hover:          #262626;
+  --bg-active:         #333333;   /* 선택 확정 — 면 + 좌측 표식으로 색 없이 드러낸다 */
+  --bg-border:         #3A3A3A;   /* 표면 위 1.5:1 — 카드가 카드로 읽히는 최소선 */
+  --bg-border-light:   #4A4A4A;
+  --bg-border-strong:  #5A5A5A;
 
   --text-primary:      #F2F2F2;
   --text-secondary:    #A0A0A0;
-  --text-tertiary:     #6E6E6E;
+  /* tertiary 는 표면 위 4.8:1 — AA 하한을 넘긴다. 그래도 구분점·비활성 아이콘 같은
+     장식으로만 쓰고, 읽어야 하는 값은 secondary 이상으로 올린다. */
+  --text-tertiary:     #8A8A8A;
 
   /* v2.0 무채색 크롬 — 다크에서 clauday-blue 계열 유틸(내비·탭·버튼·테두리)은 전부 회색조가 된다.
      상태 칩(--c-*)·워크플로(--wf-*)·링크(--link)·AI 그라디언트(--clauday-*)는 그대로 유색. */
@@ -329,16 +334,18 @@
   --elev-2: var(--shadow-md);
   --elev-3: var(--shadow-lg);
 
-  --ring-focus-color:    rgba(255,255,255,0.22);
-  --ring-focus:          0 0 0 3px var(--ring-focus-color);
-  --ring-error-color:    rgba(248,113,113,0.35);
-  --ring-error:          0 0 0 3px var(--ring-error-color);
+  /* 반투명 링은 어두운 면 위에서 1.6:1 밖에 안 나온다(비텍스트 요구 3:1).
+     표면색 2px 를 끼워 오프셋을 만들고 그 밖에 불투명 링을 둘러 13.7:1 을 확보한다. */
+  --ring-focus-color:    #E9E9EC;
+  --ring-focus:          0 0 0 2px var(--bg-surface), 0 0 0 4px var(--ring-focus-color);
+  --ring-error-color:    #F87171;
+  --ring-error:          0 0 0 2px var(--bg-surface), 0 0 0 4px var(--ring-error-color);
   --ring-selected-color: rgba(251,146,60,0.75);
   --ring-selected:       0 0 0 2px var(--ring-selected-color);
 
   --bg-disabled:     #1A1A1A;
-  --text-disabled:   #545454;
-  --border-disabled: #2B2B2B;
+  --text-disabled:   #6A6A6A;
+  --border-disabled: #3A3A3A;
 
   --wf-backlog-bg:    var(--c-neutral-bg);      --wf-backlog-fg:    var(--c-neutral-fg);  --wf-backlog-dot:    #94A3B8;
   --wf-registered-bg: var(--c-orange-bg);       --wf-registered-fg: var(--c-orange-fg);   --wf-registered-dot: #FB923C;
@@ -396,35 +403,35 @@
   --bg-primary: #F4F5F8;  --bg-surface-hover: #EAECF0;  --bg-subtle: #EEF0F4;
   --bg-hover: #EAECF0;  --bg-active: #DDE0E6;  --bg-border: #DDE0E6;
   --bg-border-light: #C5C9D2;  --bg-border-strong: #C5C9D2;
-  --text-primary: #161A22;  --text-secondary: #525A6B;  --text-tertiary: #8A91A0;
+  --text-primary: #161A22;  --text-secondary: #525A6B;  --text-tertiary: #64748B;
 }
 [data-theme='light'][data-palette='crisp-white'] {
   --bg-sidebar: #F2F3F5;  --bg-base: #F7F8FA;  --bg-surface: #FFFFFF;  --bg-surface-raised: #FFFFFF;
   --bg-primary: #F7F8FA;  --bg-surface-hover: #EEF0F3;  --bg-subtle: #F1F2F5;
   --bg-hover: #EEF0F3;  --bg-active: #E1E4E9;  --bg-border: #E1E4E9;
   --bg-border-light: #CDD1D8;  --bg-border-strong: #CDD1D8;
-  --text-primary: #111827;  --text-secondary: #4B5563;  --text-tertiary: #8A91A0;
+  --text-primary: #111827;  --text-secondary: #4B5563;  --text-tertiary: #64748B;
 }
 [data-theme='light'][data-palette='soft-blue'] {
   --bg-sidebar: #E4E8F0;  --bg-base: #EDF0F5;  --bg-surface: #FFFFFF;  --bg-surface-raised: #FFFFFF;
   --bg-primary: #EDF0F5;  --bg-surface-hover: #E0E4EC;  --bg-subtle: #E5E9F0;
   --bg-hover: #E0E4EC;  --bg-active: #D2D7E1;  --bg-border: #D5DAE2;
   --bg-border-light: #BCC2CD;  --bg-border-strong: #BCC2CD;
-  --text-primary: #101828;  --text-secondary: #414D5F;  --text-tertiary: #8A91A0;
+  --text-primary: #101828;  --text-secondary: #414D5F;  --text-tertiary: #64748B;
 }
 [data-theme='light'][data-palette='graphite'] {
   --bg-sidebar: #E2E5EB;  --bg-base: #EBEDF2;  --bg-surface: #FFFFFF;  --bg-surface-raised: #FFFFFF;
   --bg-primary: #EBEDF2;  --bg-surface-hover: #DEE1E8;  --bg-subtle: #E2E5EB;
   --bg-hover: #DEE1E8;  --bg-active: #D0D4DD;  --bg-border: #D3D7DF;
   --bg-border-light: #B6BBC6;  --bg-border-strong: #B6BBC6;
-  --text-primary: #161A22;  --text-secondary: #525A6B;  --text-tertiary: #8A91A0;
+  --text-primary: #161A22;  --text-secondary: #525A6B;  --text-tertiary: #64748B;
 }
 [data-theme='light'][data-palette='paper'] {
   --bg-sidebar: #ECECEC;  --bg-base: #F4F4F4;  --bg-surface: #FFFFFF;  --bg-surface-raised: #FFFFFF;
   --bg-primary: #F4F4F4;  --bg-surface-hover: #E8E8E8;  --bg-subtle: #EBEBEB;
   --bg-hover: #E8E8E8;  --bg-active: #DCDCDC;  --bg-border: #E0E0E0;
   --bg-border-light: #C4C4C4;  --bg-border-strong: #C4C4C4;
-  --text-primary: #1A1A1A;  --text-secondary: #4A4A4A;  --text-tertiary: #8A8A8A;
+  --text-primary: #1A1A1A;  --text-secondary: #4A4A4A;  --text-tertiary: #6B6B6B;
 }
 
 /* ============================================================
@@ -434,9 +441,9 @@
 .text-section { font-size: var(--t-14); font-weight: 600; color: var(--text-primary); }
 .text-body    { font-size: var(--t-12); font-weight: 400; color: var(--text-primary); }
 .text-meta    { font-size: var(--t-11); font-weight: 400; color: var(--text-secondary); }
-.text-caption { font-size: var(--t-10); font-weight: 400; color: var(--text-tertiary); }
-.text-mini    { font-size: var(--t-9);  font-weight: 500; color: var(--text-tertiary); letter-spacing: 0.02em; }
-.text-label   { font-size: var(--t-10); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); }
+.text-caption { font-size: var(--t-11); font-weight: 400; color: var(--text-tertiary); }
+.text-mini    { font-size: var(--t-11); font-weight: 500; color: var(--text-tertiary); letter-spacing: 0.02em; }
+.text-label   { font-size: var(--t-11); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); }
 
 .num-xl { font-size: var(--t-24); font-weight: 700; color: var(--text-primary); line-height: 1.1; }
 .num-lg { font-size: var(--t-20); font-weight: 700; color: var(--text-primary); line-height: 1.1; }
@@ -451,8 +458,8 @@
 .t-section { font-size: var(--t-14); font-weight: 600; color: var(--text-primary); }
 .t-body    { font-size: var(--t-12); font-weight: 400; color: var(--text-primary); }
 .t-meta    { font-size: var(--t-11); font-weight: 400; color: var(--text-secondary); }
-.t-caption { font-size: var(--t-10); font-weight: 400; color: var(--text-tertiary); }
-.t-label   { font-size: var(--t-10); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); }
+.t-caption { font-size: var(--t-11); font-weight: 400; color: var(--text-tertiary); }
+.t-label   { font-size: var(--t-11); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); }
 .t-mono    { font-family: var(--font-mono); }
 
 /* ============================================================

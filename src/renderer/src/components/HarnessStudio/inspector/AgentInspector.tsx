@@ -260,7 +260,7 @@ export function AgentInspector({ agent, provenance, onClose, bundlePath, gate }:
                       <div key={group.category} className="flex flex-col gap-1">
                         <div className="flex items-center gap-1">
                           <RuleGroupIcon category={group.category} />
-                          <span className="text-[calc(10px_*_var(--app-font-scale,1))] font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
+                          <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
                             {group.label}
                           </span>
                         </div>
@@ -306,7 +306,7 @@ export function AgentInspector({ agent, provenance, onClose, bundlePath, gate }:
         {bundlePath && (
           <Section
             label="AI 설명"
-            icon={<Sparkles size={10} style={{ color: 'var(--clauday-blue)' }} />}
+            icon={<Sparkles size={10} className="text-brand-claude" />}
           >
             {!explainMarkdown && !explainError && (
               <Button

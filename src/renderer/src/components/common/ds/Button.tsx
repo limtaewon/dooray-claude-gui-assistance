@@ -1,7 +1,8 @@
 import { forwardRef } from 'react'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'ai' | 'success' | 'orange' | 'icon'
+/** success 는 제거했다 — 완료 상태색을 실행 버튼에 쓰면 워크플로 칩 「완료」와 같은 색이 된다. 주 액션은 primary. */
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'ai' | 'orange' | 'icon'
 export type ButtonSize = 'xs' | 'sm' | 'md' | 'lg'
 
 export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'size'> {

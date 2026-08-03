@@ -42,7 +42,7 @@ const TaskRow = memo(function TaskRow({ task, isSelected, currentTagFilter, onSe
       <div className="flex-1 min-w-0">
         <p className="text-xs text-text-primary truncate">{task.subject}</p>
         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-          <span className={`text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full ${WORKFLOW_BG_COLORS[wf] || 'bg-gray-500/10 text-gray-400'}`}>
+          <span className={`text-[calc(11px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full ${WORKFLOW_BG_COLORS[wf] || 'bg-gray-500/10 text-gray-400'}`}>
             {wfName}
           </span>
           {task.tags && task.tags.length > 0 && (() => {
@@ -54,7 +54,7 @@ const TaskRow = memo(function TaskRow({ task, isSelected, currentTagFilter, onSe
                 {visible.map((tag) => (
                   <span
                     key={tag.id}
-                    className="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full border"
+                    className="text-[calc(11px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full border"
                     style={tagStyle(tag.color)}
                     onClick={(e) => { e.stopPropagation(); onToggleTag(tag.name || tag.id) }}
                   >
@@ -63,7 +63,7 @@ const TaskRow = memo(function TaskRow({ task, isSelected, currentTagFilter, onSe
                 ))}
                 {hidden > 0 && (
                   <span
-                    className="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-bg-surface border border-bg-border text-text-tertiary cursor-default"
+                    className="text-[calc(11px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-bg-surface border border-bg-border text-text-tertiary cursor-default"
                     title={task.tags.slice(MAX_VISIBLE).map((t) => t.name || t.id).join(', ')}
                   >
                     +{hidden}
@@ -73,12 +73,12 @@ const TaskRow = memo(function TaskRow({ task, isSelected, currentTagFilter, onSe
             )
           })()}
           {task.milestone?.name && (
-            <span className="text-[calc(9px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-400">
+            <span className="text-[calc(11px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-400">
               {task.milestone.name}
             </span>
           )}
           {task.dueDateAt && (
-            <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">
+            <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
               마감 {new Date(task.dueDateAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
             </span>
           )}

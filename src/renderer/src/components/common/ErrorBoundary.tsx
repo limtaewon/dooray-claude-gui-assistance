@@ -36,7 +36,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode; label?: stri
               {this.state.err.stack?.split('\n').slice(0, 8).join('\n')}
             </pre>
             <button onClick={this.reset}
-              className="px-3 py-1.5 rounded-md bg-clauday-blue text-white text-xs hover:opacity-90">
+              className="ds-btn primary sm">
               다시 시도
             </button>
           </div>

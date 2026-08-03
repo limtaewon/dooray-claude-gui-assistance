@@ -42,7 +42,7 @@ const ICONS: Record<ToastTone, { Icon: typeof CheckCircle; color: string }> = {
   error:   { Icon: AlertCircle, color: 'var(--c-red-solid)' },
   warn:    { Icon: AlertTriangle, color: 'var(--c-yellow-solid)' },
   ai:      { Icon: Sparkles, color: 'var(--clauday-orange)' as string },
-  default: { Icon: Info, color: 'var(--clauday-blue)' as string }
+  default: { Icon: Info, color: 'var(--c-blue-solid)' as string }
 }
 
 function ToastHost({ children }: { children: ReactNode }): JSX.Element {

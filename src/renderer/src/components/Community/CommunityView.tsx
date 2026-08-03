@@ -140,14 +140,14 @@ function CommunityView({ active = true }: { active?: boolean } = {}): JSX.Elemen
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-bg-active border border-bg-border-light">
-              <Users size={14} className="text-clauday-blue" />
+              <Users size={14} className="text-brand-dooray" />
             </div>
             <div>
               <h2 className="text-sm font-bold text-text-primary leading-tight">커뮤니티</h2>
-              <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary leading-tight">Clauday 사용자 모임</p>
+              <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary leading-tight">Clauday 사용자 모임</p>
             </div>
             {!loading && posts.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[calc(9px_*_var(--app-font-scale,1))] font-bold"
+              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[calc(11px_*_var(--app-font-scale,1))] font-bold"
                 style={{ background: 'var(--c-blue-bg)', color: 'var(--c-blue-fg)', border: '1px solid color-mix(in oklab, var(--c-blue-fg) 30%, transparent)' }}>
                 {posts.length}
               </span>
@@ -285,7 +285,7 @@ function PostCard({
       <div className="flex gap-3">
         {/* Left: Dooray task number */}
         <div className="flex-shrink-0 flex flex-col items-center pt-0.5">
-          <div className="min-w-7 h-6 px-1.5 rounded-md flex items-center justify-center text-[calc(11px_*_var(--app-font-scale,1))] font-bold text-clauday-blue group-hover:bg-clauday-blue group-hover:text-white transition-colors"
+          <div className="min-w-7 h-6 px-1.5 rounded-md flex items-center justify-center text-[calc(11px_*_var(--app-font-scale,1))] font-bold text-c-blue-fg group-hover:bg-c-blue-solid group-hover:text-white transition-colors"
             style={{ background: 'var(--c-blue-bg)', border: '1px solid color-mix(in oklab, var(--c-blue-fg) 25%, transparent)' }}>
             {post.number ?? '·'}
           </div>
@@ -293,7 +293,7 @@ function PostCard({
 
         {/* Main content */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-text-primary group-hover:text-clauday-blue transition-colors leading-snug pr-2">
+          <p className="text-sm font-semibold text-text-primary group-hover:text-brand-dooray transition-colors leading-snug pr-2">
             {post.subject}
           </p>
           {preview && (
@@ -309,15 +309,15 @@ function PostCard({
                 {initials}
               </span>
               {authorName && (
-                <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary font-medium">{authorName}</span>
+                <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary font-medium">{authorName}</span>
               )}
             </div>
-            <span className="text-text-tertiary text-[calc(10px_*_var(--app-font-scale,1))]">·</span>
-            <span className="flex items-center gap-1 text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+            <span className="text-text-tertiary text-[calc(11px_*_var(--app-font-scale,1))]">·</span>
+            <span className="flex items-center gap-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
               <Clock size={9} />
               {timeAgo}
             </span>
-            <div className="ml-auto flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[calc(9px_*_var(--app-font-scale,1))] font-medium"
+            <div className="ml-auto flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[calc(11px_*_var(--app-font-scale,1))] font-medium"
               style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)', border: '1px solid var(--bg-border)' }}>
               <MessageSquare size={8} />
               <span>댓글</span>
@@ -327,7 +327,7 @@ function PostCard({
 
         {/* Right arrow hint */}
         <div className="flex-shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity">
-          <ChevronLeft size={14} className="rotate-180 text-clauday-blue" />
+          <ChevronLeft size={14} className="rotate-180 text-brand-dooray" />
         </div>
       </div>
     </div>
@@ -411,12 +411,12 @@ function PostDetail({
         <div className="flex-1 min-w-0">
           <h2 className="text-xs font-semibold text-text-secondary truncate">{post.subject}</h2>
         </div>
-        <span className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">{formatTimeAgo(post.createdAt)}</span>
+        <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">{formatTimeAgo(post.createdAt)}</span>
         {isMyPost && (
           <button
             onClick={onDeletePost}
             title="글 삭제"
-            className="flex items-center gap-1 px-2 py-1 rounded-md text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-red-400 hover:bg-red-500/10 transition-colors"
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-red-400 hover:bg-red-500/10 transition-colors"
           >
             <Trash2 size={11} />
             글 삭제
@@ -445,10 +445,10 @@ function PostDetail({
                   <span className="text-xs font-semibold text-text-primary">{authorName || '알 수 없음'}</span>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <Clock size={9} className="text-text-tertiary" />
-                    <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">{formatTimeAgo(post.createdAt)}</span>
+                    <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">{formatTimeAgo(post.createdAt)}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 px-2 py-1 rounded-lg text-[calc(10px_*_var(--app-font-scale,1))] font-medium"
+                <div className="flex items-center gap-1 px-2 py-1 rounded-lg text-[calc(11px_*_var(--app-font-scale,1))] font-medium"
                   style={{ background: 'var(--c-blue-bg)', color: 'var(--c-blue-fg)', border: '1px solid color-mix(in oklab, var(--c-blue-fg) 25%, transparent)' }}>
                   <Hash size={9} />
                   커뮤니티
@@ -482,10 +482,10 @@ function PostDetail({
           {/* Comments section header */}
           <div className="flex items-center gap-2 mb-3">
             <div className="flex items-center gap-1.5">
-              <MessageSquare size={13} className="text-clauday-blue" />
+              <MessageSquare size={13} className="text-brand-dooray" />
               <span className="text-xs font-bold text-text-primary">댓글</span>
               {comments.length > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full text-[calc(9px_*_var(--app-font-scale,1))] font-bold"
+                <span className="px-1.5 py-0.5 rounded-full text-[calc(11px_*_var(--app-font-scale,1))] font-bold"
                   style={{ background: 'var(--c-blue-bg)', color: 'var(--c-blue-fg)' }}>
                   {comments.length}
                 </span>
@@ -517,7 +517,7 @@ function PostDetail({
                   <div key={c.id} className="flex gap-2.5 group">
                     {/* Thread line */}
                     <div className="flex flex-col items-center flex-shrink-0">
-                      <span className="w-6 h-6 rounded-full flex items-center justify-center text-[calc(9px_*_var(--app-font-scale,1))] font-bold"
+                      <span className="w-6 h-6 rounded-full flex items-center justify-center text-[calc(11px_*_var(--app-font-scale,1))] font-bold"
                         style={{ background: commenterColors.bg, color: commenterColors.text, border: `1.5px solid ${commenterColors.ring}50` }}>
                         {commenterInitials}
                       </span>
@@ -532,7 +532,7 @@ function PostDetail({
                           style={{ borderBottom: c.body?.content ? '1px solid var(--bg-border)' : 'none', background: 'var(--bg-primary)' }}>
                           <span className="text-[calc(11px_*_var(--app-font-scale,1))] font-semibold text-text-primary">{commenterName}</span>
                           {c.createdAt && (
-                            <span className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary ml-auto">{formatTimeAgo(c.createdAt)}</span>
+                            <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary ml-auto">{formatTimeAgo(c.createdAt)}</span>
                           )}
                           {isMyComment && (
                             <button
@@ -727,7 +727,7 @@ function CommentComposer({ postId, onPosted }: { postId: string; onPosted: () =>
         <div className="px-3 pb-2 flex flex-wrap gap-1.5">
           {images.map((img) => (
             <div key={img.tmpId}
-              className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-lg text-[calc(10px_*_var(--app-font-scale,1))] text-text-secondary"
+              className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-lg text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary"
               style={{ background: 'var(--bg-primary)', border: '1px solid var(--bg-border)' }}>
               <img src={img.dataUrl} alt="" className="w-5 h-5 object-cover rounded" />
               <span className="max-w-[100px] truncate">{img.filename}</span>
@@ -745,7 +745,7 @@ function CommentComposer({ postId, onPosted }: { postId: string; onPosted: () =>
       {/* Actions footer */}
       <div className="flex items-center justify-between px-3 py-2"
         style={{ borderTop: '1px solid var(--bg-border)' }}>
-        <p className="text-[calc(9px_*_var(--app-font-scale,1))] text-text-tertiary">⌘+Enter로 전송</p>
+        <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">⌘+Enter로 전송</p>
         <button
           onClick={submit}
           disabled={!text.trim() || posting}
@@ -896,7 +896,7 @@ ${body || '(빈 내용. 제목을 보고 초안을 작성해줘.)'}
               <Plus size={13} className="text-clauday-orange" />
             </div>
             <h3 className="text-sm font-bold text-text-primary">새 글 쓰기</h3>
-            <span className="text-[calc(10px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full text-text-tertiary"
+            <span className="text-[calc(11px_*_var(--app-font-scale,1))] px-1.5 py-0.5 rounded-full text-text-tertiary"
               style={{ background: 'var(--bg-border)' }}>
               커뮤니티
             </span>
@@ -1038,7 +1038,7 @@ ${body || '(빈 내용. 제목을 보고 초안을 작성해줘.)'}
         {/* Modal footer */}
         <div className="flex items-center justify-between px-5 py-3"
           style={{ borderTop: '1px solid var(--bg-border)', background: 'var(--bg-primary)' }}>
-          <p className="text-[calc(10px_*_var(--app-font-scale,1))] text-text-tertiary">
+          <p className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary">
             이미지 Paste/Drop 지원 · 게시하면 Clauday 프로젝트에 등록
           </p>
           <div className="flex items-center gap-2">
