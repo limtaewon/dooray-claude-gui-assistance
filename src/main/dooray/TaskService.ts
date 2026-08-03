@@ -125,6 +125,20 @@ export class TaskService {
     return projects
   }
 
+  /**
+   * 프로젝트 코드만 필요한 자리에서 쓴다 — 못 가져와도 흐름을 막지 않는다.
+   *
+   * 캐시 전용 조회(`projectCache.get`)는 프로젝트 목록을 아직 한 번도 안 부른 화면에서 항상
+   * 비어 있어 `projectCode` 가 undefined 로 새고, 브랜치명이 `feature/task-1234` 로 떨어진다.
+   */
+  private async projectCodeOf(projectId: string): Promise<string | undefined> {
+    const cached = this.projectCache.get(projectId)
+    if (cached) return cached.code
+    return this.getProjectInfo(projectId)
+      .then((p) => p.code)
+      .catch(() => undefined)
+  }
+
   async getProjectInfo(projectId: string): Promise<DoorayProject> {
     const cached = this.projectCache.get(projectId)
     if (cached) return cached
@@ -199,13 +213,13 @@ export class TaskService {
     const size = 100
     // 페이지를 2로 줄여 전체 호출 수 대폭 감소 (200개 이내는 대부분 1-2페이지로 충분)
     const MAX_PAGES = 2
-    const project = this.projectCache.get(projectId)
     const tStart = Date.now()
 
-    // 태그/워크플로우 정보 + 첫 페이지 동시 호출 (병렬)
-    const [tagInfo, workflowInfo, firstRes] = await Promise.all([
+    // 태그/워크플로우 정보 + 프로젝트 코드 + 첫 페이지 동시 호출 (병렬)
+    const [tagInfo, workflowInfo, projectCode, firstRes] = await Promise.all([
       this.loadTagInfo(projectId),
       this.loadWorkflows(projectId),
+      this.projectCodeOf(projectId),
       this.client.request<DoorayListResponse<DoorayTask>>(
         `/project/v1/projects/${projectId}/posts?toMemberIds=${memberId}&size=${size}&page=0&order=-createdAt`
       ).catch(() => ({ header: { resultCode: 0, isSuccessful: false }, result: [], totalCount: 0 }))
@@ -218,7 +232,7 @@ export class TaskService {
 
     const enrichTask = (task: DoorayTask): void => {
       task.projectId = projectId
-      task.projectCode = project?.code
+      task.projectCode = projectCode
       if (task.tags) {
         for (const tag of task.tags) {
           const info = tagInfo.get(tag.id)
@@ -370,8 +384,8 @@ export class TaskService {
           const res = await this.client.request<DoorayListResponse<DoorayTask>>(
             `/project/v1/projects/${projectId}/posts?ccMemberIds=${memberId}&postWorkflowClasses=registered,working&size=50&page=0&order=-createdAt`
           )
-          const project = this.projectCache.get(projectId)
-          return (res.result || []).map((t) => { t.projectId = projectId; t.projectCode = project?.code; return t })
+          const projectCode = await this.projectCodeOf(projectId)
+          return (res.result || []).map((t) => { t.projectId = projectId; t.projectCode = projectCode; return t })
         } catch { return [] }
       }
     )
@@ -448,7 +462,7 @@ export class TaskService {
     )
     const detail = res.result
     detail.projectId = projectId
-    detail.projectCode = this.projectCache.get(projectId)?.code
+    detail.projectCode = await this.projectCodeOf(projectId)
     return detail
   }
 
@@ -669,12 +683,18 @@ export class TaskService {
     return this.client.uploadFile(params)
   }
 
-  /** 태스크 본문(제목+body)만 업데이트 — 이미지 업로드 후 링크 치환에 사용 */
+  /**
+   * 태스크 본문(제목+body) 업데이트 — 이미지 업로드 후 링크 치환, 상세 화면의 본문 편집에 쓴다.
+   *
+   * `mimeType` 은 **읽어온 값을 그대로 돌려보내야** 한다. 두레이 웹에서 쓴 글은 대개
+   * `text/html` 인데 마크다운으로 저장하면 표·체크박스 같은 서식이 평문으로 깨진다.
+   */
   async updateTaskBody(params: {
     projectId: string
     postId: string
     subject: string
     body: string
+    mimeType?: string
   }): Promise<void> {
     await this.client.request(
       `/project/v1/projects/${params.projectId}/posts/${params.postId}`,
@@ -682,7 +702,7 @@ export class TaskService {
         method: 'PUT',
         body: JSON.stringify({
           subject: params.subject,
-          body: { mimeType: 'text/x-markdown', content: params.body }
+          body: { mimeType: params.mimeType || 'text/x-markdown', content: params.body }
         })
       }
     )
@@ -730,14 +750,14 @@ export class TaskService {
     posts: DoorayTask[]
     totalCount: number
   }> {
-    const project = this.projectCache.get(projectId)
+    const projectCode = await this.projectCodeOf(projectId)
     const res = await this.client.request<DoorayListResponse<DoorayTask>>(
       `/project/v1/projects/${projectId}/posts?size=${size}&page=${page}&order=-createdAt`
     ).catch(() => ({ header: { resultCode: 0, isSuccessful: false }, result: [] as DoorayTask[], totalCount: 0 }))
 
     const posts = (res.result || []).map((t) => {
       t.projectId = projectId
-      t.projectCode = project?.code
+      t.projectCode = projectCode
       return t
     })
     return { posts, totalCount: res.totalCount || posts.length }

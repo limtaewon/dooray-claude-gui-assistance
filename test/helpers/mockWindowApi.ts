@@ -122,6 +122,11 @@ export function createMockWindowApi(): Record<string, unknown> {
       readImageDataUrl: vi.fn().mockResolvedValue({ ok: true, dataUrl: '' }),
       showInFolder: vi.fn().mockResolvedValue({ ok: true })
     },
+    editor: {
+      // 기본은 "설치된 에디터 없음" — 열기 버튼이 안 나오는 것이 기본 상태다.
+      list: vi.fn().mockResolvedValue([]),
+      open: vi.fn().mockResolvedValue(undefined)
+    },
     claudeMdTemplates: {
       list: vi.fn().mockResolvedValue([]),
       apply: vi.fn().mockResolvedValue({ ok: true })
@@ -169,6 +174,16 @@ export function createMockWindowApi(): Record<string, unknown> {
       sessionLoad: vi.fn().mockResolvedValue([]),
       sessionRename: vi.fn().mockResolvedValue(undefined),
       sessionStar: vi.fn().mockResolvedValue(undefined),
+      retentionGet: vi.fn().mockResolvedValue({
+        days: 30,
+        source: 'default',
+        settingsPath: '/home/test/.claude/settings.json'
+      }),
+      retentionSet: vi.fn().mockResolvedValue({
+        days: 30,
+        source: 'default',
+        settingsPath: '/home/test/.claude/settings.json'
+      }),
       saveAttachment: vi.fn().mockResolvedValue('')
     },
     ai: {
@@ -303,6 +318,8 @@ export function createMockWindowApi(): Record<string, unknown> {
       taskDrop: {
         resolve: vi.fn().mockResolvedValue(null),
         link: vi.fn().mockResolvedValue(null),
+        watch: vi.fn().mockResolvedValue(undefined),
+        onLinked: vi.fn().mockReturnValue(noopUnsub),
         unlink: vi.fn().mockResolvedValue(undefined),
         touch: vi.fn().mockResolvedValue(undefined),
         linked: vi.fn().mockResolvedValue({})

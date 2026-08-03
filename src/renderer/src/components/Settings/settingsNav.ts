@@ -145,6 +145,7 @@ export const SETTINGS_SEARCH_TARGETS: SettingsSearchTarget[] = [
   { sectionId: 'insights', title: '토큰 사용량', keywords: ['usage', 'token', '비용', 'cost'] },
 
   { sectionId: 'appearance', title: '테마', description: '밝게/어둡게', keywords: ['theme', 'dark', 'light', '다크', '라이트'] },
+  { sectionId: 'appearance', title: '터미널 색', description: '터미널 색 테마 — 앱 테마와 따로 정합니다', keywords: ['terminal', '터미널', 'theme', '테마', '색', 'dracula', 'nord', 'solarized'] },
   { sectionId: 'appearance', title: '색상 팔레트', keywords: ['palette', 'color', '색'] },
   { sectionId: 'appearance', title: '글꼴', description: '앱 전체 글꼴과 크기', keywords: ['font', 'size', '폰트', '크기'] },
   { sectionId: 'appearance', title: '사이드바 구성', description: '메뉴 순서와 표시 여부', keywords: ['sidebar', 'menu', '메뉴', '순서'] },

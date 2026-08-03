@@ -52,8 +52,6 @@ function SourceControlPanel({ repoPath, onOpenDiff, onRepoChanged }: SourceContr
   const [busy, setBusy] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const toast = useToast()
-  /** 이전에 본 경로들 — 새로 나타난 변경만 자동 선택하기 위해. */
-  const seenPathsRef = useRef<Set<string>>(new Set())
   const repoRef = useRef(repoPath)
   repoRef.current = repoPath
 
@@ -92,34 +90,25 @@ function SourceControlPanel({ repoPath, onOpenDiff, onRepoChanged }: SourceContr
    * 커밋에 넣을 파일 — **스테이징과 분리된 화면 상태**다.
    * 체크를 스테이징에 직결하면 파일이 섹션을 옮겨 다녀 목록이 출렁인다(IntelliJ 도 이렇게 하지 않는다).
    * 실제 `git add` 는 커밋 직전에 한 번 한다.
+   *
+   * 상태로 들고 있는 것은 **사용자가 직접 바꾼 것뿐**이고 나머지는 매번 계산한다 —
+   * "이전에 본 경로" 같은 기억을 두면 목록이 갱신될 때마다 그 기억과 어긋나 선택이 사라진다.
    */
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [overrides, setOverrides] = useState<Map<string, boolean>>(new Map())
 
-  // 목록이 바뀌면 사라진 파일은 선택에서 빼고, 새로 생긴 **추적 중** 파일은 기본으로 넣는다.
-  // 추적되지 않은 파일은 자동으로 넣지 않는다 — 빌드 산출물이 딸려 들어가면 되돌리기 번거롭다.
-  useEffect(() => {
-    if (!status) return
-    const tracked = sections.changes.map((entry) => entry.path)
-    const known = new Set([...tracked, ...sections.untracked.map((entry) => entry.path)])
-    // ref 갱신은 updater **밖**에서 — React 는 updater 를 두 번 호출할 수 있어서
-    // 안에 두면 두 번째 호출이 "이미 본 경로" 로 읽어 자동 선택이 통째로 사라진다.
-    const seen = seenPathsRef.current
-    seenPathsRef.current = known
-    setSelected((prev) => {
-      const next = new Set<string>()
-      for (const path of prev) if (known.has(path)) next.add(path)
-      for (const path of tracked) if (!seen.has(path)) next.add(path)
-      return next
-    })
-  }, [status, sections])
+  const selected = useMemo(() => {
+    const picked = new Set<string>()
+    // 추적 중인 변경은 기본 포함. 버전이 없는 파일은 직접 고른 것만
+    // (빌드 산출물이 딸려 들어가면 되돌리기 번거롭다).
+    for (const entry of sections.changes) if (overrides.get(entry.path) ?? true) picked.add(entry.path)
+    for (const entry of sections.untracked) if (overrides.get(entry.path) ?? false) picked.add(entry.path)
+    return picked
+  }, [sections, overrides])
 
   const toggleSelected = useCallback((paths: string[], next: boolean): void => {
-    setSelected((prev) => {
-      const updated = new Set(prev)
-      for (const path of paths) {
-        if (next) updated.add(path)
-        else updated.delete(path)
-      }
+    setOverrides((prev) => {
+      const updated = new Map(prev)
+      for (const path of paths) updated.set(path, next)
       return updated
     })
   }, [])

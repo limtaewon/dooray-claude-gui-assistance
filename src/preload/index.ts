@@ -313,7 +313,7 @@ const api = {
       uploadFile: (params: { projectId: string; postId: string; filename: string; mime: string; data: ArrayBuffer }): Promise<{ id: string }> =>
         ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_UPLOAD_FILE, params),
       /** 태스크 본문 업데이트 */
-      updateBody: (params: { projectId: string; postId: string; subject: string; body: string }): Promise<void> =>
+      updateBody: (params: { projectId: string; postId: string; subject: string; body: string; mimeType?: string }): Promise<void> =>
         ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_UPDATE_BODY, params),
       /** 댓글 본문 수정 */
       updateComment: (params: { projectId: string; postId: string; logId: string; content: string }): Promise<void> =>
@@ -427,6 +427,15 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.SHELL_SHOW_IN_FOLDER, target)
   },
 
+  // 외부 에디터 — 워크트리 폴더를 IntelliJ 등에서 프로젝트로 연다
+  editor: {
+    /** 설치된 에디터만 돌려준다. force 면 다시 훑는다(설치 직후 갱신용) */
+    list: (force?: boolean): Promise<import('../shared/types/editor').DetectedEditor[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.EDITOR_LIST, force),
+    open: (req: import('../shared/types/editor').OpenInEditorRequest): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.EDITOR_OPEN, req)
+  },
+
   // CLAUDE.md 카탈로그 (#3) — 앱 내장 템플릿 목록 + 적용
   claudeMdTemplates: {
     list: (): Promise<Array<{ id: string; name: string; description: string }>> =>
@@ -533,6 +542,12 @@ const api = {
     /** 세션 즐겨찾기 토글 */
     sessionStar: (sessionId: string, starred: boolean): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_SESSION_STAR, { sessionId, starred }),
+    /** 세션 보관 기간 조회 — claude 가 이 기간이 지난 기록을 지운다 */
+    retentionGet: (): Promise<import('../shared/types/claude-retention').ClaudeRetentionState> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_RETENTION_GET),
+    /** 세션 보관 기간 저장. null 이면 claude 기본값(30일)을 따른다 */
+    retentionSet: (days: number | null): Promise<import('../shared/types/claude-retention').ClaudeRetentionState> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_RETENTION_SET, days),
     /** 채팅 첨부 파일 저장 → 절대 경로 반환 (drag-drop 시 path 가 이미 있으면 호출 불필요, paste 이미지에 사용) */
     saveAttachment: (name: string, data: ArrayBuffer | Uint8Array): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_ATTACHMENT_SAVE, { name, data })
@@ -763,9 +778,38 @@ const api = {
       /** preferCwd 를 주면 그 폴더의 세션을 우선 이어간다 (드롭한 pane 이 이미 있는 폴더). */
       resolve: (projectId: string, taskId: string, preferCwd?: string): Promise<TaskDropTarget | null> =>
         ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_RESOLVE, { projectId, taskId, preferCwd }),
+      /** 드롭 직후 — 세션이 생길 때까지 main 이 지켜보다 연결한다. */
+      watch: (params: {
+        projectId: string
+        taskId: string
+        cwd: string
+        since: number
+        label?: string
+        repoPath?: string
+      }): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_WATCH, params),
+      /** 연결되면 알린다 — 배지를 새로 그리기 위한 신호. */
+      onLinked: (cb: () => void): (() => void) => {
+        const handler = (): void => cb()
+        ipcRenderer.on(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINKED_PUSH, handler)
+        return () => ipcRenderer.removeListener(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINKED_PUSH, handler)
+      },
       /** 드롭 직후 생긴 세션을 태스크에 연결. `since` 이후 활동한 세션만 후보다. */
-      link: (projectId: string, taskId: string, cwd: string, since: number): Promise<string | null> =>
-        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINK, { projectId, taskId, cwd, since }),
+      link: (
+        projectId: string,
+        taskId: string,
+        cwd: string,
+        since: number,
+        label?: string,
+        repoPath?: string
+      ): Promise<string | null> =>
+        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINK, {
+          projectId,
+          taskId,
+          cwd,
+          since,
+          label,
+          repoPath
+        }),
       /** cwd 를 주면 그 폴더 링크만, 안 주면 이 업무의 링크 전부를 해제한다. */
       unlink: (projectId: string, taskId: string, cwd?: string): Promise<void> =>
         ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TASK_DROP_UNLINK, { projectId, taskId, cwd }),

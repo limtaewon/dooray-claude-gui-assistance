@@ -75,6 +75,13 @@ export const SESSION_LIMIT_CLOSE_REASON = 'AGENT_ALREADY_CONNECTED'
 export const STANDBY_RETRY_INTERVAL_MS = 15_000
 
 /**
+ * 소켓을 닫은 뒤 서버가 세션을 정리할 때까지 기다리는 시간.
+ * 곧장 새로 붙으면 서버가 아직 옛 세션을 들고 있어 '세션 중복' 으로 막고, 그러면 STANDBY 로
+ * 빠져 15초를 더 기다리게 된다 — 재연결 버튼이 바로 안 듣던 원인.
+ */
+export const CLOSE_GRACE_MS = 1_500
+
+/**
  * 연결이 끊겼을 때 다시 붙기까지의 대기 — 시도할수록 늘어난다(지수 백오프).
  * 네트워크가 잠깐 끊긴 경우엔 1초 만에 붙고, 서버가 오래 죽어 있으면 30초 간격으로 두드린다.
  */

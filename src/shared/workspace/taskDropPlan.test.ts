@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { planFromCandidate, resolveTaskDropPlan, samePath } from './taskDropPlan'
+import { planFromCandidate, resolveTaskDropPlan, samePath, sessionForRepo } from './taskDropPlan'
 import type { RepoRegistryEntry, TaskSessionLink } from '../types/workspace'
 
 const NEON: RepoRegistryEntry = { id: 'r1', path: '/Users/me/Desktop/2NEON', name: '2NEON' }
@@ -8,6 +8,49 @@ const AI: RepoRegistryEntry = { id: 'r2', path: '/Users/me/Desktop/neon-ai', nam
 function link(cwd: string, sessionId: string): TaskSessionLink {
   return { cwd, claudeSessionId: sessionId, lastUsedAt: 1 }
 }
+
+/**
+ * 브랜치 템플릿의 `{prefix}` 는 저장소별 값이라 계획에 실려야 치환된다.
+ * 안 실으면 사용자가 설정에 넣은 토큰이 조용히 빈칸이 된다 — 설정은 되는데 결과에만 없다.
+ */
+describe('taskDropPlan — 브랜치 prefix 를 실어 나른다', () => {
+  const PREFIXED: RepoRegistryEntry = { ...NEON, branchPrefix: 'team-a' }
+
+  it('저장소가 하나면 계획의 repo 에 담는다', () => {
+    const plan = resolveTaskDropPlan({
+      currentCwd: '/tmp/elsewhere',
+      mappedRepos: [PREFIXED],
+      links: []
+    })
+
+    expect(plan).toMatchObject({ kind: 'start', repo: { branchPrefix: 'team-a' } })
+  })
+
+  it('여럿이면 후보마다 담고, 고른 뒤 계획까지 이어진다', () => {
+    const plan = resolveTaskDropPlan({
+      currentCwd: '/tmp/elsewhere',
+      mappedRepos: [PREFIXED, AI],
+      links: []
+    })
+    if (plan.kind !== 'choose') throw new Error('여러 저장소면 고르게 해야 한다')
+
+    expect(plan.candidates[0]).toMatchObject({ branchPrefix: 'team-a' })
+    expect(planFromCandidate(plan.candidates[0])).toMatchObject({
+      repo: { branchPrefix: 'team-a' }
+    })
+  })
+
+  it('prefix 를 안 정한 저장소는 undefined 그대로 — 빈 문자열로 채우지 않는다', () => {
+    const plan = resolveTaskDropPlan({
+      currentCwd: '/tmp/elsewhere',
+      mappedRepos: [NEON],
+      links: []
+    })
+
+    expect(plan).toMatchObject({ kind: 'start' })
+    expect((plan as { repo?: { branchPrefix?: string } }).repo?.branchPrefix).toBeUndefined()
+  })
+})
 
 describe('samePath', () => {
   it('뒤 슬래시 차이는 같은 폴더', () => {
@@ -59,6 +102,42 @@ describe('resolveTaskDropPlan — 워크트리 안에 있을 때', () => {
   })
 })
 
+describe('sessionForRepo — 워크트리에서 돌린 세션도 그 저장소의 것', () => {
+  it('repoPath 가 붙어 있으면 cwd 가 워크트리여도 찾는다', () => {
+    const worktree: TaskSessionLink = {
+      cwd: '/Users/me/Desktop/.neon-ai-worktrees/feature-neon-6793',
+      claudeSessionId: 'wt-sess',
+      lastUsedAt: 10,
+      repoPath: AI.path
+    }
+    expect(sessionForRepo([worktree], AI.path)).toEqual({
+      sessionId: 'wt-sess',
+      cwd: worktree.cwd
+    })
+  })
+
+  it('repoPath 가 없는 옛 링크는 워크트리 경로 규칙으로 되짚는다', () => {
+    const legacy = link('/Users/me/Desktop/.neon-ai-worktrees/feature-neon-6793', 'old-sess')
+    expect(sessionForRepo([legacy], AI.path)?.sessionId).toBe('old-sess')
+  })
+
+  it('다른 저장소의 워크트리는 섞이지 않는다', () => {
+    const other = link('/Users/me/Desktop/.2NEON-worktrees/feature-neon-6793', 'neon-sess')
+    expect(sessionForRepo([other], AI.path)).toBeUndefined()
+  })
+
+  it('여러 개면 가장 최근 것', () => {
+    const older: TaskSessionLink = { cwd: AI.path, claudeSessionId: 'a', lastUsedAt: 1, repoPath: AI.path }
+    const newer: TaskSessionLink = {
+      cwd: '/Users/me/Desktop/.neon-ai-worktrees/x',
+      claudeSessionId: 'b',
+      lastUsedAt: 99,
+      repoPath: AI.path
+    }
+    expect(sessionForRepo([older, newer], AI.path)?.sessionId).toBe('b')
+  })
+})
+
 describe('resolveTaskDropPlan — 매핑되지 않은 자리에 놓았을 때', () => {
   it('저장소가 하나면 묻지 않고 그리로 간다', () => {
     const plan = resolveTaskDropPlan({
@@ -76,17 +155,38 @@ describe('resolveTaskDropPlan — 매핑되지 않은 자리에 놓았을 때', 
     })
   })
 
-  it('저장소가 여럿이면 고르게 한다', () => {
+  it('저장소가 여럿이면 고르게 한다 — 워크트리에서 하던 것도 이어가기로 잡힌다', () => {
     const plan = resolveTaskDropPlan({
       currentCwd: '/tmp/elsewhere',
       mappedRepos: [NEON, AI],
-      links: [link(AI.path, 'ai-sess')]
+      links: [
+        {
+          cwd: '/Users/me/Desktop/.neon-ai-worktrees/feature-neon-6793',
+          claudeSessionId: 'ai-sess',
+          lastUsedAt: 1,
+          repoPath: AI.path
+        }
+      ]
     })
     expect(plan.kind).toBe('choose')
     if (plan.kind !== 'choose') throw new Error('unreachable')
     expect(plan.candidates).toEqual([
-      { repoId: 'r1', name: '2NEON', path: NEON.path, baseBranch: undefined, sessionId: undefined },
-      { repoId: 'r2', name: 'neon-ai', path: AI.path, baseBranch: undefined, sessionId: 'ai-sess' }
+      {
+        repoId: 'r1',
+        name: '2NEON',
+        path: NEON.path,
+        baseBranch: undefined,
+        sessionId: undefined,
+        sessionCwd: undefined
+      },
+      {
+        repoId: 'r2',
+        name: 'neon-ai',
+        path: AI.path,
+        baseBranch: undefined,
+        sessionId: 'ai-sess',
+        sessionCwd: '/Users/me/Desktop/.neon-ai-worktrees/feature-neon-6793'
+      }
     ])
   })
 
@@ -130,6 +230,22 @@ describe('resolveTaskDropPlan — 매핑이 없을 때', () => {
 })
 
 describe('planFromCandidate', () => {
+  it('워크트리에서 하던 세션이면 그 폴더로 간다 — 세션은 만들어진 폴더에서만 이어진다', () => {
+    const plan = planFromCandidate({
+      repoId: 'r2',
+      name: 'neon-ai',
+      path: AI.path,
+      sessionId: 'wt-sess',
+      sessionCwd: '/Users/me/Desktop/.neon-ai-worktrees/feature-neon-6793'
+    })
+    expect(plan).toMatchObject({
+      cwd: '/Users/me/Desktop/.neon-ai-worktrees/feature-neon-6793',
+      sessionId: 'wt-sess',
+      needsCd: true,
+      repo: { path: AI.path, name: 'neon-ai' }
+    })
+  })
+
   it('고른 저장소로 계획을 만든다', () => {
     const plan = planFromCandidate(
       { repoId: 'r1', name: '2NEON', path: NEON.path, sessionId: 's1' },

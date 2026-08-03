@@ -19,7 +19,14 @@ export interface TaskDropServiceDeps {
  * 터미널 태스크 드로어(C-3.5)의 경량 흐름. 워크트리를 만들지 않고 매핑된 저장소 폴더에서
  * claude 를 띄우며, 태스크↔claude 세션 매핑을 관리해 두 번째부터는 resume 으로 이어간다.
  */
+/** 세션 파일이 생기길 지켜보는 주기와 한도 */
+const WATCH_INTERVAL_MS = 2000
+const WATCH_TIMEOUT_MS = 3 * 60 * 1000
+
 export class TaskDropService {
+  /** 같은 (업무, 폴더) 를 두 번 지켜보지 않게 */
+  private watching = new Set<string>()
+
   private readonly store: WorkspaceStore
   private readonly listSessions: TaskDropSessionSource
   private readonly pathExists: (p: string) => boolean
@@ -81,7 +88,14 @@ export class TaskDropService {
    * 후보로 보고 가장 최근 것을 고른다 — 이미 열려 있던 다른 세션을 잘못 붙잡지 않기 위함.
    * 후보가 없으면 null 을 반환하며 매핑도 만들지 않는다(다음 드롭이 다시 시도한다).
    */
-  async link(projectId: string, taskId: string, cwd: string, since: number): Promise<string | null> {
+  async link(
+    projectId: string,
+    taskId: string,
+    cwd: string,
+    since: number,
+    label?: string,
+    repoPath?: string
+  ): Promise<string | null> {
     const sessions = await this.listSessions(cwd)
     let best: { sessionId: string; at: number } | null = null
     for (const s of sessions) {
@@ -91,14 +105,67 @@ export class TaskDropService {
     }
     if (!best) return null
 
-    const repoName = this.store.listRepos().find((r) => r.path === cwd)?.name
+    // 워크트리 경로는 등록된 저장소와 절대 같지 않다 — 호출부가 준 이름(저장소 · 브랜치)을
+    // 우선 쓰고, 없으면 폴더 이름으로 떨어진다. 여기서 undefined 가 되면 배지가 밋밋해진다.
+    const repoName =
+      label?.trim() ||
+      this.store.listRepos().find((r) => r.path === cwd)?.name ||
+      cwd.replace(/[/\\]+$/, '').split(/[/\\]/).pop()
     this.store.upsertTaskSessionLink(workspaceKey(projectId, taskId), {
       cwd,
       claudeSessionId: best.sessionId,
       lastUsedAt: Date.now(),
-      repoName
+      repoName,
+      // 워크트리에서 돌려도 "이 저장소의 세션" 으로 찾을 수 있게 남긴다.
+      repoPath
     })
     return best.sessionId
+  }
+
+  /**
+   * 세션이 생길 때까지 지켜보다 연결한다.
+   *
+   * claude 가 세션 파일을 언제 쓰는지는 우리가 정하지 못한다 — 몇 초 뒤 한 번 보고 포기하면
+   * 시작이 느린 날엔 배지가 영영 안 붙는다. 짧은 간격으로 지켜보다 생기는 즉시 연결한다.
+   * 렌더러가 아니라 main 에서 도는 이유: 뷰가 바뀌거나 창을 닫아도 살아 있어야 한다.
+   */
+  watchAndLink(params: {
+    projectId: string
+    taskId: string
+    cwd: string
+    since: number
+    label?: string
+    repoPath?: string
+    onLinked?: (sessionId: string) => void
+  }): void {
+    const key = `${workspaceKey(params.projectId, params.taskId)}::${params.cwd}`
+    if (this.watching.has(key)) return
+    this.watching.add(key)
+
+    const deadline = Date.now() + WATCH_TIMEOUT_MS
+    const tick = async (): Promise<void> => {
+      const sessionId = await this.link(
+        params.projectId,
+        params.taskId,
+        params.cwd,
+        params.since,
+        params.label,
+        params.repoPath
+      ).catch(() => null)
+
+      if (sessionId) {
+        this.watching.delete(key)
+        params.onLinked?.(sessionId)
+        return
+      }
+      if (Date.now() >= deadline) {
+        this.watching.delete(key)
+        console.warn(`[TaskDrop] 세션을 찾지 못해 연결하지 못했습니다 cwd=${params.cwd}`)
+        return
+      }
+      setTimeout(() => void tick(), WATCH_INTERVAL_MS)
+    }
+    setTimeout(() => void tick(), WATCH_INTERVAL_MS)
   }
 
   /** 세션을 다시 열었을 때 최근 사용 시각만 갱신한다 — 목록 정렬이 실제 사용을 따르게. */

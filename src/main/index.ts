@@ -71,6 +71,8 @@ import { probePtyCwd } from './terminal/ptyCwd'
 import { buildStartTaskSpawn } from './terminal/startTaskSpawn'
 import { ClaudeChatService } from './claude/ClaudeChatService'
 import { ClaudeSessionService } from './claude/ClaudeSessionService'
+import { ClaudeRetentionService } from './claude/ClaudeRetentionService'
+import { EditorLauncher } from './editor/EditorLauncher'
 import { AttachmentService } from './claude/AttachmentService'
 import Store from 'electron-store'
 import { TerminalManager } from './terminal/TerminalManager'
@@ -93,6 +95,7 @@ import { AgentRunSpawner } from './workspace/AgentRunSpawner'
 import { WorkspaceHookHandler, WORKSPACE_HOOK_KIND } from './workspace/WorkspaceHookHandler'
 import { preApproveTrust, writeHookSettings } from './claude/claudeDirSetup'
 import { IPC_CHANNELS } from '../shared/types/ipc'
+import type { OpenInEditorRequest } from '../shared/types/editor'
 import type { McpServerConfig } from '../shared/types/mcp'
 import type { SkillSaveRequest } from '../shared/types/skills'
 import type { UsageQueryParams } from '../shared/types/usage'
@@ -220,6 +223,8 @@ const watcherService = new WatcherService(messengerService)
 const aiService = new AIService()
 const claudeChat = new ClaudeChatService(getClaudeBin())
 const claudeSessions = new ClaudeSessionService()
+const claudeRetention = new ClaudeRetentionService()
+const editorLauncher = new EditorLauncher()
 const claudeAttachments = new AttachmentService()
 const store = new Store({ name: 'clauday-data' })
 const githubService = new GitHubService()
@@ -714,7 +719,7 @@ function registerIpcHandlers(): void {
   // 본문 업데이트 (이미지 업로드 후 링크 치환에 사용)
   ipcMain.handle(
     IPC_CHANNELS.DOORAY_TASK_UPDATE_BODY,
-    (_, params: { projectId: string; postId: string; subject: string; body: string }) =>
+    (_, params: { projectId: string; postId: string; subject: string; body: string; mimeType?: string }) =>
       taskService.updateTaskBody(params)
   )
   // 댓글 본문 수정
@@ -1123,6 +1128,14 @@ function registerIpcHandlers(): void {
     async (_, { sessionId, starred }: { sessionId: string; starred: boolean }) => {
       claudeSessions.setStarred(sessionId, starred)
     }
+  )
+  ipcMain.handle(IPC_CHANNELS.EDITOR_LIST, (_, force?: boolean) => editorLauncher.detect(force))
+  ipcMain.handle(IPC_CHANNELS.EDITOR_OPEN, (_, req: OpenInEditorRequest) =>
+    editorLauncher.open(req.editorId, req.path)
+  )
+  ipcMain.handle(IPC_CHANNELS.CLAUDE_RETENTION_GET, () => claudeRetention.get())
+  ipcMain.handle(IPC_CHANNELS.CLAUDE_RETENTION_SET, (_, days: number | null) =>
+    claudeRetention.set(days)
   )
   ipcMain.handle(
     IPC_CHANNELS.CLAUDE_ATTACHMENT_SAVE,
@@ -1811,8 +1824,40 @@ ${data}`,
     return taskDropService.resolve(projectId, taskId, preferCwd)
   })
   workspaceHandle(IPC_CHANNELS.WORKSPACE_TASK_DROP_LINK, (params) => {
-    const { projectId, taskId, cwd, since } = params as { projectId: string; taskId: string; cwd: string; since: number }
-    return taskDropService.link(projectId, taskId, cwd, since)
+    const { projectId, taskId, cwd, since, label, repoPath } = params as {
+      projectId: string
+      taskId: string
+      cwd: string
+      since: number
+      label?: string
+      repoPath?: string
+    }
+    return taskDropService.link(projectId, taskId, cwd, since, label, repoPath)
+  })
+  workspaceHandle(IPC_CHANNELS.WORKSPACE_TASK_DROP_WATCH, (params) => {
+    const { projectId, taskId, cwd, since, label, repoPath } = params as {
+      projectId: string
+      taskId: string
+      cwd: string
+      since: number
+      label?: string
+      repoPath?: string
+    }
+    taskDropService.watchAndLink({
+      projectId,
+      taskId,
+      cwd,
+      since,
+      label,
+      repoPath,
+      onLinked: () => {
+        BrowserWindow.getAllWindows()[0]?.webContents.send(
+          IPC_CHANNELS.WORKSPACE_TASK_DROP_LINKED_PUSH,
+          { projectId, taskId, cwd }
+        )
+      }
+    })
+    return null
   })
   workspaceHandle(IPC_CHANNELS.WORKSPACE_TASK_DROP_UNLINK, (params) => {
     const { projectId, taskId, cwd } = params as { projectId: string; taskId: string; cwd?: string }

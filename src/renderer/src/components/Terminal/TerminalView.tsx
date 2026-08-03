@@ -36,6 +36,7 @@ import { moveTab, pickNextActiveTab, pushMru } from './tabOrder'
 import { resetGlobalWebglFailure, type TerminalRendererSetting } from './webglPolicy'
 import { useKeybindingOverrides } from '../../hooks/useKeybindings'
 import { useToast } from '../common/ds'
+import OpenInEditorButton from '../common/OpenInEditorButton'
 import { matchesBinding } from '@shared/keybindings/binding'
 import TaskDrawer, { TASK_DRAG_MIME, type TaskDragPayload } from './TaskDrawer'
 import SideDrawer, { type DrawerTab } from './SideDrawer'
@@ -62,6 +63,7 @@ import {
   resolveTaskDropPlan,
   samePath,
   sessionForCwd,
+  sessionForRepo,
   type TaskDropCandidate,
   type TaskDropPlan
 } from '@shared/workspace/taskDropPlan'
@@ -418,7 +420,9 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
       template: resolveProjectConfig(settings, task.projectId).branchTemplate,
       projectCode: task.projectCode,
       taskNumber: task.number,
-      taskId: task.taskId
+      taskId: task.taskId,
+      subject: task.subject,
+      prefix: repo.branchPrefix
     })
 
     setDropBusy({ label: '워크트리 준비 중…', where: `${repo.name} · ${branch}` })
@@ -441,12 +445,21 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     setDropBusy(null)
     if (!info) return plan
 
+    if (info.isMainRepo) {
+      // git 은 같은 브랜치를 두 곳에 체크아웃하지 못한다 — 조용히 저장소에서 시작하면
+      // "왜 워크트리가 안 생겼지" 로 남는다.
+      toast.info(
+        '워크트리 대신 저장소에서 시작합니다',
+        `${repo.name} 이 이미 ${branch} 를 체크아웃 중입니다`
+      )
+    }
+
     return {
       ...plan,
       cwd: info.path,
       repoName: info.isMainRepo ? repo.name : `${repo.name} · ${branch}`,
-      // 세션은 (업무 × 폴더) 라 폴더가 워크트리로 바뀌면 그 폴더의 세션을 다시 찾아야 한다.
-      sessionId: sessionForCwd(links, info.path),
+      // 폴더가 바뀌었어도 **그 저장소에서** 하던 세션이면 이어간다(워크트리 포함).
+      sessionId: sessionForCwd(links, info.path) ?? sessionForRepo(links, repo.path)?.sessionId,
       needsCd: !samePath(currentCwd, info.path)
     }
   }, [toast])
@@ -506,14 +519,18 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     // 폴더를 모르면 연결 키를 만들 수 없어 건너뛴다 — 실행 자체는 이미 끝났다.
     const linkCwd = plan.cwd
     if (!sessionId && linkCwd) {
-      setTimeout(() => {
-        void window.api.workspace.taskDrop
-          .link(task.projectId, task.taskId, linkCwd, since)
-          .then((sid) => {
-            if (sid) window.dispatchEvent(new CustomEvent('task-session-linked'))
-          })
-          .catch(() => undefined)
-      }, 8000)
+      // 세션이 언제 생기는지는 claude 가 정한다 — main 이 짧은 간격으로 지켜보다 연결한다.
+      // 뷰를 떠나거나 탭을 옮겨도 이어지도록 렌더러가 아니라 main 에서 돈다.
+      void window.api.workspace.taskDrop
+        .watch({
+          projectId: task.projectId,
+          taskId: task.taskId,
+          cwd: linkCwd,
+          since,
+          label: plan.repoName,
+          repoPath: plan.repo?.path
+        })
+        .catch(() => undefined)
     }
   }, [toast])
 
@@ -1260,34 +1277,36 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
         onDragEnd={endDrag}
         onDragCancel={handleDragCancel}
       >
-        <div className="ds-tabbar">
-          <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
-            {tabs.map((tab, idx) => (
-              <Fragment key={tab.tabId}>
-                {insertionIndex === idx && <TabDropIndicator />}
-                <SortableTabLabel
-                  tabId={tab.tabId}
-                  name={tab.name}
-                  kind={tab.kind ?? 'terminal'}
-                  paneCount={isDiffTab(tab) ? 0 : collectLeafIds(tab.tree).length}
-                  isActive={activeTabId === tab.tabId}
-                  isExited={allPanesExited(tab)}
-                  isDone={Object.values(tab.panes).some((pane) => doneSessions.has(pane.sessionId))}
-                  onSelect={() => activateTab(tab.tabId)}
-                  onClose={() => closeTabEntry(tab.tabId)}
-                  onRename={(newName) => renameTab(tab.tabId, newName)}
-                />
-              </Fragment>
-            ))}
-          </SortableContext>
-          {insertionIndex === tabs.length && <TabDropIndicator />}
-          <button onClick={() => createTab()}
-            data-tour="terminal-new-tab"
-            className="w-7 h-7 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover flex-shrink-0"
-            title="새 터미널 (⌘T)">
-            <Plus size={14} />
-          </button>
-          <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+        <div className="ds-tabbar split">
+          <div className="ds-tabbar-scroll">
+            <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
+              {tabs.map((tab, idx) => (
+                <Fragment key={tab.tabId}>
+                  {insertionIndex === idx && <TabDropIndicator />}
+                  <SortableTabLabel
+                    tabId={tab.tabId}
+                    name={tab.name}
+                    kind={tab.kind ?? 'terminal'}
+                    paneCount={isDiffTab(tab) ? 0 : collectLeafIds(tab.tree).length}
+                    isActive={activeTabId === tab.tabId}
+                    isExited={allPanesExited(tab)}
+                    isDone={Object.values(tab.panes).some((pane) => doneSessions.has(pane.sessionId))}
+                    onSelect={() => activateTab(tab.tabId)}
+                    onClose={() => closeTabEntry(tab.tabId)}
+                    onRename={(newName) => renameTab(tab.tabId, newName)}
+                  />
+                </Fragment>
+              ))}
+            </SortableContext>
+            {insertionIndex === tabs.length && <TabDropIndicator />}
+            <button onClick={() => createTab()}
+              data-tour="terminal-new-tab"
+              className="w-7 h-7 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover flex-shrink-0"
+              title="새 터미널 (⌘T)">
+              <Plus size={14} />
+            </button>
+          </div>
+          <div className="flex items-center gap-2 flex-none pl-2">
             {/* 분할은 자주 쓰는데 단축키를 모르면 길이 없다 — 탭바에 버튼으로 둔다. */}
             <div className="flex items-center">
               <button
@@ -1309,6 +1328,14 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
                 <Rows2 size={13} />
               </button>
             </div>
+            {/* 지금 터미널이 있는 폴더(대개 업무 워크트리)를 IDE 에서 바로 연다. */}
+            {focusedCwd && (
+              <OpenInEditorButton
+                path={focusedCwd}
+                compact
+                className="w-7 h-7 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover"
+              />
+            )}
             <button onClick={toggleDrawer}
               data-tour="terminal-drawer-toggle"
               aria-pressed={drawerOpen}

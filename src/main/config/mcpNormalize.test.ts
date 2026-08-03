@@ -96,7 +96,11 @@ describe('normalizeStdioCommandForWindows — ADR-v2-windows-fix-06 §1', () => 
   it('platform 미지정이면 process.platform 을 따른다', () => {
     const config: McpServerConfig = { command: 'npx', args: [] }
     const result = normalizeStdioCommandForWindows(config)
-    // 이 테스트는 mac CI 에서 실행되므로 무변환이어야 함
-    expect(result).toEqual(config)
+    // CI 는 macOS 와 Windows 양쪽에서 돈다 — 호스트에 맞는 결과를 기대한다.
+    if (process.platform === 'win32') {
+      expect(result).toEqual({ command: 'cmd', args: ['/c', 'npx'] })
+    } else {
+      expect(result).toEqual(config)
+    }
   })
 })

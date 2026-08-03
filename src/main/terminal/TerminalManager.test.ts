@@ -56,7 +56,27 @@ beforeEach(() => {
   spawnCallCount = 0
   spawnFailureQueue = []
   detectWindowsShellMock.mockReset()
+  // Windows 러너에서는 일반 테스트도 이 경로를 탄다 — 기본 후보를 줘야 한다.
+  // (mockReset 만 하면 undefined 가 돌아와 "candidates is not iterable" 로 전부 깨진다)
+  detectWindowsShellMock.mockReturnValue([
+    { file: 'powershell.exe', args: ['-NoLogo'], kind: 'powershell' }
+  ])
   __resetConptyDllLatchForTest()
+})
+
+describe('TerminalManager.create — Windows 러너 회귀', () => {
+  it('win32 에서도 기본 생성이 된다 — CI 가 Windows 에서 돌 때 이 경로를 탄다', () => {
+    const original = process.platform
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+    try {
+      const m = new TerminalManager()
+      const meta = m.create({})
+      expect(meta.id).toBeTruthy()
+      expect(detectWindowsShellMock).toHaveBeenCalled()
+    } finally {
+      Object.defineProperty(process, 'platform', { value: original, configurable: true })
+    }
+  })
 })
 
 describe('TerminalManager.create', () => {

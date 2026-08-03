@@ -126,6 +126,76 @@ describe('SocketModeClient — isSessionLimitClose / connect 가드', () => {
   })
 })
 
+/**
+ * 재연결 버튼이 바로 안 듣던 두 원인의 회귀 게이트.
+ * ① 대기 중이던 루프가 disconnect 후에도 깨어나지 못해 그 자리에 매달렸다.
+ * ② 소켓을 닫자마자 새로 붙어 서버가 '세션 중복' 으로 막고 STANDBY(15초)로 빠졌다.
+ */
+describe('SocketModeClient — disconnect 가 대기를 깨운다', () => {
+  type Internals = {
+    wait: (ms: number) => Promise<void>
+    pendingWaits: Set<() => void>
+    ws: unknown
+  }
+
+  it('대기 중이던 sleep 이 disconnect 로 즉시 끝난다 — clearTimeout 만으로는 영영 안 끝난다', async () => {
+    const c = new SocketModeClient({ botToken: 't', domain: 'd' })
+    const inner = c as unknown as Internals
+
+    let resolved = false
+    const waiting = inner.wait(60_000).then(() => { resolved = true })
+    expect(inner.pendingWaits.size).toBe(1)
+
+    await c.disconnect()
+    await waiting
+
+    expect(resolved).toBe(true)
+    expect(inner.pendingWaits.size).toBe(0)
+  })
+
+  it('소켓이 close 를 알리면 유예 시간을 다 안 쓰고 끝난다', async () => {
+    const c = new SocketModeClient({ botToken: 't', domain: 'd' })
+    const inner = c as unknown as Internals
+
+    const listeners: Record<string, () => void> = {}
+    let closeCalled = false
+    inner.ws = {
+      once: (event: string, cb: () => void) => { listeners[event] = cb },
+      // 실제 ws 처럼 close() 호출 뒤 close 이벤트가 온다.
+      close: () => { closeCalled = true; listeners.close?.() }
+    }
+
+    const started = Date.now()
+    await c.disconnect()
+
+    expect(closeCalled).toBe(true)
+    // CLOSE_GRACE_MS(1.5s) 를 그대로 기다렸으면 실패한다.
+    expect(Date.now() - started).toBeLessThan(1_000)
+    expect(inner.ws).toBeNull()
+  })
+
+  it('close 이벤트를 안 주는 소켓이어도 disconnect 가 걸려 있지 않는다', async () => {
+    const c = new SocketModeClient({ botToken: 't', domain: 'd' })
+    const inner = c as unknown as Internals
+    // once/close 가 조용한 소켓 — 유예 타이머로만 풀려야 한다.
+    inner.ws = { once: () => {}, close: () => {} }
+
+    const done = c.disconnect()
+    // 아직 유예 중이지만, 두 번째 disconnect 가 오면 그 대기도 깨워야 한다.
+    await c.disconnect()
+    await done
+
+    expect(inner.ws).toBeNull()
+    expect(inner.pendingWaits.size).toBe(0)
+  })
+
+  it('disconnect 후에는 state 가 DISCONNECTED 로 남는다', async () => {
+    const c = new SocketModeClient({ botToken: 't', domain: 'd' })
+    await c.disconnect()
+    expect(c.getState()).toBe('DISCONNECTED')
+  })
+})
+
 describe('reconnectDelayMs — 자동 재연결 백오프', () => {
   it('시도할수록 늘어난다', () => {
     // 지터를 0 으로 고정해 순수 지수만 본다

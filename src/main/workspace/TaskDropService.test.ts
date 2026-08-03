@@ -111,6 +111,66 @@ describe('TaskDropService', () => {
     })
   })
 
+  describe('watchAndLink', () => {
+    const since = Date.parse('2026-07-30T10:00:00Z')
+
+    it('세션이 늦게 생겨도 지켜보다 연결하고 알린다', async () => {
+      vi.useFakeTimers()
+      const listSessions = vi
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValue([{ sessionId: 'late', lastActivityAt: '2026-07-30T10:00:30Z' }])
+      const svc = new TaskDropService({ store, listSessions, pathExists: () => true })
+      const onLinked = vi.fn()
+
+      svc.watchAndLink({ projectId: 'proj-1', taskId: 'task-1', cwd: '/work/ios', since, onLinked })
+      await vi.advanceTimersByTimeAsync(10_000)
+
+      expect(onLinked).toHaveBeenCalledWith('late')
+      expect(store.listTaskSessionLinks('proj-1:task-1')[0].claudeSessionId).toBe('late')
+      vi.useRealTimers()
+    })
+
+    it('한도까지 못 찾으면 멈춘다 — 영원히 돌지 않는다', async () => {
+      vi.useFakeTimers()
+      const listSessions = vi.fn().mockResolvedValue([])
+      const svc = new TaskDropService({ store, listSessions, pathExists: () => true })
+
+      svc.watchAndLink({ projectId: 'proj-1', taskId: 'task-1', cwd: '/work/ios', since })
+      await vi.advanceTimersByTimeAsync(4 * 60 * 1000)
+      const calls = listSessions.mock.calls.length
+      await vi.advanceTimersByTimeAsync(60_000)
+
+      expect(listSessions.mock.calls.length).toBe(calls)
+      vi.useRealTimers()
+    })
+
+    it('워크트리에서 시작해도 저장소를 함께 남긴다 — 이어가기가 그걸로 붙는다', async () => {
+      vi.useFakeTimers()
+      const svc = new TaskDropService({
+        store,
+        listSessions: vi.fn().mockResolvedValue([{ sessionId: 's', lastActivityAt: '2026-07-30T10:00:30Z' }]),
+        pathExists: () => true
+      })
+
+      svc.watchAndLink({
+        projectId: 'proj-1',
+        taskId: 'task-1',
+        cwd: '/work/.ios-worktrees/feature-x',
+        since,
+        repoPath: '/work/ios'
+      })
+      await vi.advanceTimersByTimeAsync(3000)
+
+      expect(store.listTaskSessionLinks('proj-1:task-1')[0]).toMatchObject({
+        cwd: '/work/.ios-worktrees/feature-x',
+        repoPath: '/work/ios'
+      })
+      vi.useRealTimers()
+    })
+  })
+
   describe('link', () => {
     const since = Date.parse('2026-07-30T10:00:00Z')
 
@@ -206,4 +266,26 @@ describe('TaskDropService', () => {
       expect(svc.listLinks('proj-1', 'task-1')).toHaveLength(2)
     })
   })
+  describe('link — 이름 붙이기', () => {
+    it('호출부가 준 라벨을 쓴다 — 워크트리 경로는 등록된 저장소와 절대 같지 않다', async () => {
+      const svc = make({
+        sessions: [{ sessionId: 's1', lastActivityAt: new Date(2000).toISOString() }]
+      })
+
+      await svc.link('p1', 't1', '/Users/me/Desktop/.2NEON-worktrees/feature-neon-6793', 1000, '2NEON · feature/neon-6793')
+
+      expect(svc.listLinks('p1', 't1')[0].repoName).toBe('2NEON · feature/neon-6793')
+    })
+
+    it('라벨이 없으면 폴더 이름으로 떨어진다 — 배지가 비어 보이면 안 된다', async () => {
+      const svc = make({
+        sessions: [{ sessionId: 's1', lastActivityAt: new Date(2000).toISOString() }]
+      })
+
+      await svc.link('p1', 't1', '/Users/me/Desktop/.2NEON-worktrees/feature-neon-6793', 1000)
+
+      expect(svc.listLinks('p1', 't1')[0].repoName).toBe('feature-neon-6793')
+    })
+  })
 })
+

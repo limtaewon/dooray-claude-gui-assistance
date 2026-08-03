@@ -190,6 +190,14 @@ export const IPC_CHANNELS = {
   CLAUDE_SESSION_RENAME: 'claude:session:rename',
   /** 세션 즐겨찾기 토글 */
   CLAUDE_SESSION_STAR: 'claude:session:star',
+  /** 설치된 외부 에디터 목록 (IntelliJ·VS Code 등) — 없는 것은 돌려주지 않는다 */
+  EDITOR_LIST: 'editor:list',
+  /** 폴더를 그 에디터에서 프로젝트로 연다 */
+  EDITOR_OPEN: 'editor:open',
+  /** ~/.claude/settings.json 의 세션 보관 기간(cleanupPeriodDays) 조회 */
+  CLAUDE_RETENTION_GET: 'claude:retention:get',
+  /** 세션 보관 기간 저장 — null 이면 키를 지워 claude 기본값을 따른다 */
+  CLAUDE_RETENTION_SET: 'claude:retention:set',
   /** 채팅 첨부 파일 저장 (clipboard 이미지/임시 파일 등) → 절대 경로 반환 */
   CLAUDE_ATTACHMENT_SAVE: 'claude:attachment:save',
 
@@ -408,6 +416,10 @@ export const IPC_CHANNELS = {
   /** 터미널 태스크 드로어(C-3.5) — 드롭 대상 폴더/세션 해석과 세션 매핑 */
   WORKSPACE_TASK_DROP_RESOLVE: 'workspace:task-drop:resolve',
   WORKSPACE_TASK_DROP_LINK: 'workspace:task-drop:link',
+  /** 드롭 직후 — main 이 세션이 생길 때까지 지켜보다 연결한다 */
+  WORKSPACE_TASK_DROP_WATCH: 'workspace:task-drop:watch',
+  /** main → renderer: 연결됨 */
+  WORKSPACE_TASK_DROP_LINKED_PUSH: 'workspace:task-drop:linked-push',
   WORKSPACE_TASK_DROP_UNLINK: 'workspace:task-drop:unlink',
   WORKSPACE_TASK_DROP_LINKED: 'workspace:task-drop:linked',
   WORKSPACE_TASK_WORKTREE: 'workspace:task-worktree',

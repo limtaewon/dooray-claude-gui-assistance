@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { FolderGit2, Plus, RotateCcw, X } from 'lucide-react'
+import { Check, FolderGit2, Plus, RotateCcw, X } from 'lucide-react'
 import type { DoorayProject } from '@shared/types/dooray'
 import type { ProjectOverride, RepoRegistryEntry } from '@shared/types/workspace'
 import { BRANCH_NAME_PLACEHOLDERS, buildBranchName } from '@shared/workspace/branchName'
@@ -13,8 +13,19 @@ import type { ResolvedProjectConfig } from '@shared/workspace/projectConfig'
 import { Input } from '../common/ds'
 import { anchoredMenuPosition, type AnchoredMenuPosition } from '../common/anchoredMenu'
 
-/** 미리보기용 샘플 업무 — 실제 값이 어떻게 나오는지 눈으로 확인시킨다. */
-const SAMPLE = { taskNumber: 6793, taskId: 'a1b2c39f3a2c', title: 'AI 유의어 사전 - 신규 메뉴 개발' }
+/**
+ * 미리보기용 샘플 업무 — 실제 값이 어떻게 나오는지 눈으로 확인시킨다.
+ *
+ * 여기서 넘기지 않은 값은 그 토큰이 빈칸으로 그려진다. 실제 치환 경로와 같은 항목을 채워야
+ * 미리보기가 결과와 어긋나지 않는다(`{subject}` 가 미리보기에서만 사라지는 식).
+ */
+const SAMPLE = {
+  taskNumber: 6793,
+  taskId: 'a1b2c39f3a2c',
+  title: 'AI 유의어 사전 - 신규 메뉴 개발',
+  url: 'https://nhnent.dooray.com/project/posts/a1b2c39f3a2c',
+  body: '(업무 본문이 여기 들어갑니다)'
+}
 
 interface ProjectRuleCardProps {
   project: DoorayProject
@@ -30,15 +41,20 @@ interface ProjectRuleCardProps {
  * 그 사실을 각 항목에 표시해 "여긴 안 정했다" 를 눈으로 알 수 있게 한다.
  */
 function ProjectRuleCard({ project, repos, config, onChange }: ProjectRuleCardProps): JSX.Element {
+  // `{prefix}` 는 저장소마다 다르다 — 이 프로젝트에 넣은 첫 저장소의 값으로 보여준다.
+  const samplePrefix = repos.find((repo) => repo.id === config.repoIds[0])?.branchPrefix
+
   const branchPreview = useMemo(
     () =>
       buildBranchName({
         template: config.branchTemplate,
         projectCode: project.code || project.id,
         taskNumber: SAMPLE.taskNumber,
-        taskId: SAMPLE.taskId
+        taskId: SAMPLE.taskId,
+        subject: SAMPLE.title,
+        prefix: samplePrefix
       }),
-    [config.branchTemplate, project.code, project.id]
+    [config.branchTemplate, project.code, project.id, samplePrefix]
   )
 
   const promptPreview = useMemo(
@@ -46,7 +62,9 @@ function ProjectRuleCard({ project, repos, config, onChange }: ProjectRuleCardPr
       renderTaskDropPrompt(config.promptTemplate, {
         title: SAMPLE.title,
         number: SAMPLE.taskNumber,
-        projectCode: project.code
+        projectCode: project.code,
+        url: SAMPLE.url,
+        body: SAMPLE.body
       }),
     [config.promptTemplate, project.code]
   )
@@ -130,13 +148,7 @@ function ProjectRuleCard({ project, repos, config, onChange }: ProjectRuleCardPr
           aria-label={`${project.code || project.id} 브랜치 이름 템플릿`}
           onBlur={(e) => onChange({ branchTemplate: e.target.value })}
         />
-        <div className="flex flex-wrap gap-1">
-          {BRANCH_NAME_PLACEHOLDERS.map((p) => (
-            <span key={p.token} title={p.label} className="ds-chip neutral font-mono">
-              {p.token}
-            </span>
-          ))}
-        </div>
+        <TokenChips tokens={BRANCH_NAME_PLACEHOLDERS} />
         <Preview label="예시" value={branchPreview} />
       </Field>
 
@@ -154,13 +166,7 @@ function ProjectRuleCard({ project, repos, config, onChange }: ProjectRuleCardPr
           className="ds-input resize-none text-[calc(11.5px_*_var(--app-font-scale,1))]"
           onBlur={(e) => onChange({ promptTemplate: e.target.value })}
         />
-        <div className="flex flex-wrap gap-1">
-          {TASK_DROP_PLACEHOLDERS.map((p) => (
-            <span key={p.token} title={p.label} className="ds-chip neutral font-mono">
-              {p.token}
-            </span>
-          ))}
-        </div>
+        <TokenChips tokens={TASK_DROP_PLACEHOLDERS} />
         <Preview label="보낼 메시지" value={promptPreview ?? '(보내지 않음)'} />
       </Field>
     </div>
@@ -276,6 +282,51 @@ function RepoAddMenu({
         document.body
       )}
     </>
+  )
+}
+
+/**
+ * 템플릿에 쓸 수 있는 토큰 목록 — 누르면 그 토큰을 클립보드에 복사한다.
+ *
+ * 중괄호까지 손으로 옮겨 적다 오타가 나면 그 자리엔 빈 문자열이 들어가 조용히 이상한 이름이
+ * 만들어진다. 눌러서 가져가게 하고, 복사됐다는 것을 칩 안에서 잠깐 알린다.
+ */
+function TokenChips({ tokens }: { tokens: { token: string; label: string }[] }): JSX.Element {
+  const [copied, setCopied] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!copied) return
+    const timer = setTimeout(() => setCopied(null), 1200)
+    return () => clearTimeout(timer)
+  }, [copied])
+
+  const copy = (token: string): void => {
+    navigator.clipboard.writeText(token).then(
+      () => setCopied(token),
+      (err) => {
+        // 복사가 막힌 환경이면 조용히 실패한 것처럼 보인다 — 흔적은 남긴다.
+        console.warn('[ProjectRuleCard] 토큰 복사 실패', token, err)
+        setCopied(null)
+      }
+    )
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {tokens.map((p) => (
+        <button
+          key={p.token}
+          type="button"
+          onClick={() => copy(p.token)}
+          title={`${p.label} — 클릭하면 복사`}
+          aria-label={`${p.token} 복사`}
+          className={`ds-chip ${copied === p.token ? 'selected' : 'neutral'} font-mono cursor-pointer`}
+        >
+          {copied === p.token && <Check size={9} className="flex-none" />}
+          {p.token}
+        </button>
+      ))}
+    </div>
   )
 }
 

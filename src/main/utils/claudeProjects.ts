@@ -25,10 +25,14 @@ export function encodeCwd(cwd: string): string {
   return `${dashed.slice(0, MAX_ENCODED_LEN)}-${base36Abs(djb2(normalized))}`
 }
 
+/** claude 설정 디렉터리. `CLAUDE_CONFIG_DIR` 를 존중하고 기본은 `~/.claude`. */
+export function claudeConfigDir(opts?: { configDir?: string }): string {
+  return opts?.configDir ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude')
+}
+
 /** claude 프로젝트 디렉터리 루트. `CLAUDE_CONFIG_DIR` 를 존중하고 기본은 `~/.claude`. */
 export function claudeProjectsRoot(opts?: { configDir?: string }): string {
-  const configDir = opts?.configDir ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude')
-  return join(configDir, 'projects')
+  return join(claudeConfigDir(opts), 'projects')
 }
 
 export type ReadSessionCwdOptions = {
