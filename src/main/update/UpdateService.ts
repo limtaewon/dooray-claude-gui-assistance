@@ -4,13 +4,26 @@ import { mkdir, rm } from 'fs/promises'
 import { join } from 'path'
 import { pipeline } from 'stream/promises'
 import { Readable } from 'stream'
-import type { GithubRelease, UpdateState } from '../../shared/types/update'
+import type { GithubRelease, UpdateStage, UpdateState } from '../../shared/types/update'
 import { IPC_CHANNELS } from '../../shared/types/ipc'
 import { isNewerVersion, pickLatestStable, pickAssetForPlatform } from './version'
 
 const REPO = 'limtaewon/dooray-claude-gui-assistance'
 const RELEASES_API = `https://api.github.com/repos/${REPO}/releases?per_page=20`
 const RELEASES_PAGE = `https://github.com/${REPO}/releases/latest`
+
+/** 주기 재확인 간격. 릴리즈는 하루에 몇 번씩 나가지 않으므로 이 이상 자주 볼 이유가 없다. */
+const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
+
+/**
+ * 뒤에서 다시 확인해도 되는 상태.
+ *
+ * `checking`·`downloading`·`downloaded` 는 건드리면 진행이 날아간다 — `check()` 가 stage 를
+ * 덮어써서 받는 중이던 표시가 사라진다. `error` 는 「다시 시도」가 사용자 몫이라 뒤에서 지우지
+ * 않는다. `available` 도 뺀다: 알릴 것은 이미 알렸고, 다시 확인하면 조회하는 동안 stage 가
+ * `checking` 이 되어 떠 있던 업데이트 버튼이 깜빡 사라졌다 돌아온다.
+ */
+const RECHECKABLE_STAGES: readonly UpdateStage[] = ['idle', 'up-to-date']
 
 /**
  * 앱 업데이트. **플랫폼마다 의도적으로 다른 경로를 탄다** — 한쪽만 보고 양쪽에 같은 변경을
@@ -33,6 +46,8 @@ export class UpdateService {
   private checking = false
   /** macOS 에서 내려받아 둔 dmg 경로. 「받기」를 다시 눌렀을 때 재다운로드를 막는다. */
   private downloadedDmgPath: string | null = null
+  /** 주기 재확인 타이머. 두 번 걸지 않으려고 들고 있는다. */
+  private timer: ReturnType<typeof setInterval> | null = null
 
   // 생성자는 모듈 로드 시점에 돌기 때문에 여기서 electron app 을 건드리지 않는다.
   // 버전은 실제로 필요해지는 check() 에서 읽는다.
@@ -95,6 +110,31 @@ export class UpdateService {
     } finally {
       this.checking = false
     }
+  }
+
+  /**
+   * 주기적으로 새 버전을 다시 확인한다.
+   *
+   * 시작 직후 한 번만 보면, 앱을 켜둔 채로 릴리즈가 나간 세션은 그 사실을 영영 모른다 —
+   * 며칠씩 켜두는 사용법이라 실제로 새 버전을 놓친다. 껐다 켜야만 알게 되는 알림은 알림이 아니다.
+   *
+   * 지금 뭔가 진행 중이면 건너뛴다 — 어떤 상태에서 건너뛰는지는 `RECHECKABLE_STAGES` 참고.
+   */
+  startPeriodicCheck(intervalMs: number = CHECK_INTERVAL_MS): void {
+    if (this.timer) return
+    this.timer = setInterval(() => {
+      if (!RECHECKABLE_STAGES.includes(this.state.stage)) return
+      void this.check()
+    }, intervalMs)
+    // 타이머가 이벤트 루프를 붙잡아 종료를 늦추지 않게 한다.
+    this.timer.unref?.()
+  }
+
+  /** 주기 재확인을 멈춘다. 앱 종료 시 정리용. */
+  stopPeriodicCheck(): void {
+    if (!this.timer) return
+    clearInterval(this.timer)
+    this.timer = null
   }
 
   /** 새 버전을 내려받는다. 플랫폼별로 경로가 갈린다 — 클래스 주석 참고. */

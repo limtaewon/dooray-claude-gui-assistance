@@ -1,6 +1,11 @@
 # 릴리즈 워크플로우 & GitHub Actions 파이프라인
 
-Clauday의 릴리즈는 **태그 기반**입니다. `git tag v1.2.3`을 푸시하면 GitHub Actions가 자동으로 macOS dmg와 Windows exe를 빌드해 GitHub Release에 업로드합니다.
+Clauday의 릴리즈는 **태그 기반**입니다. `git tag v1.2.3`을 푸시하면 GitHub Actions가 Windows exe를 빌드해 GitHub Release에 업로드합니다.
+
+> ⚠️ **macOS dmg는 CI가 만들지 않습니다.** `build-macos` job은 2026-05-22(`983c09b`)에 제거됐고
+> 지금 `release.yml`에 있는 job은 `build-windows` 하나뿐입니다. dmg는 릴리즈마다 mac에서 손으로
+> 빌드해 올려야 합니다 — 아래 「macOS dmg 수동 업로드」 참고. 이 단계를 빠뜨리면 mac 사용자는
+> 업데이트 알림을 받고도 받을 파일이 없습니다.
 
 ## 전체 흐름
 
@@ -11,12 +16,25 @@ main 브랜치 (merge 후에는 배포 안 됨)
   ↓ git tag vX.Y.Z
   ↓ git push origin vX.Y.Z
 GitHub Actions 트리거
-  ↓ build-macos job (dmg 생성)
-  ↓ build-windows job (exe 생성)
+  ↓ build-windows job (exe + latest.yml 생성)
 GitHub Release (자동 생성)
-  ↓ dmg, exe, 릴리즈 노트 업로드
+  ↓ exe, latest.yml, 릴리즈 노트 업로드
+  ↓ [수동] mac에서 npm run dist → dmg 업로드
 배포 완료
 ```
+
+## macOS dmg 수동 업로드
+
+태그를 푸시한 뒤 mac에서:
+
+```bash
+npm run dist                                          # release/Clauday-<버전>-arm64.dmg 생성
+gh release upload vX.Y.Z release/Clauday-X.Y.Z-arm64.dmg
+```
+
+같이 생성되는 `latest-mac.yml`은 **올리지 않습니다.** macOS는 ad-hoc 서명(`identity: "-"`)이라
+Squirrel.Mac의 자동 설치가 서명 검증에서 막히고, 그래서 `UpdateService`가 autoUpdater 대신
+Releases API로 dmg 에셋을 직접 고릅니다 — 자세한 건 `UpdateService` 클래스 주석.
 
 ## 릴리즈 전 체크리스트
 
@@ -118,16 +136,12 @@ GitHub 저장소 → **Actions** 탭에서 릴리즈 워크플로우 실행 상�
 
 ```
 Release (workflow)
-├─ build-macos
-│  ├─ Setup Node
-│  ├─ Install dependencies
-│  ├─ Build app
-│  └─ Upload dmg artifact
 └─ build-windows
+   ├─ Setup Python 3.11
    ├─ Setup Node
    ├─ Install dependencies
-   ├─ Build app
-   └─ Upload exe artifact
+   ├─ Build Windows exe
+   └─ Upload to GitHub Release (exe + latest.yml)
 ```
 
 ## .github/workflows/release.yml
@@ -146,49 +160,41 @@ on:
       - 'v*'  # v1.2.3 형식의 태그만 트리거
 
 jobs:
-  build-macos:
-    runs-on: macos-latest
+  # 유일한 job — macOS 는 없다(dmg 는 수동 업로드).
+  build-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       # 1) 소스 코드 checkout
       - uses: actions/checkout@v4
-      
-      # 2) Node 설정
+
+      # 2) Python 설정 (node-gyp distutils 호환)
+      - uses: actions/setup-python@v5
+        id: python
+        with:
+          python-version: '3.11'
+
+      # 3) Node 설정
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      
-      # 3) Python 설정 (node-pty, keytar 빌드용)
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-      
-      # 4) 의존성 설치 (postinstall에서 electron-rebuild 자동)
-      - run: npm install
-      
-      # 5) 빌드 (TypeScript + 번들링)
-      - run: npm run build
-      
-      # 6) electron-builder로 dmg 패키징
-      - run: npm run dist
-      
-      # 7) GitHub Release에 업로드
-      - uses: softprops/action-gh-release@v1
+          cache: 'npm'
+
+      # 4) 의존성 설치 (postinstall 에서 electron-rebuild 자동)
+      - run: npm ci
+
+      # 5) 빌드 + electron-builder 로 exe 패키징
+      - run: npm run dist:win -- --publish never
+
+      # 6) GitHub Release 에 업로드
+      #    latest.yml 은 앱 안의 자동 업데이트가 최신 버전을 읽는 메타파일이라 빠지면 안 된다.
+      - uses: softprops/action-gh-release@v2
         with:
           files: |
-            release/*.dmg
-            release/*.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      # macOS와 유사하되, exe 생성
-      - run: npm run dist:win
-      
-      - uses: softprops/action-gh-release@v1
-        with:
-          files: release/*.exe
+            release/*.exe
+            release/latest.yml
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -206,17 +212,19 @@ out/
 ```
 
 ### npm run dist (macOS)
-electron-builder로 dmg 생성
+electron-builder로 dmg 생성. **CI 가 아니라 사람이 mac 에서 돌린다.**
 ```
 out/
   ↓ electron-builder --mac
-release/Clauday-1.5.0.dmg
-release/Clauday-1.5.0.zip  (dmg 외에 zip도 생성)
+release/Clauday-2.0.5-arm64.dmg
+release/latest-mac.yml       (생성은 되지만 릴리즈에 올리지 않는다)
 ```
 
-**dmg 서명** (optional):
-- Apple Developer 인증서가 있으면 자동 서명 (secrets: `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`)
-- 없으면 unsigned dmg (개발용)
+`package.json` 의 `build.mac.target` 은 `dmg` 하나다 — zip 은 만들지 않는다.
+
+**dmg 서명**: 지금은 ad-hoc(`identity: "-"`)이다. 정식 Developer ID 서명 + notarization 을 붙이면
+macOS 도 Windows 처럼 autoUpdater 경로로 바꿀 수 있다 — 그때까지는 사용자가 dmg 를 열어 직접
+옮긴다(`UpdateService` 클래스 주석).
 
 ### npm run dist:win (Windows)
 electron-builder로 exe 생성
@@ -294,18 +302,21 @@ GitHub Release를 생성하면 자동으로 CHANGELOG.md에서 해당 버전 섹
 ## 배포 후 확인
 
 ### 1. GitHub Release 페이지
-https://github.com/NHNent/dooray-claude-gui-assistance/releases
+https://github.com/limtaewon/dooray-claude-gui-assistance/releases
 
-- dmg, exe, zip 다운로드 가능한지 확인
+- **에셋 3종이 다 있는지 확인**: `Clauday-<버전>-arm64.dmg`(수동) · `Clauday.Setup.<버전>.exe`(CI) · `latest.yml`(CI)
+- 특히 dmg 는 CI 가 만들지 않으므로 빠지기 쉽다 — 없으면 mac 사용자는 알림만 받고 못 받는다
 - 릴리즈 노트가 정확한지 확인
 
-### 2. 앱 자동 업데이트 (향후 구현)
-현재는 수동 다운로드이지만, electron-updater를 도입하면:
-```typescript
-import { autoUpdater } from 'electron-updater'
+### 2. 앱 자동 업데이트
 
-autoUpdater.checkForUpdatesAndNotify()
-```
+구현되어 있다 — `src/main/update/UpdateService.ts`. 플랫폼마다 **의도적으로 다른 경로**를 탄다.
+
+- **Windows**: `electron-updater` 의 autoUpdater 가 `latest.yml` 을 읽어 배경 다운로드 → 재시작하며 설치까지
+- **macOS**: autoUpdater 를 쓰지 않는다(ad-hoc 서명이라 Squirrel.Mac 서명 검증에서 막힘). Releases API 를 직접 읽어 dmg 를 내려받고 Finder 로 열어주는 데까지
+
+확인 시점은 **앱 시작 5초 뒤 한 번 + 이후 6시간마다**(`startPeriodicCheck`). 받는 중이거나
+이미 알린 상태에서는 재확인을 건너뛴다 — 진행 표시를 덮어쓰지 않기 위해서다.
 
 ### 3. 되돌리기 (Rollback)
 
@@ -324,7 +335,7 @@ git push origin :refs/tags/v1.5.0
 
 **로그 확인**:
 1. Actions 탭 → 해당 워크플로우 클릭
-2. "build-macos" 또는 "build-windows" job 선택
+2. "build-windows" job 선택 (Release 워크플로우의 유일한 job)
 3. 실패 단계 로그 확인
 
 **자주 나오는 에러**:

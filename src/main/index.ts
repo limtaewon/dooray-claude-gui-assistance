@@ -2288,6 +2288,8 @@ app.whenReady().then(() => {
 
   // 업데이트 확인은 창이 뜨고 나서 — 시작을 늦추지 않는다. 실패는 UpdateService 가 조용히 삼킨다.
   setTimeout(() => { void updateService.check() }, 5_000)
+  // 시작 때 한 번만 보면 앱을 켜둔 채 나간 릴리즈를 그 세션 내내 모른다.
+  updateService.startPeriodicCheck()
 
   // v2.0 M-A: 터미널 스냅샷 자동 저장 타이머는 렌더러로 이관됐다(스크롤백은 렌더러에만 있으므로 —
   // ADR-v2-terminal-p2-03 §3). main 은 더 이상 30초 interval 을 돌리지 않는다.
@@ -2301,7 +2303,12 @@ app.whenReady().then(() => {
 
 // v2.0 M-A: before-quit 700ms 핸드셰이크로 교체 — 렌더러에 flush 요청 후 응답/타임아웃 중 먼저 오는 쪽으로
 // quitFlush.persist() 가 캐시를 저장한다. 창이 없으면(darwin 에서 창 닫고 나중에 ⌘Q) 대기 없이 즉시 캐시 경로.
-app.on('before-quit', (event) => quitFlush.onBeforeQuit(event))
+app.on('before-quit', (event) => {
+  // darwin 은 창을 닫아도 앱이 살아 있어(window-all-closed 에서 quit 하지 않는다) 거기서 멈추면
+  // ⌘N 으로 창을 다시 연 뒤 재확인이 죽은 채로 남는다. 정리는 진짜 종료 시점에서만.
+  updateService.stopPeriodicCheck()
+  quitFlush.onBeforeQuit(event)
+})
 
 app.on('window-all-closed', () => {
   configWatcher.stop()
