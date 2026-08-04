@@ -54,7 +54,8 @@ import { buildTaskDropSteps } from './taskDrop'
 import {
   DEFAULT_TASK_DROP_PROMPT,
   renderTaskDropPrompt,
-  templateNeedsBody
+  templateNeedsBody,
+  templateNeedsImages
 } from '@shared/workspace/taskDropPrompt'
 import { workspaceKey } from '@shared/workspace/workspaceKey'
 import { resolveProjectConfig } from '@shared/workspace/projectConfig'
@@ -486,6 +487,17 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
         .then((d) => d?.body?.content)
         .catch(() => undefined)
     }
+    // 첨부 이미지는 내려받는 데 시간이 걸린다 — 템플릿이 실제로 쓸 때만 받는다.
+    let imagePaths: string[] | undefined
+    let omittedImages = 0
+    if (!sessionId && templateNeedsImages(template)) {
+      setDropBusy({ label: '첨부 이미지 받는 중', where: plan.cwd })
+      const picked = await window.api.dooray.tasks
+        .images(task.projectId, task.taskId)
+        .catch(() => null)
+      imagePaths = picked?.files.map((f) => f.path)
+      omittedImages = picked?.omitted ?? 0
+    }
     const prompt = sessionId
       ? null
       : renderTaskDropPrompt(template, {
@@ -493,7 +505,9 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
         number: task.number,
         projectCode: task.projectCode,
         url: `https://nhnent.dooray.com/project/posts/${task.taskId}`,
-        body
+        body,
+        imagePaths,
+        omittedImages
       })
 
     const since = Date.now()

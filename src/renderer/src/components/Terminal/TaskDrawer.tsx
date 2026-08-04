@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ClipboardList, FolderGit2, RefreshCw, Search, Settings, X } from 'lucide-react'
 import type { DoorayTask } from '@shared/types/dooray'
 import type { RepoRegistryEntry, TaskSessionLink, WorkspaceSettings } from '@shared/types/workspace'
@@ -8,6 +8,7 @@ import ProjectFilter from '../common/ProjectFilter'
 import TaskCard from '../Workspace/TaskCard'
 import TaskDetailOverlay from '../Workspace/TaskDetailOverlay'
 import TaskFilterMenu from './TaskFilterMenu'
+import TaskSortMenu from './TaskSortMenu'
 import {
   EMPTY_TASK_FILTER,
   TASK_FACET_LABELS,
@@ -20,6 +21,15 @@ import {
   type TaskFilterState,
   type TaskScope
 } from './taskFilter'
+import { DEFAULT_TASK_SORT, isTaskSortKey, sortTasks, type TaskSortKey } from './taskSort'
+import {
+  changedTaskIds,
+  ensureSeenBaseline,
+  isTaskSeenMap,
+  markAllSeen,
+  markSeen,
+  type TaskSeenMap
+} from './taskSeen'
 import { resolveTaskSetupState, type TaskSetupState } from './taskSetupState'
 
 /** 드래그 페이로드 — pane 의 dragover/drop 이 이 타입으로 식별한다. */
@@ -37,6 +47,10 @@ export interface TaskDragPayload {
 
 /** 이 패널이 보여줄 프로젝트 — 두레이 뷰의 핀과 분리해 별도 키로 관리한다. */
 const PROJECTS_SETTINGS_KEY = 'terminalTaskProjects'
+/** 정렬 기준 — 앱을 다시 켜도 고른 순서를 유지한다. */
+const SORT_SETTINGS_KEY = 'terminalTaskSort'
+/** 업무별로 마지막에 확인한 `updatedAt` — "그 뒤로 바뀐 것" 판정의 기준선. */
+const SEEN_SETTINGS_KEY = 'terminalTaskSeen'
 
 const SCOPE_TABS: [TaskScope, string][] = [
   ['mine', '내 업무'],
@@ -60,6 +74,11 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
   const [links, setLinks] = useState<Record<string, TaskSessionLink[]>>({})
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<TaskFilterState>(EMPTY_TASK_FILTER)
+  const [sort, setSort] = useState<TaskSortKey>(DEFAULT_TASK_SORT)
+  /** 확인 기준선. 저장값을 읽기 전에 판정하면 전부 "변경됨" 으로 번쩍이므로 로드 전엔 비운다. */
+  const [seen, setSeen] = useState<TaskSeenMap>({})
+  /** `load` 는 의존성이 비어 있어 state 를 못 본다 — 새로고침이 방금 지운 배지를 되살리지 않게 최신값을 따로 든다. */
+  const seenRef = useRef<TaskSeenMap>({})
   const [selected, setSelected] = useState<DoorayTask | null>(null)
   /** 목록이 비었을 때 "설정이 덜 됐다" 와 "정말 업무가 없다" 를 가르는 근거. */
   const [setup, setSetup] = useState<TaskSetupState>({ stage: 'ready', projectsWithoutRepo: [] })
@@ -68,16 +87,35 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
     setLoading(true)
     try {
       const projectIds = ((await window.api.settings.get(PROJECTS_SETTINGS_KEY)) as string[] | null) ?? []
-      const [list, linkMap, settings, repos] = await Promise.all([
+      const [list, linkMap, settings, repos, storedSort, storedSeen] = await Promise.all([
         // 프로젝트를 고르지 않았으면 목록을 비운다 — 수백 건을 쏟아붓지 않는다
         projectIds.length > 0 ? window.api.dooray.tasks.list(projectIds, force) : Promise.resolve([]),
         window.api.workspace.taskDrop.linked().catch(() => ({}) as Record<string, TaskSessionLink[]>),
         window.api.workspace.settings.get().catch(() => null as WorkspaceSettings | null),
-        window.api.workspace.repos.list().catch(() => [] as RepoRegistryEntry[])
+        window.api.workspace.repos.list().catch(() => [] as RepoRegistryEntry[]),
+        window.api.settings.get(SORT_SETTINGS_KEY).catch(() => null),
+        window.api.settings.get(SEEN_SETTINGS_KEY).catch(() => null)
       ])
       setTasks(list)
       setLinks(linkMap)
       setSetup(resolveTaskSetupState({ projectIds, settings, repos }))
+      setSort(isTaskSortKey(storedSort) ? storedSort : DEFAULT_TASK_SORT)
+
+      // 기준선이 없던 첫 실행이면 이번 목록을 그대로 기준선으로 굳힌다 — 처음부터 전부
+      // "변경됨" 으로 뜨면 배지가 신호 구실을 못 한다.
+      //
+      // 이미 들고 있는 기준선이 있으면 **디스크 값보다 그쪽을 믿는다.** 업무를 열어 배지를 지운
+      // 직후(저장은 비동기) 새로고침이 겹치면, 방금 지운 배지가 옛 디스크 값으로 되살아난다.
+      const stored =
+        Object.keys(seenRef.current).length > 0
+          ? seenRef.current
+          : isTaskSeenMap(storedSeen)
+            ? storedSeen
+            : {}
+      const baseline = ensureSeenBaseline(list, stored)
+      seenRef.current = baseline
+      setSeen(baseline)
+      if (baseline !== stored) void window.api.settings.set(SEEN_SETTINGS_KEY, baseline)
     } catch {
       setTasks([])
     } finally {
@@ -102,7 +140,27 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
     }
   }, [load])
 
-  const filtered = useMemo(() => filterTasks(tasks, filter), [tasks, filter])
+  const filtered = useMemo(() => sortTasks(filterTasks(tasks, filter), sort), [tasks, filter, sort])
+  const changed = useMemo(() => changedTaskIds(tasks, seen), [tasks, seen])
+
+  const changeSort = (next: TaskSortKey): void => {
+    setSort(next)
+    void window.api.settings.set(SORT_SETTINGS_KEY, next)
+  }
+
+  const persistSeen = (next: TaskSeenMap): void => {
+    seenRef.current = next
+    setSeen(next)
+    void window.api.settings.set(SEEN_SETTINGS_KEY, next)
+  }
+
+  /** 상세를 열면 그 업무는 확인한 것으로 친다 — 배지를 지우는 유일한 자연스러운 지점이다. */
+  const openTask = (task: DoorayTask): void => {
+    setSelected(task)
+    if (changed.has(task.id)) persistSeen(markSeen(seen, task))
+  }
+
+  const toggleTag = (name: string): void => setFilter((f) => toggleFilterFacet(f, 'tags', name))
 
   // 고를 수 있는 값은 갈래·검색어까지 좁힌 목록에서 뽑는다 — 지금 화면에 없는 값을 권하지 않는다.
   const facets = useMemo(
@@ -147,6 +205,7 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
                 aria-label="업무 검색"
               />
             </div>
+            <TaskSortMenu value={sort} onChange={changeSort} />
             <TaskFilterMenu facets={facets} state={filter} onChange={setFilter} />
           </div>
           <div className="flex items-center gap-1">
@@ -160,6 +219,17 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
                 {label}
               </button>
             ))}
+            {/* 배지가 여러 개 쌓였을 때 하나씩 열어 지우게 두지 않는다. */}
+            {changed.size > 0 && (
+              <button
+                type="button"
+                onClick={() => persistSeen(markAllSeen(tasks))}
+                title="변경 표시를 모두 지웁니다"
+                className="ml-auto flex-none text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-secondary hover:text-text-primary"
+              >
+                변경 {changed.size} · 모두 읽음
+              </button>
+            )}
           </div>
           {/* 걸린 상세 필터는 밖에 내놓는다 — 접어두면 "왜 안 보이지" 가 된다. */}
           {chips.length > 0 && (
@@ -238,7 +308,10 @@ function TaskDrawer({ onRunInTerminal }: TaskDrawerProps): JSX.Element {
                   task={task}
                   sessions={taskLinks}
                   onResumeSession={(link) => resumeSession(task, link)}
-                  onSelect={setSelected}
+                  onSelect={openTask}
+                  changed={changed.has(task.id)}
+                  onToggleTag={toggleTag}
+                  activeTags={filter.tags}
                   draggableProps={{
                     draggable: true,
                     onDragStart: (e) => {

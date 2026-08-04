@@ -13,6 +13,10 @@ interface ProjectFilterProps {
    * 고르지 못하게 하고 **지금 뭐가 켜져 있는지만** 보여준다.
    * 프로젝트를 고른 뒤 정할 것들(저장소·브랜치·첫 지시)이 설정에만 있어서, 두 군데서 고르게 하면
    * 여기서 고른 프로젝트가 규칙 없이 남는다.
+   *
+   * ⚠️ 이때는 **체크박스를 그리지 않는다.** 한때는 체크박스를 그대로 두고 `disabled` 만 걸었는데,
+   * 눌리게 생긴 것이 안 눌리니 "고장났다" 로 읽혔다. 못 고치는 자리라면 고칠 수 있는 것처럼
+   * 보이지 않아야 하고, 대신 고칠 수 있는 곳(설정)을 그 자리에서 가리켜야 한다.
    */
   readOnly?: boolean
   /** 프로젝트 목록 대신 위키 도메인 목록을 사용할지 */
@@ -206,6 +210,12 @@ function ProjectFilter({
                 {readOnly ? '표시 중인 프로젝트' : '표시할 프로젝트 선택'}
               </span>
               <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary ml-2">{pinnedCount > 0 ? `${pinnedCount}개 선택` : '전체 표시'}</span>
+              {/* 왜 여기서 못 고치는지를 못 고치는 그 자리에서 말한다. */}
+              {readOnly && (
+                <p className="mt-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary leading-relaxed">
+                  고르는 곳은 설정입니다 — 프로젝트마다 저장소·브랜치 이름을 함께 정해야 합니다.
+                </p>
+              )}
             </div>
             {/* 검색 — 조회 전용일 때는 목록이 짧아 필요 없다 */}
             {!readOnly && (
@@ -239,30 +249,41 @@ function ProjectFilter({
               ) : filtered.map((p) => {
                 const checked = pinnedIds.includes(p.id)
                 const isCustom = customIds.has(p.id)
+                const icon = isCustom ? (
+                  <Link size={11} className={`flex-shrink-0 ${checked ? 'text-brand-dooray' : 'text-text-tertiary'}`} />
+                ) : (
+                  <FolderOpen size={11} className={`flex-shrink-0 ${checked ? 'text-text-primary' : 'text-text-tertiary'}`} />
+                )
+                const label = (
+                  <span className={`text-[calc(11px_*_var(--app-font-scale,1))] truncate min-w-0 ${checked ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>{p.code}</span>
+                )
                 return (
                   <div key={p.id} className="flex items-center group">
-                    <button
-                      onClick={() => { if (!readOnly) void toggle(p.id) }}
-                      disabled={readOnly}
-                      className={`flex-1 flex items-center gap-2 px-3 py-1.5 transition-colors text-left ${
-                        readOnly ? 'cursor-default' : 'hover:bg-bg-surface-hover'
-                      }`}
-                    >
-                      <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 ${
-                        checked
-                          ? 'bg-brand-dooray border-brand-dooray'
-                          : 'border-bg-border-strong'
-                      }`}>
-                        {checked && <Check size={9} className="text-white" strokeWidth={3} />}
+                    {readOnly ? (
+                      // 켜져 있는 것만 나오는 목록이라 체크 표시 자체가 군더더기다 — 그냥 이름만 읽힌다.
+                      <div className="flex-1 flex items-center gap-2 px-3 py-1.5">
+                        {icon}
+                        {label}
                       </div>
-                      {isCustom ? (
-                        <Link size={11} className={`flex-shrink-0 ${checked ? 'text-brand-dooray' : 'text-text-tertiary'}`} />
-                      ) : (
-                        <FolderOpen size={11} className={`flex-shrink-0 ${checked ? 'text-text-primary' : 'text-text-tertiary'}`} />
-                      )}
-                      <span className={`text-[calc(11px_*_var(--app-font-scale,1))] truncate min-w-0 ${checked ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>{p.code}</span>
-                    </button>
-                    {isCustom && (
+                    ) : (
+                      <button
+                        onClick={() => void toggle(p.id)}
+                        role="checkbox"
+                        aria-checked={checked}
+                        className="flex-1 flex items-center gap-2 px-3 py-1.5 transition-colors text-left hover:bg-bg-surface-hover"
+                      >
+                        <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 ${
+                          checked
+                            ? 'bg-brand-dooray border-brand-dooray'
+                            : 'border-bg-border-strong'
+                        }`}>
+                          {checked && <Check size={9} className="text-white" strokeWidth={3} />}
+                        </div>
+                        {icon}
+                        {label}
+                      </button>
+                    )}
+                    {!readOnly && isCustom && (
                       <button onClick={() => removeCustomProject(p.id)}
                         className="px-1.5 opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-red-400 transition-all"
                         title="수동 추가 프로젝트 제거">
@@ -316,7 +337,12 @@ function ProjectFilter({
                     new CustomEvent('goto-settings', { detail: { tab: 'workspace' } })
                   )
                 }}
-                className="flex items-center gap-1.5 w-full px-3 py-2 border-t border-bg-border text-left text-[calc(10.5px_*_var(--app-font-scale,1))] text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover transition-colors"
+                className={`flex items-center gap-1.5 w-full px-3 py-2 border-t border-bg-border text-left text-[calc(10.5px_*_var(--app-font-scale,1))] transition-colors hover:bg-bg-surface-hover ${
+                  // 조회 전용에서는 이게 이 팝오버의 **유일한** 동작이다 — 부록처럼 흐려 두면 막다른 길이 된다.
+                  readOnly
+                    ? 'text-text-primary font-medium'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
               >
                 <Settings size={11} className="flex-none" />
                 <span className="flex-1 min-w-0">

@@ -11,6 +11,7 @@ import { UsageParser } from './usage/UsageParser'
 import { DoorayClient } from './dooray/DoorayClient'
 import { DoorayCalendarApi } from './dooray/DoorayCalendarApi'
 import { TaskService } from './dooray/TaskService'
+import { TaskImageService } from './dooray/TaskImageService'
 import { ErrorReportService, type ErrorReportPayload } from './error-report/ErrorReportService'
 import { feedbackService } from './feedback/FeedbackService'
 import type { FeedbackPayload, EnrichedFeedbackPayload } from '../shared/types/feedback'
@@ -332,6 +333,19 @@ function getHarnessEditService(): HarnessEditService {
     _harnessEditService = new HarnessEditService(app.getPath('userData'), getHarnessService())
   }
   return _harnessEditService
+}
+
+/** 업무 첨부 이미지 다운로더 — userData 경로가 필요해 Harness 와 같은 지연 초기화를 쓴다. */
+let _taskImageService: TaskImageService | null = null
+function getTaskImageService(): TaskImageService {
+  if (!_taskImageService) {
+    _taskImageService = new TaskImageService(
+      doorayClient,
+      taskService,
+      join(app.getPath('userData'), 'task-images')
+    )
+  }
+  return _taskImageService
 }
 
 // (이전에는 브리핑/보고서 사이에 cachedTasks를 공유했지만, 두레이 측에서 상태가
@@ -1099,6 +1113,18 @@ function registerIpcHandlers(): void {
     IPC_CHANNELS.DOORAY_TASK_COMMENTS,
     (_, { projectId, taskId }: { projectId: string; taskId: string }) =>
       taskService.getTaskComments(projectId, taskId)
+  )
+
+  // 업무 첨부 이미지 → 로컬 파일. 실패해도 업무 시작 흐름을 막지 않도록 빈 배열로 떨어진다.
+  ipcMain.handle(
+    IPC_CHANNELS.DOORAY_TASK_IMAGES,
+    (_, { projectId, taskId }: { projectId: string; taskId: string }) =>
+      getTaskImageService()
+        .download(projectId, taskId)
+        .catch((err) => {
+          console.warn('[TaskImages] 다운로드 실패:', err instanceof Error ? err.message : err)
+          return { files: [], omitted: 0 }
+        })
   )
 
   // 프로젝트 워크플로우(상태) 목록 — v2.0 C-2 startTask 의 두레이 상태 전환에 사용

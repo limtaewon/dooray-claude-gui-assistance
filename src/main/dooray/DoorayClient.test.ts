@@ -270,6 +270,48 @@ describe('DoorayClient.fetchBinary', () => {
     expect(dataUrl.startsWith('data:image/jpeg;base64,')).toBe(true)
   })
 
+  /**
+   * 두레이 파일 API 는 버킷 20개 · 초당 5개 충전이다. api.dooray.com 을 거치면 307 때문에
+   * 이미지 한 장에 요청이 두 개 나가 버킷이 절반 속도로 마른다 — 실물 서버로 곧장 간다.
+   */
+  it('첫 후보는 실물 파일 서버 — 307 왕복을 건너뛴다', async () => {
+    const c = new DoorayClient()
+    await c.setToken('T')
+    responseQueue.push({ statusCode: 200, body: 'IMG', headers: { 'content-type': 'image/png' } })
+
+    await c.fetchBinary('/files/123', { projectId: 'p1', postId: 'po1' })
+
+    expect(requestLog).toHaveLength(1)
+    expect(requestLog[0].url).toBe(
+      'https://file-api.dooray.com/downloads/project/v1/projects/p1/posts/po1/files/123?media=raw'
+    )
+  })
+
+  it('429 는 실패가 아니라 잠깐 뒤 재시도 — 이미지가 깨진 채 남으면 안 된다', async () => {
+    const c = new DoorayClient()
+    await c.setToken('T')
+    responseQueue.push({ statusCode: 429, body: 'Too Many Requests' })
+    responseQueue.push({ statusCode: 200, body: 'IMG', headers: { 'content-type': 'image/png' } })
+
+    const dataUrl = await c.fetchBinary('/files/123', { projectId: 'p1', postId: 'po1' })
+
+    expect(dataUrl.startsWith('data:image/png;base64,')).toBe(true)
+    // 같은 URL 로 다시 쳤다 — 다음 후보로 넘어간 게 아니다
+    expect(requestLog).toHaveLength(2)
+    expect(requestLog[0].url).toBe(requestLog[1].url)
+  })
+
+  it('403 이면 남은 후보를 두드리지 않는다 — 권한 없는 파일은 어느 경로로도 못 받는다', async () => {
+    const c = new DoorayClient()
+    await c.setToken('T')
+    responseQueue.push({ statusCode: 403, body: 'Forbidden' })
+
+    await expect(
+      c.fetchBinary('/files/123', { projectId: 'p1', postId: 'po1' })
+    ).rejects.toThrow(/파일 로드 실패/)
+    expect(requestLog).toHaveLength(1)
+  })
+
   it('mime 이 json/html 이면 파일이 아닌 응답 에러', async () => {
     const c = new DoorayClient()
     await c.setToken('T')

@@ -288,6 +288,15 @@ const api = {
         ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASKS_UPDATE, params),
       comments: (projectId: string, taskId: string): Promise<import('../shared/types/dooray').DoorayTaskComment[]> =>
         ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_COMMENTS, { projectId, taskId }),
+      /**
+       * 업무 본문·댓글의 첨부 이미지를 로컬 파일로 내려받는다.
+       * claude 는 프롬프트 안의 파일 경로로만 그림을 읽으므로, 터미널에 업무를 넘길 때 쓴다.
+       */
+      images: (
+        projectId: string,
+        taskId: string
+      ): Promise<{ files: Array<{ fileId: string; path: string; alt?: string }>; omitted: number }> =>
+        ipcRenderer.invoke(IPC_CHANNELS.DOORAY_TASK_IMAGES, { projectId, taskId }),
       /** 프로젝트별 태스크 점진 로딩 이벤트 수신 */
       onPartial: (callback: (payload: { projectId: string; tasks: DoorayTask[]; done: boolean }) => void): (() => void) => {
         const handler = (_: IpcRendererEvent, payload: { projectId: string; tasks: DoorayTask[]; done: boolean }): void =>

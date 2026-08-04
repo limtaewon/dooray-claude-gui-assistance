@@ -1,13 +1,39 @@
 import { net } from 'electron'
 import keytar from 'keytar'
+import {
+  FILE_FETCH_CONCURRENCY,
+  FILE_FETCH_MAX_RETRIES,
+  createLimiter,
+  isRetriableStatus,
+  retryDelayMs
+} from './rateLimit'
 
 const SERVICE_NAME = 'clauday'
 const ACCOUNT_NAME = 'dooray-api-token'
 // NHN Dooray API 베이스 URL
 const BASE_URL = 'https://api.dooray.com'
+/**
+ * 파일 실물이 사는 곳. `api.dooray.com` 의 파일 경로는 307 로 여기를 가리킬 뿐이라,
+ * 처음부터 여기로 가면 **요청이 절반**이 된다 — rate limit 버킷을 아끼는 가장 큰 한 수다.
+ */
+const FILE_API_URL = 'https://file-api.dooray.com/downloads'
+
+/** 상태 코드를 들고 다니는 에러 — 재시도할지(429·5xx) 말지(403·404) 가르는 근거. */
+export class DoorayHttpError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+    readonly retryAfter?: string | string[]
+  ) {
+    super(message)
+    this.name = 'DoorayHttpError'
+  }
+}
 
 export class DoorayClient {
   private token: string | null = null
+  /** 파일 요청 전용 동시 실행 제한. 한 이미지의 후보 경로 시도 전체가 한 자리를 쓴다. */
+  private fileLimiter = createLimiter(FILE_FETCH_CONCURRENCY)
 
   async setToken(token: string): Promise<void> {
     try {
@@ -163,40 +189,56 @@ export class DoorayClient {
     const token = await this.getToken()
     if (!token) throw new Error('Dooray API 토큰이 설정되지 않았습니다')
 
-    if (path.startsWith('http')) return this.fetchBinaryUrl(path, token)
+    // 동시 요청을 묶는다 — 이미지가 여러 장인 업무를 열 때 버킷을 한 번에 비우지 않도록.
+    return this.fileLimiter(async () => {
+      if (path.startsWith('http')) return this.fetchBinaryWithRetry(path, token)
 
-    const fileIdMatch = path.match(/\/files\/(\d+)/)
-    if (fileIdMatch) {
+      const fileIdMatch = path.match(/\/files\/(\d+)/)
+      if (!fileIdMatch) return this.fetchBinaryWithRetry(`${BASE_URL}${path}`, token)
+
       const fileId = fileIdMatch[1]
-      const candidates: string[] = []
-
-      // 컨텍스트 기반 경로 우선
+      const scoped: string[] = []
       if (context?.projectId && context?.postId) {
-        candidates.push(`${BASE_URL}/project/v1/projects/${context.projectId}/posts/${context.postId}/files/${fileId}?media=raw`)
+        scoped.push(`/project/v1/projects/${context.projectId}/posts/${context.postId}/files/${fileId}?media=raw`)
       }
       if (context?.wikiId && context?.pageId) {
-        candidates.push(`${BASE_URL}/wiki/v1/wikis/${context.wikiId}/pages/${context.pageId}/files/${fileId}?media=raw`)
+        scoped.push(`/wiki/v1/wikis/${context.wikiId}/pages/${context.pageId}/files/${fileId}?media=raw`)
       }
-      // 범용 fallback
-      candidates.push(`${BASE_URL}/common/v1/files/${fileId}?media=raw`)
-      candidates.push(`${BASE_URL}${path}`)
+
+      // 실물 서버로 곧장(요청 1개) → 안 되면 api 경유(307 로 같은 곳, 요청 2개) → 범용 경로
+      const candidates = [
+        ...scoped.map((p) => `${FILE_API_URL}${p}`),
+        ...scoped.map((p) => `${BASE_URL}${p}`),
+        `${BASE_URL}/common/v1/files/${fileId}?media=raw`,
+        `${BASE_URL}${path}`
+      ]
 
       const errors: string[] = []
+      /**
+       * 화면에 보여줄 실패 원인. **첫 후보(=컨텍스트 경로)의 상태 코드**를 쓴다 — 그게 되어야
+       * 맞는 경로이고 나머지는 보험이다. 합친 메시지로 원인을 짐작하게 두면 안 되는 이유가 있다:
+       * 범용 후보 `/common/v1/files/{id}` 는 늘 404 라, 진짜 원인이 429 여도 메시지에 404 가
+       * 섞여 "파일이 없다" 로 읽힌다.
+       */
+      let cause: number | null = null
       for (const url of candidates) {
         try {
-          return await this.fetchBinaryUrl(url, token)
+          return await this.fetchBinaryWithRetry(url, token)
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err)
           errors.push(msg.substring(0, 80))
+          if (cause === null && err instanceof DoorayHttpError) cause = err.status
+          // 권한이 없는 파일(다른 프로젝트에서 복사해 온 본문)은 어느 경로로도 못 받는다 —
+          // 남은 후보를 마저 두드리면 버킷만 축내고 결과는 같다.
+          if (err instanceof DoorayHttpError && err.status === 403) break
         }
       }
-      const ctxStr = context
-        ? `ctx=${JSON.stringify(context)}`
-        : 'ctx=없음'
-      throw new Error(`파일 로드 실패 [${ctxStr}]\n시도: ${candidates.length}개\n${errors.map((e, i) => `  ${i+1}. ${e}`).join('\n')}`)
-    }
-
-    return this.fetchBinaryUrl(`${BASE_URL}${path}`, token)
+      const ctxStr = context ? `ctx=${JSON.stringify(context)}` : 'ctx=없음'
+      throw new Error(
+        `파일 로드 실패 [cause=${cause ?? 'unknown'}] [${ctxStr}]\n` +
+          `시도: ${errors.length}개\n${errors.map((e, i) => `  ${i + 1}. ${e}`).join('\n')}`
+      )
+    })
   }
 
   /**
@@ -301,6 +343,30 @@ export class DoorayClient {
    * 크로스 도메인이라 자동 redirect 시 Authorization 드랍됨.
    * redirect: 'manual' + `redirect` 이벤트로 명시 처리 → 새 요청에 Authorization 재첨부.
    */
+  /**
+   * 429/5xx 를 만나면 잠깐 쉬었다 다시 친다.
+   *
+   * 두레이 파일 API 는 버킷이 20개, 초당 5개씩 찬다. 이미지가 여러 장인 업무를 열면 뒤에 선
+   * 요청부터 429 로 떨어지는데, 이건 "그 파일이 없다" 가 아니라 "지금은 안 된다" 다.
+   * 한 번 실패했다고 깨진 이미지로 남기면 새로고침 말고는 되살릴 방법이 없다.
+   */
+  private async fetchBinaryWithRetry(url: string, token: string): Promise<string> {
+    let lastError: unknown
+    for (let attempt = 1; attempt <= FILE_FETCH_MAX_RETRIES + 1; attempt++) {
+      try {
+        return await this.fetchBinaryUrl(url, token)
+      } catch (err) {
+        lastError = err
+        const status = err instanceof DoorayHttpError ? err.status : 0
+        if (!isRetriableStatus(status) || attempt > FILE_FETCH_MAX_RETRIES) break
+        const wait = retryDelayMs(attempt, err instanceof DoorayHttpError ? err.retryAfter : undefined)
+        console.log(`[DoorayClient] HTTP ${status} — ${wait}ms 뒤 재시도 (${attempt}/${FILE_FETCH_MAX_RETRIES})`)
+        await new Promise((r) => setTimeout(r, wait))
+      }
+    }
+    throw lastError
+  }
+
   private fetchBinaryUrl(url: string, token: string, redirectCount = 0): Promise<string> {
     if (redirectCount > 5) {
       return Promise.reject(new Error('리다이렉트 5회 초과'))
@@ -345,8 +411,12 @@ export class DoorayClient {
           if (handled) return
           if (statusCode >= 400) {
             const body = Buffer.concat(chunks).toString('utf-8').substring(0, 200)
-            const shortUrl = url.replace(BASE_URL, '').replace('https://file-api.dooray.com', 'file-api')
-            settle(() => reject(new Error(`HTTP ${statusCode} (${shortUrl}): ${body}`)))
+            const shortUrl = url.replace(BASE_URL, '').replace(FILE_API_URL, 'file-api')
+            settle(() =>
+              reject(
+                new DoorayHttpError(statusCode, `HTTP ${statusCode} (${shortUrl}): ${body}`, response.headers['retry-after'])
+              )
+            )
             return
           }
           if (mime.includes('json') || mime.includes('html')) {
