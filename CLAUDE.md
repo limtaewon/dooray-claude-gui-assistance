@@ -178,7 +178,11 @@ npm run icons        # scripts/generate-icons.mjs
 
 ## 릴리즈
 
-태그 푸시(`vX.Y.Z`)가 트리거. `.github/workflows/release.yml` 이 macOS(dmg/zip) + Windows(exe) 빌드 후 GitHub Release 자동 업로드. main 머지만으로는 배포되지 않음.
+태그 푸시(`vX.Y.Z`)가 트리거. `.github/workflows/release.yml` 이 **Windows(exe) + `latest.yml` 만** 빌드해 GitHub Release 에 자동 업로드한다. main 머지만으로는 배포되지 않음.
+
+**macOS dmg 는 CI 가 만들지 않는다 — 릴리즈마다 손으로 올려야 한다.** 태그를 민 뒤 mac 에서 `npm run dist` 를 돌리고 `release/Clauday-<버전>-arm64.dmg` 를 `gh release upload <태그> <파일>` 로 붙인다. 이 단계를 빠뜨리면 mac 사용자는 업데이트 알림을 받고도 받을 파일이 없다 (`pickAssetForPlatform` 이 dmg 를 못 찾음).
+
+같이 생성되는 `latest-mac.yml` 은 올리지 않는다. macOS 는 ad-hoc 서명(`identity: "-"`) 때문에 autoUpdater 를 의도적으로 안 쓰고 Releases API 로 dmg 를 직접 고른다 — 자세한 건 `UpdateService` 클래스 주석.
 
 ## 참고 문서
 
