@@ -1003,6 +1003,7 @@ function registerIpcHandlers(): void {
   )
   ipcMain.handle(IPC_CHANNELS.TERMINAL_LIST, () => terminalManager.listSessions())
   ipcMain.handle(IPC_CHANNELS.TERMINAL_SAVE_OUTPUT, (_, id: string) => terminalManager.getOutput(id))
+  ipcMain.handle(IPC_CHANNELS.TERMINAL_ATTACH, (_, id: string) => terminalManager.attach(id))
   ipcMain.handle(IPC_CHANNELS.TERMINAL_RENAME, (_, { id, name }: { id: string; name: string }) => {
     return terminalManager.setName(id, name)
   })

@@ -5,7 +5,6 @@ import { release } from 'os'
 ipcRenderer.setMaxListeners(100)
 
 // 터미널 출력 구독: 단일 IPC 리스너를 공유해서 핸들러 수만큼 이벤트 리스너가 누적되지 않게 함
-type TerminalOutputPayload = { id: string; data: string }
 const terminalOutputHandlers = new Set<(payload: TerminalOutputPayload) => void>()
 let terminalOutputSubscribed = false
 function subscribeTerminalOutput(cb: (payload: TerminalOutputPayload) => void): () => void {
@@ -148,6 +147,8 @@ import type {
   TerminalCreateOptions,
   TerminalResizeOptions,
   TerminalExitPayload,
+  TerminalOutputPayload,
+  TerminalAttachResult,
   TerminalWorkspaceSnapshotV2,
   TerminalSaveStateResult,
   TerminalResolvePathRequest,
@@ -479,8 +480,11 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_SAVE_OUTPUT, id),
     rename: (id: string, name: string): Promise<boolean> =>
       ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_RENAME, { id, name }),
-    onOutput: (callback: (payload: { id: string; data: string }) => void): (() => void) =>
+    onOutput: (callback: (payload: TerminalOutputPayload) => void): (() => void) =>
       subscribeTerminalOutput(callback),
+    /** pane 마운트 시 main 이 쌓아둔 출력으로 따라잡는다 — 구독 전 출력(셸 프롬프트)이 유실되지 않게. */
+    attach: (id: string): Promise<TerminalAttachResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_ATTACH, id),
     /** v2.0 B-1: PTY 종료 통지 구독. suppression·at-most-once 판정은 main 이 수행. */
     onExit: (callback: (payload: TerminalExitPayload) => void): (() => void) =>
       subscribeTerminalExit(callback),

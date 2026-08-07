@@ -149,6 +149,8 @@ export function createMockWindowApi(): Record<string, unknown> {
       kill: vi.fn().mockResolvedValue(undefined),
       list: vi.fn().mockResolvedValue([]),
       getOutput: vi.fn().mockResolvedValue(''),
+      // pane 마운트 시 main 버퍼 따라잡기 — 기본은 "밀린 출력 없음"
+      attach: vi.fn().mockResolvedValue({ data: '', seq: 0 }),
       rename: vi.fn().mockResolvedValue(true),
       onOutput: vi.fn().mockReturnValue(noopUnsub),
       // v2.0 B-1: 테스트에서 마지막으로 등록된 콜백은 `mock.calls.at(-1)?.[0]` 로 꺼내 직접 발화시킬 수 있음

@@ -21,6 +21,7 @@ import { installMockWindowApi, resetMockWindowApi } from '../../../../../test/he
 import { renderWithDs } from '../../../../../test/helpers/renderWithDs'
 import { REPLAY_CLEAR, POST_REPLAY_MODE_RESET } from './replay'
 import { resetGlobalWebglFailure } from './webglPolicy'
+import { resetGlyphCacheRegistry, glyphCacheTargetCount, clearGlyphCacheAllPanes } from './glyphCache'
 
 interface FakeKeyEvent {
   type: string
@@ -55,6 +56,8 @@ let registeredOscHandlers: Array<[number, (data: string) => boolean]> = []
 let deferWriteCallback = false
 // term.focus() 호출 횟수 — 새 pane 이 DOM 에 붙은 뒤 다시 포커스를 잡는지 확인용.
 let focusCallCount = 0
+// terminal.clearTextureAtlas() 총 호출 횟수 — split 글자 깨짐 회귀 게이트(glyphCache.ts).
+let clearTextureAtlasCalls = 0
 // v2.0 B-5: serialize() 결과를 테스트별로 조절.
 let fakeSerializeResult = 'FAKE_SERIALIZED'
 let fakeSerializeShouldThrow = false
@@ -104,6 +107,8 @@ vi.mock('@xterm/xterm', () => {
     }
     reset(): void {}
     dispose(): void {}
+    // 글리프 아틀라스 비우기 — 공유 아틀라스라 pane 하나만 비우면 나머지가 깨진다(glyphCache.ts).
+    clearTextureAtlas(): void { clearTextureAtlasCalls += 1 }
     focus(): void { focusCallCount++ }
     clear(): void {}
     selectAll(): void {}
@@ -223,6 +228,8 @@ describe('TerminalPane — v2.0 B-1 종료 오버레이 / 입력 차단', () => 
     registeredOscHandlers = []
     deferWriteCallback = false
     focusCallCount = 0
+    clearTextureAtlasCalls = 0
+    resetGlyphCacheRegistry()
     fakeSerializeResult = 'FAKE_SERIALIZED'
     fakeSerializeShouldThrow = false
     webglConstructorShouldThrow = false
@@ -730,6 +737,141 @@ describe('TerminalPane — v2.0 B-1 종료 오버레이 / 입력 차단', () => 
       const osc7 = registeredOscHandlers.find(([ident]) => ident === 7)?.[1]
       osc7?.('file://host/Users/dev/project')
       expect(onCwdChange).toHaveBeenCalledWith('/Users/dev/project')
+    })
+  })
+
+  // PTY 는 renderer 가 onOutput 을 구독하기 전부터 출력을 뱉는다 — split 로 만든 pane 의 첫 셸
+  // 프롬프트가 실제로 이렇게 사라져 화면이 백지로 남았다(Enter 를 쳐야 프롬프트가 나타남).
+  // main 의 버퍼를 attach 로 받아 따라잡고, seq 로 라이브 수신분과의 중복을 걸러낸다.
+  describe('마운트 시 출력 따라잡기 — 구독 전 출력 유실', () => {
+    it('attach 로 받은 밀린 출력을 화면에 쓴다', async () => {
+      vi.mocked(window.api.terminal.attach).mockResolvedValue({ data: '셸-프롬프트', seq: 3 })
+
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused />)
+
+      await waitFor(() => expect(callOrder).toContain('write:셸-프롬프트'))
+      expect(window.api.terminal.attach).toHaveBeenCalledWith('s1')
+    })
+
+    it('따라잡은 지점 이하의 라이브 수신분은 중복 write 하지 않는다', async () => {
+      let resolveAttach: (v: { data: string; seq: number }) => void = () => {}
+      vi.mocked(window.api.terminal.attach).mockReturnValue(
+        new Promise((r) => { resolveAttach = r })
+      )
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused />)
+      await waitFor(() => expect(window.api.terminal.onOutput).toHaveBeenCalled())
+      const emit = vi.mocked(window.api.terminal.onOutput).mock.calls.at(-1)?.[0]
+
+      // attach 응답을 기다리는 동안 도착한 수신분 — seq 2 는 attach 결과에 이미 들어 있다.
+      emit?.({ id: 's1', data: '이미-포함', seq: 2 })
+      emit?.({ id: 's1', data: '새-출력', seq: 5 })
+      resolveAttach({ data: '밀린-출력', seq: 3 })
+
+      await waitFor(() => expect(callOrder).toContain('write:새-출력'))
+      expect(callOrder).toContain('write:밀린-출력')
+      expect(callOrder).not.toContain('write:이미-포함')
+    })
+
+    it('attach 가 실패해도 큐를 열어 라이브 출력은 계속 표시한다', async () => {
+      vi.mocked(window.api.terminal.attach).mockRejectedValue(new Error('IPC 실패'))
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused />)
+      await waitFor(() => expect(window.api.terminal.onOutput).toHaveBeenCalled())
+      const emit = vi.mocked(window.api.terminal.onOutput).mock.calls.at(-1)?.[0]
+
+      await waitFor(() => expect(warnSpy).toHaveBeenCalled())
+      emit?.({ id: 's1', data: '실패-후-출력', seq: 1 })
+
+      await waitFor(() => expect(callOrder).toContain('write:실패-후-출력'))
+      warnSpy.mockRestore()
+    })
+
+    it('다른 세션의 출력은 무시한다', async () => {
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused />)
+      await waitFor(() => expect(window.api.terminal.onOutput).toHaveBeenCalled())
+      const emit = vi.mocked(window.api.terminal.onOutput).mock.calls.at(-1)?.[0]
+
+      emit?.({ id: 's2', data: '남의-출력', seq: 1 })
+
+      await waitFor(() => expect(window.api.terminal.attach).toHaveBeenCalled())
+      expect(callOrder).not.toContain('write:남의-출력')
+    })
+  })
+
+  // 글리프 아틀라스는 글꼴·테마가 같은 pane 끼리 공유된다(@xterm/addon-webgl CharAtlasCache).
+  // 한 pane 만 clearTextureAtlas() 하면 나머지 pane 은 옛 UV 좌표로 비워진 아틀라스를 샘플링해
+  // 글자가 조각나거나 사라진다 — split 로 여러 pane 을 띄웠을 때 실제로 관측된 증상이다.
+  describe('글리프 아틀라스 공유 — split 다중 pane 글자 깨짐', () => {
+    // jsdom 에는 document.fonts / matchMedia 가 없다 — 두 경로를 실제로 태우기 위해 대역을 꽂는다.
+    let dprChangeHandlers: Array<() => void> = []
+
+    function installFontAndDprFakes(fontStatus: 'loaded' | 'loading'): void {
+      dprChangeHandlers = []
+      Object.defineProperty(document, 'fonts', {
+        value: { status: fontStatus, ready: Promise.resolve() },
+        configurable: true
+      })
+      Object.defineProperty(window, 'matchMedia', {
+        value: () => ({
+          addEventListener: (_type: string, cb: () => void) => { dprChangeHandlers.push(cb) },
+          removeEventListener: () => {}
+        }),
+        configurable: true
+      })
+    }
+
+    afterEach(() => {
+      Reflect.deleteProperty(document, 'fonts')
+      Reflect.deleteProperty(window, 'matchMedia')
+    })
+
+    it('웹폰트 로드가 끝난 뒤 추가된 pane 은 아틀라스를 비우지 않는다', async () => {
+      installFontAndDprFakes('loaded')
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused />)
+      await waitFor(() => expect(window.api.terminal.resize).toHaveBeenCalled())
+      clearTextureAtlasCalls = 0
+
+      // split 으로 2번째 pane 추가 — 여기서 아틀라스를 비우면 공유 중인 s1 의 화면이 깨진다.
+      renderWithDs(<TerminalPane sessionId="s2" isVisible />)
+      await waitFor(() => expect(glyphCacheTargetCount()).toBe(2))
+      await Promise.resolve()
+
+      expect(clearTextureAtlasCalls).toBe(0)
+    })
+
+    it('웹폰트가 늦게 도착하면 아틀라스를 비운다(흐릿함 보정은 유지)', async () => {
+      installFontAndDprFakes('loading')
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused />)
+
+      await waitFor(() => expect(clearTextureAtlasCalls).toBeGreaterThan(0))
+    })
+
+    it('DPR 변경은 살아 있는 pane 전체에 브로드캐스트한다', async () => {
+      installFontAndDprFakes('loaded')
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused />)
+      renderWithDs(<TerminalPane sessionId="s2" isVisible />)
+      renderWithDs(<TerminalPane sessionId="s3" isVisible />)
+      await waitFor(() => expect(glyphCacheTargetCount()).toBe(3))
+      clearTextureAtlasCalls = 0
+
+      // 배율이 바뀐 pane 하나만 알림을 받아도 3개 pane 이 모두 비워져야 한다.
+      dprChangeHandlers[0]()
+
+      expect(clearTextureAtlasCalls).toBe(3)
+    })
+
+    it('언마운트한 pane 은 브로드캐스트 대상에서 빠진다', async () => {
+      installFontAndDprFakes('loaded')
+      renderWithDs(<TerminalPane sessionId="s1" isVisible isFocused />)
+      const second = renderWithDs(<TerminalPane sessionId="s2" isVisible />)
+      await waitFor(() => expect(glyphCacheTargetCount()).toBe(2))
+      clearTextureAtlasCalls = 0
+
+      second.unmount()
+      clearGlyphCacheAllPanes()
+
+      expect(glyphCacheTargetCount()).toBe(1)
+      expect(clearTextureAtlasCalls).toBe(1)
     })
   })
 })
