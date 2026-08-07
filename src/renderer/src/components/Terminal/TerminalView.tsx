@@ -1321,12 +1321,22 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
             </button>
           </div>
           <div className="flex items-center gap-2 flex-none pl-2">
-            {/* 분할은 자주 쓰는데 단축키를 모르면 길이 없다 — 탭바에 버튼으로 둔다. */}
-            <div className="flex items-center">
+            {/* 분할은 자주 쓰는데 단축키를 모르면 길이 없다 — 탭바에 버튼으로 둔다.
+                아이콘 둘만 두면 무슨 버튼인지 안 읽혀서(실제 제보) 묶음 라벨을 앞에 붙인다.
+                방향은 아이콘이 맡는다 — 라벨을 셋으로 늘리면 좁은 창에서 탭 영역을 다 먹는다. */}
+            <div
+              role="group"
+              aria-label="pane 분할"
+              data-tour="terminal-split"
+              className="flex items-center h-7 rounded-[7px] border border-bg-border text-text-secondary overflow-hidden"
+            >
+              <span className={`pl-2.5 pr-2 text-[calc(11.5px_*_var(--app-font-scale,1))] font-medium select-none ${activeTerminalTab ? '' : 'opacity-40'}`}>
+                분할
+              </span>
               <button
                 onClick={() => void splitFocusedPane('row')}
                 disabled={!activeTerminalTab}
-                className="w-7 h-7 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover disabled:opacity-40 disabled:hover:bg-transparent"
+                className="w-7 h-7 flex items-center justify-center border-l border-bg-border hover:text-text-primary hover:bg-bg-surface-hover disabled:opacity-40 disabled:hover:bg-transparent"
                 title="오른쪽으로 분할 (⌘D)"
                 aria-label="오른쪽으로 분할"
               >
@@ -1335,20 +1345,22 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
               <button
                 onClick={() => void splitFocusedPane('column')}
                 disabled={!activeTerminalTab}
-                className="w-7 h-7 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover disabled:opacity-40 disabled:hover:bg-transparent"
+                className="w-7 h-7 flex items-center justify-center border-l border-bg-border hover:text-text-primary hover:bg-bg-surface-hover disabled:opacity-40 disabled:hover:bg-transparent"
                 title="아래로 분할 (⌘⇧D)"
                 aria-label="아래로 분할"
               >
                 <Rows2 size={13} />
               </button>
             </div>
-            {/* 지금 터미널이 있는 폴더(대개 업무 워크트리)를 IDE 에서 바로 연다. */}
+            {/* 지금 터미널이 있는 폴더(대개 업무 워크트리)를 IDE 에서 바로 연다.
+                감지된 에디터 이름까지 라벨에 드러낸다 — "↗" 아이콘만으로는 새 창/공유/열기가 구분 안 된다. */}
             {focusedCwd && (
-              <OpenInEditorButton
-                path={focusedCwd}
-                compact
-                className="w-7 h-7 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover"
-              />
+              <span data-tour="terminal-open-editor" className="flex-none">
+                <OpenInEditorButton
+                  path={focusedCwd}
+                  className="flex items-center gap-1.5 h-7 px-2.5 rounded-[7px] border border-bg-border text-[calc(11.5px_*_var(--app-font-scale,1))] font-medium text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover transition-colors whitespace-nowrap"
+                />
+              </span>
             )}
             <button onClick={toggleDrawer}
               data-tour="terminal-drawer-toggle"
@@ -1363,7 +1375,8 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
             </button>
             {tabs.length >= 3 && (
               <button onClick={closeAll}
-                className="flex items-center gap-1 px-2 py-0.5 rounded text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                // 파괴적 동작은 hover 전에 이미 붉어야 한다 — 색이 hover 에서야 나타나면 실수 클릭을 못 막는다.
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[calc(11px_*_var(--app-font-scale,1))] text-c-red-fg hover:bg-c-red-bg transition-colors"
                 title={`${tabs.length}개 터미널 모두 닫기`}>
                 <Trash2 size={10} /> 모두 닫기 ({tabs.length})
               </button>
@@ -1700,7 +1713,7 @@ function TabLabel({
       )}
       <button onClick={(e) => { e.stopPropagation(); onClose() }}
         onPointerDown={(e) => e.stopPropagation()}
-        className="text-text-tertiary hover:text-red-300 ml-0.5"
+        className="text-text-tertiary hover:text-c-red-fg ml-0.5"
         title="탭 닫기">
         <X size={11} />
       </button>

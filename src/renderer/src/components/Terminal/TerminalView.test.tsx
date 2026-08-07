@@ -19,6 +19,7 @@ import { installMockWindowApi, resetMockWindowApi } from '../../../../../test/he
 import { renderWithDs } from '../../../../../test/helpers/renderWithDs'
 import type { TerminalWorkspaceSnapshotV2 } from '@shared/types/terminal'
 import { collectLeafIds, isValidTree } from './splitTree'
+import { resetEditorCache } from '../common/OpenInEditorButton'
 
 // TerminalPane 은 xterm 의 native 모듈을 끌어와서 jsdom 에서 무거움 → forwardRef stub 으로 교체.
 vi.mock('./TerminalPane', () => ({
@@ -1003,6 +1004,70 @@ describe('TerminalView (integration)', () => {
         const pane = screen.getByTestId(`term-pane-restored-${i}`)
         expect(pane).toHaveAttribute('data-active', String(i === focusedIndex))
       }
+    })
+  })
+
+  // 탭바 오른쪽 액션이 아이콘만이라 무슨 버튼인지 못 알아보겠다는 제보 → 글자로 드러낸다.
+  // 아이콘만 남으면 다시 같은 문제가 되므로 라벨 존재를 계약으로 고정한다.
+  describe('탭바 오른쪽 액션 — 글자로 드러내기', () => {
+    // 에디터 감지 결과는 모듈 전역에 캐시된다 — 테스트끼리 새지 않게 매번 비운다.
+    beforeEach(() => {
+      resetEditorCache()
+      // 에디터 버튼은 포커스된 pane 의 cwd 가 있어야 나온다. cwd 없이 연 탭은 pane.cwd 가
+      // undefined 라 sessionCwd 프로브 결과가 유일한 출처다.
+      vi.mocked(window.api.terminal.sessionCwd).mockResolvedValue('/repo/work')
+    })
+    afterEach(() => { resetEditorCache() })
+
+    /** 탭이 하나 있어야 focusedCwd 가 잡힌다. */
+    async function openOneTab(): Promise<void> {
+      await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+      await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalled())
+    }
+
+    it('분할은 묶음 라벨 아래에 두 방향 버튼을 둔다', async () => {
+      renderWithDs(<TerminalView />)
+      await screen.findByText('터미널')
+
+      const group = document.querySelector('[data-tour="terminal-split"]')
+      expect(group).not.toBeNull()
+      expect(group).toHaveTextContent('분할')
+      // 방향은 아이콘이 맡되, 스크린리더·툴팁으로는 방향이 드러나야 한다.
+      expect(screen.getByLabelText('오른쪽으로 분할')).toBeInTheDocument()
+      expect(screen.getByLabelText('아래로 분할')).toBeInTheDocument()
+    })
+
+    it('에디터 열기 버튼은 감지된 에디터 이름을 글자로 보여준다', async () => {
+      vi.mocked(window.api.editor.list).mockResolvedValue([
+        { id: 'vscode', name: 'VS Code', target: '/x', kind: 'app' }
+      ] as never)
+
+      renderWithDs(<TerminalView active />)
+      await openOneTab()
+
+      expect(await screen.findByText('VS Code 로 열기')).toBeInTheDocument()
+    })
+
+    it('에디터가 여러 개면 고르는 버튼임을 글자로 알린다', async () => {
+      vi.mocked(window.api.editor.list).mockResolvedValue([
+        { id: 'vscode', name: 'VS Code', target: '/x', kind: 'app' },
+        { id: 'cursor', name: 'Cursor', target: '/y', kind: 'app' }
+      ] as never)
+
+      renderWithDs(<TerminalView active />)
+      await openOneTab()
+
+      expect(await screen.findByText('에디터로 열기')).toBeInTheDocument()
+    })
+
+    it('설치된 에디터가 없으면 버튼을 그리지 않는다 (눌러도 소용없는 버튼 금지)', async () => {
+      renderWithDs(<TerminalView active />)
+      await openOneTab()
+
+      await waitFor(() =>
+        expect(document.querySelector('[data-tour="terminal-open-editor"]')).not.toBeNull()
+      )
+      expect(document.querySelector('[data-tour="terminal-open-editor"] button')).toBeNull()
     })
   })
 })
