@@ -59,4 +59,30 @@ describe('resolveCandidates', () => {
     const [result] = await promise
     expect(result.kind).toBeNull()
   })
+
+  // 링크 후보 추출(renderer)이 한글을 잡아도 여기서 존재 검증에 실패하면 밑줄이 안 그어진다.
+  // 실제 파일시스템으로 끝까지 통하는지 확인한다.
+  describe('한글 경로', () => {
+    const koDir = join(dir, '문서')
+    const koFile = join(koDir, '보고서 최종.md')
+    mkdirSync(koDir)
+    writeFileSync(koFile, 'hi')
+
+    it('한글 폴더를 directory 로 잡는다', async () => {
+      const [result] = await resolveCandidates({ cwd: dir, candidates: ['문서'] })
+      expect(result.kind).toBe('directory')
+      expect(result.resolved).toBe(koDir)
+    })
+
+    it('공백 섞인 한글 파일을 file 로 잡는다', async () => {
+      const [result] = await resolveCandidates({ cwd: dir, candidates: ['문서/보고서 최종.md'] })
+      expect(result.kind).toBe('file')
+      expect(result.resolved).toBe(koFile)
+    })
+
+    it('절대 경로로 줘도 같다', async () => {
+      const [result] = await resolveCandidates({ cwd: homedir(), candidates: [koFile] })
+      expect(result.kind).toBe('file')
+    })
+  })
 })

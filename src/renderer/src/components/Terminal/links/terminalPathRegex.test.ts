@@ -75,6 +75,56 @@ describe('detectLocalPathLinks', () => {
   })
 })
 
+/**
+ * 문자 클래스를 ASCII 로 한정하면 한글 폴더에서 매칭이 끊긴다 — 사용자 보고.
+ * `/Users/nhn/문서/보고서.md` 가 `/Users/nhn/` 까지만 잡혔다.
+ */
+describe('detectLocalPathLinks — 비-ASCII 경로', () => {
+  it('한글 폴더가 섞인 절대 경로를 끝까지 잡는다', () => {
+    const links = detectLocalPathLinks('열기 /Users/nhn/문서/보고서.md')
+    expect(links.map((l) => l.pathText)).toContain('/Users/nhn/문서/보고서.md')
+  })
+
+  it('경로 전체가 한글이어도 잡는다', () => {
+    const links = detectLocalPathLinks('cat ~/바탕화면/프로젝트/설정.json')
+    expect(links.map((l) => l.pathText)).toContain('~/바탕화면/프로젝트/설정.json')
+  })
+
+  it('한글로 시작하는 상대 경로도 잡는다 — ASCII 전용이면 시작조차 못 잡았다', () => {
+    const links = detectLocalPathLinks('  M 문서/한글파일.txt')
+    expect(links.map((l) => l.pathText)).toContain('문서/한글파일.txt')
+  })
+
+  it('한글 경로의 line:col 도 분리한다', () => {
+    const [link] = detectLocalPathLinks('at 소스/메인/진입점.ts:120:8')
+    expect(link).toMatchObject({ pathText: '소스/메인/진입점.ts', line: 120, column: 8 })
+  })
+
+  it('공백이 섞인 한글 경로도 잡는다', () => {
+    const links = detectLocalPathLinks('saved to /Users/x/내 문서/보고서 최종.md')
+    expect(links.map((l) => l.pathText)).toContain('/Users/x/내 문서/보고서 최종.md')
+  })
+
+  it('한글 외 비-ASCII(악센트·일본어·중국어)도 같이 통과한다', () => {
+    expect(detectLocalPathLinks('open /Users/x/résumé/naïve.md').map((l) => l.pathText))
+      .toContain('/Users/x/résumé/naïve.md')
+    expect(detectLocalPathLinks('open /Users/x/ドキュメント/報告.md').map((l) => l.pathText))
+      .toContain('/Users/x/ドキュメント/報告.md')
+  })
+
+  it('macOS 가 NFD 로 돌려준 한글(자모 분리)도 끊기지 않는다', () => {
+    // 'ㅁ' 계열 자모로 분해된 형태 — 결합 문자를 허용하지 않으면 중간에서 끊긴다.
+    const nfd = '/Users/nhn/문서/보고서.md'.normalize('NFD')
+    const links = detectLocalPathLinks(`열기 ${nfd}`)
+    expect(links.map((l) => l.pathText)).toContain(nfd)
+  })
+
+  it('한글이 섞여도 URL 은 로컬 경로로 오인하지 않는다', () => {
+    const links = detectLocalPathLinks('https://example.com/문서/보고서')
+    expect(links).toEqual([])
+  })
+})
+
 describe('range 유틸', () => {
   it('detectRanges 는 경계 구두점을 잘라낸다', () => {
     const [range] = detectRanges('(src/foo.ts)', /src\/foo\.ts\)?/g)
