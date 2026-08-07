@@ -84,6 +84,31 @@ claude code 의 작업이 끝나면 *stop hook* 이 발사. 그게 HookServer �
 - session limit close 시: `STANDBY_RETRY_INTERVAL_MS` 후 재시도
 - `electron.net` 으로 WS request (Electron 의 시스템 프록시 통합)
 
+### 연결 유지 — "영영 CONNECTING" 을 막는 상한들
+
+재연결 루프(`runOnce`)는 **소켓의 close 를 기다려** 다음 시도로 넘어간다. 그래서 close 가 오지
+않는 상태에 빠지면 루프가 그 자리에 매달린 채 상태만 CONNECTING 으로 남는다. 그 구간마다 상한을
+둔다 (types.ts):
+
+| 상수 | 막는 구간 |
+|---|---|
+| `TOKEN_FETCH_TIMEOUT_MS` | 토큰 발급 POST 가 응답 없음 |
+| `HANDSHAKE_TIMEOUT_MS` | WS 업그레이드가 끝나지 않음 (ws 옵션) |
+| `SESSION_INFO_TIMEOUT_MS` | open 은 됐는데 sessionInfo 가 안 옴 |
+| `INBOUND_IDLE_TIMEOUT_MS` | FIN 없이 끊긴 half-open (소켓은 OPEN 인데 아무것도 안 옴) |
+
+`failCurrentAttempt(ws, code, reason)` 가 공통 탈출구다 — `terminate()` 후 close 를 직접
+emit 해서 `awaitClose()` 가 매달리지 않게 한다.
+
+⚠️ **`unexpected-response` 리스너는 반드시 요청을 destroy 해야 한다.** ws 는 이 이벤트에
+리스너가 있으면 스스로 `abortHandshake` 를 하지 않는다
+(`websocket.js`: `else if (!websocket.emit('unexpected-response', req, res))`).
+리스너만 달고 아무것도 안 하면 401/403/5xx 핸드셰이크 거절에서 close 가 영영 오지 않는다 —
+실제로 이것 때문에 CONNECTING 에서 못 빠져나왔다.
+
+백오프는 `sessionInfo` 수신(ACTIVE) 시 `reconnectAttempt = 0` 으로 리셋한다. 리셋이 빠지면
+끊길 때마다 간격이 누적돼 상한(30초)에 눌러앉고, 잠깐 끊겼다 붙는 흔한 경우에도 30초씩 걸린다.
+
 ## 함정
 
 - **여러 클라이언트 = session limit**: 두레이 동일 토큰으로 여러 WS 동시 접속 차단. 재접속 시 standby retry.

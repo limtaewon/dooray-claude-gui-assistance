@@ -12,6 +12,10 @@ import {
   CLOSE_GRACE_MS,
   reconnectDelayMs,
   PING_INTERVAL_MS,
+  TOKEN_FETCH_TIMEOUT_MS,
+  HANDSHAKE_TIMEOUT_MS,
+  SESSION_INFO_TIMEOUT_MS,
+  INBOUND_IDLE_TIMEOUT_MS,
   WS_PATH,
   SOCKET_MODE_TOKEN_PATH
 } from './types'
@@ -51,6 +55,12 @@ export class SocketModeClient extends EventEmitter {
 
   private ws: WebSocket | null = null
   private pingTimer: NodeJS.Timeout | null = null
+  /** open 후 sessionInfo 를 기다리는 상한 타이머 — ACTIVE 가 되면 해제한다. */
+  private sessionInfoTimer: NodeJS.Timeout | null = null
+  /** 마지막 수신 시각. ping 틱마다 이 값이 너무 오래됐으면 죽은 회선으로 보고 끊는다. */
+  private lastInboundAt = 0
+  /** 진행 중인 토큰 발급 요청 — disconnect 가 즉시 끊을 수 있게 들고 있는다. */
+  private pendingTokenRequest: { abort: () => void } | null = null
   private state: ConnectionState = 'DISCONNECTED'
   private tokenInfo: SocketModeTokenInfo | null = null
 
@@ -100,6 +110,8 @@ export class SocketModeClient extends EventEmitter {
     this.inStandbyLoop = false
     this.setState('DISCONNECTED')
     this.clearTimers()
+    // 토큰 발급 응답을 기다리는 중이면 그것도 끊는다 — 안 그러면 루프가 응답까지 매달린다.
+    this.abortTokenRequest()
     // 재연결/standby 대기 중이면 그 자리에서 깨워 루프를 끝낸다.
     this.wakeAllWaits()
     await this.closeSocket()
@@ -231,37 +243,67 @@ export class SocketModeClient extends EventEmitter {
       req.setHeader('Content-Type', 'application/json')
       req.setHeader('Accept', 'application/json')
 
+      // 응답이 영영 안 오면 루프가 여기 매달린 채 상태만 CONNECTING 으로 남는다 — 상한을 건다.
+      let settled = false
+      const finish = (fn: () => void): void => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeoutTimer)
+        this.pendingTokenRequest = null
+        fn()
+      }
+      const timeoutTimer = setTimeout(() => {
+        finish(() => {
+          try { req.abort() } catch { /* ok */ }
+          reject(new Error(`Socket Mode 토큰 발급 시간 초과 (${TOKEN_FETCH_TIMEOUT_MS}ms)`))
+        })
+      }, TOKEN_FETCH_TIMEOUT_MS)
+      this.pendingTokenRequest = {
+        abort: () => {
+          finish(() => {
+            try { req.abort() } catch { /* ok */ }
+            reject(new Error('Socket Mode 토큰 발급 취소'))
+          })
+        }
+      }
+
       let body = ''
       req.on('response', (res) => {
         const code = res.statusCode!
         res.on('data', (chunk: Buffer) => { body += chunk.toString() })
         res.on('end', () => {
           if (code >= 400) {
-            reject(new Error(`Socket Mode 토큰 발급 실패 (${code}): ${body.slice(0, 200)}`))
+            finish(() => reject(new Error(`Socket Mode 토큰 발급 실패 (${code}): ${body.slice(0, 200)}`)))
             return
           }
           try {
             const parsed = JSON.parse(body) as { result?: SocketModeTokenInfo }
             const r = parsed.result
             if (!r?.accessToken || !r?.tenantId || !r?.organizationMemberId) {
-              reject(new Error(`Socket Mode 토큰 응답 형식 오류: ${body.slice(0, 200)}`))
+              finish(() => reject(new Error(`Socket Mode 토큰 응답 형식 오류: ${body.slice(0, 200)}`)))
               return
             }
             this.tokenInfo = r
             console.log(
               `[SocketMode] 토큰 발급 OK tenantId=${r.tenantId} memberId=${r.organizationMemberId}`
             )
-            resolve()
+            finish(resolve)
           } catch (err) {
-            reject(new Error(`토큰 응답 파싱 실패: ${err instanceof Error ? err.message : String(err)}`))
+            finish(() => reject(new Error(`토큰 응답 파싱 실패: ${err instanceof Error ? err.message : String(err)}`)))
           }
         })
       })
-      req.on('error', (err) => reject(err))
+      req.on('error', (err) => finish(() => reject(err)))
       // 빈 body POST
       req.write('')
       req.end()
     })
+  }
+
+  private abortTokenRequest(): void {
+    const pending = this.pendingTokenRequest
+    this.pendingTokenRequest = null
+    pending?.abort()
   }
 
   // ===== 내부: WebSocket 연결 =====
@@ -277,7 +319,9 @@ export class SocketModeClient extends EventEmitter {
       ws = new WebSocket(wsUrl, {
         headers: {
           Authorization: `Bearer ${this.tokenInfo.accessToken}`
-        }
+        },
+        // 업그레이드가 끝나지 않으면 open/close 어느 쪽도 오지 않는다 — ws 가 끊게 한다.
+        handshakeTimeout: HANDSHAKE_TIMEOUT_MS
       })
     } catch (err) {
       throw new Error(`WebSocket 생성 실패: ${err instanceof Error ? err.message : err}`)
@@ -286,10 +330,13 @@ export class SocketModeClient extends EventEmitter {
 
     ws.on('open', () => {
       console.log('[SocketMode] WS handshake OK — sessionInfo 대기')
+      this.lastInboundAt = Date.now()
       this.startPing()
+      this.startSessionInfoTimeout(ws)
     })
 
     ws.on('message', (data: RawData) => {
+      this.lastInboundAt = Date.now()
       const text = data.toString()
       this.handleRawMessage(text)
     })
@@ -303,15 +350,21 @@ export class SocketModeClient extends EventEmitter {
       this.clearTimers()
     })
 
-    ws.on('unexpected-response', (_req, res) => {
-      // 401 등 핸드셰이크 거부 → 토큰 재발급 후 한 번 재시도
+    ws.on('unexpected-response', (req, res) => {
+      // 핸드셰이크가 업그레이드 대신 HTTP 응답으로 거절된 경우(401·403·5xx·프록시).
+      //
+      // ⚠️ ws 는 이 이벤트에 리스너가 있으면 스스로 abortHandshake 를 하지 않는다
+      // (websocket.js: `else if (!websocket.emit('unexpected-response', req, res))`).
+      // 그래서 여기서 요청을 끊지 않으면 close/error 가 영영 오지 않고, awaitClose() 가
+      // 그 자리에 매달려 재연결 루프가 CONNECTING 인 채로 멈춘다 — 실제 증상의 원인.
       const status = res.statusCode
-      console.warn(`[SocketMode] handshake 거부 status=${status}`)
-      if (status === 401) {
-        console.log('[SocketMode] 401 — 토큰 재발급 후 재시도 예정')
-        this.tokenInfo = null
-        // close 이벤트가 뒤이어 발생하므로 루프가 자동 재진입
-      }
+      console.warn(`[SocketMode] handshake 거부 status=${status} — 소켓을 끊고 재시도한다`)
+      // 토큰 문제일 수 있으니 버린다. 어차피 루프가 다음 시도에서 다시 받는다.
+      this.tokenInfo = null
+      try { req.destroy() } catch { /* ok */ }
+      try { res.destroy?.() } catch { /* ok */ }
+      // destroy 만으로 close 가 안 오는 구현을 대비해 루프를 직접 깨운다.
+      this.failCurrentAttempt(ws, 4000, `handshake_rejected_${status}`)
     })
 
     ws.on('error', (err) => {
@@ -322,6 +375,15 @@ export class SocketModeClient extends EventEmitter {
   private startPing(): void {
     this.clearPing()
     this.pingTimer = setInterval(() => {
+      // 회선이 FIN 없이 끊기면(무선 전환·VPN 재접속) 소켓은 OPEN 인 채 남고 close 가 오지 않는다.
+      // ping 을 보내도 응답이 없으면 죽은 것으로 보고 끊어서 루프가 다시 붙게 한다.
+      if (this.lastInboundAt > 0 && Date.now() - this.lastInboundAt > INBOUND_IDLE_TIMEOUT_MS) {
+        console.warn(
+          `[SocketMode] ${Math.round(INBOUND_IDLE_TIMEOUT_MS / 1000)}초간 수신 없음 — 죽은 회선으로 보고 끊는다`
+        )
+        this.failCurrentAttempt(this.ws, 4001, 'inbound_idle')
+        return
+      }
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         try {
           this.ws.send(JSON.stringify({ type: 'ping' }))
@@ -330,6 +392,40 @@ export class SocketModeClient extends EventEmitter {
         }
       }
     }, PING_INTERVAL_MS)
+  }
+
+  /**
+   * open 은 됐는데 sessionInfo 가 안 오는 구간을 끊는다.
+   * sessionInfo 를 받아야 ACTIVE 다 — 안 오면 소켓만 열린 채 아무것도 못 받고 CONNECTING 에 남는다.
+   */
+  private startSessionInfoTimeout(ws: WebSocket): void {
+    this.clearSessionInfoTimer()
+    this.sessionInfoTimer = setTimeout(() => {
+      this.sessionInfoTimer = null
+      if (this.state === 'ACTIVE') return
+      console.warn(
+        `[SocketMode] ${SESSION_INFO_TIMEOUT_MS / 1000}초간 sessionInfo 없음 — 끊고 재시도한다`
+      )
+      this.failCurrentAttempt(ws, 4002, 'session_info_timeout')
+    }, SESSION_INFO_TIMEOUT_MS)
+  }
+
+  /**
+   * 지금 시도를 실패로 끝내고 재연결 루프를 깨운다.
+   * 소켓을 terminate 하면 close 가 오지만, close 가 안 오는 구현(핸드셰이크 거절 등)도 있어
+   * 마지막에 emit('close') 로 직접 깨운다 — awaitClose 가 매달리지 않게 하는 것이 목적이다.
+   */
+  private failCurrentAttempt(ws: WebSocket | null, code: number, reason: string): void {
+    this.clearTimers()
+    if (!ws) return
+    this.lastCloseCode = code
+    this.lastCloseReason = reason
+    try {
+      ws.terminate?.()
+    } catch { /* ok */ }
+    try {
+      ws.emit('close', code, Buffer.from(reason))
+    } catch { /* ok */ }
   }
 
   // ===== 내부: 메시지 처리 =====
@@ -350,6 +446,10 @@ export class SocketModeClient extends EventEmitter {
       console.log('[SocketMode] sessionInfo 수신 → ACTIVE')
       this.setState('ACTIVE')
       this.inStandbyLoop = false
+      this.clearSessionInfoTimer()
+      // 백오프 리셋 — 이게 없으면 한 번 끊길 때마다 간격이 계속 늘어 상한(30초)에 눌러앉는다.
+      // 잠깐 끊겼다 붙는 흔한 경우에도 다음 재연결이 30초씩 걸려 "안 붙는다" 로 보인다.
+      this.reconnectAttempt = 0
       return
     }
 
@@ -461,8 +561,13 @@ export class SocketModeClient extends EventEmitter {
     if (this.pingTimer) { clearInterval(this.pingTimer); this.pingTimer = null }
   }
 
+  private clearSessionInfoTimer(): void {
+    if (this.sessionInfoTimer) { clearTimeout(this.sessionInfoTimer); this.sessionInfoTimer = null }
+  }
+
   private clearTimers(): void {
     this.clearPing()
+    this.clearSessionInfoTimer()
   }
 }
 
