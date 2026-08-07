@@ -128,10 +128,21 @@ leaf 하나뿐이다. 이 둘을 묶어 판정하는 것이 `isViewerTab()` — 
 remark-gfm), html/htm → iframe. 그 외는 `null` 이라 토글을 아예 그리지 않는다. 렌더 가능하면
 미리보기로 먼저 연다.
 
-⚠️ **HTML 미리보기 iframe 은 `sandbox=""`(모든 제한) 이다.** 앱의 preload 가 강한 IPC 를 들고
-있어서, 여는 파일이 스크립트를 돌릴 수 있으면 그게 곧 통로가 된다. 이 제약을 풀지 말 것.
-대가로 외부 CSS·이미지 같은 **상대 경로 리소스는 뜨지 않는다**(출처가 없어 file:// 하위 리소스가
-차단된다) — 인라인 style 문서는 정상이다.
+HTML 미리보기는 전용 스킴 `clauday-preview://local/<절대경로>` 로 서빙한다
+(`previewUrl.ts` + `main/file/previewProtocol.ts`).
+
+⚠️ **`srcdoc` 으로 되돌리지 말 것.** srcdoc 문서에는 자체 URL 이 없어 페이지 안 앵커
+(`href="#x"`)가 앱 URL 기준으로 해석된다 — 누르는 순간 프레임이 문서를 떠나 백지가 된다.
+실제로 그렇게 만들었다가 제보를 받았다. 자체 URL 이 있어야 앵커도 상대 경로 리소스도 산다.
+
+보안은 세 겹이다. 하나라도 빼지 말 것:
+1. iframe 에 `allow-scripts` 를 **주지 않는다** — 스크립트가 아예 안 돈다
+2. 앱과 다른 출처라 프레임이 앱 DOM 에 닿지 못한다 (`allow-same-origin` 은 자체 출처를 유지해
+   앵커·상대 경로를 살리기 위한 것이고, 스크립트가 없으므로 그 출처로 할 수 있는 일이 없다)
+3. main 이 응답에 CSP 를 붙여 원격 요청까지 막는다 (`default-src 'self'`, `script-src 'none'`)
+
+스킴 권한 등록(`registerSchemesAsPrivileged`)은 **`app.whenReady()` 이전**이어야 한다.
+이후에 부르면 조용히 무시되고 `standard: true` 가 안 붙어 상대 경로가 깨진다.
 
 저장은 읽은 시점의 mtime 을 함께 보내 검사한다(`writeTextFile.expectedMtimeMs`). 다르면
 `conflict` 로 거절 — 터미널에서 돌린 스크립트·git 이 같은 파일을 건드리는 화면이라 조용한

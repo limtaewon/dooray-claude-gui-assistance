@@ -65,6 +65,12 @@ vi.mock('electron', () => {
       removeHandler: vi.fn(),
       removeAllListeners: vi.fn()
     },
+    // 파일 미리보기 전용 스킴 — 권한 등록은 ready 이전(모듈 최상위)에 돈다.
+    protocol: {
+      registerSchemesAsPrivileged: vi.fn(),
+      handle: vi.fn()
+    },
+    net: { fetch: vi.fn(), request: vi.fn() },
     shell: {
       openExternal: vi.fn(),
       openPath: vi.fn(),

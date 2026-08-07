@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Save, RotateCcw, ExternalLink, AlertTriangle, Eye, Code2 } from 'lucide-react'
 import type { FileTabRequest, TextFileWriteReason } from '@shared/types/textFile'
+import { previewUrlForPath } from '@shared/types/previewUrl'
 import { useTheme } from '../../hooks/useTheme'
 import { languageOf } from '../common/monacoLanguage'
 import { filePreviewKind } from './filePreviewKind'
@@ -31,18 +32,25 @@ const WRITE_FAIL_MESSAGE: Record<TextFileWriteReason, string> = {
 /**
  * 소스 대신 렌더 결과를 보여준다.
  *
- * HTML 은 `sandbox=""`(모든 제한) iframe 에 넣는다 — 스크립트·폼·같은 출처·상위 프레임 이동이
- * 전부 막힌다. 앱의 preload 는 강한 IPC 를 들고 있어서, 여는 파일이 스크립트를 돌릴 수 있으면
- * 그게 곧 통로가 된다. 대신 이 제약 때문에 **외부 CSS·이미지 같은 상대 경로 리소스는 안 뜬다**
- * (출처가 없어 file:// 하위 리소스가 차단된다). 인라인 style 로 된 문서는 그대로 보인다.
+ * HTML 은 전용 스킴(`clauday-preview://`)으로 서빙한 URL 을 iframe 에 물린다. `srcdoc` 은
+ * 문서에 자체 URL 이 없어 페이지 안 앵커(`href="#x"`)를 누르면 프레임이 문서를 떠나 백지가 됐다.
+ *
+ * 보안은 세 겹이다: ①`allow-scripts` 를 주지 않아 스크립트가 아예 안 돈다 ②앱과 다른 출처라
+ * 프레임이 앱 DOM 에 닿지 못한다 ③main 이 응답에 CSP 를 붙여 원격 요청까지 막는다.
+ * `allow-same-origin` 은 자체 출처를 유지해 앵커·상대 경로 리소스를 살리기 위한 것으로,
+ * 스크립트가 없으므로 그 출처로 할 수 있는 일이 없다.
  */
-function FilePreview({ kind, content }: { kind: 'markdown' | 'html'; content: string }): JSX.Element {
+function FilePreview({
+  kind,
+  content,
+  path
+}: { kind: 'markdown' | 'html'; content: string; path: string }): JSX.Element {
   if (kind === 'html') {
     return (
       <iframe
         title="파일 미리보기"
-        sandbox=""
-        srcDoc={content}
+        sandbox="allow-same-origin"
+        src={previewUrlForPath(path)}
         className="w-full h-full border-0 bg-white"
       />
     )
@@ -169,7 +177,7 @@ function FileView({ request, onDirtyChange }: FileViewProps): JSX.Element {
       </div>
       <div className="flex-1 min-h-0">
         {showPreview && previewKind ? (
-          <FilePreview kind={previewKind} content={content} />
+          <FilePreview kind={previewKind} content={content} path={request.path} />
         ) : (
           <Editor
             height="100%"
