@@ -123,6 +123,11 @@ export function createMockWindowApi(): Record<string, unknown> {
       readImageDataUrl: vi.fn().mockResolvedValue({ ok: true, dataUrl: '' }),
       showInFolder: vi.fn().mockResolvedValue({ ok: true })
     },
+    // 앱 안 파일 탭 — 기본은 "앱이 그릴 수 없는 파일"이라 OS 폴백이 기본 동작이다.
+    file: {
+      readText: vi.fn().mockResolvedValue({ ok: false, reason: 'not-found' }),
+      writeText: vi.fn().mockResolvedValue({ ok: true, mtimeMs: 1 })
+    },
     editor: {
       // 기본은 "설치된 에디터 없음" — 열기 버튼이 안 나오는 것이 기본 상태다.
       list: vi.fn().mockResolvedValue([]),

@@ -109,6 +109,26 @@ pane 에 브로드캐스트**한다. `RenderService.clearTextureAtlas()` 가 렌
 웹폰트 로드가 이미 끝난 뒤 열린 pane 은 비울 이유가 없으므로 생성 시점의
 `document.fonts.status` 로 판정해 건너뛴다.
 
+## 앱 안 파일 탭
+
+터미널 탭은 `kind` 판별자로 갈린다 — 없으면 터미널, `'diff'` 는 파일 diff, `'file'` 은 편집 가능한
+파일 뷰(`FileView.tsx`, Monaco). diff/file 은 PTY 가 없어 `panes` 가 비고 `tree` 는 자리표시자
+leaf 하나뿐이다. 이 둘을 묶어 판정하는 것이 `isViewerTab()` — 분할·스냅샷·PTY resize 대상에서 뺀다.
+
+⌘클릭 라우팅은 `TerminalView.handleTerminalPathOpen` 한 곳이다:
+
+1. `⌥⌘` 면 판정 없이 `shell.openPath` — OS 탈출구는 항상 남긴다
+2. `file.readText` 가 성공하면 파일 탭으로 (`FileTabRequest.line` 이 있으면 그 줄로 이동)
+3. 실패(폴더·이진·`TEXT_FILE_MAX_BYTES` 초과)면 `shell.openPath`
+
+`TerminalPane.onOpenPath` 를 배선하지 않은 호스트(MentionAgentView·BranchWorkspace)는 기존대로
+전부 OS 로 넘어간다 — prop 없으면 옛 동작이 그대로다.
+
+저장은 읽은 시점의 mtime 을 함께 보내 검사한다(`writeTextFile.expectedMtimeMs`). 다르면
+`conflict` 로 거절 — 터미널에서 돌린 스크립트·git 이 같은 파일을 건드리는 화면이라 조용한
+덮어쓰기는 위험하다. 이진 판정은 확장자가 아니라 선두 8KB 의 NUL 바이트로 한다(확장자 목록은
+항상 뒤처진다).
+
 ## 함정
 
 - **resize(0,0)**: node-pty 가 throw. 항상 `cols > 0 && rows > 0` 검사 후 호출.

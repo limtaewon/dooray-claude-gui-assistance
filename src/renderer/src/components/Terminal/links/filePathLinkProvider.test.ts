@@ -54,8 +54,35 @@ describe('createFilePathLinkProvider', () => {
     expect(link.text).toBe('src/main/index.ts')
 
     link.activate(new MouseEvent('click', { metaKey: true }) as MouseEvent, link.text)
-    expect(openPath).toHaveBeenCalledWith('/repo/src/main/index.ts')
+    expect(openPath).toHaveBeenCalledWith('/repo/src/main/index.ts', { preferExternal: false, line: null })
     expect(clearSelection).toHaveBeenCalledTimes(1)
+  })
+
+  // 앱 안 파일 탭이 기본이 되면서, OS 기본 앱으로 나가는 탈출구가 ⌥⌘ 다.
+  it('⌥⌘클릭은 preferExternal 로 알린다 — OS 기본 앱 탈출구', async () => {
+    const buffer = createFakeBuffer([{ text: 'M src/main/index.ts' }])
+    const { terminal } = makeTerminal(buffer)
+    const { deps, openPath, resolvePath } = makeDeps()
+    resolvePath.mockResolvedValue([{ candidate: 'src/main/index.ts', resolved: '/repo/src/main/index.ts', kind: 'file' }])
+    const provider = createFilePathLinkProvider(terminal, deps)
+    const links = await provideLinksAsync(provider, 1)
+
+    links![0].activate(new MouseEvent('click', { metaKey: true, altKey: true }) as MouseEvent, links![0].text)
+
+    expect(openPath).toHaveBeenCalledWith('/repo/src/main/index.ts', { preferExternal: true, line: null })
+  })
+
+  it('파일.ts:120 형태면 line 을 함께 넘긴다 — 앱 안에서 그 줄로 간다', async () => {
+    const buffer = createFakeBuffer([{ text: 'at src/main/index.ts:120:8' }])
+    const { terminal } = makeTerminal(buffer)
+    const { deps, openPath, resolvePath } = makeDeps()
+    resolvePath.mockResolvedValue([{ candidate: 'src/main/index.ts', resolved: '/repo/src/main/index.ts', kind: 'file' }])
+    const provider = createFilePathLinkProvider(terminal, deps)
+    const links = await provideLinksAsync(provider, 1)
+
+    links![0].activate(new MouseEvent('click', { metaKey: true }) as MouseEvent, links![0].text)
+
+    expect(openPath).toHaveBeenCalledWith('/repo/src/main/index.ts', { preferExternal: false, line: 120 })
   })
 
   it('modifier 없는 클릭은 activate 되어도 openPath 를 호출하지 않는다', async () => {

@@ -5,19 +5,8 @@ import { ChevronDown, ChevronUp, FileDiff } from 'lucide-react'
 import { currentChangeIndex, formatChangePosition } from './diffNavigation'
 import type { GitFileDiffContent, GitFileDiffParams } from '@shared/git/scmTypes'
 import { useTheme } from '../../../hooks/useTheme'
+import { languageOf } from '../../common/monacoLanguage'
 import { LoadingView } from '../../common/ds'
-
-/** 확장자 → Monaco 언어. 목록에 없으면 plaintext 로 두고 하이라이트를 포기한다. */
-const LANGUAGE_BY_EXTENSION: Record<string, string> = {
-  ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript', mjs: 'javascript',
-  json: 'json', css: 'css', scss: 'scss', html: 'html', md: 'markdown', yml: 'yaml', yaml: 'yaml',
-  sh: 'shell', bash: 'shell', zsh: 'shell', py: 'python', java: 'java', kt: 'kotlin', go: 'go',
-  rs: 'rust', sql: 'sql', xml: 'xml', toml: 'ini', ini: 'ini'
-}
-
-function languageOf(path: string): string {
-  return LANGUAGE_BY_EXTENSION[path.split('.').pop()?.toLowerCase() ?? ''] ?? 'plaintext'
-}
 
 export interface DiffRequest extends GitFileDiffParams {
   /** 헤더에 붙일 부제 — 커밋 제목이나 '스테이징됨' 등 */

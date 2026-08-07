@@ -154,6 +154,11 @@ import type {
   TerminalResolvePathRequest,
   TerminalResolvedPath
 } from '../shared/types/terminal'
+import type {
+  TextFileReadResult,
+  TextFileWriteRequest,
+  TextFileWriteResult
+} from '../shared/types/textFile'
 import type { GitHubStatus } from '../shared/types/github'
 import type {
   GitWorktree,
@@ -427,6 +432,14 @@ const api = {
   },
 
   // Shell — OS 기본 핸들러로 열기 (절대경로/URL/file://)
+  /** 앱 안 파일 탭 — 터미널에서 ⌘클릭한 경로를 OS 기본 앱 대신 탭으로 연다. */
+  file: {
+    /** 열 수 없으면 throw 하지 않고 `reason` 을 담아 돌려준다 — 호출자가 OS 로 넘길지 판단한다. */
+    readText: (path: string): Promise<TextFileReadResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.FILE_READ_TEXT, path),
+    writeText: (req: TextFileWriteRequest): Promise<TextFileWriteResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.FILE_WRITE_TEXT, req)
+  },
   shell: {
     openPath: (target: string): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke(IPC_CHANNELS.SHELL_OPEN_PATH, target),

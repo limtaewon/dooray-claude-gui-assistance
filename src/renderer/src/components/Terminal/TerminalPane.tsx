@@ -88,6 +88,12 @@ interface TerminalPaneProps {
   /** v2.0 B-7: OSC7 로 새 cwd 를 알게 될 때마다 호출된다(링크 cwd 우선순위 1순위) — 호스트가
    *  `PaneRuntime.cwd` 를 갱신해 스냅샷 저장에도 반영할 수 있게 한다 (ADR-v2-terminal-p2-05 §레이어 4). */
   onCwdChange?: (cwd: string) => void
+  /**
+   * ⌘클릭한 경로를 여는 곳 — 호스트가 앱 안 탭으로 열 수 있으면 배선한다.
+   * 없으면 기존대로 OS 기본 앱으로 넘긴다(레거시 3호스트 호환).
+   * `preferExternal`(⌥⌘)이면 호스트도 OS 로 넘겨야 한다 — 탈출구를 없애지 않는다.
+   */
+  onOpenPath?: (absolutePath: string, opts: { preferExternal: boolean; line: number | null }) => void | Promise<void>
 }
 
 /** DOM 리페어런트(reattachPaneHost) 전후로 주고받는 xterm 뷰포트 스크롤 위치. */
@@ -132,7 +138,8 @@ function TerminalPaneInner(
     rendererSetting,
     onWebglUnavailable,
     onTitleChange,
-    onCwdChange
+    onCwdChange,
+    onOpenPath
   }: TerminalPaneProps,
   ref: ForwardedRef<TerminalPaneHandle>
 ): JSX.Element {
@@ -172,6 +179,9 @@ function TerminalPaneInner(
   // 콜백을 참조하도록 ref 로 동기화한다(onFocusRequestRef 와 동일 패턴).
   const onCwdChangeRef = useRef(onCwdChange)
   useEffect(() => { onCwdChangeRef.current = onCwdChange }, [onCwdChange])
+  // 링크 provider 는 mount effect 에서 한 번만 만들어진다 — 최신 콜백을 ref 로 참조한다.
+  const onOpenPathRef = useRef(onOpenPath)
+  useEffect(() => { onOpenPathRef.current = onOpenPath }, [onOpenPath])
   const terminalTheme = useTerminalTheme()
   const terminalFont = useTerminalFont()
   const fontRef = useRef(terminalFont)
@@ -494,7 +504,14 @@ function TerminalPaneInner(
         getCwdHint: () => paneCwd,
         cache: pathLinkCache,
         resolvePath: (req) => window.api.terminal.resolvePath(req),
-        openPath: (absolutePath) => {
+        openPath: (absolutePath, opts) => {
+          // 호스트가 앱 안 열기를 배선했으면 그쪽으로 — 없으면(레거시 호스트) 기존대로 OS 로 넘긴다.
+          const openInApp = onOpenPathRef.current
+          if (openInApp) {
+            void Promise.resolve(openInApp(absolutePath, opts))
+              .catch((err) => console.warn('[term-link] 앱 안에서 열기 실패', err))
+            return
+          }
           window.api.shell.openPath(absolutePath).catch((err) => console.warn('[term-link] open 실패', err))
         },
         tooltip: linkTooltip

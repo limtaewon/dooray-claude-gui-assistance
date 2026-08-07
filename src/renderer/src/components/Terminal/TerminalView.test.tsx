@@ -22,23 +22,24 @@ import { collectLeafIds, isValidTree } from './splitTree'
 import { resetEditorCache } from '../common/OpenInEditorButton'
 
 // TerminalPane 은 xterm 의 native 모듈을 끌어와서 jsdom 에서 무거움 → forwardRef stub 으로 교체.
+/** TerminalPane 에 마지막으로 넘어간 props — 호스트가 배선한 콜백을 테스트가 직접 발화시킨다. */
+interface StubPaneProps {
+  sessionId: string
+  isVisible?: boolean
+  isFocused?: boolean
+  exitInfo?: { exitCode: number } | null
+  restore?: { cols: number; rows: number; serialized: string }
+  onOpenPath?: (path: string, opts: { preferExternal: boolean; line: number | null }) => void | Promise<void>
+}
+let lastPaneProps: StubPaneProps | null = null
+
 vi.mock('./TerminalPane', () => ({
   default: forwardRef(function StubTerminalPane(
-    {
-      sessionId,
-      isVisible,
-      isFocused,
-      exitInfo,
-      restore
-    }: {
-      sessionId: string
-      isVisible?: boolean
-      isFocused?: boolean
-      exitInfo?: { exitCode: number } | null
-      restore?: { cols: number; rows: number; serialized: string }
-    },
+    props: StubPaneProps,
     ref: React.ForwardedRef<unknown>
   ) {
+    const { sessionId, isVisible, isFocused, exitInfo, restore } = props
+    lastPaneProps = props
     useImperativeHandle(ref, () => ({
       serialize: () => null,
       focus: () => {},
@@ -66,6 +67,10 @@ vi.mock('./TerminalPane', () => ({
 vi.mock('@monaco-editor/react', () => ({
   DiffEditor: ({ original, modified }: { original: string; modified: string }) => (
     <div data-testid="diff-editor" data-original={original} data-modified={modified} />
+  ),
+  // 파일 탭용 — 실제 Monaco 는 jsdom 에서 못 뜬다. 값만 노출해 계약을 확인한다.
+  default: ({ value, path }: { value: string; path: string }) => (
+    <div data-testid="file-editor" data-path={path} data-value={value} />
   )
 }))
 
@@ -1004,6 +1009,75 @@ describe('TerminalView (integration)', () => {
         const pane = screen.getByTestId(`term-pane-restored-${i}`)
         expect(pane).toHaveAttribute('data-active', String(i === focusedIndex))
       }
+    })
+  })
+
+  /**
+   * 터미널에서 ⌘클릭한 파일을 OS 기본 앱 대신 앱 안 탭으로 연다.
+   * 앱이 그릴 수 없는 것(폴더·이진·너무 큼)과 ⌥⌘ 는 그대로 OS 로 넘어가야 한다 — 탈출구를 없애지 않는다.
+   */
+  describe('앱 안 파일 탭', () => {
+    /** TerminalPane 에 넘어간 onOpenPath 를 꺼내 직접 발화시킨다. */
+    async function openPathFromTerminal(
+      path: string,
+      opts: { preferExternal: boolean; line: number | null }
+    ): Promise<void> {
+      await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+      await waitFor(() => expect(lastPaneProps?.onOpenPath).toBeTypeOf('function'))
+      await act(async () => { await lastPaneProps!.onOpenPath!(path, opts) })
+    }
+
+    it('텍스트 파일이면 탭으로 연다 — OS 로 넘기지 않는다', async () => {
+      vi.mocked(window.api.file.readText).mockResolvedValue({
+        ok: true, content: 'export const a = 1', mtimeMs: 10
+      })
+      renderWithDs(<TerminalView active />)
+
+      await openPathFromTerminal('/repo/src/a.ts', { preferExternal: false, line: null })
+
+      expect(await screen.findByTestId('file-editor')).toHaveAttribute('data-path', '/repo/src/a.ts')
+      expect(window.api.shell.openPath).not.toHaveBeenCalled()
+    })
+
+    it('앱이 그릴 수 없는 파일(이진)은 OS 기본 앱으로 넘긴다', async () => {
+      vi.mocked(window.api.file.readText).mockResolvedValue({ ok: false, reason: 'binary' })
+      renderWithDs(<TerminalView active />)
+
+      await openPathFromTerminal('/repo/img.png', { preferExternal: false, line: null })
+
+      expect(window.api.shell.openPath).toHaveBeenCalledWith('/repo/img.png')
+      expect(screen.queryByTestId('file-editor')).not.toBeInTheDocument()
+    })
+
+    it('⌥⌘클릭은 읽어보지도 않고 바로 OS 로 넘긴다', async () => {
+      renderWithDs(<TerminalView active />)
+
+      await openPathFromTerminal('/repo/src/a.ts', { preferExternal: true, line: null })
+
+      expect(window.api.file.readText).not.toHaveBeenCalled()
+      expect(window.api.shell.openPath).toHaveBeenCalledWith('/repo/src/a.ts')
+    })
+
+    it('같은 파일을 다시 열면 탭을 새로 만들지 않는다', async () => {
+      vi.mocked(window.api.file.readText).mockResolvedValue({ ok: true, content: 'x', mtimeMs: 1 })
+      renderWithDs(<TerminalView active />)
+
+      await openPathFromTerminal('/repo/src/a.ts', { preferExternal: false, line: null })
+      await act(async () => {
+        await lastPaneProps!.onOpenPath!('/repo/src/a.ts', { preferExternal: false, line: null })
+      })
+
+      // 탭마다 뷰가 하나씩 렌더되므로 편집기 수 = 파일 탭 수다.
+      await waitFor(() => expect(screen.getAllByTestId('file-editor')).toHaveLength(1))
+    })
+
+    it('파일 탭은 분할 대상이 아니다 — PTY 가 없다', async () => {
+      vi.mocked(window.api.file.readText).mockResolvedValue({ ok: true, content: 'x', mtimeMs: 1 })
+      renderWithDs(<TerminalView active />)
+      await openPathFromTerminal('/repo/src/a.ts', { preferExternal: false, line: null })
+
+      // 파일 탭이 활성인 동안에는 분할 버튼이 비활성이어야 한다.
+      await waitFor(() => expect(screen.getByLabelText('오른쪽으로 분할')).toBeDisabled())
     })
   })
 

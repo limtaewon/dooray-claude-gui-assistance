@@ -45,6 +45,8 @@ import BranchDiffPanel from '../Git/scm/BranchDiffPanel'
 import GitHistoryPanel from '../Git/scm/GitHistoryPanel'
 import BranchesPanel from '../Git/scm/BranchesPanel'
 import DiffView, { diffTabId, type DiffRequest } from '../Git/scm/DiffView'
+import FileView from './FileView'
+import type { FileTabRequest } from '@shared/types/textFile'
 import DrawerRepoEmptyState from '../Git/scm/DrawerRepoEmptyState'
 import { useTerminalRepo } from '../Git/scm/useRepoRoot'
 import { useScmRepoSelection } from '../Git/scm/useScmRepoSelection'
@@ -131,13 +133,13 @@ interface PaneRuntime {
  * 탭 1개 — split 트리 + 포커스 leaf + leaf 별 런타임(ADR-v2-terminal-p2-02 §3).
  *
  * `kind` 는 판별자다. 값이 없으면 터미널 탭 — 기존 스냅샷을 그대로 읽기 위해 optional 로 둔다.
- * diff 탭은 PTY 를 갖지 않으므로 `panes` 가 비어 있고 `tree` 는 자리표시자 leaf 하나뿐이다.
+ * diff/file 탭은 PTY 를 갖지 않으므로 `panes` 가 비어 있고 `tree` 는 자리표시자 leaf 하나뿐이다.
  * pane 을 순회하는 코드는 `tab.panes[leafId]` 가 없으면 건너뛰므로 그대로 안전하다.
  */
 interface TabEntry {
   tabId: string
   name: string
-  kind?: 'terminal' | 'diff'
+  kind?: 'terminal' | 'diff' | 'file'
   /** 사용자가 직접 이름을 바꿨으면 셸 제목으로 덮어쓰지 않는다 (Warp 와 동일) */
   nameIsCustom?: boolean
   tree: SplitNode
@@ -145,10 +147,13 @@ interface TabEntry {
   panes: Record<string, PaneRuntime>
   /** kind === 'diff' 일 때만 — 무엇을 비교할지 */
   diff?: DiffRequest
+  /** kind === 'file' 일 때만 — 어떤 파일을 열지 */
+  file?: FileTabRequest
 }
 
-function isDiffTab(tab: TabEntry): boolean {
-  return tab.kind === 'diff'
+/** PTY 가 없는 탭 — 분할·리사이즈·스냅샷 대상이 아니다. */
+function isViewerTab(tab: TabEntry): boolean {
+  return tab.kind === 'diff' || tab.kind === 'file'
 }
 
 function allPanesExited(tab: TabEntry): boolean {
@@ -214,7 +219,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
   const lastTerminalTabIdRef = useRef<string | null>(null)
   useEffect(() => {
     const active = tabsRef.current.find((t) => t.tabId === activeTabId)
-    if (active && active.kind !== 'diff') lastTerminalTabIdRef.current = activeTabId
+    if (active && !isViewerTab(active)) lastTerminalTabIdRef.current = activeTabId
   }, [activeTabId, tabs])
   // v2.0 B-5: pane.serialize() 가 null 을 반환할 때(addon 미준비 등) 재사용할 마지막 성공 스냅샷.
   const lastPaneSnapshotRef = useRef<Map<string, TerminalPaneSnapshot>>(new Map())
@@ -224,7 +229,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
   const collectSnapshot = useCallback((): TerminalWorkspaceSnapshotV2 => {
     // diff 탭은 저장하지 않는다 — 파일 상태에서 파생되는 뷰라 복원해도 의미가 없고,
     // PTY 가 없어 스냅샷 스키마(panes 필수)와도 맞지 않는다.
-    const tabsSnapshot = tabsRef.current.filter((t) => !isDiffTab(t)).map((tab) => {
+    const tabsSnapshot = tabsRef.current.filter((t) => !isViewerTab(t)).map((tab) => {
       const panes: Record<string, TerminalPaneSnapshot> = {}
       for (const leafId of collectLeafIds(tab.tree)) {
         const pane = tab.panes[leafId]
@@ -663,7 +668,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
 
   /** 상세 오버레이의 "터미널에서 시작" — 활성 탭의 포커스 pane 을 쓴다. 탭이 없으면 하나 만든다. */
   const runTaskInFocusedPane = useCallback(async (task: DoorayTask): Promise<void> => {
-    const tab = tabsRef.current.find((t) => t.tabId === activeTabIdRef.current && t.kind !== 'diff')
+    const tab = tabsRef.current.find((t) => t.tabId === activeTabIdRef.current && !isViewerTab(t))
     const pane = tab?.panes[tab.focusedLeafId] ?? (await createPaneForTask())
     if (!pane) return
     await runTaskInPane(
@@ -685,7 +690,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     e.preventDefault()
 
     // 터미널 탭이 하나도 없으면(또는 diff 탭만 열려 있으면) 만들어서 거기서 시작한다 — 드롭을 삼키지 않는다.
-    const tab = tabsRef.current.find((t) => t.tabId === activeTabIdRef.current && t.kind !== 'diff')
+    const tab = tabsRef.current.find((t) => t.tabId === activeTabIdRef.current && !isViewerTab(t))
     const pane = tab?.panes[tab.focusedLeafId] ?? (await createPaneForTask())
     if (!pane) {
       toast.error('업무를 시작할 터미널이 없습니다')
@@ -979,10 +984,10 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
    */
   const focusedPane = (() => {
     const active = tabs.find((t) => t.tabId === activeTabId)
-    const tab = active && !isDiffTab(active)
+    const tab = active && !isViewerTab(active)
       ? active
-      : tabs.find((t) => t.tabId === lastTerminalTabIdRef.current && !isDiffTab(t)) ??
-        tabs.find((t) => !isDiffTab(t))
+      : tabs.find((t) => t.tabId === lastTerminalTabIdRef.current && !isViewerTab(t)) ??
+        tabs.find((t) => !isViewerTab(t))
     return tab ? tab.panes[tab.focusedLeafId] : undefined
   })()
   const {
@@ -1016,15 +1021,58 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
     if (drawerOpen && drawerTab !== 'tasks') refreshRepoRoot()
   }, [drawerOpen, drawerTab, activeTabId, refreshRepoRoot])
 
-  /** 지금 분할할 수 있는 탭인지 — diff 탭에는 PTY 가 없다. */
-  const activeTerminalTab = tabs.find((t) => t.tabId === activeTabId && !isDiffTab(t)) ?? null
+  /** 지금 분할할 수 있는 탭인지 — diff/file 탭에는 PTY 가 없다. */
+  const activeTerminalTab = tabs.find((t) => t.tabId === activeTabId && !isViewerTab(t)) ?? null
+
+  /**
+   * 터미널에서 ⌘클릭한 파일을 앱 안 탭으로 연다. 같은 파일이면 새로 만들지 않고 그 탭을 살린다.
+   */
+  const openFileTab = useCallback((request: FileTabRequest) => {
+    const tabId = `file ${request.path}`
+    if (tabsRef.current.some((t) => t.tabId === tabId)) {
+      activateTab(tabId)
+      return
+    }
+    const leafId = crypto.randomUUID()
+    setTabs((prev) => [...prev, {
+      tabId,
+      kind: 'file',
+      name: request.path.split('/').pop() || request.path,
+      // 파일 탭에는 PTY 가 없다 — 자리표시자 leaf 하나만 두고 panes 는 비운다(diff 탭과 동일).
+      tree: { type: 'leaf', leafId },
+      focusedLeafId: leafId,
+      panes: {},
+      file: request
+    }])
+    activateTab(tabId)
+    notifyLayoutChanged()
+  }, [activateTab, notifyLayoutChanged])
+
+  /**
+   * 터미널 링크 클릭의 종착지. 앱이 그릴 수 있는 텍스트면 탭으로, 아니면 OS 기본 앱으로 넘긴다.
+   * `preferExternal`(⌥⌘클릭)이면 판정 없이 바로 OS 로 — 탈출구를 항상 남긴다.
+   */
+  const handleTerminalPathOpen = useCallback(async (
+    absolutePath: string,
+    opts: { preferExternal: boolean; line?: number | null }
+  ): Promise<void> => {
+    if (!opts.preferExternal) {
+      const probe = await window.api.file.readText(absolutePath).catch(() => null)
+      if (probe?.ok) {
+        openFileTab({ path: absolutePath, line: opts.line ?? null })
+        return
+      }
+    }
+    // 폴더·이진·너무 큰 파일, 그리고 ⌥⌘ — 앱이 그릴 수 없는 것은 OS 가 더 잘한다.
+    await window.api.shell.openPath(absolutePath)
+  }, [openFileTab])
 
   /** v2.0 B-4: split 은 항상 새 PTY — 현재 focused pane 의 cwd 를 상속한다(ADR-02 §7). */
   const splitFocusedPane = useCallback(async (direction: SplitDirection) => {
     const tabId = activeTabIdRef.current
     if (!tabId) return
     const tab = tabsRef.current.find((t) => t.tabId === tabId)
-    if (!tab || isDiffTab(tab)) return
+    if (!tab || isViewerTab(tab)) return
     const cwd = tab.panes[tab.focusedLeafId]?.cwd
     let session: TerminalSession
     try {
@@ -1301,7 +1349,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
                     tabId={tab.tabId}
                     name={tab.name}
                     kind={tab.kind ?? 'terminal'}
-                    paneCount={isDiffTab(tab) ? 0 : collectLeafIds(tab.tree).length}
+                    paneCount={isViewerTab(tab) ? 0 : collectLeafIds(tab.tree).length}
                     isActive={activeTabId === tab.tabId}
                     isExited={allPanesExited(tab)}
                     isDone={Object.values(tab.panes).some((pane) => doneSessions.has(pane.sessionId))}
@@ -1430,6 +1478,7 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
               onWebglUnavailable={handleWebglUnavailable}
               onTitleChange={focused ? (title) => applyAutoName(tab.tabId, title) : undefined}
               onCwdChange={(cwd) => updatePaneCwd(tab.tabId, leafId, cwd)}
+              onOpenPath={handleTerminalPathOpen}
             />,
             getOrCreateHost(leafId)
           )
@@ -1450,6 +1499,8 @@ function TerminalView({ active = true }: TerminalViewProps): JSX.Element {
             >
               {tab.kind === 'diff' && tab.diff ? (
                 <DiffView request={tab.diff} />
+              ) : tab.kind === 'file' && tab.file ? (
+                <FileView request={tab.file} />
               ) : (
                 <SplitLayout
                   tree={tab.tree}
