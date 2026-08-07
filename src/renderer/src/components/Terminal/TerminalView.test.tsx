@@ -1071,6 +1071,56 @@ describe('TerminalView (integration)', () => {
       await waitFor(() => expect(screen.getAllByTestId('file-editor')).toHaveLength(1))
     })
 
+    it('마크다운은 미리보기로 먼저 연다 — 문서를 열었는데 태그부터 보이면 한 번 더 눌러야 한다', async () => {
+      vi.mocked(window.api.file.readText).mockResolvedValue({
+        ok: true, content: '# 제목\n본문', mtimeMs: 1
+      })
+      renderWithDs(<TerminalView active />)
+
+      await openPathFromTerminal('/repo/README.md', { preferExternal: false, line: null })
+
+      expect(await screen.findByText('제목')).toBeInTheDocument()
+      // 미리보기 중에는 편집기가 아니라 '소스' 로 돌아가는 버튼이 보인다.
+      expect(screen.getByTitle('소스 보기')).toBeInTheDocument()
+      expect(screen.queryByTestId('file-editor')).not.toBeInTheDocument()
+    })
+
+    it('미리보기 ↔ 소스 를 오간다', async () => {
+      vi.mocked(window.api.file.readText).mockResolvedValue({
+        ok: true, content: '# 제목', mtimeMs: 1
+      })
+      renderWithDs(<TerminalView active />)
+      await openPathFromTerminal('/repo/README.md', { preferExternal: false, line: null })
+
+      await userEvent.click(await screen.findByTitle('소스 보기'))
+
+      expect(await screen.findByTestId('file-editor')).toBeInTheDocument()
+      expect(screen.getByTitle('렌더 결과 보기')).toBeInTheDocument()
+    })
+
+    it('렌더할 수 없는 형식이면 미리보기 토글을 아예 그리지 않는다', async () => {
+      vi.mocked(window.api.file.readText).mockResolvedValue({
+        ok: true, content: 'export const a = 1', mtimeMs: 1
+      })
+      renderWithDs(<TerminalView active />)
+
+      await openPathFromTerminal('/repo/src/a.ts', { preferExternal: false, line: null })
+
+      await screen.findByTestId('file-editor')
+      expect(screen.queryByTitle('렌더 결과 보기')).not.toBeInTheDocument()
+      expect(screen.queryByTitle('소스 보기')).not.toBeInTheDocument()
+    })
+
+    // 아이콘만 있던 링크 버튼이 눈에 안 띈다는 제보 → 글자를 붙였다.
+    it('OS 기본 앱으로 여는 버튼은 글자로 드러낸다', async () => {
+      vi.mocked(window.api.file.readText).mockResolvedValue({ ok: true, content: 'x', mtimeMs: 1 })
+      renderWithDs(<TerminalView active />)
+
+      await openPathFromTerminal('/repo/src/a.ts', { preferExternal: false, line: null })
+
+      expect(await screen.findByText('기본 앱')).toBeInTheDocument()
+    })
+
     it('파일 탭은 분할 대상이 아니다 — PTY 가 없다', async () => {
       vi.mocked(window.api.file.readText).mockResolvedValue({ ok: true, content: 'x', mtimeMs: 1 })
       renderWithDs(<TerminalView active />)

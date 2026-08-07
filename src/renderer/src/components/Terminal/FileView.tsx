@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Editor, { type OnMount } from '@monaco-editor/react'
-import { Save, RotateCcw, ExternalLink, AlertTriangle } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { Save, RotateCcw, ExternalLink, AlertTriangle, Eye, Code2 } from 'lucide-react'
 import type { FileTabRequest, TextFileWriteReason } from '@shared/types/textFile'
 import { useTheme } from '../../hooks/useTheme'
 import { languageOf } from '../common/monacoLanguage'
+import { filePreviewKind } from './filePreviewKind'
 import { LoadingView, useToast } from '../common/ds'
 import Button from '../common/ds/Button'
 
@@ -25,6 +28,34 @@ const WRITE_FAIL_MESSAGE: Record<TextFileWriteReason, string> = {
  * 저장은 ⌘S. 읽은 시점의 mtime 을 함께 보내 그 사이 파일이 바뀌었으면 덮어쓰지 않는다 —
  * 터미널에서 돌린 스크립트·git 이 같은 파일을 건드리는 일이 흔한 화면이라서다.
  */
+/**
+ * 소스 대신 렌더 결과를 보여준다.
+ *
+ * HTML 은 `sandbox=""`(모든 제한) iframe 에 넣는다 — 스크립트·폼·같은 출처·상위 프레임 이동이
+ * 전부 막힌다. 앱의 preload 는 강한 IPC 를 들고 있어서, 여는 파일이 스크립트를 돌릴 수 있으면
+ * 그게 곧 통로가 된다. 대신 이 제약 때문에 **외부 CSS·이미지 같은 상대 경로 리소스는 안 뜬다**
+ * (출처가 없어 file:// 하위 리소스가 차단된다). 인라인 style 로 된 문서는 그대로 보인다.
+ */
+function FilePreview({ kind, content }: { kind: 'markdown' | 'html'; content: string }): JSX.Element {
+  if (kind === 'html') {
+    return (
+      <iframe
+        title="파일 미리보기"
+        sandbox=""
+        srcDoc={content}
+        className="w-full h-full border-0 bg-white"
+      />
+    )
+  }
+  return (
+    <div className="h-full overflow-auto px-6 py-4">
+      <div className="markdown-body max-w-[900px]">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+      </div>
+    </div>
+  )
+}
+
 function FileView({ request, onDirtyChange }: FileViewProps): JSX.Element {
   const { theme } = useTheme()
   const toast = useToast()
@@ -39,6 +70,10 @@ function FileView({ request, onDirtyChange }: FileViewProps): JSX.Element {
 
   const dirty = content !== null && content !== savedContent
   useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
+
+  // 렌더해 볼 수 있는 형식이면 미리보기로 연다 — 문서를 열었는데 태그부터 보이면 한 번 더 눌러야 한다.
+  const previewKind = useMemo(() => filePreviewKind(request.path), [request.path])
+  const [showPreview, setShowPreview] = useState(previewKind !== null)
 
   const load = useCallback(async (): Promise<void> => {
     setError(null)
@@ -111,32 +146,47 @@ function FileView({ request, onDirtyChange }: FileViewProps): JSX.Element {
         <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary truncate min-w-0 flex-1">
           {request.path}
         </span>
+        {previewKind && (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setShowPreview((v) => !v)}
+            title={showPreview ? '소스 보기' : '렌더 결과 보기'}
+          >
+            {showPreview ? <><Code2 size={12} /> 소스</> : <><Eye size={12} /> 미리보기</>}
+          </Button>
+        )}
         <Button size="sm" variant="ghost" onClick={() => void load()} disabled={saving} title="디스크 내용으로 되돌리기">
           <RotateCcw size={12} /> 되돌리기
         </Button>
         <Button size="sm" variant="secondary" onClick={() => void save()} disabled={!dirty || saving} title="저장 (⌘S)">
           <Save size={12} /> 저장
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => void window.api.shell.openPath(request.path)} title="기본 앱으로 열기">
-          <ExternalLink size={12} />
+        {/* 아이콘만 두면 무슨 버튼인지 안 읽힌다 — 탭바에서 겪은 것과 같은 문제라 라벨을 붙인다. */}
+        <Button size="sm" variant="ghost" onClick={() => void window.api.shell.openPath(request.path)} title="OS 기본 앱으로 열기 (⌥⌘클릭도 같다)">
+          <ExternalLink size={12} /> 기본 앱
         </Button>
       </div>
       <div className="flex-1 min-h-0">
-        <Editor
-          height="100%"
-          path={request.path}
-          language={languageOf(request.path)}
-          value={content}
-          onChange={(next) => setContent(next ?? '')}
-          onMount={handleMount}
-          theme={theme === 'dark' ? 'vs-dark' : 'light'}
-          options={{
-            minimap: { enabled: false },
-            fontSize: 12,
-            scrollBeyondLastLine: false,
-            renderWhitespace: 'selection'
-          }}
-        />
+        {showPreview && previewKind ? (
+          <FilePreview kind={previewKind} content={content} />
+        ) : (
+          <Editor
+            height="100%"
+            path={request.path}
+            language={languageOf(request.path)}
+            value={content}
+            onChange={(next) => setContent(next ?? '')}
+            onMount={handleMount}
+            theme={theme === 'dark' ? 'vs-dark' : 'light'}
+            options={{
+              minimap: { enabled: false },
+              fontSize: 12,
+              scrollBeyondLastLine: false,
+              renderWhitespace: 'selection'
+            }}
+          />
+        )}
       </div>
     </div>
   )

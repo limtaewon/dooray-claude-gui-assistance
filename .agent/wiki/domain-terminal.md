@@ -124,6 +124,15 @@ leaf 하나뿐이다. 이 둘을 묶어 판정하는 것이 `isViewerTab()` — 
 `TerminalPane.onOpenPath` 를 배선하지 않은 호스트(MentionAgentView·BranchWorkspace)는 기존대로
 전부 OS 로 넘어간다 — prop 없으면 옛 동작이 그대로다.
 
+`filePreviewKind()` 가 렌더 가능 형식을 정한다 — md/markdown/mdx → 마크다운(react-markdown +
+remark-gfm), html/htm → iframe. 그 외는 `null` 이라 토글을 아예 그리지 않는다. 렌더 가능하면
+미리보기로 먼저 연다.
+
+⚠️ **HTML 미리보기 iframe 은 `sandbox=""`(모든 제한) 이다.** 앱의 preload 가 강한 IPC 를 들고
+있어서, 여는 파일이 스크립트를 돌릴 수 있으면 그게 곧 통로가 된다. 이 제약을 풀지 말 것.
+대가로 외부 CSS·이미지 같은 **상대 경로 리소스는 뜨지 않는다**(출처가 없어 file:// 하위 리소스가
+차단된다) — 인라인 style 문서는 정상이다.
+
 저장은 읽은 시점의 mtime 을 함께 보내 검사한다(`writeTextFile.expectedMtimeMs`). 다르면
 `conflict` 로 거절 — 터미널에서 돌린 스크립트·git 이 같은 파일을 건드리는 화면이라 조용한
 덮어쓰기는 위험하다. 이진 판정은 확장자가 아니라 선두 8KB 의 NUL 바이트로 한다(확장자 목록은
