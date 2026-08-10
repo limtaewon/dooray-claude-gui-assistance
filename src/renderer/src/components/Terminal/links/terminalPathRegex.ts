@@ -37,17 +37,35 @@ export interface FileLinkCandidate {
 const LEADING_TRIM_CHARS = new Set(['(', '[', '{', '"', "'"])
 const TRAILING_TRIM_CHARS = new Set([')', ']', '}', '"', "'", ',', ';', '.'])
 
+/**
+ * 경로 이름에 쓰이는 글자 — ASCII 로 한정하면 한글 폴더에서 매칭이 끊긴다.
+ * `/Users/nhn/문서/보고서.md` 가 `/Users/nhn/` 까지만 잡히던 것이 그 증상이다.
+ *
+ * `\p{L}`(모든 문자) + `\p{N}`(숫자) + `\p{M}`(결합 문자). 결합 문자를 넣는 이유는 macOS 가
+ * 파일명을 NFD 로 돌려주는 경우가 있어서다 — 한글은 자모로, 라틴 악센트는 결합 부호로 쪼개진다.
+ * 쓰는 쪽은 반드시 `u` 플래그를 함께 준다.
+ */
+const PATH_NAME_CHARS = String.raw`\p{L}\p{N}\p{M}`
+
 // 구분자(`/`, `\`) 를 포함하는 압축 경로 — `./src/foo.ts`, `/abs/bar`, `src/foo.ts:12:3` 등.
 // 프레임워크 라우트 파일(`app/(shop)/products/[id]/page.tsx`)처럼 괄호 세그먼트를 쓰는 경우가
 // 흔해 괄호류도 허용 문자에 포함한다.
-const LOCAL_PATH_REGEX =
-  /(?:~[\\/]|[\\/]|\.{1,2}[\\/]|[A-Za-z]:[\\/]|[A-Za-z0-9._-]+[\\/])[A-Za-z0-9._~\-/%+@\\()[\]]*(?::\d+)?(?::\d+)?/g
+const LOCAL_PATH_REGEX = new RegExp(
+  String.raw`(?:~[\\/]|[\\/]|\.{1,2}[\\/]|[A-Za-z]:[\\/]|[${PATH_NAME_CHARS}._-]+[\\/])` +
+    String.raw`[${PATH_NAME_CHARS}._~\-/%+@\\()[\]]*(?::\d+)?(?::\d+)?`,
+  'gu'
+)
 
 // 공백 포함 경로 3-pass 가 공유하는 "넓은" 후보 정규식 — ReDoS 회피를 위해 정규식 자체는 하나의
 // 부정 문자 클래스로 선형 스캔만 하고, 세 가지 판정(구분자 뒤 공백/확장자 종료/줄 끝 공백)은
 // 코드에서 후보를 좁힌다 (ADR-05 §레이어 2).
-const SPACED_PATH_CANDIDATE_REGEX =
-  /(?:~[\\/]|[\\/]|\.{1,2}[\\/]|[A-Za-z]:[\\/]|[A-Za-z0-9._-]+[\\/])[^()[\]{}'",;<>|`\r\n]+(?::\d+)?(?::\d+)?/g
+// 본문은 부정 클래스라 원래도 한글을 통과시켰지만, 상대경로 시작(`문서/`)은 못 잡았다.
+const SPACED_PATH_CANDIDATE_REGEX = new RegExp(
+  String.raw`(?:~[\\/]|[\\/]|\.{1,2}[\\/]|[A-Za-z]:[\\/]|[${PATH_NAME_CHARS}._-]+[\\/])` +
+    // 백틱은 \x60 으로 쓴다 — String.raw 안에서 \` 는 백슬래시가 남아 u 모드의 잘못된 이스케이프가 된다.
+    String.raw`[^()[\]{}'",;<>|\x60\r\n]+(?::\d+)?(?::\d+)?`,
+  'gu'
+)
 
 const URI_PREFIX_CHAR_PATTERN = /^[A-Za-z0-9+./:-]$/
 

@@ -207,6 +207,53 @@ describe('TerminalManager.onData 처리', () => {
     expect(cb).toHaveBeenCalledTimes(1)
   })
 
+  // pane 은 PTY 가 스폰된 뒤에야 구독을 붙이므로 첫 셸 프롬프트를 라이브 이벤트로 못 받을 수 있다.
+  // attach 가 그 구간을 메운다 — 렌더러는 seq 로 라이브 수신분과의 중복을 걸러낸다.
+  describe('attach — pane 따라잡기', () => {
+    it('지금까지의 출력 전체와 마지막 seq 를 돌려준다', () => {
+      const m = new TerminalManager()
+      const { id } = m.create({})
+
+      lastPty!.emitData('prompt1')
+      lastPty!.emitData('prompt2')
+
+      expect(m.attach(id)).toEqual({ data: 'prompt1prompt2', seq: 2 })
+    })
+
+    it('출력이 아직 없으면 빈 문자열과 seq 0', () => {
+      const m = new TerminalManager()
+      const { id } = m.create({})
+      expect(m.attach(id)).toEqual({ data: '', seq: 0 })
+    })
+
+    it('모르는 세션이면 빈 결과 + warn (throw 금지)', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const m = new TerminalManager()
+
+      expect(m.attach('없는-세션')).toEqual({ data: '', seq: 0 })
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[TerminalManager] attach — 없는 세션',
+        expect.objectContaining({ sessionId: '없는-세션' })
+      )
+      warnSpy.mockRestore()
+    })
+
+    it('seq 는 push 되는 payload 의 번호와 일치한다', () => {
+      const send = vi.fn()
+      const win = { isDestroyed: () => false, webContents: { send } }
+      const m = new TerminalManager()
+      m.setMainWindow(win as never)
+      const { id } = m.create({})
+
+      lastPty!.emitData('a')
+      lastPty!.emitData('b')
+
+      expect(send).toHaveBeenNthCalledWith(1, IPC_CHANNELS.TERMINAL_OUTPUT, { id, data: 'a', seq: 1 })
+      expect(send).toHaveBeenNthCalledWith(2, IPC_CHANNELS.TERMINAL_OUTPUT, { id, data: 'b', seq: 2 })
+      expect(m.attach(id).seq).toBe(2)
+    })
+  })
+
   it('output listener 1개가 throw 해도 webContents.send 와 다른 listener 는 정상', () => {
     const send = vi.fn()
     const win = { isDestroyed: () => false, webContents: { send } }
@@ -221,7 +268,7 @@ describe('TerminalManager.onData 처리', () => {
 
     lastPty!.emitData('x')
 
-    expect(send).toHaveBeenCalledWith(IPC_CHANNELS.TERMINAL_OUTPUT, { id, data: 'x' })
+    expect(send).toHaveBeenCalledWith(IPC_CHANNELS.TERMINAL_OUTPUT, { id, data: 'x', seq: 1 })
     expect(ok).toHaveBeenCalledWith(id, 'x')
     expect(warnSpy).toHaveBeenCalledWith(
       '[TerminalManager] output listener 실패',

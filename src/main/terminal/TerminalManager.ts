@@ -8,7 +8,9 @@ import type {
   TerminalSession,
   TerminalCreateOptions,
   TerminalResizeOptions,
-  TerminalExitPayload
+  TerminalExitPayload,
+  TerminalOutputPayload,
+  TerminalAttachResult
 } from '../../shared/types/terminal'
 import { mergePathIntoEnv, claudeExtraPaths } from '../utils/env'
 import { detectWindowsShell, defaultShellProbe } from './windowsShell'
@@ -17,6 +19,8 @@ interface PtySession {
   pty: pty.IPty
   meta: TerminalSession
   outputBuffer: string[]  // 최근 출력 보관
+  /** 마지막으로 내보낸 출력 청크 번호(1부터). 렌더러의 attach 따라잡기 기준점이다. */
+  seq: number
 }
 
 const MAX_BUFFER_LINES = 5000
@@ -160,17 +164,19 @@ export class TerminalManager {
       createdAt: Date.now()
     }
 
-    const session: PtySession = { pty: ptyProcess, meta, outputBuffer: [] }
+    const session: PtySession = { pty: ptyProcess, meta, outputBuffer: [], seq: 0 }
 
     ptyProcess.onData((data: string) => {
       // 버퍼에 저장
       session.outputBuffer.push(data)
+      session.seq += 1
       if (session.outputBuffer.length > MAX_BUFFER_LINES) {
         session.outputBuffer = session.outputBuffer.slice(-MAX_BUFFER_LINES)
       }
 
       if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-        this.mainWindow.webContents.send(IPC_CHANNELS.TERMINAL_OUTPUT, { id, data })
+        const payload: TerminalOutputPayload = { id, data, seq: session.seq }
+        this.mainWindow.webContents.send(IPC_CHANNELS.TERMINAL_OUTPUT, payload)
       }
 
       for (const listener of this.outputListeners) {
@@ -256,6 +262,20 @@ export class TerminalManager {
   getOutput(id: string): string {
     const session = this.sessions.get(id)
     return session ? session.outputBuffer.join('') : ''
+  }
+
+  /**
+   * pane 이 붙을 때 지금까지의 출력과 그 마지막 청크 번호를 함께 준다.
+   * 렌더러는 구독보다 늦게 붙을 수 있어 초기 출력(셸 프롬프트)을 라이브 이벤트로는 못 받는다 —
+   * 여기서 따라잡고, 이보다 큰 seq 의 수신분만 이어 쓰면 중복 없이 이어진다.
+   */
+  attach(id: string): TerminalAttachResult {
+    const session = this.sessions.get(id)
+    if (!session) {
+      console.warn('[TerminalManager] attach — 없는 세션', { sessionId: id })
+      return { data: '', seq: 0 }
+    }
+    return { data: session.outputBuffer.join(''), seq: session.seq }
   }
 
   // 탭 이름 변경 (UI 표시용 — 출력에는 영향 없음)

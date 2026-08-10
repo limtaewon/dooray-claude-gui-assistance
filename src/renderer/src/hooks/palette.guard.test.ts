@@ -62,7 +62,6 @@ const BASELINE: Record<string, number> = {
   '/components/Skills/SkillEditor.tsx': 4,
   '/components/Terminal/ClaudeChatPane.tsx': 9,
   '/components/Terminal/TerminalSearchBar.tsx': 1,
-  '/components/Terminal/TerminalView.tsx': 3,
   '/components/Usage/UsageDashboard.tsx': 4,
   '/components/common/ErrorBoundary.tsx': 3,
   '/components/common/ImageLightbox.tsx': 2,

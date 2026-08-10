@@ -19,25 +19,27 @@ import { installMockWindowApi, resetMockWindowApi } from '../../../../../test/he
 import { renderWithDs } from '../../../../../test/helpers/renderWithDs'
 import type { TerminalWorkspaceSnapshotV2 } from '@shared/types/terminal'
 import { collectLeafIds, isValidTree } from './splitTree'
+import { resetEditorCache } from '../common/OpenInEditorButton'
 
 // TerminalPane 은 xterm 의 native 모듈을 끌어와서 jsdom 에서 무거움 → forwardRef stub 으로 교체.
+/** TerminalPane 에 마지막으로 넘어간 props — 호스트가 배선한 콜백을 테스트가 직접 발화시킨다. */
+interface StubPaneProps {
+  sessionId: string
+  isVisible?: boolean
+  isFocused?: boolean
+  exitInfo?: { exitCode: number } | null
+  restore?: { cols: number; rows: number; serialized: string }
+  onOpenPath?: (path: string, opts: { preferExternal: boolean; line: number | null }) => void | Promise<void>
+}
+let lastPaneProps: StubPaneProps | null = null
+
 vi.mock('./TerminalPane', () => ({
   default: forwardRef(function StubTerminalPane(
-    {
-      sessionId,
-      isVisible,
-      isFocused,
-      exitInfo,
-      restore
-    }: {
-      sessionId: string
-      isVisible?: boolean
-      isFocused?: boolean
-      exitInfo?: { exitCode: number } | null
-      restore?: { cols: number; rows: number; serialized: string }
-    },
+    props: StubPaneProps,
     ref: React.ForwardedRef<unknown>
   ) {
+    const { sessionId, isVisible, isFocused, exitInfo, restore } = props
+    lastPaneProps = props
     useImperativeHandle(ref, () => ({
       serialize: () => null,
       focus: () => {},
@@ -65,6 +67,10 @@ vi.mock('./TerminalPane', () => ({
 vi.mock('@monaco-editor/react', () => ({
   DiffEditor: ({ original, modified }: { original: string; modified: string }) => (
     <div data-testid="diff-editor" data-original={original} data-modified={modified} />
+  ),
+  // 파일 탭용 — 실제 Monaco 는 jsdom 에서 못 뜬다. 값만 노출해 계약을 확인한다.
+  default: ({ value, path }: { value: string; path: string }) => (
+    <div data-testid="file-editor" data-path={path} data-value={value} />
   )
 }))
 
@@ -1003,6 +1009,189 @@ describe('TerminalView (integration)', () => {
         const pane = screen.getByTestId(`term-pane-restored-${i}`)
         expect(pane).toHaveAttribute('data-active', String(i === focusedIndex))
       }
+    })
+  })
+
+  /**
+   * 터미널에서 ⌘클릭한 파일을 OS 기본 앱 대신 앱 안 탭으로 연다.
+   * 앱이 그릴 수 없는 것(폴더·이진·너무 큼)과 ⌥⌘ 는 그대로 OS 로 넘어가야 한다 — 탈출구를 없애지 않는다.
+   */
+  describe('앱 안 파일 탭', () => {
+    /** TerminalPane 에 넘어간 onOpenPath 를 꺼내 직접 발화시킨다. */
+    async function openPathFromTerminal(
+      path: string,
+      opts: { preferExternal: boolean; line: number | null }
+    ): Promise<void> {
+      await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+      await waitFor(() => expect(lastPaneProps?.onOpenPath).toBeTypeOf('function'))
+      await act(async () => { await lastPaneProps!.onOpenPath!(path, opts) })
+    }
+
+    it('텍스트 파일이면 탭으로 연다 — OS 로 넘기지 않는다', async () => {
+      vi.mocked(window.api.file.readText).mockResolvedValue({
+        ok: true, content: 'export const a = 1', mtimeMs: 10
+      })
+      renderWithDs(<TerminalView active />)
+
+      await openPathFromTerminal('/repo/src/a.ts', { preferExternal: false, line: null })
+
+      expect(await screen.findByTestId('file-editor')).toHaveAttribute('data-path', '/repo/src/a.ts')
+      expect(window.api.shell.openPath).not.toHaveBeenCalled()
+    })
+
+    it('앱이 그릴 수 없는 파일(이진)은 OS 기본 앱으로 넘긴다', async () => {
+      vi.mocked(window.api.file.readText).mockResolvedValue({ ok: false, reason: 'binary' })
+      renderWithDs(<TerminalView active />)
+
+      await openPathFromTerminal('/repo/img.png', { preferExternal: false, line: null })
+
+      expect(window.api.shell.openPath).toHaveBeenCalledWith('/repo/img.png')
+      expect(screen.queryByTestId('file-editor')).not.toBeInTheDocument()
+    })
+
+    it('⌥⌘클릭은 읽어보지도 않고 바로 OS 로 넘긴다', async () => {
+      renderWithDs(<TerminalView active />)
+
+      await openPathFromTerminal('/repo/src/a.ts', { preferExternal: true, line: null })
+
+      expect(window.api.file.readText).not.toHaveBeenCalled()
+      expect(window.api.shell.openPath).toHaveBeenCalledWith('/repo/src/a.ts')
+    })
+
+    it('같은 파일을 다시 열면 탭을 새로 만들지 않는다', async () => {
+      vi.mocked(window.api.file.readText).mockResolvedValue({ ok: true, content: 'x', mtimeMs: 1 })
+      renderWithDs(<TerminalView active />)
+
+      await openPathFromTerminal('/repo/src/a.ts', { preferExternal: false, line: null })
+      await act(async () => {
+        await lastPaneProps!.onOpenPath!('/repo/src/a.ts', { preferExternal: false, line: null })
+      })
+
+      // 탭마다 뷰가 하나씩 렌더되므로 편집기 수 = 파일 탭 수다.
+      await waitFor(() => expect(screen.getAllByTestId('file-editor')).toHaveLength(1))
+    })
+
+    it('마크다운은 미리보기로 먼저 연다 — 문서를 열었는데 태그부터 보이면 한 번 더 눌러야 한다', async () => {
+      vi.mocked(window.api.file.readText).mockResolvedValue({
+        ok: true, content: '# 제목\n본문', mtimeMs: 1
+      })
+      renderWithDs(<TerminalView active />)
+
+      await openPathFromTerminal('/repo/README.md', { preferExternal: false, line: null })
+
+      expect(await screen.findByText('제목')).toBeInTheDocument()
+      // 미리보기 중에는 편집기가 아니라 '소스' 로 돌아가는 버튼이 보인다.
+      expect(screen.getByTitle('소스 보기')).toBeInTheDocument()
+      expect(screen.queryByTestId('file-editor')).not.toBeInTheDocument()
+    })
+
+    it('미리보기 ↔ 소스 를 오간다', async () => {
+      vi.mocked(window.api.file.readText).mockResolvedValue({
+        ok: true, content: '# 제목', mtimeMs: 1
+      })
+      renderWithDs(<TerminalView active />)
+      await openPathFromTerminal('/repo/README.md', { preferExternal: false, line: null })
+
+      await userEvent.click(await screen.findByTitle('소스 보기'))
+
+      expect(await screen.findByTestId('file-editor')).toBeInTheDocument()
+      expect(screen.getByTitle('렌더 결과 보기')).toBeInTheDocument()
+    })
+
+    it('렌더할 수 없는 형식이면 미리보기 토글을 아예 그리지 않는다', async () => {
+      vi.mocked(window.api.file.readText).mockResolvedValue({
+        ok: true, content: 'export const a = 1', mtimeMs: 1
+      })
+      renderWithDs(<TerminalView active />)
+
+      await openPathFromTerminal('/repo/src/a.ts', { preferExternal: false, line: null })
+
+      await screen.findByTestId('file-editor')
+      expect(screen.queryByTitle('렌더 결과 보기')).not.toBeInTheDocument()
+      expect(screen.queryByTitle('소스 보기')).not.toBeInTheDocument()
+    })
+
+    // 아이콘만 있던 링크 버튼이 눈에 안 띈다는 제보 → 글자를 붙였다.
+    it('OS 기본 앱으로 여는 버튼은 글자로 드러낸다', async () => {
+      vi.mocked(window.api.file.readText).mockResolvedValue({ ok: true, content: 'x', mtimeMs: 1 })
+      renderWithDs(<TerminalView active />)
+
+      await openPathFromTerminal('/repo/src/a.ts', { preferExternal: false, line: null })
+
+      expect(await screen.findByText('기본 앱')).toBeInTheDocument()
+    })
+
+    it('파일 탭은 분할 대상이 아니다 — PTY 가 없다', async () => {
+      vi.mocked(window.api.file.readText).mockResolvedValue({ ok: true, content: 'x', mtimeMs: 1 })
+      renderWithDs(<TerminalView active />)
+      await openPathFromTerminal('/repo/src/a.ts', { preferExternal: false, line: null })
+
+      // 파일 탭이 활성인 동안에는 분할 버튼이 비활성이어야 한다.
+      await waitFor(() => expect(screen.getByLabelText('오른쪽으로 분할')).toBeDisabled())
+    })
+  })
+
+  // 탭바 오른쪽 액션이 아이콘만이라 무슨 버튼인지 못 알아보겠다는 제보 → 글자로 드러낸다.
+  // 아이콘만 남으면 다시 같은 문제가 되므로 라벨 존재를 계약으로 고정한다.
+  describe('탭바 오른쪽 액션 — 글자로 드러내기', () => {
+    // 에디터 감지 결과는 모듈 전역에 캐시된다 — 테스트끼리 새지 않게 매번 비운다.
+    beforeEach(() => {
+      resetEditorCache()
+      // 에디터 버튼은 포커스된 pane 의 cwd 가 있어야 나온다. cwd 없이 연 탭은 pane.cwd 가
+      // undefined 라 sessionCwd 프로브 결과가 유일한 출처다.
+      vi.mocked(window.api.terminal.sessionCwd).mockResolvedValue('/repo/work')
+    })
+    afterEach(() => { resetEditorCache() })
+
+    /** 탭이 하나 있어야 focusedCwd 가 잡힌다. */
+    async function openOneTab(): Promise<void> {
+      await userEvent.click(await screen.findByRole('button', { name: '새 터미널' }))
+      await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalled())
+    }
+
+    it('분할은 묶음 라벨 아래에 두 방향 버튼을 둔다', async () => {
+      renderWithDs(<TerminalView />)
+      await screen.findByText('터미널')
+
+      const group = document.querySelector('[data-tour="terminal-split"]')
+      expect(group).not.toBeNull()
+      expect(group).toHaveTextContent('분할')
+      // 방향은 아이콘이 맡되, 스크린리더·툴팁으로는 방향이 드러나야 한다.
+      expect(screen.getByLabelText('오른쪽으로 분할')).toBeInTheDocument()
+      expect(screen.getByLabelText('아래로 분할')).toBeInTheDocument()
+    })
+
+    it('에디터 열기 버튼은 감지된 에디터 이름을 글자로 보여준다', async () => {
+      vi.mocked(window.api.editor.list).mockResolvedValue([
+        { id: 'vscode', name: 'VS Code', target: '/x', kind: 'app' }
+      ] as never)
+
+      renderWithDs(<TerminalView active />)
+      await openOneTab()
+
+      expect(await screen.findByText('VS Code 로 열기')).toBeInTheDocument()
+    })
+
+    it('에디터가 여러 개면 고르는 버튼임을 글자로 알린다', async () => {
+      vi.mocked(window.api.editor.list).mockResolvedValue([
+        { id: 'vscode', name: 'VS Code', target: '/x', kind: 'app' },
+        { id: 'cursor', name: 'Cursor', target: '/y', kind: 'app' }
+      ] as never)
+
+      renderWithDs(<TerminalView active />)
+      await openOneTab()
+
+      expect(await screen.findByText('에디터로 열기')).toBeInTheDocument()
+    })
+
+    it('설치된 에디터가 없으면 버튼을 그리지 않는다 (눌러도 소용없는 버튼 금지)', async () => {
+      renderWithDs(<TerminalView active />)
+      await openOneTab()
+
+      await waitFor(() =>
+        expect(document.querySelector('[data-tour="terminal-open-editor"]')).not.toBeNull()
+      )
+      expect(document.querySelector('[data-tour="terminal-open-editor"] button')).toBeNull()
     })
   })
 })

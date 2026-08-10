@@ -5,7 +5,6 @@ import { release } from 'os'
 ipcRenderer.setMaxListeners(100)
 
 // 터미널 출력 구독: 단일 IPC 리스너를 공유해서 핸들러 수만큼 이벤트 리스너가 누적되지 않게 함
-type TerminalOutputPayload = { id: string; data: string }
 const terminalOutputHandlers = new Set<(payload: TerminalOutputPayload) => void>()
 let terminalOutputSubscribed = false
 function subscribeTerminalOutput(cb: (payload: TerminalOutputPayload) => void): () => void {
@@ -148,11 +147,18 @@ import type {
   TerminalCreateOptions,
   TerminalResizeOptions,
   TerminalExitPayload,
+  TerminalOutputPayload,
+  TerminalAttachResult,
   TerminalWorkspaceSnapshotV2,
   TerminalSaveStateResult,
   TerminalResolvePathRequest,
   TerminalResolvedPath
 } from '../shared/types/terminal'
+import type {
+  TextFileReadResult,
+  TextFileWriteRequest,
+  TextFileWriteResult
+} from '../shared/types/textFile'
 import type { GitHubStatus } from '../shared/types/github'
 import type {
   GitWorktree,
@@ -426,6 +432,14 @@ const api = {
   },
 
   // Shell — OS 기본 핸들러로 열기 (절대경로/URL/file://)
+  /** 앱 안 파일 탭 — 터미널에서 ⌘클릭한 경로를 OS 기본 앱 대신 탭으로 연다. */
+  file: {
+    /** 열 수 없으면 throw 하지 않고 `reason` 을 담아 돌려준다 — 호출자가 OS 로 넘길지 판단한다. */
+    readText: (path: string): Promise<TextFileReadResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.FILE_READ_TEXT, path),
+    writeText: (req: TextFileWriteRequest): Promise<TextFileWriteResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.FILE_WRITE_TEXT, req)
+  },
   shell: {
     openPath: (target: string): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke(IPC_CHANNELS.SHELL_OPEN_PATH, target),
@@ -479,8 +493,11 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_SAVE_OUTPUT, id),
     rename: (id: string, name: string): Promise<boolean> =>
       ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_RENAME, { id, name }),
-    onOutput: (callback: (payload: { id: string; data: string }) => void): (() => void) =>
+    onOutput: (callback: (payload: TerminalOutputPayload) => void): (() => void) =>
       subscribeTerminalOutput(callback),
+    /** pane 마운트 시 main 이 쌓아둔 출력으로 따라잡는다 — 구독 전 출력(셸 프롬프트)이 유실되지 않게. */
+    attach: (id: string): Promise<TerminalAttachResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_ATTACH, id),
     /** v2.0 B-1: PTY 종료 통지 구독. suppression·at-most-once 판정은 main 이 수행. */
     onExit: (callback: (payload: TerminalExitPayload) => void): (() => void) =>
       subscribeTerminalExit(callback),

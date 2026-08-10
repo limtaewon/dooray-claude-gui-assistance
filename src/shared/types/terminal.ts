@@ -28,6 +28,26 @@ export interface TerminalExitPayload {
   signal: number | null
 }
 
+/**
+ * PTY 출력 push payload. `seq` 는 세션별 1부터 증가하는 청크 번호 —
+ * 렌더러가 attach 로 따라잡은 지점과 라이브 수신분을 구분해 중복 write 를 막는 데 쓴다.
+ */
+export interface TerminalOutputPayload {
+  id: string
+  data: string
+  seq: number
+}
+
+/**
+ * pane 이 세션에 붙을 때 받아가는 따라잡기 결과 — `data` 는 지금까지 쌓인 출력 전체,
+ * `seq` 는 그 마지막 청크 번호다. 이보다 큰 seq 의 라이브 수신분만 뒤이어 쓰면 된다.
+ * 모르는 세션이면 `{ data: '', seq: 0 }`.
+ */
+export interface TerminalAttachResult {
+  data: string
+  seq: number
+}
+
 // v2.0 B-4: split 레이아웃 이진 트리 (ADR-v2-terminal-p2-02 §1). leaf 는 leafId 만 갖는다 — sessionId 는
 // 재시작마다 새로 발급되므로 트리에 넣지 않는다. 런타임 바인딩/영속 값은 각각 렌더러 상태와
 // TerminalTabSnapshot.panes 에 둔다.

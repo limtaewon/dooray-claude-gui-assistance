@@ -69,6 +69,9 @@ import { mergePathIntoEnv, claudeExtraPaths } from './utils/env'
 import { SnapshotStore } from './terminal/snapshotStore'
 import { createQuitFlushCoordinator } from './terminal/quitFlush'
 import { resolveCandidates } from './terminal/pathResolver'
+import { readTextFile, writeTextFile } from './file/textFileService'
+import { registerPreviewSchemePrivileges, installPreviewProtocol } from './file/previewProtocol'
+import type { TextFileWriteRequest } from '../shared/types/textFile'
 import { probePtyCwd } from './terminal/ptyCwd'
 import { buildStartTaskSpawn } from './terminal/startTaskSpawn'
 import { ClaudeChatService } from './claude/ClaudeChatService'
@@ -1003,6 +1006,9 @@ function registerIpcHandlers(): void {
   )
   ipcMain.handle(IPC_CHANNELS.TERMINAL_LIST, () => terminalManager.listSessions())
   ipcMain.handle(IPC_CHANNELS.TERMINAL_SAVE_OUTPUT, (_, id: string) => terminalManager.getOutput(id))
+  ipcMain.handle(IPC_CHANNELS.TERMINAL_ATTACH, (_, id: string) => terminalManager.attach(id))
+  ipcMain.handle(IPC_CHANNELS.FILE_READ_TEXT, (_, path: string) => readTextFile(path))
+  ipcMain.handle(IPC_CHANNELS.FILE_WRITE_TEXT, (_, req: TextFileWriteRequest) => writeTextFile(req))
   ipcMain.handle(IPC_CHANNELS.TERMINAL_RENAME, (_, { id, name }: { id: string; name: string }) => {
     return terminalManager.setName(id, name)
   })
@@ -2277,7 +2283,11 @@ function installAppMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
+// 스킴 권한은 ready 이전에 등록해야 한다 — 이후에 부르면 무시된다.
+registerPreviewSchemePrivileges()
+
 app.whenReady().then(() => {
+  installPreviewProtocol()
   installAppMenu()
   registerIpcHandlers()
   configWatcher.start()

@@ -99,6 +99,34 @@ export function reconnectDelayMs(attempt: number, random = Math.random): number 
 /** Ping 주기 */
 export const PING_INTERVAL_MS = 30_000
 
+/**
+ * 연결 유지의 핵심 — "영영 CONNECTING" 을 만드는 구간에는 전부 상한을 둔다.
+ *
+ * 재연결 루프는 소켓의 close 를 기다려 다음 시도로 넘어간다. 그래서 close 가 오지 않는 상태
+ * (토큰 요청이 응답 없음 · 핸드셰이크가 끝나지 않음 · 붙었는데 sessionInfo 가 안 옴 · 회선이
+ * 조용히 끊긴 half-open)에 빠지면 루프가 그 자리에 매달린 채 상태만 CONNECTING 으로 남는다.
+ * 아래 상한들이 그 구간을 끊어 루프가 다시 돌게 한다.
+ */
+
+/** 토큰 발급 POST 응답 대기 상한. 넘으면 요청을 끊고 재시도로 넘어간다. */
+export const TOKEN_FETCH_TIMEOUT_MS = 10_000
+
+/** WebSocket 업그레이드 완료 대기 상한 (ws 의 handshakeTimeout). */
+export const HANDSHAKE_TIMEOUT_MS = 10_000
+
+/**
+ * 핸드셰이크 성공(open) 후 서버의 sessionInfo 대기 상한.
+ * sessionInfo 가 와야 ACTIVE 다 — 안 오면 소켓은 열려 있어도 아무것도 못 받는 상태로 남는다.
+ */
+export const SESSION_INFO_TIMEOUT_MS = 15_000
+
+/**
+ * 마지막 수신으로부터 이 시간이 지나면 죽은 회선으로 보고 끊는다.
+ * 우리가 30초마다 ping 을 보내고 서버가 pong 을 주므로, 조용한 채널이라도 수신은 계속된다.
+ * 회선이 FIN 없이 끊기면(무선 전환·VPN 재접속) 소켓은 OPEN 인 채 남아 close 가 오지 않는다.
+ */
+export const INBOUND_IDLE_TIMEOUT_MS = PING_INTERVAL_MS * 2 + 5_000
+
 /** WebSocket path */
 export const WS_PATH = '/messenger/v5/ws'
 

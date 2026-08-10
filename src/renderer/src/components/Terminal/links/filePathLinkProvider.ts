@@ -30,8 +30,12 @@ export interface FilePathLinkProviderDeps {
   getCwdHint: () => string | undefined
   cache: Map<string, CachedPathResolution>
   resolvePath: (req: TerminalResolvePathRequest) => Promise<TerminalResolvedPath[]>
-  /** resolved 절대 경로를 OS 핸들러로 연다 — `~` 확장은 이미 main 이 끝낸 상태다. */
-  openPath: (absolutePath: string) => void
+  /**
+   * resolved 절대 경로를 연다 — `~` 확장은 이미 main 이 끝낸 상태다.
+   * `preferExternal`(⌥ 조합)이면 앱 안에서 열 수 있어도 OS 기본 앱으로 넘긴다.
+   * `line` 은 `파일.ts:120` 형태였을 때만 채워진다 — 앱 안에서 열 때 그 줄로 간다.
+   */
+  openPath: (absolutePath: string, opts: { preferExternal: boolean; line: number | null }) => void
   tooltip: FilePathLinkTooltip
 }
 
@@ -104,7 +108,10 @@ export function createFilePathLinkProvider(terminal: Terminal, deps: FilePathLin
                 activate: (event) => {
                   if (!isLinkActivationEvent(event)) return
                   terminal.clearSelection() // Cmd+클릭 3버그 모듈 ③ — 드래그 선택 폭주 방지
-                  deps.openPath(absolutePath)
+                  deps.openPath(absolutePath, {
+                    preferExternal: Boolean(event?.altKey),
+                    line: candidate.line ?? null
+                  })
                 },
                 hover: (event) => deps.tooltip.show(tooltipText, event),
                 leave: () => deps.tooltip.hide()

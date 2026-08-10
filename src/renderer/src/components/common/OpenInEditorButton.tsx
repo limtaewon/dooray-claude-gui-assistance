@@ -120,7 +120,8 @@ function OpenInEditorButton({ path, compact = false, className = '' }: OpenInEdi
         className={className || 'ds-btn ghost xs flex-none'}
       >
         <SquareArrowOutUpRight size={compact ? 11 : 12} />
-        {!compact && <span>열기</span>}
+        {/* 아이콘만으로는 무슨 버튼인지 읽히지 않는다 — 라벨을 쓸 때는 감지된 에디터 이름까지 드러낸다. */}
+        {!compact && <span>{label}</span>}
       </button>
 
       {open &&

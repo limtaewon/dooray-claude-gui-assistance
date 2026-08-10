@@ -154,6 +154,11 @@ export const IPC_CHANNELS = {
   /** v2.0 B-1: PTY 종료 push (main → renderer). handle 등록 대상 아님 */
   TERMINAL_EXIT: 'terminal:exit',
   TERMINAL_SAVE_OUTPUT: 'terminal:save-output',
+  /** pane 이 붙을 때 main 이 쌓아둔 출력을 한 번에 받아 따라잡는다 (invoke) */
+  TERMINAL_ATTACH: 'terminal:attach',
+  /** 앱 안 파일 탭 — 텍스트 읽기/저장. 열 수 없으면 사유를 돌려 호출자가 OS 로 넘긴다. */
+  FILE_READ_TEXT: 'file:read-text',
+  FILE_WRITE_TEXT: 'file:write-text',
   TERMINAL_RENAME: 'terminal:rename',
   /** v2.0 B-5: 렌더러 스냅샷 저장 (invoke). main 이 store 쓰기 + 메모리 캐시 갱신 */
   TERMINAL_SAVE_STATE: 'terminal:save-state',

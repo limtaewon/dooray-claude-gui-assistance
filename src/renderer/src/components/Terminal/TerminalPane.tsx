@@ -18,6 +18,7 @@ import type { PasteToken } from './pasteTargetState'
 import { serializeWithAbsoluteCursor } from './serializeAbsoluteCursor'
 import { createReplayGuard, REPLAY_CLEAR, POST_REPLAY_MODE_RESET } from './replay'
 import { shouldAttachWebgl, getGlobalWebglFailure, setGlobalWebglFailure } from './webglPolicy'
+import { registerGlyphCacheTarget, clearGlyphCacheAllPanes } from './glyphCache'
 import { activateTerminalUnicodeProvider } from './terminalUnicodeProvider'
 import { useTerminalTheme } from '../../hooks/useTerminalTheme'
 import { useTerminalFont } from '../../hooks/useTerminalFont'
@@ -39,19 +40,6 @@ import { windowsPtyOptions } from '@shared/utils/windowsPty'
 import { trimSerializedToBytes } from '@shared/utils/textBytes'
 import type { TerminalPaneSnapshot } from '@shared/types/terminal'
 import '@xterm/xterm/css/xterm.css'
-
-/**
- * WebGL 렌더러가 캐시한 글리프 아틀라스를 비운다.
- * 글꼴·배율이 바뀐 뒤 비우지 않으면 옛 비트맵이 남아 흐릿하게 보인다.
- */
-function clearGlyphCache(term: Terminal): void {
-  const clear = (term as unknown as { clearTextureAtlas?: () => void }).clearTextureAtlas
-  try {
-    clear?.call(term)
-  } catch {
-    /* DOM 렌더러에는 없는 API — 없으면 그대로 둔다 */
-  }
-}
 
 /** v2.0 B-5: serialize() 스냅샷의 leaf 당 UTF-8 바이트 캡 (ADR-v2-terminal-p2-03 §9). */
 const PANE_SNAPSHOT_MAX_BYTES = 512 * 1024
@@ -100,6 +88,12 @@ interface TerminalPaneProps {
   /** v2.0 B-7: OSC7 로 새 cwd 를 알게 될 때마다 호출된다(링크 cwd 우선순위 1순위) — 호스트가
    *  `PaneRuntime.cwd` 를 갱신해 스냅샷 저장에도 반영할 수 있게 한다 (ADR-v2-terminal-p2-05 §레이어 4). */
   onCwdChange?: (cwd: string) => void
+  /**
+   * ⌘클릭한 경로를 여는 곳 — 호스트가 앱 안 탭으로 열 수 있으면 배선한다.
+   * 없으면 기존대로 OS 기본 앱으로 넘긴다(레거시 3호스트 호환).
+   * `preferExternal`(⌥⌘)이면 호스트도 OS 로 넘겨야 한다 — 탈출구를 없애지 않는다.
+   */
+  onOpenPath?: (absolutePath: string, opts: { preferExternal: boolean; line: number | null }) => void | Promise<void>
 }
 
 /** DOM 리페어런트(reattachPaneHost) 전후로 주고받는 xterm 뷰포트 스크롤 위치. */
@@ -144,7 +138,8 @@ function TerminalPaneInner(
     rendererSetting,
     onWebglUnavailable,
     onTitleChange,
-    onCwdChange
+    onCwdChange,
+    onOpenPath
   }: TerminalPaneProps,
   ref: ForwardedRef<TerminalPaneHandle>
 ): JSX.Element {
@@ -184,6 +179,9 @@ function TerminalPaneInner(
   // 콜백을 참조하도록 ref 로 동기화한다(onFocusRequestRef 와 동일 패턴).
   const onCwdChangeRef = useRef(onCwdChange)
   useEffect(() => { onCwdChangeRef.current = onCwdChange }, [onCwdChange])
+  // 링크 provider 는 mount effect 에서 한 번만 만들어진다 — 최신 콜백을 ref 로 참조한다.
+  const onOpenPathRef = useRef(onOpenPath)
+  useEffect(() => { onOpenPathRef.current = onOpenPath }, [onOpenPath])
   const terminalTheme = useTerminalTheme()
   const terminalFont = useTerminalFont()
   const fontRef = useRef(terminalFont)
@@ -206,7 +204,7 @@ function TerminalPaneInner(
     term.options.fontSize = terminalFont.size
     term.options.lineHeight = terminalFont.lineHeight
     term.options.fontWeight = terminalFont.weight
-    clearGlyphCache(term)
+    clearGlyphCacheAllPanes()
     try {
       fitAddonRef.current?.fit()
     } catch { /* 숨은 pane 은 0×0 이라 실패할 수 있다 */ }
@@ -329,15 +327,21 @@ function TerminalPaneInner(
 
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
+    // 아틀라스 비우기 브로드캐스트 대상으로 등록 — 공유 아틀라스라 pane 하나만 비우면 나머지가
+    // 깨진다(glyphCache.ts). 언마운트 때 해제한다.
+    const unregisterGlyphCacheTarget = registerGlyphCacheTarget(terminal)
 
     // 흐릿함의 두 원인을 여기서 막는다.
     //  1) 웹폰트가 늦게 도착하면 xterm 은 이미 폴백 글꼴로 글리프 아틀라스를 만든 뒤다 —
-    //     도착 시점에 아틀라스를 비우고 다시 맞춘다.
+    //     도착 시점에 아틀라스를 비우고 다시 맞춘다. 이미 로드가 끝난 뒤 열린 pane(=split 으로
+    //     추가된 2번째 이후 pane)은 비울 이유가 없다 — 여기서 비우면 먼저 떠 있던 pane 들의
+    //     화면만 깨진다. 생성 시점의 로드 상태로 판정한다.
     //  2) 모니터를 옮기거나 배율이 바뀌면(devicePixelRatio 변경) 아틀라스가 옛 배율로 남는다.
+    const webfontsPending = document.fonts?.status !== 'loaded'
     void document.fonts?.ready
       .then(() => {
         if (terminalRef.current !== terminal) return
-        clearGlyphCache(terminal)
+        if (webfontsPending) clearGlyphCacheAllPanes()
         try { fitAddon.fit() } catch { /* 숨은 pane */ }
       })
       .catch(() => undefined)
@@ -347,7 +351,7 @@ function TerminalPaneInner(
     if (dprQuery) {
       const onDprChange = (): void => {
         if (terminalRef.current !== terminal) return
-        clearGlyphCache(terminal)
+        clearGlyphCacheAllPanes()
         try { fitAddon.fit() } catch { /* 숨은 pane */ }
       }
       dprQuery.addEventListener('change', onDprChange)
@@ -435,8 +439,12 @@ function TerminalPaneInner(
 
     // v2.0 B-5: replay 중 도착한 라이브 출력은 큐에 적재했다가 replay 종료 후 flush 한다(6/14단계).
     // PTY 는 이미 살아 있어 셸 프롬프트를 뱉으므로, 그대로 write 하면 복원 내용과 뒤섞인다.
-    let restoring = hasRestoreSnapshot
-    const outputQueue: string[] = []
+    //
+    // 마운트 직후 구간도 같은 큐를 쓴다: PTY 는 renderer 가 구독하기 전부터 출력을 뱉으므로
+    // (split 로 만든 pane 의 첫 셸 프롬프트가 실제로 이렇게 사라졌다) main 이 쌓아둔 버퍼를
+    // `terminal.attach` 로 받아 따라잡은 뒤, 그보다 뒤(seq) 의 수신분만 이어 쓴다.
+    let catchingUp = true
+    const outputQueue: Array<{ seq: number; data: string }> = []
 
     // #2 PTY 출력에서 이미지 path 감지. 절대경로 (~/ 또는 / 또는 C:\) + 이미지 확장자.
     // ANSI escape 시퀀스가 섞여 있을 수 있어 정규식이 그 사이에서 잘 매칭되도록 lookbehind 회피.
@@ -469,10 +477,10 @@ function TerminalPaneInner(
       sniffImages(data)
     }
 
-    // 6) onOutput 구독 시작 — replay 중 도착분은 큐잉.
-    const cleanup = window.api.terminal.onOutput(({ id, data }) => {
+    // 6) onOutput 구독 시작 — 따라잡기/replay 가 끝날 때까지 도착분은 seq 와 함께 큐잉.
+    const cleanup = window.api.terminal.onOutput(({ id, data, seq }) => {
       if (id !== sessionId) return
-      if (restoring) { outputQueue.push(data); return }
+      if (catchingUp) { outputQueue.push({ seq, data }); return }
       writeLiveOutput(data)
     })
 
@@ -496,7 +504,14 @@ function TerminalPaneInner(
         getCwdHint: () => paneCwd,
         cache: pathLinkCache,
         resolvePath: (req) => window.api.terminal.resolvePath(req),
-        openPath: (absolutePath) => {
+        openPath: (absolutePath, opts) => {
+          // 호스트가 앱 안 열기를 배선했으면 그쪽으로 — 없으면(레거시 호스트) 기존대로 OS 로 넘긴다.
+          const openInApp = onOpenPathRef.current
+          if (openInApp) {
+            void Promise.resolve(openInApp(absolutePath, opts))
+              .catch((err) => console.warn('[term-link] 앱 안에서 열기 실패', err))
+            return
+          }
           window.api.shell.openPath(absolutePath).catch((err) => console.warn('[term-link] open 실패', err))
         },
         tooltip: linkTooltip
@@ -769,16 +784,35 @@ function TerminalPaneInner(
     // TerminalPaneHandle.fit() 배선 — B-5 가 복원 순서(§7 13단계)에서, B-4 가 리페어런트에서 호출한다.
     fitFnRef.current = () => safeResize(fitAddon)
 
-    // v2.0 B-5: 마운트 fit/복원 완료 처리 — 13)fit→PTY resize, 14)큐 flush. 비복원 마운트에서도
-    // 동일 경로를 태워 fit 타이밍을 하나로 통일한다.
+    // v2.0 B-5: 마운트 fit/복원 완료 처리 — 13)fit→PTY resize, 14)따라잡기 + 큐 flush.
+    // 비복원 마운트에서도 동일 경로를 태워 fit 타이밍을 하나로 통일한다.
     const finishMount = (): void => {
       deferredRef.current = false
       safeResize(fitAddon)
-      restoring = false
-      if (outputQueue.length > 0) {
-        for (const chunk of outputQueue.splice(0)) writeLiveOutput(chunk)
-      }
       evaluateWebgl()
+      void catchUpFromMain()
+    }
+
+    /**
+     * main 이 쌓아둔 출력으로 화면을 따라잡고 큐를 연다.
+     * 따라잡은 지점(seq) 이하의 큐 항목은 버린다 — 그 구간은 attach 결과에 이미 들어 있다.
+     * attach 가 실패해도 큐는 반드시 열어야 한다(안 그러면 pane 이 영영 멈춘다).
+     */
+    const catchUpFromMain = async (): Promise<void> => {
+      let caughtUpToSeq = 0
+      try {
+        const attached = await window.api.terminal.attach(sessionId)
+        if (terminalRef.current !== terminal) return // 대기 중 언마운트됨
+        caughtUpToSeq = attached.seq
+        if (attached.data) writeLiveOutput(attached.data)
+      } catch (error) {
+        console.warn('[TerminalPane] 출력 따라잡기 실패 — 라이브 수신분만 표시된다', { sessionId, error })
+      }
+      if (terminalRef.current !== terminal) return
+      catchingUp = false
+      for (const chunk of outputQueue.splice(0)) {
+        if (chunk.seq > caughtUpToSeq) writeLiveOutput(chunk.data)
+      }
     }
 
     // 언마운트 이후(테스트 간 격리, 빠른 탭 전환 등) 지연 예약된 rAF 가 stale 클로저로 fit/PTY
@@ -842,6 +876,7 @@ function TerminalPaneInner(
       if (resizeTimer !== null) clearTimeout(resizeTimer)
       if (mountRafId !== null) cancelAnimationFrame(mountRafId)
       paneTextarea?.removeEventListener('focus', handleTextareaFocus)
+      unregisterGlyphCacheTarget()
       disposeWebglNow()
       terminal.dispose()
     }
