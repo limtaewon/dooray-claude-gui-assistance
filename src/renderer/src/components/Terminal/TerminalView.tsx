@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, X, Terminal, Trash2, Pencil, FileDiff, PanelRight, Loader2, Columns2, Rows2 } from 'lucide-react'
+import { Plus, X, Terminal, Trash2, Pencil, FileDiff, FileText, PanelRight, Loader2, Columns2, Rows2 } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -1621,7 +1621,7 @@ function TabDropIndicator(): JSX.Element {
 function SortableTabLabel(props: {
   tabId: string
   name: string
-  kind: 'terminal' | 'diff'
+  kind: 'terminal' | 'diff' | 'file'
   paneCount: number
   isActive: boolean
   isExited: boolean
@@ -1666,7 +1666,7 @@ function TabLabel({
 }: {
   tabId: string
   name: string
-  kind: 'terminal' | 'diff'
+  kind: 'terminal' | 'diff' | 'file'
   paneCount: number
   isActive: boolean
   isExited: boolean
@@ -1680,8 +1680,8 @@ function TabLabel({
   dragListeners?: DraggableSyntheticListeners
   isDragging?: boolean
 }): JSX.Element {
-  // diff 탭 이름은 파일명이 곧 이름이라 사용자가 바꿀 대상이 아니다.
-  const isDiff = kind === 'diff'
+  // diff/file 탭은 파일명이 곧 이름이라 사용자가 바꿀 대상이 아니다.
+  const isViewer = kind !== 'terminal'
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(name)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -1710,11 +1710,13 @@ function TabLabel({
       {...dragAttributes}
       {...dragListeners}
       onClick={onSelect}
-      onDoubleClick={(e) => { if (isDiff) return; e.stopPropagation(); setEditing(true) }}
+      onDoubleClick={(e) => { if (isViewer) return; e.stopPropagation(); setEditing(true) }}
       className={`ds-tab group ${isActive ? 'active' : ''} ${isExited || isDragging ? 'opacity-50' : ''}`}
-      title={isExited ? '종료됨' : isDiff ? '파일 비교' : undefined}
+      title={isExited ? '종료됨' : kind === 'diff' ? '파일 비교' : kind === 'file' ? '파일' : undefined}
     >
-      {isDiff ? <FileDiff size={11} className="text-text-tertiary" /> : <Terminal size={11} />}
+      {kind === 'diff' ? <FileDiff size={11} className="text-text-tertiary" />
+        : kind === 'file' ? <FileText size={11} className="text-text-tertiary" />
+        : <Terminal size={11} />}
       {isDone && !isActive && (
         <span
           className="w-1.5 h-1.5 rounded-full bg-brand-terminal flex-none"
@@ -1752,7 +1754,7 @@ function TabLabel({
           {isExited && (
             <span className="text-[calc(11px_*_var(--app-font-scale,1))] text-text-tertiary flex-shrink-0">종료됨</span>
           )}
-          {!isDiff && (
+          {!isViewer && (
             <button onClick={(e) => { e.stopPropagation(); setEditing(true) }}
               onPointerDown={(e) => e.stopPropagation()}
               className="text-text-tertiary hover:text-text-primary ml-0.5"
