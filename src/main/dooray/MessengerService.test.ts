@@ -155,3 +155,158 @@ describe('MessengerService.getMemberName / resolveMemberNames', () => {
     expect(client.request).toHaveBeenCalledTimes(2)
   })
 })
+
+// ───────────────────────── 에이전트 강화(S1/S2) 추가분 ─────────────────────────
+
+describe('MessengerService.sendMessage — logId 반환', () => {
+  it('result.id 를 돌려준다', async () => {
+    const client = makeClient(() => ({ result: { id: 'log-77' } }))
+    svc = new MessengerService(client as never)
+    expect(await svc.sendMessage('ch1', 'hi')).toBe('log-77')
+  })
+
+  it('result 가 없으면 null', async () => {
+    svc = new MessengerService(makeClient(() => ({ result: null })) as never)
+    expect(await svc.sendMessage('ch1', 'hi')).toBeNull()
+    svc = new MessengerService(makeClient(() => ({ result: {} })) as never)
+    expect(await svc.sendMessage('ch1', 'hi')).toBeNull()
+  })
+})
+
+describe('MessengerService.sendCard', () => {
+  it('POST /logs 에 text + attachments + organizationId, logId 반환', async () => {
+    const client = makeClient(() => ({ result: { id: 'card-1' } }))
+    svc = new MessengerService(client as never)
+    const card = { title: '제목', color: '#2E7D32', fields: [{ title: '소요', value: '0:10', short: true }] }
+    const id = await svc.sendCard('ch1', '[Clauday]', [card], 'org1')
+    expect(id).toBe('card-1')
+    const [path, opts] = client.request.mock.calls[0] as [string, { method: string; body: string }]
+    expect(path).toBe('/messenger/v1/channels/ch1/logs')
+    expect(opts.method).toBe('POST')
+    expect(JSON.parse(opts.body)).toEqual({ text: '[Clauday]', attachments: [card], organizationId: 'org1' })
+  })
+
+  it('organizationId 생략 시 body 에서 빠진다', async () => {
+    const client = makeClient(() => ({ result: { id: 'c' } }))
+    svc = new MessengerService(client as never)
+    await svc.sendCard('ch1', 't', [{ title: 'x' }])
+    const body = JSON.parse((client.request.mock.calls[0][1] as { body: string }).body)
+    expect('organizationId' in body).toBe(false)
+  })
+})
+
+describe('MessengerService.updateMessage', () => {
+  it('PUT /logs/{logId} 에 text 만 보낸다', async () => {
+    const client = makeClient(() => ({ header: { isSuccessful: true } }))
+    svc = new MessengerService(client as never)
+    await svc.updateMessage('ch1', 'log9', '✅ 완료')
+    const [path, opts] = client.request.mock.calls[0] as [string, { method: string; body: string }]
+    expect(path).toBe('/messenger/v1/channels/ch1/logs/log9')
+    expect(opts.method).toBe('PUT')
+    expect(JSON.parse(opts.body)).toEqual({ text: '✅ 완료' })
+  })
+
+  it('빈 텍스트는 요청 없이 throw', async () => {
+    const client = makeClient()
+    svc = new MessengerService(client as never)
+    await expect(svc.updateMessage('ch1', 'l', '  ')).rejects.toThrow(/비어있/)
+    expect(client.request).not.toHaveBeenCalled()
+  })
+})
+
+describe('MessengerService.createThreadAndSend', () => {
+  it('body 에 text·attachments·threadText, threadChannelId 반환', async () => {
+    const client = makeClient(() => ({ result: { id: 'root-1', channelId: 'thr-1' } }))
+    svc = new MessengerService(client as never)
+    const card = { title: '요약' }
+    const res = await svc.createThreadAndSend('ch1', { text: '[Clauday]', attachments: [card] }, '(1/2)\n본문')
+    expect(res).toEqual({ threadChannelId: 'thr-1' })
+    const [path, opts] = client.request.mock.calls[0] as [string, { method: string; body: string }]
+    expect(path).toBe('/messenger/v1/channels/ch1/threads/create-and-send')
+    expect(opts.method).toBe('POST')
+    expect(JSON.parse(opts.body)).toEqual({ text: '[Clauday]', attachments: [card], threadText: '(1/2)\n본문' })
+  })
+
+  it('attachments 가 없거나 비어 있고 threadText 도 없으면 text 만', async () => {
+    const client = makeClient(() => ({ result: { channelId: 't' } }))
+    svc = new MessengerService(client as never)
+    await svc.createThreadAndSend('ch1', { text: 'a', attachments: [] })
+    expect(JSON.parse((client.request.mock.calls[0][1] as { body: string }).body)).toEqual({ text: 'a' })
+  })
+
+  it('응답에 channelId 가 없으면 threadChannelId null', async () => {
+    svc = new MessengerService(makeClient(() => ({ result: { id: 'x' } })) as never)
+    expect(await svc.createThreadAndSend('ch1', { text: 'a' })).toEqual({ threadChannelId: null })
+    svc = new MessengerService(makeClient(() => ({ result: null })) as never)
+    expect(await svc.createThreadAndSend('ch1', { text: 'a' })).toEqual({ threadChannelId: null })
+  })
+})
+
+describe('MessengerService.downloadChannelFile', () => {
+  const clientWith = (dataUrl: string) => ({ fetchBinary: vi.fn().mockResolvedValue(dataUrl), request: vi.fn() })
+
+  it('file-api 경로로 요청하고 base64 data URL 을 Buffer 로 디코드', async () => {
+    const client = clientWith(`data:image/png;base64,${Buffer.from('PNGDATA').toString('base64')}`)
+    svc = new MessengerService(client as never)
+    const res = await svc.downloadChannelFile('ch1', 'file9')
+    expect(client.fetchBinary).toHaveBeenCalledWith('https://file-api.dooray.com/downloads/messenger/v1/channels/ch1/files/file9?media=raw')
+    expect(res.mimeType).toBe('image/png')
+    expect(res.data.toString()).toBe('PNGDATA')
+    expect(client.request).not.toHaveBeenCalled()
+  })
+
+  it('base64 가 아닌 data URL 은 퍼센트 디코드한 utf8', async () => {
+    svc = new MessengerService(clientWith('data:text/plain,%ED%95%9C%EA%B8%80') as never)
+    const res = await svc.downloadChannelFile('c', 'f')
+    expect(res.mimeType).toBe('text/plain')
+    expect(res.data.toString('utf8')).toBe('한글')
+  })
+
+  it('mime 이 비어 있으면 application/octet-stream', async () => {
+    svc = new MessengerService(clientWith('data:;base64,QUJD') as never)
+    const res = await svc.downloadChannelFile('c', 'f')
+    expect(res.mimeType).toBe('application/octet-stream')
+    expect(res.data.toString()).toBe('ABC')
+  })
+
+  it('data URL 형식이 아니면 throw', async () => {
+    svc = new MessengerService(clientWith('<html>login</html>') as never)
+    await expect(svc.downloadChannelFile('c', 'f')).rejects.toThrow(/형식/)
+  })
+
+  it('fetchBinary 실패는 그대로 전파', async () => {
+    const client = { fetchBinary: vi.fn().mockRejectedValue(new Error('403')), request: vi.fn() }
+    svc = new MessengerService(client as never)
+    await expect(svc.downloadChannelFile('c', 'f')).rejects.toThrow('403')
+  })
+})
+
+describe('MessengerService.listAllChannelsRaw', () => {
+  it('direct 는 포함하고 보관(archivedAt) 채널만 제외', async () => {
+    const client = makeClient(() => ({
+      result: [
+        { id: '1', type: 'channel', updatedAt: '2026-01-01', organizationId: 'o1' },
+        { id: '2', type: 'direct', updatedAt: '2026-02-02' },
+        { id: '3', type: 'channel', archivedAt: '2026-04-01' }
+      ]
+    }))
+    svc = new MessengerService(client as never)
+    const all = await svc.listAllChannelsRaw()
+    expect(all.map((c) => c.id)).toEqual(['1', '2'])
+    expect(all[0]).toMatchObject({ organizationId: 'o1', updatedAt: '2026-01-01' })
+    expect(client.request).toHaveBeenCalledWith('/messenger/v1/channels?size=200')
+  })
+
+  it('캐시를 쓰지 않고 매번 조회', async () => {
+    const client = makeClient(() => ({ result: [{ id: '1' }] }))
+    svc = new MessengerService(client as never)
+    await svc.listAllChannelsRaw()
+    await svc.listAllChannelsRaw()
+    expect(client.request).toHaveBeenCalledTimes(2)
+  })
+
+  it('result 가 없으면 빈 배열', async () => {
+    svc = new MessengerService(makeClient(() => ({})) as never)
+    expect(await svc.listAllChannelsRaw()).toEqual([])
+  })
+})

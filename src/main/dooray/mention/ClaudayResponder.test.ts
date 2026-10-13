@@ -29,39 +29,34 @@ describe('ClaudayResponder.send', () => {
     expect(m.sendMessage).toHaveBeenCalledWith('ch1', '[Clauday] hi', 'org1')
   })
 
-  it('마크다운 헤더가 있으면 본문을 ```md 블록으로 감싼다', async () => {
+  it('마크다운은 ```md 로 감싸지 않고 두레이에서 읽히는 평문으로 바꾼다', async () => {
     const m = makeMessenger()
     const r = new ClaudayResponder(m as never)
-    await r.send('ch1', '# 헤더\n본문')
+    await r.send('ch1', '# 헤더\n- 항목1\n- **굵게** 항목2')
     const arg = m.sendMessage.mock.calls[0][1] as string
-    expect(arg.startsWith('[Clauday]\n')).toBe(true)
-    expect(arg).toContain('```md')
-    expect(arg).toContain('# 헤더')
+    expect(arg).toBe('[Clauday]\n▍헤더\n• 항목1\n• 굵게 항목2')
+    expect(arg).not.toContain('```md')
   })
 
-  it('코드 펜스 영역은 그대로 두고 일반 영역만 ```md 로 감싼다', async () => {
+  it('언어를 적은 코드 펜스는 그대로 둔다', async () => {
     const m = makeMessenger()
     const r = new ClaudayResponder(m as never)
     await r.send('ch1', '설명입니다.\n```java\ncode\n```\n끝')
-    const arg = m.sendMessage.mock.calls[0][1] as string
-    expect(arg).toContain('```md')
-    expect(arg).toContain('```java')
-    expect(arg).toContain('code')
+    expect(m.sendMessage.mock.calls[0][1]).toBe('[Clauday]\n설명입니다.\n```java\ncode\n```\n끝')
   })
 
-  it('굵게/리스트도 마크다운으로 인식', async () => {
+  it('보낸 메시지의 logId 를 돌려준다 — 진행 메시지를 나중에 고쳐 쓰기 위해', async () => {
     const m = makeMessenger()
+    m.sendMessage.mockResolvedValueOnce('log-7')
     const r = new ClaudayResponder(m as never)
-    await r.send('ch1', '- 항목1\n- 항목2')
-    const arg = m.sendMessage.mock.calls[0][1] as string
-    expect(arg).toContain('```md')
+    await expect(r.send('ch1', 'hi')).resolves.toBe('log-7')
   })
 
-  it('전송 실패해도 throw 하지 않는다 (로그만)', async () => {
+  it('전송 실패해도 throw 하지 않고 null (warn 로그)', async () => {
     const m = makeMessenger()
     m.sendMessage.mockRejectedValueOnce(new Error('boom'))
     const r = new ClaudayResponder(m as never)
-    await expect(r.send('ch1', 'hi')).resolves.toBeUndefined()
+    await expect(r.send('ch1', 'hi')).resolves.toBeNull()
   })
 })
 

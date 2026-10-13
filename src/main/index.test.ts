@@ -46,6 +46,8 @@ vi.mock('electron', () => {
     static getAllWindows = (): unknown[] => [mockWindow]
   }
   return {
+    powerMonitor: { on: vi.fn(), isOnBatteryPower: vi.fn(() => false) },
+    powerSaveBlocker: { start: vi.fn(() => 1), stop: vi.fn() },
     app: {
       // index.ts 의 app.whenReady().then(...) 가 동기적으로 실행되도록 즉시 resolve.
       whenReady: vi.fn().mockResolvedValue(undefined),
@@ -234,9 +236,9 @@ vi.mock('./dooray/mention/promptBuilder', () => ({
   buildPromptFromContext: vi.fn().mockReturnValue(''),
   extractUserRequest: vi.fn().mockReturnValue('')
 }))
-vi.mock('./dooray/mention/MentionTerminalSpawner', () => ({ MentionTerminalSpawner: makeStubClass() }))
+vi.mock('./dooray/mention/MentionTerminalSpawner', () => ({ MentionTerminalSpawner: makeStubClass({ setApprovalMode: vi.fn() }) }))
 vi.mock('./dooray/mention/MentionNotifier', () => ({ notifyMention: vi.fn() }))
-vi.mock('./dooray/mention/AgentWorkspaceManager', () => ({ AgentWorkspaceManager: makeStubClass() }))
+vi.mock('./dooray/mention/AgentWorkspaceManager', () => ({ AgentWorkspaceManager: makeStubClass({ setApprovalMode: vi.fn() }) }))
 vi.mock('./dooray/mention/ChannelSessionStore', () => ({ ChannelSessionStore: makeStubClass() }))
 vi.mock('./dooray/mention/ClaudayResponder', () => ({
   ClaudayResponder: makeStubClass(),
@@ -251,7 +253,6 @@ vi.mock('./dooray/mention/HookServer', () => ({
 }))
 vi.mock('./dooray/mention/transcriptReader', () => ({
   readLastAssistantText: vi.fn().mockReturnValue(''),
-  truncateForMessenger: vi.fn((s: string) => s)
 }))
 vi.mock('./watcher/WatcherService', () => ({ WatcherService: makeStubClass() }))
 vi.mock('./ai/AIService', () => ({

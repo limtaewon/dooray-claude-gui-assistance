@@ -229,3 +229,139 @@ describe('MentionDispatcher 매칭', () => {
     errSpy.mockRestore()
   })
 })
+
+describe('MentionDispatcher — 중복 실행 방지 (processed)', () => {
+  function makeProcessed(initial: string[] = []) {
+    const set = new Set(initial)
+    return { has: vi.fn((id: string) => set.has(id)), add: vi.fn((id: string) => { set.add(id) }), set }
+  }
+  const flush = (): Promise<void> => new Promise((r) => setTimeout(r, 5))
+
+  it('handle 경로: 처음 보는 logId 는 실행하고 processed 에 기록', async () => {
+    const processed = makeProcessed()
+    const dd = new MentionDispatcher(bot as never, taskService as never, processed)
+    const h = vi.fn()
+    dd.onMention(h)
+    dd.start()
+    await bot.emit(makeEvent({ logId: 'L1' }))
+    await flush()
+    expect(h).toHaveBeenCalledOnce()
+    expect(processed.add).toHaveBeenCalledWith('L1')
+  })
+
+  it('handle 경로: 같은 logId 가 두 번 오면 한 번만 실행', async () => {
+    const processed = makeProcessed()
+    const dd = new MentionDispatcher(bot as never, taskService as never, processed)
+    const h = vi.fn()
+    dd.onMention(h)
+    dd.start()
+    await bot.emit(makeEvent({ logId: 'L1' }))
+    await flush()
+    await bot.emit(makeEvent({ logId: 'L1' }))
+    await flush()
+    expect(h).toHaveBeenCalledOnce()
+  })
+
+  it('handle 경로: 이미 처리된 logId 는 건너뜀', async () => {
+    const processed = makeProcessed(['L1'])
+    const dd = new MentionDispatcher(bot as never, taskService as never, processed)
+    const h = vi.fn()
+    dd.onMention(h)
+    dd.start()
+    await bot.emit(makeEvent({ logId: 'L1' }))
+    await flush()
+    expect(h).not.toHaveBeenCalled()
+    expect(processed.add).not.toHaveBeenCalled()
+  })
+
+  it('handle 로 처리한 멘션을 catch-up(dispatchContext)이 다시 실행하지 않는다', async () => {
+    const processed = makeProcessed()
+    const dd = new MentionDispatcher(bot as never, taskService as never, processed)
+    const h = vi.fn()
+    dd.onMention(h)
+    dd.start()
+    await bot.emit(makeEvent({ logId: 'L1' }))
+    await flush()
+    expect(await dd.dispatchContext({ channelId: 'c1', senderId: 'me', logId: 'L1', text: '@clauday x' })).toBe(false)
+    expect(h).toHaveBeenCalledOnce()
+  })
+
+  it('dispatchContext 로 처리한 멘션이 뒤늦게 소켓으로 와도 다시 실행하지 않는다', async () => {
+    const processed = makeProcessed()
+    const dd = new MentionDispatcher(bot as never, taskService as never, processed)
+    const h = vi.fn()
+    dd.onMention(h)
+    dd.start()
+    expect(await dd.dispatchContext({ channelId: 'c1', senderId: 'me', logId: 'L2', text: '@clauday x' })).toBe(true)
+    await bot.emit(makeEvent({ logId: 'L2' }))
+    await flush()
+    expect(h).toHaveBeenCalledOnce()
+  })
+
+  it('processed 를 주지 않은 디스패처는 중복 제거 없이 동작', async () => {
+    const h = vi.fn()
+    d.onMention(h)
+    const ctx = { channelId: 'c1', senderId: 'me', logId: 'L', text: '@clauday x' }
+    expect(await d.dispatchContext(ctx)).toBe(true)
+    expect(await d.dispatchContext(ctx)).toBe(true)
+    expect(h).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('MentionDispatcher.dispatchContext / matches / getMyMemberId', () => {
+  it('핸들러에 ctx 를 그대로 넘기고 true 반환', async () => {
+    const h = vi.fn()
+    d.onMention(h)
+    const ctx = { channelId: 'c1', senderId: 'me', logId: 'L', text: '@clauday x', delayedMs: 5000 }
+    expect(await d.dispatchContext(ctx)).toBe(true)
+    expect(h).toHaveBeenCalledWith(ctx)
+  })
+
+  it('disabled 면 false, 핸들러·processed 모두 건드리지 않음', async () => {
+    const add = vi.fn()
+    const dd = new MentionDispatcher(bot as never, taskService as never, { has: () => false, add })
+    const h = vi.fn()
+    dd.onMention(h)
+    dd.setEnabled(false)
+    expect(await dd.dispatchContext({ channelId: 'c1', senderId: 'me', logId: 'L', text: '@clauday x' })).toBe(false)
+    expect(h).not.toHaveBeenCalled()
+    expect(add).not.toHaveBeenCalled()
+  })
+
+  it('핸들러가 던져도 true (다른 핸들러는 계속)', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const b = vi.fn()
+    d.onMention(vi.fn().mockRejectedValue(new Error('x')))
+    d.onMention(b)
+    expect(await d.dispatchContext({ channelId: 'c1', senderId: 'me', logId: 'L', text: '@clauday' })).toBe(true)
+    expect(b).toHaveBeenCalled()
+    errSpy.mockRestore()
+  })
+
+  it('matches: 맨 앞 단독 토큰만 true (공백·줄바꿈·대소문자 허용)', () => {
+    expect(d.matches('@clauday 안녕')).toBe(true)
+    expect(d.matches('  @Clauday\n해줘')).toBe(true)
+    expect(d.matches('@clauday')).toBe(true)
+    expect(d.matches('안녕 @clauday')).toBe(false)
+    expect(d.matches('@claudaybot')).toBe(false)
+    expect(d.matches('')).toBe(false)
+  })
+
+  it('matches 는 setTrigger 를 따른다', () => {
+    d.setTrigger('@Bot')
+    expect(d.matches('@bot 해줘')).toBe(true)
+    expect(d.matches('@clauday 해줘')).toBe(false)
+  })
+
+  it('getMyMemberId: 조회 후 캐시, 실패 시 null', async () => {
+    expect(await d.getMyMemberId()).toBe('me')
+    expect(await d.getMyMemberId()).toBe('me')
+    expect(taskService.getMyMemberIdPublic).toHaveBeenCalledTimes(1)
+
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    taskService.getMyMemberIdPublic.mockRejectedValueOnce(new Error('x'))
+    const fresh = new MentionDispatcher(bot as never, taskService as never)
+    expect(await fresh.getMyMemberId()).toBeNull()
+    errSpy.mockRestore()
+  })
+})

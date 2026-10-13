@@ -1,6 +1,4 @@
-import { readFileSync, readdirSync, statSync, existsSync } from 'fs'
-import { join } from 'path'
-import { homedir } from 'os'
+import { readFileSync } from 'fs'
 
 /**
  * claude code transcript JSONL의 마지막 assistant 메시지 텍스트 추출.
@@ -49,10 +47,4 @@ function extractText(node: AssistantNode): string {
     if (b.type === 'text' && typeof b.text === 'string') out.push(b.text)
   }
   return out.join('\n').trim()
-}
-
-/** 두레이 메시지 길이 제한을 고려해 적절히 자름. */
-export function truncateForMessenger(text: string, maxLen = 1500): string {
-  if (text.length <= maxLen) return text
-  return text.slice(0, maxLen - 3) + '...'
 }

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, writeFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { readLastAssistantText, truncateForMessenger } from './transcriptReader'
+import { readLastAssistantText } from './transcriptReader'
 
 let tmpDir: string
 
@@ -69,23 +69,5 @@ describe('readLastAssistantText', () => {
       { type: 'assistant', message: { content: null } }
     ])
     expect(readLastAssistantText(path)).toBe('')
-  })
-})
-
-describe('truncateForMessenger', () => {
-  it('길이가 maxLen 이하면 그대로', () => {
-    expect(truncateForMessenger('hi', 100)).toBe('hi')
-  })
-
-  it('초과하면 maxLen-3 까지 자르고 ... 추가', () => {
-    const text = 'a'.repeat(100)
-    expect(truncateForMessenger(text, 10)).toBe('aaaaaaa...')
-    expect(truncateForMessenger(text, 10).length).toBe(10)
-  })
-
-  it('기본값 maxLen=1500', () => {
-    const text = 'b'.repeat(2000)
-    expect(truncateForMessenger(text).length).toBe(1500)
-    expect(truncateForMessenger(text).endsWith('...')).toBe(true)
   })
 })

@@ -117,3 +117,97 @@ describe('AgentWorkspaceManager.setHookConfig', () => {
     expect(existsSync(join(ws.channelDir, '.claude', 'settings.local.json'))).toBe(false)
   })
 })
+
+describe('AgentWorkspaceManager.ensureChannel — hook 설정 호출', () => {
+  it('writeHookSettings 를 { trackPrompts: true } 로만 부른다 (승인 정책·permissions 옵션 없음)', () => {
+    const writeHook = vi.fn(() => false)
+    const m = new AgentWorkspaceManager(root, { preApproveTrust: vi.fn((): TrustResult => 'no-config'), writeHookSettings: writeHook })
+    m.setHookConfig({ port: 1111, secret: 'sec' })
+    const ws = m.ensureChannel('ch1')
+    expect(writeHook).toHaveBeenCalledWith(ws.channelDir, { port: 1111, secret: 'sec' }, { trackPrompts: true })
+  })
+
+  it('hookConfig 가 없으면 null 로 넘긴다', () => {
+    const writeHook = vi.fn(() => false)
+    const m = new AgentWorkspaceManager(root, { preApproveTrust: vi.fn((): TrustResult => 'no-config'), writeHookSettings: writeHook })
+    const ws = m.ensureChannel('ch1')
+    expect(writeHook).toHaveBeenCalledWith(ws.channelDir, null, { trackPrompts: true })
+  })
+
+  it('setApprovalMode 는 더 이상 없다', () => {
+    expect((new AgentWorkspaceManager(root, testDeps) as unknown as Record<string, unknown>).setApprovalMode).toBeUndefined()
+  })
+
+  it('실제 settings 파일에 UserPromptSubmit hook 이 들어간다', () => {
+    const m = new AgentWorkspaceManager(root, testDeps)
+    m.setHookConfig({ port: 2222, secret: 's' })
+    const ws = m.ensureChannel('ch1')
+    const parsed = JSON.parse(readFileSync(join(ws.channelDir, '.claude', 'settings.local.json'), 'utf8'))
+    expect(parsed.hooks.UserPromptSubmit[0].hooks[0].url).toContain('event=user_prompt_submit')
+  })
+
+  it('writeTaskPrompt 도 ensureChannel 을 거쳐 hook 설정이 갱신된다', () => {
+    const writeHook = vi.fn(() => false)
+    const m = new AgentWorkspaceManager(root, { preApproveTrust: vi.fn((): TrustResult => 'no-config'), writeHookSettings: writeHook })
+    m.writeTaskPrompt('ch1', 'log1', 'x')
+    expect(writeHook).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('AgentWorkspaceManager.saveAttachment', () => {
+  it('attachments/{fileId}-{파일명} 에 저장하고 채널 폴더 기준 상대경로를 반환', () => {
+    const m = new AgentWorkspaceManager(root, testDeps)
+    const rel = m.saveAttachment('ch1', 'f123', 'err.png', Buffer.from('PNG'))
+    expect(rel).toBe(join('attachments', 'f123-err.png'))
+    expect(readFileSync(join(root, 'agent', 'ch1', rel)).toString()).toBe('PNG')
+  })
+
+  it('한글 파일명은 살린다', () => {
+    const m = new AgentWorkspaceManager(root, testDeps)
+    const rel = m.saveAttachment('ch1', 'f1', '장애 화면.png', Buffer.from('x'))
+    expect(rel).toBe(join('attachments', 'f1-장애 화면.png'))
+    expect(existsSync(join(root, 'agent', 'ch1', rel))).toBe(true)
+  })
+
+  it('경로 구분자·OS 금지문자·제어문자를 _ 로 바꿔 경로 이탈을 막는다', () => {
+    const m = new AgentWorkspaceManager(root, testDeps)
+    const rel = m.saveAttachment('ch1', 'f1', '../../etc/pa:ss*wd?"<>|\x01\x1f.png', Buffer.from('x'))
+    expect(rel).not.toMatch(/\.\.[/\\]/)
+    expect(rel.split(/[/\\]/)).toHaveLength(2)
+    expect(rel).not.toMatch(/[:*?"<>|\x00-\x1f]/)
+    expect(existsSync(join(root, 'agent', 'ch1', rel))).toBe(true)
+    expect(existsSync(join(root, 'etc'))).toBe(false)
+  })
+
+  it('백슬래시 구분자도 치환', () => {
+    const m = new AgentWorkspaceManager(root, testDeps)
+    const rel = m.saveAttachment('ch1', 'f1', 'a\\b\\c.txt', Buffer.from('x'))
+    expect(rel).toBe(join('attachments', 'f1-a_b_c.txt'))
+  })
+
+  it('선행 점은 _ 로 (숨김 파일/.. 방지), 빈 이름은 file', () => {
+    const m = new AgentWorkspaceManager(root, testDeps)
+    expect(m.saveAttachment('ch1', 'f1', '.bashrc', Buffer.from('x'))).toBe(join('attachments', 'f1-_bashrc'))
+    expect(m.saveAttachment('ch1', 'f2', '   ', Buffer.from('x'))).toBe(join('attachments', 'f2-file'))
+  })
+
+  it('파일명은 120자로 제한', () => {
+    const m = new AgentWorkspaceManager(root, testDeps)
+    const rel = m.saveAttachment('ch1', 'f1', 'a'.repeat(300) + '.png', Buffer.from('x'))
+    expect(rel.length).toBeLessThanOrEqual('attachments/'.length + 'f1-'.length + 120)
+  })
+
+  it('fileId·channelId 의 금지문자도 정리', () => {
+    const m = new AgentWorkspaceManager(root, testDeps)
+    const rel = m.saveAttachment('ch/1', '../f', 'a.png', Buffer.from('x'))
+    expect(rel).toBe(join('attachments', '.._f-a.png'))
+    expect(existsSync(join(root, 'agent', 'ch_1', rel))).toBe(true)
+  })
+
+  it('같은 fileId+이름이면 덮어쓴다', () => {
+    const m = new AgentWorkspaceManager(root, testDeps)
+    m.saveAttachment('ch1', 'f1', 'a.png', Buffer.from('old'))
+    const rel = m.saveAttachment('ch1', 'f1', 'a.png', Buffer.from('new'))
+    expect(readFileSync(join(root, 'agent', 'ch1', rel)).toString()).toBe('new')
+  })
+})

@@ -1,11 +1,13 @@
-import { mkdirSync, writeFileSync, existsSync } from 'fs'
+import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
 import { preApproveTrust, writeHookSettings } from '../../claude/claudeDirSetup'
+import { BUNDLED_SKILLS, type BundledSkill } from './agent/bundledSkills'
 
 const DEFAULT_ROOT = join(homedir(), 'Clauday-Workspaces')
 const AGENT_DIRNAME = 'agent'
 const TASKS_DIRNAME = 'tasks'
+const ATTACHMENTS_DIRNAME = 'attachments'
 const CLAUDE_MD = 'CLAUDE.md'
 
 export interface ChannelWorkspace {
@@ -82,9 +84,20 @@ export class AgentWorkspaceManager {
 
     // claude code의 hook 설정 (.claude/settings.local.json) 자동 작성.
     // 매 호출 시 현재 hookConfig 기준으로 갱신 (port/secret이 부팅마다 바뀜).
-    this.deps.writeHookSettings(channelDir, this.hookConfig)
+    this.deps.writeHookSettings(channelDir, this.hookConfig, { trackPrompts: true })
+
+    syncBundledSkills(channelDir, BUNDLED_SKILLS)
 
     return { channelDir, tasksDir, claudeMdPath }
+  }
+
+  /** 대화 첨부를 채널 폴더 attachments/ 에 저장. 반환값은 채널 폴더 기준 상대경로 */
+  saveAttachment(channelId: string, fileId: string, fileName: string, data: Buffer): string {
+    const dir = join(this.getAgentRoot(), sanitizeId(channelId), ATTACHMENTS_DIRNAME)
+    mkdirSync(dir, { recursive: true })
+    const filename = `${sanitizeId(fileId)}-${sanitizeFileName(fileName)}`
+    writeFileSync(join(dir, filename), data)
+    return join(ATTACHMENTS_DIRNAME, filename)
   }
 
   /** prompt 파일 저장. 반환값은 채널 폴더 기준 상대경로 (예: tasks/{logId}.md) */
@@ -98,9 +111,30 @@ export class AgentWorkspaceManager {
   }
 }
 
+/** Clauday 번들 스킬을 채널 폴더 .claude/skills/ 에 맞춘다(기획 §5.6). 내용이 다를 때만 쓴다. */
+export function syncBundledSkills(channelDir: string, skills: BundledSkill[]): void {
+  for (const skill of skills) {
+    const dir = join(channelDir, '.claude', 'skills', skill.name)
+    const file = join(dir, 'SKILL.md')
+    try {
+      if (existsSync(file) && readFileSync(file, 'utf8') === skill.content) continue
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(file, skill.content, 'utf8')
+    } catch (err) {
+      console.warn(`[AgentWorkspace] 번들 스킬 동기화 실패 skill=${skill.name} dir=${channelDir}:`, err)
+    }
+  }
+}
+
 function sanitizeId(id: string): string {
   // 두레이 ID는 숫자 문자열이라 안전하지만 방어적으로 OS 금지문자 제거
   return id.replace(/[^a-zA-Z0-9._-]/g, '_')
+}
+
+/** 첨부 파일명 — 한글은 살리고 경로 구분자·제어문자·OS 금지문자만 바꾼다. */
+function sanitizeFileName(name: string): string {
+  const cleaned = name.replace(/[/\\:*?"<>|\x00-\x1f]/g, '_').replace(/^\.+/, '_').trim()
+  return (cleaned || 'file').slice(0, 120)
 }
 
 function initialClaudeMd(channelId: string, channelName?: string): string {

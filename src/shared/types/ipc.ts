@@ -134,6 +134,12 @@ export const IPC_CHANNELS = {
   BOT_STATE_UPDATE: 'bot:state-update',
   /** 이벤트 도착 (메시지 등, main → renderer — 모니터링/디버깅용) */
   BOT_EVENT: 'bot:event',
+  /** @clauday 대기 상태 조회 — 깨어 있기·최근 연결 끊김·마지막 놓친 멘션 찾기 결과 */
+  BOT_GET_AGENT_STATUS: 'bot:get-agent-status',
+  /** 깨어 있기(충전 중 잠자기 방지) 켜기/끄기 */
+  BOT_SET_KEEP_AWAKE: 'bot:set-keep-awake',
+  /** @clauday 권한 모드 (두레이 승인 / 자율) */
+  BOT_SET_PERMISSION_MODE: 'bot:set-permission-mode',
 
   // AI - 필터 규칙 생성
   AI_GENERATE_FILTER: 'ai:generate-filter',

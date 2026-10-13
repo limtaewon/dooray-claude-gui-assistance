@@ -17,6 +17,14 @@ export interface MentionContext {
   isThread?: boolean
   /** 부모 채널 ID (thread만) */
   parentChannelId?: string
+  /** 놓친 멘션 찾기(catch-up)로 늦게 처리하는 경우, 보낸 시각부터 지난 시간 */
+  delayedMs?: number
+}
+
+/** 이미 처리한 멘션 logId 기록 — 소켓 실시간 수신과 재연결 catch-up 이 같은 멘션을 두 번 실행하지 않게 한다. */
+export interface ProcessedMentionLog {
+  has(logId: string): boolean
+  add(logId: string): void
 }
 
 export type MentionHandler = (ctx: MentionContext) => void | Promise<void>
@@ -45,7 +53,8 @@ export class MentionDispatcher {
 
   constructor(
     private botService: BotService,
-    private taskService: TaskService
+    private taskService: TaskService,
+    private processed?: ProcessedMentionLog
   ) {}
 
   setTrigger(t: string): void {
@@ -82,6 +91,30 @@ export class MentionDispatcher {
 
   stop(): void {
     if (this.unsubscribe) { this.unsubscribe(); this.unsubscribe = null }
+  }
+
+  /** 놓친 멘션 찾기가 찾은 멘션을 실시간 멘션과 같은 경로로 실행한다. 이미 처리한 logId 면 건너뛴다. */
+  async dispatchContext(ctx: MentionContext): Promise<boolean> {
+    if (!this.enabled) return false
+    if (this.processed?.has(ctx.logId)) return false
+    this.processed?.add(ctx.logId)
+    await this.runHandlers(ctx)
+    return true
+  }
+
+  /** 멘션 텍스트가 트리거로 시작하는지 (catch-up 이 같은 규칙으로 고르도록 공개) */
+  matches(text: string): boolean {
+    return this.matchesTrigger(text)
+  }
+
+  async getMyMemberId(): Promise<string | null> {
+    return this.ensureMyMemberId()
+  }
+
+  private async runHandlers(ctx: MentionContext): Promise<void> {
+    for (const h of this.handlers) {
+      try { await h(ctx) } catch (err) { console.error('[MentionDispatcher] handler 에러:', err) }
+    }
   }
 
   private async ensureMyMemberId(): Promise<string | null> {
@@ -133,6 +166,12 @@ export class MentionDispatcher {
       `[MentionDispatcher] 멘션 매치 channelId=${ev.channelId} logId=${ev.logId} text="${ev.text.slice(0, 80)}"`
     )
 
+    if (this.processed?.has(ev.logId)) {
+      console.log(`[MentionDispatcher] 이미 처리한 멘션 건너뜀 logId=${ev.logId}`)
+      return
+    }
+    this.processed?.add(ev.logId)
+
     const meta = extractChannelMeta(ev)
     const ctx: MentionContext = {
       channelId: ev.channelId,
@@ -143,9 +182,7 @@ export class MentionDispatcher {
       raw: ev.raw,
       ...meta
     }
-    for (const h of this.handlers) {
-      try { await h(ctx) } catch (err) { console.error('[MentionDispatcher] handler 에러:', err) }
-    }
+    await this.runHandlers(ctx)
   }
 }
 

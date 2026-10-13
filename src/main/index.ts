@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, dialog, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, dialog, Menu, powerMonitor, powerSaveBlocker } from 'electron'
 import { join } from 'path'
 import { homedir } from 'os'
 import { randomUUID } from 'crypto'
@@ -48,12 +48,21 @@ import { MessengerService } from './dooray/MessengerService'
 import { BotService } from './dooray/socket-mode/BotService'
 import { MentionDispatcher } from './dooray/mention/MentionDispatcher'
 import { ContextCollector } from './dooray/mention/ContextCollector'
-import { buildPromptFromContext, extractUserRequest } from './dooray/mention/promptBuilder'
 import { MentionTerminalSpawner } from './dooray/mention/MentionTerminalSpawner'
 import { notifyMention } from './dooray/mention/MentionNotifier'
 import { AgentWorkspaceManager } from './dooray/mention/AgentWorkspaceManager'
 import { ChannelSessionStore } from './dooray/mention/ChannelSessionStore'
-import { ClaudayResponder, extractOrgId } from './dooray/mention/ClaudayResponder'
+import { ClaudayResponder } from './dooray/mention/ClaudayResponder'
+import { MentionPipeline, STALE_MENTION_MS } from './dooray/mention/MentionPipeline'
+import { MentionCatchUp, MentionCatchUpState, type KeyValueStorage } from './dooray/mention/MentionCatchUp'
+import { ResultPublisher } from './dooray/mention/agent/ResultPublisher'
+import { MentionTurnTracker } from './dooray/mention/agent/MentionTurnTracker'
+import { ProgressReporter } from './dooray/mention/agent/ProgressReporter'
+import { ApprovalBroker } from './dooray/mention/agent/ApprovalBroker'
+import { AlwaysAllowStore } from './dooray/mention/agent/AlwaysAllowStore'
+import { BotSocketLog } from './dooray/socket-mode/BotSocketLog'
+import { AwakeKeeper } from './power/AwakeKeeper'
+import type { BotAgentStatus, MentionPermissionMode } from '../shared/types/bot'
 import { HookServer } from './dooray/mention/HookServer'
 import { ClaudeHookRouter } from './hooks/ClaudeHookRouter'
 import { MentionHookHandler, MENTION_HOOK_KIND } from './dooray/mention/MentionHookHandler'
@@ -222,7 +231,10 @@ async function getEventsLegacy(params: { from: string; to: string }): Promise<im
 const messengerService = new MessengerService(doorayClient)
 sharedSkills.setMemberNameResolver((id) => messengerService.getMemberName(id))
 const botService = new BotService(doorayClient)
-const mentionDispatcher = new MentionDispatcher(botService, taskService)
+// 처리한 멘션 logId·소켓 마지막 생존 시각 — 잠자기·재시작을 넘어 놓친 멘션을 찾는 기준(기획 §5.8)
+const mentionCatchUpStorage = new Store({ name: 'clauday-mention-catchup' }) as unknown as KeyValueStorage
+const mentionCatchUpState = new MentionCatchUpState(mentionCatchUpStorage)
+const mentionDispatcher = new MentionDispatcher(botService, taskService, mentionCatchUpState)
 const mentionContextCollector = new ContextCollector(messengerService)
 const watcherService = new WatcherService(messengerService)
 const aiService = new AIService()
@@ -272,13 +284,96 @@ const hookServer = new HookServer()
 // claude code hook(PostToolUse/Stop) 라우팅 — 소유 도메인은 resolver first-match 로 결정.
 // getAgentRoot 는 반드시 thunk: setRoot() 로 부팅 후 커스텀 root 가 적용되므로 값으로 넘기면 안 된다.
 const hookRouter = new ClaudeHookRouter()
+const mentionTurns = new MentionTurnTracker()
+const mentionProgress = new ProgressReporter(messengerService)
+// 두레이 승인(기획 §5.2) — PermissionRequest hook 을 두레이 카드 + 내 답장으로 결정한다
+const approvalBroker = new ApprovalBroker({
+  messenger: messengerService,
+  notify: (info) => {
+    const win = BrowserWindow.getAllWindows()[0] ?? null
+    if (win) notifyMention(win, { channelName: '승인 필요', preview: info.title })
+  },
+  onWaiting: (channelId, waiting) => mentionProgress.setPhase(channelId, waiting ? '🟧 두레이 승인 대기 중' : '작업 중')
+})
 const mentionHookHandler = new MentionHookHandler({
   getAgentRoot: () => agentWorkspace.getAgentRoot(),
   sessions: channelSessionStore,
-  responder: claudayResponder
+  publisher: new ResultPublisher(messengerService),
+  turns: mentionTurns,
+  approvals: approvalBroker,
+  progress: mentionProgress,
+  // 판정은 앱이 하므로 설정을 바꾸면 이미 떠 있는 claude 에도 즉시 적용된다
+  isGateEnabled: () => getMentionPermissionMode() === 'approval',
+  alwaysAllow: new AlwaysAllowStore(mentionCatchUpStorage)
 })
+function getMentionPermissionMode(): MentionPermissionMode {
+  return store.get('doorayMentionTrigger.permissionMode', 'approval') === 'bypass' ? 'bypass' : 'approval'
+}
+const mentionCatchUp = new MentionCatchUp({
+  messenger: messengerService,
+  getMyMemberId: () => mentionDispatcher.getMyMemberId(),
+  matches: (text) => mentionDispatcher.matches(text),
+  processed: mentionCatchUpState
+})
+const botSocketLog = new BotSocketLog(join(app.getPath('userData'), 'logs', 'bot-socket.log'))
+/** powerMonitor 는 app ready 이후에만 쓸 수 있어 처음 쓰일 때 만든다 */
+let awakeKeeper: AwakeKeeper | null = null
+function getAwakeKeeper(): AwakeKeeper {
+  if (!awakeKeeper) {
+    awakeKeeper = new AwakeKeeper({
+      startBlocker: () => powerSaveBlocker.start('prevent-app-suspension'),
+      stopBlocker: (id) => powerSaveBlocker.stop(id),
+      isOnBattery: () => powerMonitor.isOnBatteryPower(),
+      onPowerSourceChange: (listener) => {
+        powerMonitor.on('on-ac', listener)
+        powerMonitor.on('on-battery', listener)
+      }
+    })
+    awakeKeeper.setEnabled((store.get('doorayBot.keepAwake', true) as boolean) ?? true)
+    awakeKeeper.onChange((st) =>
+      botSocketLog.append({ kind: 'power', detail: st.holding ? 'awake-hold' : 'awake-release', data: { onAC: st.onAC, botActive: st.botActive } })
+    )
+  }
+  return awakeKeeper
+}
+let lastCatchUp: BotAgentStatus['lastCatchUp'] = null
+let catchUpRunning = false
+/** 소켓이 다시 붙었을 때 끊겨 있던 동안의 내 @clauday 멘션을 찾아 실행한다 */
+async function runMentionCatchUp(): Promise<void> {
+  const now = Date.now()
+  const since = mentionCatchUpState.getLastAliveAt()
+  mentionCatchUpState.setLastAliveAt(now)
+  // 처음 실행이거나 짧은 끊김(90초 미만)은 실시간 수신과 겹쳐 의미가 없다. 7일 넘게 꺼져 있었으면 훑지 않는다.
+  if (!since || now - since < 90_000 || now - since > 7 * 24 * 3_600_000) return
+  if (catchUpRunning) return
+  catchUpRunning = true
+  try {
+    const result = await mentionCatchUp.find(since)
+    let ran = 0
+    let skippedStale = 0
+    for (const ctx of result.mentions) {
+      if ((ctx.delayedMs ?? 0) > STALE_MENTION_MS) skippedStale++
+      else ran++
+      await mentionDispatcher.dispatchContext(ctx)
+    }
+    lastCatchUp = { at: now, found: result.mentions.length, ran, skippedStale }
+    botSocketLog.append({
+      kind: 'catch-up',
+      detail: `found=${result.mentions.length} ran=${ran} stale=${skippedStale}`,
+      data: { sinceMs: since, gapMin: Math.round((now - since) / 60000), scannedChannels: result.scannedChannels }
+    })
+    console.log(`[MentionCatchUp] 끊김 ${Math.round((now - since) / 60000)}분 — 채널 ${result.scannedChannels}개, 멘션 ${result.mentions.length}건`)
+  } catch (err) {
+    console.error('[MentionCatchUp] 실패:', err)
+    botSocketLog.append({ kind: 'catch-up', detail: 'error', data: { message: err instanceof Error ? err.message : String(err) } })
+  } finally {
+    catchUpRunning = false
+  }
+}
+let mentionAgentWired = false
 hookRouter.addResolver((cwd) => mentionHookHandler.resolve(cwd))
 hookRouter.setHandler(MENTION_HOOK_KIND, (ev, route) => mentionHookHandler.handle(ev, route))
+hookRouter.setDecider(MENTION_HOOK_KIND, (ev, route, signal) => mentionHookHandler.decide(ev, route, signal))
 const skillStore = new SkillStore()
 const gitService = new GitService()
 const analyticsService = new AnalyticsService()
@@ -418,6 +513,7 @@ function createWindow(): BrowserWindow {
   void hookServer.start().then(({ port, secret }) => {
     agentWorkspace.setHookConfig({ port, secret })
     hookServer.setHandler((ev) => hookRouter.dispatch(ev))
+    hookServer.setDecider((ev, signal) => hookRouter.decide(ev, signal))
   }).catch((err) => console.error('[HookServer] start 실패:', err))
   // v2.0 C-2 — run 변경을 렌더러로 push. electron 의존(webContents.send)은 index.ts 에만 둔다.
   workspaceService.addChangeListener((payload) => {
@@ -427,78 +523,47 @@ function createWindow(): BrowserWindow {
   })
   // 부팅 시 휘발 상태 정리(terminalSessionId 초기화 + 외부 삭제 워크트리 감지)
   void workspaceService.reconcile().catch((err) => console.error('[Workspace] reconcile 실패:', err))
-  mentionDispatcher.onMention(async (ctx) => {
-    try {
-      const orgId = extractOrgId(ctx)
-      // 동시 작업 차단 — 같은 채널에서 진행 중이면 거부 + 두레이 채널로 안내
-      const busyState = mentionTerminalSpawner.checkBusy(ctx.channelId)
-      if (busyState.busy) {
-        const minutes = Math.max(1, Math.floor(busyState.sinceMs / 60000))
-        await claudayResponder.send(
-          ctx.channelId,
-          `이전 작업이 아직 진행 중입니다 (시작 ${minutes}분 전). 끝나면 다시 호출해주세요.`,
-          orgId
-        )
-        console.log(`[Mention] busy 거부 channelId=${ctx.channelId} since=${minutes}m`)
-        return
+  if (!mentionAgentWired) {
+    mentionAgentWired = true
+    const mentionPipeline = new MentionPipeline({
+      spawner: mentionTerminalSpawner,
+      collector: mentionContextCollector,
+      workspace: agentWorkspace,
+      responder: claudayResponder,
+      sessions: channelSessionStore,
+      turns: mentionTurns,
+      progress: mentionProgress,
+      getWindowSize: () => (store.get('doorayMentionTrigger.windowSize', 50) as number) || 50,
+      getTrigger: () => mentionDispatcher.getTrigger(),
+      onReceived: (info) => {
+        const win = BrowserWindow.getAllWindows()[0] ?? null
+        // 알림은 사용자 인지를 위해 dispatch 전에 즉시
+        if (win) notifyMention(win, { channelName: info.channelName, preview: info.text })
+        // 사이드바 배지/pulse 트리거용 IPC push
+        if (win && !win.isDestroyed()) win.webContents.send(IPC_CHANNELS.MENTION_RECEIVED, info)
       }
-      const windowSize =
-        (store.get('doorayMentionTrigger.windowSize', 50) as number) || 50
-      const collected = await mentionContextCollector.collect(
-        ctx.channelId,
-        ctx.logId,
-        windowSize,
-        ctx.channelDisplayName
-      )
-      const prompt = buildPromptFromContext(collected)
-      const ws = agentWorkspace.ensureChannel(ctx.channelId, collected.channelName)
-      const promptRelPath = agentWorkspace.writeTaskPrompt(
-        ctx.channelId,
-        ctx.logId,
-        prompt
-      )
-      // 알림은 사용자 인지를 위해 dispatch 전에 즉시
-      notifyMention(mainWindow, {
-        channelName: collected.channelName,
-        preview: ctx.text
+    })
+    mentionDispatcher.onMention((ctx) => mentionPipeline.handle(ctx))
+    // 승인 대기 중인 채널에 온 내 답장(승인/거절/항상 승인)을 브로커로 — 내 메시지만 판정한다
+    botService.addEventListener((ev) => {
+      if (!ev.channelId || !ev.text || !approvalBroker.hasPending(ev.channelId)) return
+      void mentionDispatcher.getMyMemberId().then((myId) => {
+        if (myId && ev.senderId === myId) approvalBroker.onReply(ev.channelId!, ev.text!)
       })
-      // 사이드바 배지/pulse 트리거용 IPC push
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send(IPC_CHANNELS.MENTION_RECEIVED, {
-          channelId: ctx.channelId,
-          channelName: collected.channelName,
-          text: ctx.text,
-          logId: ctx.logId,
-          sentAt: ctx.sentAt
-        })
-      }
-      // 시작 알림 — 두레이 채널로 즉시 통보
-      await claudayResponder.send(ctx.channelId, '작업을 시작합니다.', orgId)
-      // organizationId를 세션에 저장 (Stop hook에서 종료 알림 송신 시 재사용)
-      channelSessionStore.set(ctx.channelId, channelSessionStore.get(ctx.channelId)?.tabId || '', collected.channelName, orgId)
-
-      // 멘션에서 @clauday 떼낸 실제 요청을 한 줄 입력에 직접 박는다 (md 파일과 분리)
-      const userRequest = extractUserRequest(ctx.text, mentionDispatcher.getTrigger())
-      const result = await mentionTerminalSpawner.dispatch({
-        channelId: ctx.channelId,
-        channelName: collected.channelName,
-        channelDir: ws.channelDir,
-        promptRelPath,
-        userRequest
-      })
-      // dispatch가 set을 또 호출하니 orgId가 누락되지 않게 한 번 더 보강
-      const cur = channelSessionStore.get(ctx.channelId)
-      if (cur && !cur.organizationId && orgId) {
-        channelSessionStore.set(ctx.channelId, cur.tabId, cur.channelName, orgId)
-      }
-      console.log(
-        `[Mention] dispatch 완료 tabId=${result.tabId} reused=${result.reused} ` +
-        `messages=${collected.messages.length} prompt=${promptRelPath}`
-      )
-    } catch (err) {
-      console.error('[Mention] 파이프라인 실패:', err)
-    }
-  })
+    })
+    // 소켓 상태 → 연결 기록 · 깨어 있기 · 놓친 멘션 찾기 (기획 §5.8)
+    botService.addStateListener((state) => {
+      botSocketLog.append({ kind: 'state', detail: state })
+      getAwakeKeeper().setBotActive(state === 'ACTIVE')
+      if (state === 'ACTIVE') void runMentionCatchUp()
+    })
+    // 살아 있는 동안 1분마다 생존 시각을 남긴다 — 앱 종료·잠자기로 끊긴 구간의 시작점
+    setInterval(() => {
+      if (botService.getStatus().state === 'ACTIVE') mentionCatchUpState.setLastAliveAt(Date.now())
+    }, 60_000)
+    powerMonitor.on('suspend', () => botSocketLog.append({ kind: 'power', detail: 'suspend' }))
+    powerMonitor.on('resume', () => botSocketLog.append({ kind: 'power', detail: 'resume' }))
+  }
   mentionDispatcher.start()
   void botService.start().catch((err) => console.error('[BotService] start 실패:', err))
   // AI가 스킬을 system prompt에 자동으로 합치도록 연결 (enabled && autoApply 스킬만)
@@ -799,6 +864,28 @@ function registerIpcHandlers(): void {
     }
   )
   ipcMain.handle(IPC_CHANNELS.BOT_GET_STATUS, () => botService.getStatus())
+  const getBotAgentStatus = (): BotAgentStatus => {
+    const awake = getAwakeKeeper().getStatus()
+    return {
+      permissionMode: getMentionPermissionMode(),
+      keepAwake: awake.enabled,
+      awakeHolding: awake.holding,
+      onAC: awake.onAC,
+      disconnects24h: botSocketLog.summary().disconnects24h,
+      lastCatchUp
+    }
+  }
+  ipcMain.handle(IPC_CHANNELS.BOT_GET_AGENT_STATUS, () => getBotAgentStatus())
+  ipcMain.handle(IPC_CHANNELS.BOT_SET_PERMISSION_MODE, (_, mode: MentionPermissionMode) => {
+    const next: MentionPermissionMode = mode === 'bypass' ? 'bypass' : 'approval'
+    store.set('doorayMentionTrigger.permissionMode', next)
+    return getBotAgentStatus()
+  })
+  ipcMain.handle(IPC_CHANNELS.BOT_SET_KEEP_AWAKE, (_, enabled: boolean) => {
+    store.set('doorayBot.keepAwake', !!enabled)
+    getAwakeKeeper().setEnabled(!!enabled)
+    return getBotAgentStatus()
+  })
   ipcMain.handle(IPC_CHANNELS.BOT_START, () => botService.start())
   ipcMain.handle(IPC_CHANNELS.BOT_STOP, () => botService.stop())
   // AI: 메신저 메시지 정리/생성
