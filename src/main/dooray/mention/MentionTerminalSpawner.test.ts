@@ -93,13 +93,18 @@ describe('dispatch — 신규 (MISS)', () => {
     expect(store.markBusy).toHaveBeenCalledWith('c1')
     // input 호출에 claude 명령 + prompt 라인 + \r 포함
     const allInputs = tm.input.mock.calls.map((c) => c[1] as string)
+    // 항상 권한 확인을 건너뛴다 — 위험 동작만 PreToolUse hook(DangerGate)이 두레이 승인을 받는다
     expect(allInputs.some((x) => x.startsWith('claude ') && x.includes('--dangerously-skip-permissions'))).toBe(true)
+    expect(allInputs.some((x) => x.includes('acceptEdits'))).toBe(false)
     expect(allInputs.some((x) => x.includes('tasks/log1.md'))).toBe(true)
   })
 
-  it('이전 탭이 죽어있으면 store clear 후 claude 명령은 --resume 없이', async () => {
-    // findReusableTabId 가 먼저 호출되어 dead 탭 정보를 clear 하므로
-    // prev?.claudeSessionId 는 이후 null → --resume 미사용
+  it('영속 설정 모드와 무관하게 setApprovalMode 같은 분기가 없다 (항상 skip-permissions)', () => {
+    expect((s as unknown as Record<string, unknown>).setApprovalMode).toBeUndefined()
+  })
+
+  it('이전 탭이 죽어 있어도 저장된 claude 세션을 --resume 으로 이어받는다 (채널 1:1 세션)', async () => {
+    // 예전엔 dead 탭 정보를 지운 뒤 prev 를 읽어 --resume 에 도달하지 못했다
     store._data['c1'] = { tabId: 'dead', busy: false, claudeSessionId: 'sess-1' }
     const p = s.dispatch({
       channelId: 'c1', channelName: 'A', channelDir: '/ws/c1',
@@ -108,8 +113,7 @@ describe('dispatch — 신규 (MISS)', () => {
     await vi.runAllTimersAsync()
     await p
     const inputs = tm.input.mock.calls.map((c) => c[1] as string)
-    expect(inputs.some((x) => x.startsWith('claude --dangerously'))).toBe(true)
-    expect(inputs.some((x) => x.includes('--resume'))).toBe(false)
+    expect(inputs.some((x) => x.startsWith('claude --resume sess-1 --dangerously-skip-permissions'))).toBe(true)
   })
 
   it('userRequest 빈 문자열이면 안내 문구 prompt 사용', async () => {
@@ -215,5 +219,74 @@ describe('setMainWindow', () => {
     expect(win.restore).toHaveBeenCalled()
     expect(win.show).toHaveBeenCalled()
     expect(win.webContents.send).toHaveBeenCalled()
+  })
+})
+
+describe('tryReserve / release', () => {
+  const req = { channelId: 'c1', channelName: 'A', channelDir: '/ws/c1', promptRelPath: 'tasks/x.md', userRequest: 'go' }
+
+  it('첫 호출은 ok, 같은 채널 연속 호출은 sinceMs 와 함께 거부', () => {
+    expect(s.tryReserve('c1')).toEqual({ ok: true })
+    vi.advanceTimersByTime(4000)
+    const second = s.tryReserve('c1')
+    expect(second.ok).toBe(false)
+    if (!second.ok) expect(second.sinceMs).toBeGreaterThanOrEqual(4000)
+  })
+
+  it('다른 채널은 막지 않는다', () => {
+    expect(s.tryReserve('c1').ok).toBe(true)
+    expect(s.tryReserve('c2').ok).toBe(true)
+  })
+
+  it('선점 중에는 checkBusy 도 busy', () => {
+    s.tryReserve('c1')
+    expect(s.checkBusy('c1').busy).toBe(true)
+  })
+
+  it('release 후에는 다시 선점 가능', () => {
+    s.tryReserve('c1')
+    s.release('c1')
+    expect(s.tryReserve('c1')).toEqual({ ok: true })
+  })
+
+  it('세션 저장소가 busy 인 채널(탭 생존)은 선점 거부', () => {
+    tm._sessions.push({ id: 'tab-1', name: 'x' })
+    store._data['c1'] = { tabId: 'tab-1', busy: true, busySince: Date.now() - 1000 }
+    expect(s.tryReserve('c1').ok).toBe(false)
+  })
+
+  it('dispatch 가 성공하면 선점이 풀리고 세션 busy 로 넘어간다', async () => {
+    s.tryReserve('c1')
+    const p = s.dispatch(req)
+    await vi.runAllTimersAsync()
+    await p
+    // 선점은 풀렸지만 세션이 busy 라 여전히 거부 — 선점 → busy 인계
+    expect(store.markBusy).toHaveBeenCalledWith('c1')
+    const r = s.tryReserve('c1')
+    expect(r.ok).toBe(false)
+    s.release('c1') // 선점이 없었다면 no-op
+  })
+
+  it('dispatch 가 예외로 끝나도 선점이 풀린다', async () => {
+    tm.create.mockImplementation(() => { throw new Error('pty 실패') })
+    s.tryReserve('c1')
+    const p = s.dispatch(req).catch((e: Error) => e)
+    await vi.runAllTimersAsync()
+    const err = await p
+    expect((err as Error).message).toBe('pty 실패')
+    expect(s.tryReserve('c1')).toEqual({ ok: true })
+  })
+
+  it('재사용 경로(HIT)에서도 dispatch 후 선점이 풀린다', async () => {
+    tm._sessions.push({ id: 'tab-1', name: 'x' })
+    store._data['c1'] = { tabId: 'tab-1', busy: false }
+    s.tryReserve('c1')
+    const p = s.dispatch(req)
+    await vi.runAllTimersAsync()
+    const res = await p
+    expect(res.reused).toBe(true)
+    // 선점 맵이 비었는지: 세션 busy 를 끄면 바로 선점 가능해야 한다
+    store._data['c1'].busy = false
+    expect(s.tryReserve('c1')).toEqual({ ok: true })
   })
 })

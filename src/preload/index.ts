@@ -898,6 +898,13 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.BOT_GET_STATUS),
     start: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.BOT_START),
     stop: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.BOT_STOP),
+    /** @clauday 대기 상태 — 깨어 있기·최근 연결 끊김·마지막 놓친 멘션 찾기 */
+    getAgentStatus: (): Promise<import('../shared/types/bot').BotAgentStatus> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOT_GET_AGENT_STATUS),
+    setKeepAwake: (enabled: boolean): Promise<import('../shared/types/bot').BotAgentStatus> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOT_SET_KEEP_AWAKE, enabled),
+    setPermissionMode: (mode: import('../shared/types/bot').MentionPermissionMode): Promise<import('../shared/types/bot').BotAgentStatus> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOT_SET_PERMISSION_MODE, mode),
     onStateUpdate: (callback: (status: { state: string; lastError: string | null; ready: boolean }) => void): (() => void) => {
       const handler = (_: IpcRendererEvent, status: { state: string; lastError: string | null; ready: boolean }): void =>
         callback(status)

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { HookServer, type HookEventPayload } from './HookServer'
+import { request as httpRequest } from 'http'
+import { HookServer, DECISION_EVENTS, type HookEventPayload } from './HookServer'
 
 async function post(port: number, path: string, body: unknown, headers: Record<string, string> = {}): Promise<{ status: number; body: string }> {
   const res = await fetch(`http://127.0.0.1:${port}${path}`, {
@@ -99,5 +100,134 @@ describe('HookServer', () => {
     const { port } = await server.start()
     server.stop()
     await expect(fetch(`http://127.0.0.1:${port}/clauday-hook`)).rejects.toThrow()
+  })
+})
+
+// ───────────────────────── permission_request 결정 ─────────────────────────
+
+describe('HookServer — decider (pre_tool_use)', () => {
+  const PERM = '/clauday-hook?event=pre_tool_use'
+
+  it('DECISION_EVENTS 는 pre_tool_use 만 (permission_request 는 더 이상 결정하지 않는다)', () => {
+    expect([...DECISION_EVENTS]).toEqual(['pre_tool_use'])
+  })
+
+  it('decider 결과를 응답 본문(JSON)으로 돌려주고, 이벤트 payload 를 넘긴다', async () => {
+    const { port, secret } = await server.start()
+    const decision = { hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'allow' } } }
+    const decider = vi.fn(async () => decision)
+    const handler = vi.fn()
+    server.setDecider(decider)
+    server.setHandler(handler)
+    const res = await post(port, PERM, { cwd: '/ws/c1', tool_name: 'Bash', tool_input: { command: 'ls' } }, { 'X-Clauday-Secret': secret })
+    expect(res.status).toBe(200)
+    expect(JSON.parse(res.body)).toEqual(decision)
+    expect(decider).toHaveBeenCalledTimes(1)
+    const [ev, signal] = decider.mock.calls[0] as unknown as [HookEventPayload, AbortSignal]
+    expect(ev).toMatchObject({ event: 'pre_tool_use', cwd: '/ws/c1', tool_name: 'Bash', tool_input: { command: 'ls' } })
+    expect(signal.aborted).toBe(false)
+    // 결정형 이벤트는 일반 handler 로 가지 않는다
+    await new Promise((r) => setTimeout(r, 20))
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('decider 가 오래 걸리면 그동안 응답을 보류한다', async () => {
+    const { port, secret } = await server.start()
+    let release!: (v: Record<string, unknown>) => void
+    server.setDecider(() => new Promise((r) => { release = r }))
+    let done = false
+    const pending = post(port, PERM, { cwd: '/x' }, { 'X-Clauday-Secret': secret }).then((r) => { done = true; return r })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(done).toBe(false)
+    release({ ok: 1 })
+    expect(JSON.parse((await pending).body)).toEqual({ ok: 1 })
+  })
+
+  it('decider 가 null 을 주면 빈 객체 (결정 안 함)', async () => {
+    const { port, secret } = await server.start()
+    server.setDecider(async () => null)
+    const res = await post(port, PERM, { cwd: '/x' }, { 'X-Clauday-Secret': secret })
+    expect(res.status).toBe(200)
+    expect(JSON.parse(res.body)).toEqual({})
+  })
+
+  it('decider 가 throw 해도 200 {} 로 마감', async () => {
+    const { port, secret } = await server.start()
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    server.setDecider(async () => { throw new Error('boom') })
+    const res = await post(port, PERM, { cwd: '/x' }, { 'X-Clauday-Secret': secret })
+    expect(res.status).toBe(200)
+    expect(JSON.parse(res.body)).toEqual({})
+    expect(errSpy).toHaveBeenCalled()
+    errSpy.mockRestore()
+  })
+
+  it('decider 대기 중 클라이언트가 연결을 끊으면 signal 이 abort 된다', async () => {
+    const { port, secret } = await server.start()
+    let captured: AbortSignal | undefined
+    const started = vi.fn()
+    server.setDecider((_ev, signal) => {
+      captured = signal
+      started()
+      return new Promise((resolve) => signal.addEventListener('abort', () => resolve(null)))
+    })
+    const body = JSON.stringify({ cwd: '/x', tool_name: 'Bash' })
+    const req = httpRequest({
+      host: '127.0.0.1', port, path: PERM, method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body), 'X-Clauday-Secret': secret }
+    })
+    req.on('error', () => {})
+    req.end(body)
+    await vi.waitFor(() => expect(started).toHaveBeenCalled())
+    expect(captured!.aborted).toBe(false)
+    req.destroy()
+    await vi.waitFor(() => expect(captured!.aborted).toBe(true))
+  })
+
+  it('정상 응답이 나간 뒤에는 abort 하지 않는다', async () => {
+    const { port, secret } = await server.start()
+    let captured: AbortSignal | undefined
+    server.setDecider(async (_ev, signal) => { captured = signal; return {} })
+    await post(port, PERM, { cwd: '/x' }, { 'X-Clauday-Secret': secret })
+    await new Promise((r) => setTimeout(r, 30))
+    expect(captured!.aborted).toBe(false)
+  })
+
+  it('다른 이벤트는 decider 를 거치지 않고 즉시 {} + handler 호출', async () => {
+    const { port, secret } = await server.start()
+    const decider = vi.fn(async () => ({ never: true }))
+    const seen: HookEventPayload[] = []
+    server.setDecider(decider)
+    server.setHandler((ev) => { seen.push(ev) })
+    for (const event of ['stop', 'permission_request', 'user_prompt_submit', 'post_tool_use']) {
+      const res = await post(port, `/clauday-hook?event=${event}`, { cwd: '/x' }, { 'X-Clauday-Secret': secret })
+      expect(res.status).toBe(200)
+      expect(res.body).toBe('{}')
+    }
+    await new Promise((r) => setTimeout(r, 30))
+    expect(decider).not.toHaveBeenCalled()
+    expect(seen.map((e) => e.event)).toEqual(['stop', 'permission_request', 'user_prompt_submit', 'post_tool_use'])
+  })
+
+  it('decider 미설정이면 pre_tool_use 도 기존 동작 (즉시 {} + handler)', async () => {
+    const { port, secret } = await server.start()
+    const seen: HookEventPayload[] = []
+    server.setHandler((ev) => { seen.push(ev) })
+    const res = await post(port, PERM, { cwd: '/x' }, { 'X-Clauday-Secret': secret })
+    expect(res.status).toBe(200)
+    expect(res.body).toBe('{}')
+    await new Promise((r) => setTimeout(r, 30))
+    expect(seen.map((e) => e.event)).toEqual(['pre_tool_use'])
+  })
+
+  it('시크릿이 틀리면 pre_tool_use 도 401, decider 호출 없음', async () => {
+    const { port } = await server.start()
+    const decider = vi.fn(async () => ({}))
+    server.setDecider(decider)
+    const r1 = await post(port, PERM, { cwd: '/x' })
+    const r2 = await post(port, PERM, { cwd: '/x' }, { 'X-Clauday-Secret': 'wrong' })
+    expect(r1.status).toBe(401)
+    expect(r2.status).toBe(401)
+    expect(decider).not.toHaveBeenCalled()
   })
 })

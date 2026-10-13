@@ -1,5 +1,9 @@
 # Domain — Dooray Bot (@clauday)
 
+> **v2.1 진행 중 (2026-10-13)** — 회신 형식·두레이 승인·진행 표시·원글 수집·놓친 멘션 찾기로 구조가 바뀌었다. 이 문서 본문은 v1.4 기준이다.
+> 현재 상태와 이어서 할 일: `feature/dooray-bot/v2.1-agentic/plan.md` · 담당 에이전트: `.claude/agents/clauday-agent-owner.md`
+
+
 > Clauday 가 두레이 채널에 *상주봇* 으로 들어가서 `@clauday <요청>` 멘션을 받아 Claude Code CLI 를 띄우는 흐름.
 > Ultra Agent 와는 *별개* (Ultra Agent 는 *외부* 메신저 채널에 결합된 다른 Claude Code 인스턴스). 본 도메인은 Clauday *내장* 봇.
 

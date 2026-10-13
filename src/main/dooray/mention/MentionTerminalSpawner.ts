@@ -19,7 +19,7 @@ const CLAUDE_BOOT_DELAY_MS = 1500
 const CLAUDE_READY_DELAY_MS = 3000
 /** 기존 탭에 추가 입력하기 전 잠깐 대기 (입력창 포커스/렌더 안정화 여유) */
 const REUSE_DELAY_MS = 250
-/** busy 자동 해제 시간 — 30분 안에 끝난다고 가정. 길어지면 사용자가 reset 명령으로 강제 해제 */
+/** busy 자동 해제 시간 — 30분 안에 끝난다고 가정 */
 const BUSY_TIMEOUT_MS = 30 * 60 * 1000
 
 /**
@@ -41,6 +41,8 @@ const BUSY_TIMEOUT_MS = 30 * 60 * 1000
  */
 export class MentionTerminalSpawner {
   private mainWindow: BrowserWindow | null = null
+  /** channelId → 선점 시각. 멘션 수신~dispatch 사이의 경쟁을 막는다 */
+  private reserved = new Map<string, number>()
 
   constructor(
     private terminalManager: TerminalManager,
@@ -57,6 +59,8 @@ export class MentionTerminalSpawner {
    *  - 위 조건 어긋나면 stale로 보고 자동 idle 처리
    */
   checkBusy(channelId: string): { busy: boolean; sinceMs: number } {
+    const reservedAt = this.reserved.get(channelId)
+    if (reservedAt !== undefined) return { busy: true, sinceMs: Date.now() - reservedAt }
     const cur = this.sessionStore.get(channelId)
     if (!cur || !cur.busy) return { busy: false, sinceMs: 0 }
     const alive = this.terminalManager.listSessions().some((s) => s.id === cur.tabId)
@@ -72,9 +76,33 @@ export class MentionTerminalSpawner {
     return { busy: true, sinceMs }
   }
 
+  /**
+   * busy 확인과 선점을 한 번에 — 확인 뒤 컨텍스트 수집(await) 동안 같은 채널 멘션이 또 들어와도 통과하지 못한다.
+   * 선점은 dispatch 가 끝나 세션 저장소의 busy 로 넘어가거나 release 로 풀린다.
+   */
+  tryReserve(channelId: string): { ok: true } | { ok: false; sinceMs: number } {
+    const state = this.checkBusy(channelId)
+    if (state.busy) return { ok: false, sinceMs: state.sinceMs }
+    this.reserved.set(channelId, Date.now())
+    return { ok: true }
+  }
+
+  release(channelId: string): void {
+    this.reserved.delete(channelId)
+  }
+
   async dispatch(req: SpawnRequest): Promise<{ tabId: string; reused: boolean }> {
-    const reuseTabId = this.findReusableTabId(req.channelId)
+    try {
+      return await this.dispatchInner(req)
+    } finally {
+      this.release(req.channelId)
+    }
+  }
+
+  private async dispatchInner(req: SpawnRequest): Promise<{ tabId: string; reused: boolean }> {
+    // 먼저 읽는다 — findReusableTabId 가 죽은 탭의 기록을 지우면 이어받을 claude 세션 id 까지 사라진다
     const prev = this.sessionStore.get(req.channelId)
+    const reuseTabId = this.findReusableTabId(req.channelId)
 
     if (reuseTabId) {
       this.activate(reuseTabId)
@@ -93,13 +121,13 @@ export class MentionTerminalSpawner {
     this.sessionStore.markBusy(req.channelId)
 
     await sleep(CLAUDE_BOOT_DELAY_MS)
-    // 같은 채널의 이전 claude 세션이 있으면 --resume으로 이어받기 → 채널 1:1 영구 보장
-    // --dangerously-skip-permissions: 멘션 자동 처리 도중 권한 다이얼로그가 뜨면 사용자 입력 없이는
-    // 작업이 멈춰버린다. 두레이 멘션 워크플로우는 자동화가 본질이므로 권한을 우회한다.
-    const skipPerms = '--dangerously-skip-permissions'
+    // 같은 채널의 이전 claude 세션이 있으면 --resume으로 이어받기 → 채널 1:1 영구 보장.
+    // 권한 확인은 건너뛴다 — 무인 실행이라 다이얼로그가 뜨면 멈춘다. 위험 동작만 PreToolUse hook 이 잡아
+    // 두레이 승인을 받는다(DangerGate, 기획 §5.1 · D11).
+    const permFlag = '--dangerously-skip-permissions'
     const claudeCmd = prev?.claudeSessionId
-      ? `claude --resume ${prev.claudeSessionId} ${skipPerms}\r`
-      : `claude ${skipPerms}\r`
+      ? `claude --resume ${prev.claudeSessionId} ${permFlag}\r`
+      : `claude ${permFlag}\r`
     this.terminalManager.input(meta.id, claudeCmd)
 
     await sleep(CLAUDE_READY_DELAY_MS)

@@ -6,20 +6,21 @@
  *
  * 변경: Orca 원본은 xterm 6.1-beta 패치 세트가 추가한 `terminal.options.mouseEventsRequireAlt`
  * (stable xterm 에는 없는 옵션 — `@xterm/xterm@5.5.0` 번들을 grep 해서 부재를 확인했다)를 토글해
- * PTY 로의 마우스 리포팅 자체를 억제한다. Clauday 는 xterm 을 패치하지 않으므로(ADR 제약 —
- * xterm 버전을 올리거나 패치하지 않는다) 그 옵션이 없다 — 대신 **DOM 이벤트 전파를 캡처 단계에서
- * 끊는** 방식으로 같은 목표를 달성한다. xterm 의 마우스 리포팅(CoreMouseService)/선택 리스너는
- * `terminal.element` 의 자식인 뷰포트/스크린 엘리먼트에 버블 단계로 붙는다 — `terminal.element`
- * 에 캡처 단계로 붙인 이 리스너가 그보다 먼저 순회되므로, 억제 대상 mousedown 은
- * `stopPropagation()` 으로 xterm 내부 리스너에 아예 도달하지 못하게 막는다. **mouseup 은 막지
- * 않는다** — xterm 의 링크 activate 판정이 mouseup 에서 일어나므로, 그것까지 막으면 이 모듈이
- * 막으려는 "이중 열림" 대신 오히려 "링크 자체가 안 열림" 회귀가 된다.
+ * PTY 로의 마우스 리포팅 자체를 억제한다. Clauday 는 xterm 을 패치하지 않으므로(ADR 제약) 대신
+ * **DOM 이벤트 전파를 끊는** 방식으로 같은 목표를 달성한다.
+ *
+ * 끊는 자리가 중요하다 — xterm 5.5 의 DOM 구조(`terminal.element` > `.xterm-screen` > 클릭 대상):
+ *  - 링크 감지기(Linkifier)는 `.xterm-screen` 에 mousedown/mouseup 을 붙인다. mousedown 에서 "누른 링크" 를
+ *    기억하고 mouseup 에서 같은 링크일 때만 activate 한다 — **mousedown 이 닿아야 링크가 열린다**.
+ *  - PTY 마우스 리포팅·선택은 `terminal.element` 에 붙는다.
+ * 그래서 `.xterm-screen` 에 **버블 단계**로 붙여, 먼저 등록된 Linkifier 가 mousedown 을 받은 뒤
+ * `terminal.element` 로 올라가지 못하게 막는다. (예전엔 `terminal.element` 캡처 단계에서 막아 Linkifier 까지
+ * 못 받아, Claude Code 처럼 마우스 리포팅을 켠 TUI 위에서 ⌘클릭이 툴팁만 뜨고 열리지 않았다 — 2026-10-13 B1.)
+ * mouseup 은 막지 않는다 — activate 판정이 거기서 일어난다.
  */
 
 import type { IDisposable, Terminal } from '@xterm/xterm'
 import { isHttpLinkActivationEvent } from './linkActivation'
-
-const CAPTURE_LISTENER_OPTIONS = { capture: true } as const
 
 /**
  * vim/htop 등 마우스 리포팅을 켠 TUI 위에서 Cmd/Ctrl+클릭하면, xterm 이 같은 클릭을 앱(PTY 마우스
@@ -31,13 +32,13 @@ export function installTerminalLinkPtyMouseSuppression(
   terminal: Terminal,
   shouldSuppressMouseEvent: (event: MouseEvent) => boolean
 ): IDisposable {
-  const terminalElement = terminal.element
+  const screenElement = terminal.element?.querySelector<HTMLElement>('.xterm-screen') ?? terminal.element
   const handleMouseDown = (event: MouseEvent): void => {
     if (event.button !== 0 || !isHttpLinkActivationEvent(event) || !shouldSuppressMouseEvent(event)) return
     event.stopPropagation()
   }
-  terminalElement?.addEventListener('mousedown', handleMouseDown, CAPTURE_LISTENER_OPTIONS)
+  screenElement?.addEventListener('mousedown', handleMouseDown)
   return {
-    dispose: () => terminalElement?.removeEventListener('mousedown', handleMouseDown, CAPTURE_LISTENER_OPTIONS)
+    dispose: () => screenElement?.removeEventListener('mousedown', handleMouseDown)
   }
 }

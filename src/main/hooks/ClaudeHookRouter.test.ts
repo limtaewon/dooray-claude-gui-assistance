@@ -108,3 +108,83 @@ describe('ClaudeHookRouter', () => {
     expect(second).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('ClaudeHookRouter.decide', () => {
+  const permEvent = (cwd = '/x'): HookEventPayload => ({ event: 'permission_request', cwd, raw: {} })
+
+  it('resolver 가 매치한 kind 의 decider 를 (ev, route, signal) 로 호출하고 결과를 돌려준다', async () => {
+    const router = new ClaudeHookRouter()
+    const route: HookRoute = { kind: 'a', id: '1' }
+    router.addResolver(() => route)
+    const result = { hookSpecificOutput: { ok: true } }
+    const decider = vi.fn(async () => result)
+    router.setDecider('a', decider)
+    const ev = permEvent()
+    const signal = new AbortController().signal
+    await expect(router.decide(ev, signal)).resolves.toBe(result)
+    expect(decider).toHaveBeenCalledWith(ev, route, signal)
+  })
+
+  it('다른 kind 의 decider 는 호출하지 않는다', async () => {
+    const router = new ClaudeHookRouter()
+    router.addResolver(() => ({ kind: 'a', id: '1' }))
+    const other = vi.fn(async () => ({}))
+    router.setDecider('b', other)
+    await expect(router.decide(permEvent(), new AbortController().signal)).resolves.toBeNull()
+    expect(other).not.toHaveBeenCalled()
+  })
+
+  it('route 가 없으면 null (decider 호출 없음)', async () => {
+    const router = new ClaudeHookRouter()
+    router.addResolver(() => null)
+    const decider = vi.fn(async () => ({}))
+    router.setDecider('a', decider)
+    await expect(router.decide(permEvent(), new AbortController().signal)).resolves.toBeNull()
+    expect(decider).not.toHaveBeenCalled()
+  })
+
+  it('resolver 가 없어도 null', async () => {
+    await expect(new ClaudeHookRouter().decide(permEvent(), new AbortController().signal)).resolves.toBeNull()
+  })
+
+  it('decider 가 없으면 null', async () => {
+    const router = new ClaudeHookRouter()
+    router.addResolver(() => ({ kind: 'a', id: '1' }))
+    await expect(router.decide(permEvent(), new AbortController().signal)).resolves.toBeNull()
+  })
+
+  it('decider 가 null 을 주면 그대로 null', async () => {
+    const router = new ClaudeHookRouter()
+    router.addResolver(() => ({ kind: 'a', id: '1' }))
+    router.setDecider('a', async () => null)
+    await expect(router.decide(permEvent(), new AbortController().signal)).resolves.toBeNull()
+  })
+
+  it('resolver 예외는 무시하고 다음 resolver 로', async () => {
+    const router = new ClaudeHookRouter()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    router.addResolver(() => { throw new Error('boom') })
+    router.addResolver(() => ({ kind: 'a', id: '1' }))
+    router.setDecider('a', async () => ({ ok: 1 }))
+    await expect(router.decide(permEvent(), new AbortController().signal)).resolves.toEqual({ ok: 1 })
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('first-match — 앞 resolver 가 매치하면 뒤 resolver 는 호출되지 않는다', async () => {
+    const router = new ClaudeHookRouter()
+    const second = vi.fn(() => ({ kind: 'b', id: '2' }))
+    router.addResolver(() => ({ kind: 'a', id: '1' }))
+    router.addResolver(second)
+    router.setDecider('a', async () => ({}))
+    await router.decide(permEvent(), new AbortController().signal)
+    expect(second).not.toHaveBeenCalled()
+  })
+
+  it('decider 의 예외는 호출자에게 전파된다 (HookServer 가 {} 로 마감)', async () => {
+    const router = new ClaudeHookRouter()
+    router.addResolver(() => ({ kind: 'a', id: '1' }))
+    router.setDecider('a', async () => { throw new Error('x') })
+    await expect(router.decide(permEvent(), new AbortController().signal)).rejects.toThrow('x')
+  })
+})

@@ -23,6 +23,7 @@ import {
 import { saveTerminalTheme } from '../../hooks/useTerminalTheme'
 import { saveTerminalFont } from '../../hooks/useTerminalFont'
 import GitHubSettings from './GitHubSettings'
+import type { BotAgentStatus, MentionPermissionMode } from '@shared/types/bot'
 import {
   SettingsDivider,
   SettingsNumberRow,
@@ -607,6 +608,91 @@ function SocketModeSettings({ hasApiToken }: { hasApiToken: boolean }): JSX.Elem
           className="mt-2 px-4 py-1.5 rounded-lg bg-clauday-orange text-white text-xs font-medium hover:opacity-90 disabled:opacity-50">
           {saving ? '연결 중...' : domain ? '재연결' : '연결'}
         </button>
+      </div>
+
+      {domain && <MentionAgentAwakeSettings botState={state} />}
+    </div>
+  )
+}
+
+/** @clauday 에이전트 — 권한 모드(기획 §5.1) · 충전 중 깨어 있기 · 연결 끊김·놓친 멘션 찾기 결과(§5.8) */
+function MentionAgentAwakeSettings({ botState }: { botState: string }): JSX.Element {
+  const [st, setSt] = useState<BotAgentStatus | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    window.api.bot.getAgentStatus()
+      .then((next) => { if (alive) setSt(next) })
+      .catch((err) => console.warn('[MentionAgentAwake] 상태 조회 실패:', err))
+    return () => { alive = false }
+  }, [botState])
+
+  const toggle = async (): Promise<void> => {
+    if (!st) return
+    try {
+      setSt(await window.api.bot.setKeepAwake(!st.keepAwake))
+    } catch (err) {
+      console.warn('[MentionAgentAwake] 설정 실패:', err)
+    }
+  }
+
+  const changeMode = async (mode: MentionPermissionMode): Promise<void> => {
+    try {
+      setSt(await window.api.bot.setPermissionMode(mode))
+    } catch (err) {
+      console.warn('[MentionAgentAwake] 권한 모드 설정 실패:', err)
+    }
+  }
+
+  const holdingText = !st ? '' : st.awakeHolding ? '지금 잠자기를 막는 중' : !st.onAC ? '배터리 사용 중이라 쉬는 중' : st.keepAwake ? '봇 연결을 기다리는 중' : '꺼짐'
+  const catchUp = st?.lastCatchUp
+
+  return (
+    <div className="mt-4">
+      <div data-tour="bot-permission-mode">
+        <SettingsRow
+          label="@clauday 권한"
+          description={
+            st?.permissionMode === 'bypass'
+              ? '자율 — 아무것도 묻지 않고 실행합니다. git push · 폴더 삭제 · DB 쓰기 · Drop 게시 · 두레이 쓰기도 그대로 통과합니다.'
+              : '위험 동작만 승인 — 평소엔 묻지 않고 실행하고, git push · 폴더 삭제(rm -r) · DB 쓰기 · Drop 게시 · 두레이 쓰기만 채널에 승인 카드를 보내 답장(승인 · 거절 사유 · 항상 승인)으로 받습니다. 9분 안에 답이 없으면 거절합니다.'
+          }
+          searchKeywords={['승인', '권한', 'permission', 'clauday']}
+          control={
+            <SettingsSegmentedControl
+              value={st?.permissionMode ?? 'approval'}
+              onChange={(m) => void changeMode(m)}
+              ariaLabel="@clauday 권한"
+              options={[
+                { value: 'approval' as const, label: '위험 동작만 승인', disabled: !st },
+                { value: 'bypass' as const, label: '자율', disabled: !st }
+              ]}
+            />
+          }
+        />
+      </div>
+      <div className="mt-3" data-tour="bot-keep-awake">
+      <SettingsSwitchRow
+        label="@clauday 대기 중 깨어 있기"
+        description="충전 중일 때만 잠자기와 App Nap 을 막아, 외출 중에도 두레이에서 보낸 @clauday 를 받습니다. 덮개를 닫으면 잠듭니다."
+        checked={st?.keepAwake ?? true}
+        onChange={() => void toggle()}
+        disabled={!st}
+        searchKeywords={['잠자기', '슬립', '깨어', 'clauday', '멘션']}
+      />
+      {st && (
+        <div className="mt-2 space-y-1 text-[calc(11px_*_var(--app-font-scale,1))] text-text-secondary">
+          <p>상태 · {holdingText}</p>
+          <p>최근 24시간 연결 끊김 · {st.disconnects24h}회</p>
+          {catchUp && (
+            <p>
+              놓친 멘션 찾기 · {new Date(catchUp.at).toLocaleString()} — {catchUp.found}건 찾음
+              {catchUp.ran > 0 && `, ${catchUp.ran}건 실행`}
+              {catchUp.skippedStale > 0 && `, ${catchUp.skippedStale}건은 오래돼 실행 안 함`}
+            </p>
+          )}
+        </div>
+      )}
       </div>
     </div>
   )

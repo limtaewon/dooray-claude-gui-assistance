@@ -11,6 +11,13 @@
 
 ## 결정 이력 (워크플로우 도입 후)
 
+- 2026-10-13 — [@clauday 실행은 TUI(PTY) 유지](../../feature/dooray-bot/v2.1-agentic/adr.md) — `-p`/SDK 별도 크레딧(2026-06-15) 때문에 대화형 claude + hook 으로 구조화 이벤트를 받는다. 영향: dooray-bot.
+- 2026-10-13 — [두레이 회신은 평문 변환 + 카드 불변 + 긴 답은 카드 원글 글타래](../../feature/dooray-bot/v2.1-agentic/adr.md) — 실측: text 는 링크·인라인코드·언어 코드블록만 렌더, PUT 은 카드를 지움, create-and-send 는 카드를 원글로 받음. ```md 감싸기 폐기. 영향: dooray-bot.
+- 2026-10-13 — [진행 표시는 도구 이벤트 → 사람이 읽는 단계](../../feature/dooray-bot/v2.1-agentic/adr.md) — 2.1.296 대화형 세션에 할 일 목록 도구 미노출. 세부(파일명·명령)는 내보내지 않음. 영향: dooray-bot.
+- 2026-10-13 — [사내 시스템은 개인 스킬로, Clauday 는 지도만](../../feature/dooray-bot/v2.1-agentic/adr.md) — Drop 자동 발행 안 함. 번들 스킬 dooray-reply·internal-systems 만 채널 폴더에 동기화. 영향: dooray-bot.
+- 2026-10-13 — [컨텍스트: 글타래 원글 + 첨부 이미지 + 비밀값 마스킹](../../feature/dooray-bot/v2.1-agentic/adr.md) — 원글은 부모 채널에서 thread.channelId 로 검색(메타 API 없음). 운영 채널 글타래 첫 답글 ~40% 가 원글 전제. 영향: dooray-bot.
+- 2026-10-13 — [외출 중: 충전 중 깨어 있기 + 놓친 멘션 찾기 + 소켓 이력](../../feature/dooray-bot/v2.1-agentic/adr.md) — Socket Mode 는 연결 중 메시지만 전달. 3시간 초과 멘션은 안내만. 영향: dooray-bot, electron.
+- 2026-10-13 — [권한 확인 없이 실행 + 위험 동작만 PreToolUse 두레이 승인](../../feature/dooray-bot/v2.1-agentic/adr.md) — ADR-03(acceptEdits + PermissionRequest) 대체. 1차 실기에서 읽기 명령까지 승인이 쏟아지고 백그라운드 하위 에이전트 승인이 PC 에만 떠 "멈춤". 위험 목록: git push·리셋·PR 머지 / rm -r / DB 쓰기·Drop 게시 / 두레이 쓰기. 영향: dooray-bot, claude-chat.
 - 2026-07-30 — [claude code hook 수신을 cwd resolver first-match + kind 핸들러 라우터로 일반화](../../feature/workspace/v2-workspace-p0/adr.md) — `HookServer` 의 단일 멘션 전용 핸들러를 도메인 무지(domain-agnostic) `ClaudeHookRouter` 로 분리, 멘션 로직은 `MentionHookHandler` 로 이사해 처음으로 단위 테스트 가능해짐(무동작변경). C-2 워크스페이스 hook 은 resolver 추가만으로 확장 가능. 영향: dooray-bot, claude-chat.
 - 2026-07-30 — [.claude 준비 로직을 claudeDirSetup 모듈 함수로 추출](../../feature/workspace/v2-workspace-p0/adr.md) — `AgentWorkspaceManager` 의 private trust/hook settings 메서드를 경로 주입 가능한 모듈 함수(`src/main/claude/claudeDirSetup.ts`)로 분리. 테스트가 개발자의 실제 `~/.claude.json` 을 오염시키던 문제 제거. 영향: dooray-bot, claude-chat.
 - 2026-07-30 — [TaskRow 추출 시 taskStyles.ts 동반 분리](../../feature/workspace/v2-workspace-p0/adr.md) — 비export 로컬 `TaskRow`/워크플로·태그 스타일 헬퍼를 `Dooray/TaskRow.tsx`+`Dooray/taskStyles.ts` 로 승격, 후속 워크스페이스 뷰가 `import` 한 줄로 재사용 가능. 영향: renderer-only.

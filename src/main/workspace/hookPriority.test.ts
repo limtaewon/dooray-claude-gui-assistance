@@ -39,7 +39,8 @@ function setup(): {
   const mentionHandler = new MentionHookHandler({
     getAgentRoot: () => AGENT_ROOT,
     sessions: { get: vi.fn(), setClaudeSessionId: vi.fn(), markIdle: vi.fn() },
-    responder: { send: vi.fn(async () => {}) }
+    publisher: { publish: vi.fn(async () => {}) },
+    turns: { onPromptSubmit: vi.fn(() => 'manual' as const), onStop: vi.fn(() => ({ kind: 'manual' as const })), current: vi.fn(() => null) }
   })
 
   const store = new WorkspaceStore(new MemoryStorage())
