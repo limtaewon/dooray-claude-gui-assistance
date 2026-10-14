@@ -5,6 +5,9 @@ export interface MentionTurn {
   /** 회신할 채널 (멘션이 온 채널 — 글타래면 글타래 채널) */
   replyChannelId: string
   inThread: boolean
+  /** 글타래면 부모 채널 — 되물은 질문의 답을 다음 턴으로 넣을 때 원글을 다시 찾는다 */
+  parentChannelId?: string
+  channelDisplayName?: string
   organizationId?: string
   /** 진행 메시지 logId — 끝나면 완료로 고쳐 쓴다 */
   progressLogId?: string | null

@@ -59,6 +59,7 @@ import { ResultPublisher } from './dooray/mention/agent/ResultPublisher'
 import { MentionTurnTracker } from './dooray/mention/agent/MentionTurnTracker'
 import { ProgressReporter } from './dooray/mention/agent/ProgressReporter'
 import { ApprovalBroker } from './dooray/mention/agent/ApprovalBroker'
+import { QuestionWatcher } from './dooray/mention/agent/QuestionWatcher'
 import { AlwaysAllowStore } from './dooray/mention/agent/AlwaysAllowStore'
 import { BotSocketLog } from './dooray/socket-mode/BotSocketLog'
 import { AwakeKeeper } from './power/AwakeKeeper'
@@ -297,6 +298,22 @@ const approvalBroker = new ApprovalBroker({
   },
   onWaiting: (channelId, waiting) => mentionProgress.setPhase(channelId, waiting ? '🟧 두레이 승인 대기 중' : '작업 중')
 })
+// 에이전트가 되물은 회신에 @clauday 없이 반응·답장으로 답한다 — 받은 답은 같은 채널의 다음 멘션 턴으로 넣는다
+const questionWatcher = new QuestionWatcher({
+  messenger: messengerService,
+  getMyMemberId: () => mentionDispatcher.getMyMemberId(),
+  onAnswer: ({ origin, logId, request }) => {
+    void mentionDispatcher.dispatchContext({
+      channelId: origin.channelId,
+      senderId: '',
+      logId,
+      text: `@${mentionDispatcher.getTrigger()} ${request}`,
+      channelDisplayName: origin.channelDisplayName,
+      isThread: origin.inThread,
+      parentChannelId: origin.parentChannelId
+    })
+  }
+})
 const mentionHookHandler = new MentionHookHandler({
   getAgentRoot: () => agentWorkspace.getAgentRoot(),
   sessions: channelSessionStore,
@@ -304,6 +321,7 @@ const mentionHookHandler = new MentionHookHandler({
   turns: mentionTurns,
   approvals: approvalBroker,
   progress: mentionProgress,
+  questions: questionWatcher,
   // 판정은 앱이 하므로 설정을 바꾸면 이미 떠 있는 claude 에도 즉시 적용된다
   isGateEnabled: () => getMentionPermissionMode() === 'approval',
   alwaysAllow: new AlwaysAllowStore(mentionCatchUpStorage)
@@ -545,12 +563,22 @@ function createWindow(): BrowserWindow {
         if (win && !win.isDestroyed()) win.webContents.send(IPC_CHANNELS.MENTION_RECEIVED, info)
       }
     })
-    mentionDispatcher.onMention((ctx) => mentionPipeline.handle(ctx))
-    // 승인 대기 중인 채널에 온 내 답장(승인/거절/항상 승인)을 브로커로 — 내 메시지만 판정한다
+    mentionDispatcher.onMention((ctx) => {
+      // 새 요청이 오면 앞서 되물은 질문의 답은 더 기다리지 않는다
+      questionWatcher.clear(ctx.channelId)
+      return mentionPipeline.handle(ctx)
+    })
+    // 내 답장 — 승인 대기가 먼저, 그다음 되물은 질문. @clauday 로 시작하면 멘션 경로가 처리한다
     botService.addEventListener((ev) => {
-      if (!ev.channelId || !ev.text || !approvalBroker.hasPending(ev.channelId)) return
+      const channelId = ev.channelId
+      const text = ev.text
+      if (!channelId || !text) return
+      if (!approvalBroker.hasPending(channelId) && !questionWatcher.isWatching(channelId)) return
+      if (mentionDispatcher.matches(text)) return
       void mentionDispatcher.getMyMemberId().then((myId) => {
-        if (myId && ev.senderId === myId) approvalBroker.onReply(ev.channelId!, ev.text!)
+        if (!myId || ev.senderId !== myId) return
+        if (approvalBroker.onReply(channelId, text)) return
+        if (ev.logId) questionWatcher.onReply(channelId, text, ev.logId)
       })
     })
     // 소켓 상태 → 연결 기록 · 깨어 있기 · 놓친 멘션 찾기 (기획 §5.8)

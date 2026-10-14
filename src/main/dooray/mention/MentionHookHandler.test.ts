@@ -124,6 +124,28 @@ describe('MentionHookHandler.handle — 턴 출처 / stop 회신', () => {
     })
   })
 
+  it('되묻는 회신이면 그 메시지를 질문 대기에 넘긴다 (회신 자리·글타래 정보 포함)', async () => {
+    const deps = makeDeps()
+    const question = { kind: 'choice', options: ['상신', '임시저장'] }
+    deps.publisher.publish.mockResolvedValueOnce({ logId: 'P1', text: '질문', question })
+    const questions = { watch: vi.fn() }
+    beginTurn(deps, { organizationId: 'org-1' })
+    const handler = new MentionHookHandler({ ...deps, questions })
+    await handler.handle(makeEvent({ event: 'user_prompt_submit', raw: { prompt: 'tasks/L1.md 파일의 채팅을 참고…' } }), ROUTE)
+    await handler.handle(makeEvent({ event: 'stop', raw: { last_assistant_message: '어느 쪽?' } }), ROUTE)
+    expect(questions.watch).toHaveBeenCalledWith({
+      channelId: 'ch1',
+      replyChannelId: 'ch1',
+      questionLogId: 'P1',
+      questionText: '질문',
+      question,
+      organizationId: 'org-1',
+      inThread: false,
+      parentChannelId: undefined,
+      channelDisplayName: undefined
+    })
+  })
+
   it('TUI 에 직접 친 턴의 stop 은 두레이로 회신하지 않는다', async () => {
     const deps = makeDeps()
     const handler = new MentionHookHandler(deps)

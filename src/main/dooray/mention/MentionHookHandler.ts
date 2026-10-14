@@ -9,6 +9,7 @@ import type { ProgressReporter } from './agent/ProgressReporter'
 import { toHookResponse, type ApprovalBroker } from './agent/ApprovalBroker'
 import { classifyDanger } from './agent/DangerGate'
 import type { AlwaysAllowStore } from './agent/AlwaysAllowStore'
+import type { QuestionWatcher } from './agent/QuestionWatcher'
 
 export const MENTION_HOOK_KIND = 'mention'
 
@@ -26,6 +27,8 @@ export interface MentionHookDeps {
   alwaysAllow?: Pick<AlwaysAllowStore, 'has' | 'add'>
   /** 진행 메시지 단계 갱신 */
   progress?: Pick<ProgressReporter, 'onTool' | 'stop'>
+  /** 되물은 회신의 반응·답장 대기 */
+  questions?: Pick<QuestionWatcher, 'watch'>
   readTranscript?: (path: string) => string
 }
 
@@ -114,14 +117,28 @@ export class MentionHookHandler {
     const { turn } = decision
     // 보내는 중인 진행 갱신이 완료 표기를 덮지 않게 먼저 멈춘다
     if (!decision.followUp) await this.deps.progress?.stop(channelId)
-    await this.deps.publisher.publish({
+    const organizationId = turn.organizationId ?? this.deps.sessions.get(channelId)?.organizationId
+    const asked = await this.deps.publisher.publish({
       channelId: turn.replyChannelId,
       inThread: turn.inThread,
-      organizationId: turn.organizationId ?? this.deps.sessions.get(channelId)?.organizationId,
+      organizationId,
       answer,
       startedAt: turn.startedAt,
       progressLogId: turn.progressLogId
     })
+    if (asked) {
+      this.deps.questions?.watch({
+        channelId,
+        replyChannelId: turn.replyChannelId,
+        questionLogId: asked.logId,
+        questionText: asked.text,
+        question: asked.question,
+        organizationId,
+        inThread: turn.inThread,
+        parentChannelId: turn.parentChannelId,
+        channelDisplayName: turn.channelDisplayName
+      })
+    }
   }
 }
 

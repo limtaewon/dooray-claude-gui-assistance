@@ -76,6 +76,8 @@ export class MentionPipeline {
         logId: ctx.logId,
         replyChannelId: ctx.channelId,
         inThread: !!ctx.isThread,
+        parentChannelId: ctx.parentChannelId,
+        channelDisplayName: ctx.channelDisplayName,
         organizationId: orgId,
         progressLogId: null,
         startedAt: now

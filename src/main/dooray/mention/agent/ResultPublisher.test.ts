@@ -86,7 +86,7 @@ describe('ResultPublisher.publish — 짧은 답은 진행 메시지 자리에',
 
   it('고쳐 쓰기·완료 표기가 모두 실패해도 본문은 보낸다', async () => {
     m.updateMessage.mockRejectedValue(new Error('PUT 실패'))
-    await expect(pub.publish({ ...base, answer: '본문', progressLogId: 'p' })).resolves.toBeUndefined()
+    await expect(pub.publish({ ...base, answer: '본문', progressLogId: 'p' })).resolves.toBeNull()
     expect(m.sendMessage).toHaveBeenCalledTimes(1)
   })
 
@@ -135,7 +135,7 @@ describe('ResultPublisher.publish — 빈 응답', () => {
 
   it('진행 메시지 완료 표기 실패는 throw 하지 않는다 (대체 송신도 없음)', async () => {
     m.updateMessage.mockRejectedValue(new Error('x'))
-    await expect(pub.publish({ ...base, answer: '', progressLogId: 'p' })).resolves.toBeUndefined()
+    await expect(pub.publish({ ...base, answer: '', progressLogId: 'p' })).resolves.toBeNull()
     expect(m.sendMessage).not.toHaveBeenCalled()
   })
 })
@@ -236,18 +236,18 @@ describe('ResultPublisher.publish — 긴 답, 글타래 안 멘션', () => {
 describe('ResultPublisher.publish — 송신 실패', () => {
   it('sendMessage 실패는 throw 하지 않고 warn', async () => {
     m.sendMessage.mockRejectedValue(new Error('net'))
-    await expect(pub.publish({ ...base, answer: '본문' })).resolves.toBeUndefined()
+    await expect(pub.publish({ ...base, answer: '본문' })).resolves.toBeNull()
     expect(console.warn).toHaveBeenCalled()
   })
 
   it('빈 응답 송신 실패도 throw 하지 않음', async () => {
     m.sendMessage.mockRejectedValue(new Error('net'))
-    await expect(pub.publish({ ...base, answer: '' })).resolves.toBeUndefined()
+    await expect(pub.publish({ ...base, answer: '' })).resolves.toBeNull()
   })
 
   it('카드 송신 실패에도 조각 송신은 계속', async () => {
     m.sendCard.mockRejectedValue(new Error('card'))
-    await expect(pub.publish({ ...base, inThread: true, answer: longMarkdown() })).resolves.toBeUndefined()
+    await expect(pub.publish({ ...base, inThread: true, answer: longMarkdown() })).resolves.toBeNull()
     expect(m.sendMessage).toHaveBeenCalled()
   })
 
@@ -263,5 +263,27 @@ describe('ResultPublisher.publish — 송신 실패', () => {
     await pub.publish({ channelId: 'c1', inThread: false, answer: 'x', startedAt: 0, progressLogId: 'p' })
     vi.useRealTimers()
     expect(m.updateMessage.mock.calls[0][2]).toBe('[Clauday] ✅ 1:05\nx')
+  })
+})
+
+describe('ResultPublisher.publish — 되묻는 답', () => {
+  const ask = '어느 쪽으로 할까요?\n1) 상신\n2) 임시저장'
+
+  it('진행 메시지에 쓴 질문 — 끝에 반응 안내 한 줄을 붙이고 그 메시지를 돌려준다', async () => {
+    const asked = await pub.publish({ ...base, answer: ask, progressLogId: 'p1' })
+    const text = m.updateMessage.mock.calls[0][2] as string
+    expect(text.endsWith('↳ 1️⃣ 2️⃣ 반응이나 번호 답장으로 골라 주세요 (@clauday 없이)')).toBe(true)
+    expect(asked).toEqual({ logId: 'p1', text, question: { kind: 'choice', options: ['상신', '임시저장'] } })
+  })
+
+  it('새 메시지로 보낸 질문은 그 메시지 logId', async () => {
+    const asked = await pub.publish({ ...base, answer: '어느 저장소인가요?' })
+    expect(asked?.logId).toBe('log-1')
+    expect(asked?.question).toEqual({ kind: 'open' })
+  })
+
+  it('묻지 않는 답·글타래로 간 긴 답은 null', async () => {
+    expect(await pub.publish({ ...base, answer: '완료했습니다.' })).toBeNull()
+    expect(await pub.publish({ ...base, answer: longMarkdown() })).toBeNull()
   })
 })
