@@ -655,7 +655,7 @@ function MentionAgentAwakeSettings({ botState }: { botState: string }): JSX.Elem
           description={
             st?.permissionMode === 'bypass'
               ? '자율 — 아무것도 묻지 않고 실행합니다. git push · 폴더 삭제 · DB 쓰기 · Drop 게시 · 두레이 쓰기도 그대로 통과합니다.'
-              : '위험 동작만 승인 — 평소엔 묻지 않고 실행하고, git push · 폴더 삭제(rm -r) · DB 쓰기 · Drop 게시 · 두레이 쓰기만 채널에 승인 카드를 보내 답장(승인 · 거절 사유 · 항상 승인)으로 받습니다. 9분 안에 답이 없으면 거절합니다.'
+              : '위험 동작만 승인 — 평소엔 묻지 않고 실행하고, git push · 폴더 삭제(rm -r) · DB 쓰기 · Drop 게시 · 두레이 쓰기만 채널에 승인 카드를 보내고 카드에 누른 반응(✅ 승인 · ❌ 거절 · 👌 항상 승인)이나 답장으로 받습니다. 9분 안에 답이 없으면 거절합니다.'
           }
           searchKeywords={['승인', '권한', 'permission', 'clauday']}
           control={

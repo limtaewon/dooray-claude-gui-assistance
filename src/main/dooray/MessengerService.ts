@@ -169,6 +169,11 @@ export class MessengerService {
     )
   }
 
+  /** 내가 보낸 메시지를 지운다. 시스템 메시지는 지워지지 않는다(500). */
+  async deleteMessage(channelId: string, logId: string): Promise<void> {
+    await this.client.request<SingleResponse<unknown>>(`/messenger/v1/channels/${channelId}/logs/${logId}`, { method: 'DELETE' })
+  }
+
   /** 새 글타래를 만들고 원글(카드 가능)과 첫 답글을 보낸다. 반환 threadChannelId 로 이후 답글을 보낸다. */
   async createThreadAndSend(
     channelId: string,

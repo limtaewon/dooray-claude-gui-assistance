@@ -78,6 +78,12 @@ claude TUI hook ─▶ HookServer ─▶ ClaudeHookRouter
 - **B1 터미널 ⌘클릭** — 원인은 마우스 트래킹 자체가 아니라 `ptyMouseSuppression.ts` 가 `terminal.element` **캡처 단계**에서 mousedown 을 끊어 자식 `.xterm-screen` 의 xterm Linkifier 까지 막은 것. Linkifier 는 mousedown 에 "누른 링크" 를 기억하고 mouseup 에 같은 링크일 때만 activate 하므로 툴팁만 뜨고 안 열렸다(URL 링크도 동일). `.xterm-screen` **버블 단계**로 옮겨 Linkifier 는 받고 PTY 리포팅(`terminal.element`)으로는 안 올라가게 함. xterm 내부 필드는 건드리지 않음. 회귀 테스트: 실제 DOM 구조(element > .xterm-screen > target)로 Linkifier 수신 확인.
 - **B2 멘션 hook 경로** — `MentionHookHandler.resolve` 가 `startsWith(agentRoot)` 만 봐서 형제 폴더를 채널 `..` 로 잡던 것을 경로 경계(`agentRoot + sep`)까지 보도록.
 
+## S6 테스트가 잡아 고친 것 (2026-10-14)
+- MCP "항상 승인" 이 서버·분류 단위라 게시를 허용하면 **삭제도 통과** → 삭제 계열(delete·remove·drop·truncate)은 도구별 서명
+- 셸 우회 미탐: `sudo -u root rm -rf`, `bash -lc "git push"`, `eval "git push"`, `$(git push)`, 백틱, `timeout 5 git push`
+- `run_sql`·`run_query` 처럼 임의 SQL 도구는 본문(INSERT·UPDATE·DELETE·DROP…)으로 DB 쓰기 판정
+- 타임아웃 결과 한 줄에만 경과 시간이 빠짐
+
 ## 실기 확인
 
 ### 1차 — 2026-10-13 18:14~18:21, 개인 채널, `npm run dev`

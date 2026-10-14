@@ -467,6 +467,15 @@ describe('isLongAnswer — 질문이면 길어도 false', () => {
     expect(isLongAnswer(code, 'x')).toBe(false)
   })
 
+  it('질문 예외는 포맷된 길이 1500자까지 — 넘으면 다시 긴 답', () => {
+    const q = (n: number): string => 'x'.repeat(n) + '\n\n어떻게 할까요?'
+    const at = q(1500 - '\n\n어떻게 할까요?'.length)
+    expect(at.length).toBe(1500)
+    expect(isLongAnswer(at, at)).toBe(false)
+    const over = q(1500 - '\n\n어떻게 할까요?'.length + 1)
+    expect(isLongAnswer(over, over)).toBe(true)
+  })
+
   it('질문이 아니면 기존 규칙 그대로', () => {
     const t = 'x'.repeat(700) + '\n\n이상입니다.'
     expect(isLongAnswer(t, t)).toBe(true)

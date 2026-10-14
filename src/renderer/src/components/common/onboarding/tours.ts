@@ -357,7 +357,7 @@ export const TOURS: Record<TourViewId, TourStep[]> = {
     {
       anchor: 'bot-permission-mode',
       title: '@clauday 권한 — 위험 동작만 승인',
-      body: '평소엔 묻지 않고 실행합니다. git push · 폴더 삭제 · DB 쓰기 · Drop 게시 · 두레이 쓰기만 채널에 승인 카드를 보냅니다. 같은 채널에 "승인", "거절 사유", "항상 승인" 으로 답장하면 됩니다. 모드는 바로 적용됩니다.'
+      body: '평소엔 묻지 않고 실행합니다. git push · 폴더 삭제 · DB 쓰기 · Drop 게시 · 두레이 쓰기만 채널에 승인 카드를 보냅니다. 카드에 ✅(승인) · ❌(거절) · 👌(항상 승인) 반응을 누르면 됩니다 — 폰에서도 됩니다. 답장으로 "승인" 이라고 써도 됩니다.'
     },
     {
       anchor: 'bot-keep-awake',

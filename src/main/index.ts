@@ -289,6 +289,8 @@ const mentionProgress = new ProgressReporter(messengerService)
 // 두레이 승인(기획 §5.2) — PermissionRequest hook 을 두레이 카드 + 내 답장으로 결정한다
 const approvalBroker = new ApprovalBroker({
   messenger: messengerService,
+  // 카드 반응은 내가 누른 것만 인정한다 — mentionDispatcher 는 아래에서 만들어지므로 호출 시점에 찾는다
+  getMyMemberId: () => mentionDispatcher.getMyMemberId(),
   notify: (info) => {
     const win = BrowserWindow.getAllWindows()[0] ?? null
     if (win) notifyMention(win, { channelName: '승인 필요', preview: info.title })

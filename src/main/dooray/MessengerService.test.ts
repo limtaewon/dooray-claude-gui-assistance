@@ -310,3 +310,23 @@ describe('MessengerService.listAllChannelsRaw', () => {
     expect(await svc.listAllChannelsRaw()).toEqual([])
   })
 })
+
+describe('MessengerService.deleteMessage', () => {
+  it('DELETE /messenger/v1/channels/{ch}/logs/{id}', async () => {
+    const client = makeClient(() => ({ header: { isSuccessful: true } }))
+    svc = new MessengerService(client as never)
+    await expect(svc.deleteMessage('ch1', 'log9')).resolves.toBeUndefined()
+    expect(client.request).toHaveBeenCalledTimes(1)
+    const [path, opts] = client.request.mock.calls[0] as [string, { method: string; body?: string }]
+    expect(path).toBe('/messenger/v1/channels/ch1/logs/log9')
+    expect(opts.method).toBe('DELETE')
+    expect(opts.body).toBeUndefined()
+  })
+
+  it('서버 오류(시스템 메시지 500 등)는 호출자에게 전파', async () => {
+    const client = { request: vi.fn().mockRejectedValue(new Error('500')) }
+    svc = new MessengerService(client as never)
+    await expect(svc.deleteMessage('ch1', 'sys')).rejects.toThrow('500')
+  })
+})
+
