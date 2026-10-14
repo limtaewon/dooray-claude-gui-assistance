@@ -84,6 +84,15 @@ claude TUI hook ─▶ HookServer ─▶ ClaudeHookRouter
 - `run_sql`·`run_query` 처럼 임의 SQL 도구는 본문(INSERT·UPDATE·DELETE·DROP…)으로 DB 쓰기 판정
 - 타임아웃 결과 한 줄에만 경과 시간이 빠짐
 
+## 되물은 질문에 반응으로 답하기 (2026-10-14, plan 6-1)
+- 계기: 휴가 상신 확인 회신("1) 상신 2) 임시저장")은 승인 카드가 아니라 반응으로 답할 수 없었고, 답장도 `@clauday` 를 붙여야 했다.
+- `agent/QuestionWatcher.ts` — `detectQuestion` 이 회신을 choice(고르라는 말이 붙은 번호 목록) / confirm(진행해도 되는지) / open(그 밖의 질문)으로 나눈다. 단계 설명 같은 번호 목록은 선택지로 보지 않는다.
+- `ResultPublisher` 가 짧은 답 끝에 `questionHint` 한 줄을 붙이고 그 메시지를 돌려준다 → `MentionHookHandler` 가 `QuestionWatcher.watch`. 글타래로 간 긴 답은 대상 아님.
+- 반응은 처음 5분 3초, 이후 15초 주기로 2시간 확인. ❌ 가 숫자보다 이긴다. 답장은 번호·예/아니오 단답은 언제든, 문장은 질문 뒤 10분 안에만 받는다(같은 채널의 다른 대화를 삼키지 않도록).
+- 받은 답은 선택지 문장으로 풀어(`1) 상신: … — 이걸로 진행해 주세요.`) `mentionDispatcher.dispatchContext` 로 같은 채널의 다음 멘션 턴이 된다. 질문 메시지의 안내 줄은 `↳ 1️⃣ 선택됨` 으로 바뀐다.
+- 새 멘션이 오면 기다림을 접는다. 승인 대기가 있으면 답장은 승인이 먼저 받는다.
+- `dooray-reply` 스킬 4항: 선택지는 `1)` `2)` + "아래 중 하나로 답 주세요" — 감지 규칙과 맞춘다.
+
 ## 실기 확인
 
 ### 1차 — 2026-10-13 18:14~18:21, 개인 채널, `npm run dev`
