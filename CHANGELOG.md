@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.2] - 2026-10-14
+
+### 추가 — @clauday 가 되물으면 반응으로 답할 수 있습니다
+
+에이전트가 선택지(`1) 상신 2) 임시저장`)나 진행 확인을 물으면 메시지 끝에 답하는 법이 한 줄 붙습니다.
+그 메시지에 **1️⃣ 2️⃣ … 숫자 반응**이나 **✅ 진행 · ❌ 취소** 반응을 누르면 바로 이어서 진행합니다.
+`@clauday` 없이 `1` · `네` 처럼 답장해도 됩니다 (문장 답장은 질문 뒤 10분 안까지).
+
 ## [2.1.1] - 2026-10-14
 
 ### 변경 — @clauday 승인은 카드에 반응을 누르면 됩니다
@@ -1006,7 +1014,7 @@ v1.5는 두 가지 큰 축이 있습니다. 첫째, 두레이 캘린더를 CalDA
 - ESC 로 picker / shareTarget 모달 닫기
 - 버튼 색상 다양화: 새로고침 secondary, 선택 활성 시 orange, 위키 추가 secondary, 공유에 올리기 primary 등 (`ai` 변형은 실제 AI 호출에만 한정)
 
-## [Unreleased] - Design System v1 (feat/design-system 브랜치)
+## [2.1.2] - 2026-10-14 - Design System v1 (feat/design-system 브랜치)
 
 Claude Design이 생성한 디자인 시스템을 실제 코드베이스에 점진 이식.
 `handoff/` 폴더의 MIGRATION.md + bundle.md + screens/ 기반.
