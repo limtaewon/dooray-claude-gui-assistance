@@ -35,19 +35,23 @@ export class ResultPublisher {
     const answer = req.answer.trim()
     const formatted = answer ? formatForDooray(answer) : ''
 
-    await this.finishProgress(req, elapsedMs)
-
     if (!formatted) {
-      await this.safeSend(req.channelId, `${MESSAGE_PREFIX} 응답 완료.`, req.organizationId)
+      // 진행 메시지가 있으면 "✅ 완료" 로 고쳐 쓰는 것으로 충분하다
+      if (req.progressLogId) await this.finishProgress(req, elapsedMs)
+      else await this.safeSend(req.channelId, `${MESSAGE_PREFIX} 응답 완료.`, req.organizationId)
       return
     }
 
     if (!isLongAnswer(answer, formatted)) {
-      for (const chunk of splitForMessenger(formatted)) {
-        await this.safeSend(req.channelId, withPrefix(chunk), req.organizationId)
-      }
+      const chunks = splitForMessenger(formatted)
+      // 한 조각짜리 짧은 답은 진행 메시지 자리에 답을 고쳐 쓴다 — 턴마다 메시지가 하나 줄어든다
+      if (chunks.length === 1 && req.progressLogId && (await this.replaceProgress(req, `${MESSAGE_PREFIX} ✅ ${formatElapsed(elapsedMs)}\n${chunks[0]}`))) return
+      await this.finishProgress(req, elapsedMs)
+      for (const chunk of chunks) await this.safeSend(req.channelId, withPrefix(chunk), req.organizationId)
       return
     }
+
+    await this.finishProgress(req, elapsedMs)
 
     const chunks = splitForMessenger(formatted)
     const detailNote = req.inThread ? `아래 ${chunks.length}개` : `글타래 ${chunks.length}개`
@@ -75,6 +79,16 @@ export class ResultPublisher {
       return
     }
     for (const c of labeled.slice(1)) await this.safeSend(threadChannelId, c, req.organizationId)
+  }
+
+  private async replaceProgress(req: PublishRequest, text: string): Promise<boolean> {
+    try {
+      await this.messenger.updateMessage(req.channelId, req.progressLogId!, text)
+      return true
+    } catch (err) {
+      console.warn(`[ResultPublisher] 진행 메시지에 답 쓰기 실패 — 새 메시지로 channelId=${req.channelId} logId=${req.progressLogId}:`, err)
+      return false
+    }
   }
 
   private async finishProgress(req: PublishRequest, elapsedMs: number): Promise<void> {

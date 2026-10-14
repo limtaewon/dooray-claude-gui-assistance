@@ -121,32 +121,65 @@ describe('classifyDanger — Bash 위험', () => {
     expect(bash('git push origin a')?.signature).not.toBe(bash('git push origin b')?.signature)
   })
 
-  // 우회: 현재 분해는 래퍼 명령을 해석하지 못해 아래가 모두 통과(null)한다.
   it.each([
-    ['/bin/rm -rf x', 'delete'],
-    ['\\rm -rf x', 'delete'],
-    ['env FOO=1 git push', 'git'],
-    ['env -i git push origin main', 'git'],
-    ['command git push', 'git'],
-    ['nohup git push &', 'git'],
-    ['bash -c "git push"', 'git'],
-    ["sh -c 'cd x && rm -rf build'", 'delete'],
-    ['ls | xargs rm -rf', 'delete'],
-    ['find . -exec rm -rf {} +', 'delete'],
-    ['find . -name "*.tmp" -delete', 'delete']
-  ])('래퍼·우회도 위험으로 본다: %s', (command, category) => {
-    expect(classifyDanger('Bash', { command })?.category).toBe(category)
+    ['/bin/rm -rf x', 'delete', 'Bash:rm -rf x'],
+    ['\\rm -rf x', 'delete', 'Bash:rm -rf x'],
+    ['/usr/bin/git push', 'git', 'Bash:git push'],
+    ['env FOO=1 git push', 'git', 'Bash:git push'],
+    ['command git push', 'git', 'Bash:git push'],
+    ['exec git push', 'git', 'Bash:git push'],
+    ['nohup git push', 'git', 'Bash:git push'],
+    ['time git push', 'git', 'Bash:git push'],
+    ['nice rm -rf x', 'delete', 'Bash:rm -rf x'],
+    ['sudo env A=1 /bin/rm -rf x', 'delete', 'Bash:rm -rf x'],
+    ['(git push)', 'git', 'Bash:git push']
+  ])('절대경로·래퍼 우회도 위험으로 본다: %s', (cmd, category, signature) => {
+    const m = bash(cmd)
+    expect(m?.category).toBe(category)
+    expect(m?.signature).toBe(signature)
   })
 
-  it.each(['echo "a; git push"', "echo 'rm -rf /' > note.txt", 'find . -name x -print', 'ls 2>&1 | head', 'bash -c "git status"'])(
-    '따옴표 안·안전한 명령은 위험이 아니다: %s',
-    (command) => {
-      expect(classifyDanger('Bash', { command })).toBeNull()
-    }
-  )
+  it.each([
+    ['bash -c "git push"', 'git'],
+    ["sh -c 'rm -rf x'", 'delete'],
+    ['zsh -c "git push"', 'git'],
+    ['xargs rm -rf', 'delete'],
+    ['xargs -n1 rm -r', 'delete'],
+    ['find . -exec rm -rf {} +', 'delete'],
+    ['find . -delete', 'delete']
+  ])('다른 셸·xargs·find 로 감싼 위험도 위험으로 본다: %s', (cmd, category) => {
+    expect(bash(cmd)?.category).toBe(category)
+  })
 
-  it('괄호 서브셸 "(git push)" 는 "git push" 와 같은 서명 — 항상 승인이 맞물린다', () => {
-    expect(classifyDanger('Bash', { command: '(git push)' })?.signature).toBe(classifyDanger('Bash', { command: 'git push' })?.signature)
+  it.each([
+    'bash -c "echo hi"',
+    'echo "a; git push"',
+    'echo "a && git push"',
+    'git commit -m "a && git push"',
+    "echo 'x; rm -rf y'",
+    'find . -name "*.log"',
+    'xargs echo'
+  ])('따옴표 안/무해한 래퍼는 위험이 아님: %s', (cmd) => {
+    expect(bash(cmd)).toBeNull()
+  })
+
+  it('`;`·`&` 뒤 위험도 잡고, 2>&1 같은 리다이렉트의 & 는 구분자가 아니다', () => {
+    expect(bash('git push; echo done')?.category).toBe('git')
+    expect(bash('sleep 1 & git push')?.category).toBe('git')
+    expect(bash('ls 2>&1')).toBeNull()
+    expect(bash('make &> log.txt')).toBeNull()
+  })
+
+  // 남은 우회 — 현재 아래는 모두 null 로 통과한다.
+  it.each([
+    ['sudo -u root rm -rf x', 'delete'],
+    ['bash -lc "git push"', 'git'],
+    ['eval "git push"', 'git'],
+    ['echo $(git push)', 'git'],
+    ['echo `rm -rf build`', 'delete'],
+    ['timeout 5 git push', 'git']
+  ])('남은 우회도 위험으로 본다: %s', (command, category) => {
+    expect(classifyDanger('Bash', { command })?.category).toBe(category)
   })
 })
 
@@ -167,7 +200,9 @@ describe('classifyDanger — MCP', () => {
     const m = classifyDanger(tool, {})
     expect(m?.category).toBe('dooray')
     expect(m?.label).toBe('두레이 쓰기')
-    expect(m?.signature).toBe(tool)
+    // MCP 서명은 서버·분류 단위 — 단 삭제 계열은 도구별로 따로 기억한다
+    const base = `mcp:${/^mcp__(.+?)__/.exec(tool)![1].toLowerCase()}:dooray`
+    expect(m?.signature).toBe(/delete/.test(tool) ? `${base}:${/^mcp__.+?__(.+)$/.exec(tool)![1]}` : base)
   })
 
   it.each([
@@ -183,16 +218,20 @@ describe('classifyDanger — MCP', () => {
   it.each([
     'mcp__drop__drop_publish',
     'mcp__drop__drop_upload',
-    'mcp__drop__drop_upload_begin',
     'mcp__drop__drop_upload_finish',
     'mcp__drop__drop_commit_upload',
-    'mcp__drop__drop_delete_file',
-    'mcp__drop__drop_create_project'
+    'mcp__drop__drop_delete_file'
   ])('Drop 게시: %s', (tool) => {
     expect(classifyDanger(tool, {})?.category).toBe('drop')
   })
 
-  it.each(['mcp__drop__drop_list_projects', 'mcp__drop__drop_list_files', 'mcp__drop__drop_cancel_upload'])('Drop 조회/취소는 위험 아님: %s', (tool) => {
+  it.each([
+    'mcp__drop__drop_list_projects',
+    'mcp__drop__drop_list_files',
+    'mcp__drop__drop_cancel_upload',
+    'mcp__drop__drop_create_project',
+    'mcp__drop__drop_upload_begin'
+  ])('Drop 조회/취소/아직 공개 전 단계(프로젝트 생성·업로드 예약)는 위험 아님: %s', (tool) => {
     expect(classifyDanger(tool, {})).toBeNull()
   })
 
@@ -222,6 +261,22 @@ describe('classifyDanger — MCP', () => {
     expect(classifyDanger(tool, {})).toBeNull()
   })
 
+  it('MCP 서명은 mcp:{server}:{category} — 같은 서버·분류면 도구가 달라도 같은 서명, Drop 게시 단계 간에도 공유(삭제 제외)', () => {
+    expect(classifyDanger('mcp__dooray-mcp__create_task', {})?.signature).toBe('mcp:dooray-mcp:dooray')
+    expect(classifyDanger('mcp__dooray-mcp__modify_task', {})?.signature).toBe('mcp:dooray-mcp:dooray')
+    expect(classifyDanger('mcp__drop__drop_publish', {})?.signature).toBe('mcp:drop:drop')
+    expect(classifyDanger('mcp__drop__drop_upload_finish', {})?.signature).toBe('mcp:drop:drop')
+    expect(classifyDanger('mcp__mysql-nfi__execute_update', {})?.signature).toBe('mcp:mysql-nfi:db')
+  })
+
+  it('서버가 다르면 서명도 다르다 (두레이 MCP 두 가지 이름)', () => {
+    expect(classifyDanger('mcp__dooray-mcp__create_task', {})?.signature).not.toBe(classifyDanger('mcp__mcp-dooray__create_task', {})?.signature)
+  })
+
+  it('Bash 서명은 여전히 명령 단위 (git push 를 허용해도 rm -rf 는 다시 묻는다)', () => {
+    expect(bash('git push')?.signature).not.toBe(bash('rm -rf x')?.signature)
+  })
+
   it('알 수 없는 서버의 쓰기 이름은 위험으로 보지 않는다', () => {
     expect(classifyDanger('mcp__grafana__create_dashboard', {})).toBeNull()
     expect(classifyDanger('mcp__other__create_x', {})).toBeNull()
@@ -243,5 +298,23 @@ describe('classifyDanger — MCP', () => {
     expect(classifyDanger('mcp__mysql-nfi__execute_ddl', {})?.category).toBe('db')
     expect(classifyDanger('mcp__mysql-nfi__execute_select', {})).toBeNull()
     expect(classifyDanger('mcp__mysql-nfi__deleted_count', {})).toBeNull()
+  })
+})
+
+describe('classifyDanger — 삭제는 따로 기억 · SQL 본문 판정', () => {
+  it('Drop 게시를 항상 승인해도 삭제는 서명이 달라 다시 묻는다', () => {
+    const publish = classifyDanger('mcp__drop__drop_upload_finish', {})!.signature
+    expect(classifyDanger('mcp__drop__drop_commit_upload', {})!.signature).toBe(publish)
+    expect(classifyDanger('mcp__drop__drop_delete_file', {})!.signature).not.toBe(publish)
+  })
+
+  it('두레이 작성과 삭제도 서명이 다르다', () => {
+    expect(classifyDanger('mcp__dooray-mcp__create_task', {})!.signature).not.toBe(classifyDanger('mcp__dooray-mcp__delete_task_comment', {})!.signature)
+  })
+
+  it('run_sql·run_query 는 SQL 본문이 쓰기일 때만 DB 쓰기', () => {
+    expect(classifyDanger('mcp__neon__run_sql', { sql: 'DROP TABLE t' })?.category).toBe('db')
+    expect(classifyDanger('mcp__clickhouse__run_query', { query: 'select 1; insert into t values (1)' })?.category).toBe('db')
+    expect(classifyDanger('mcp__clickhouse__run_query', { query: 'SELECT count() FROM t' })).toBeNull()
   })
 })

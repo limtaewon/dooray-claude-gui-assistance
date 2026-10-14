@@ -24,11 +24,12 @@ branch: feat/version-2.1.0
 | S3 | 번들 스킬 `dooray-reply`·`internal-systems` 동기화 | ✅ | AC8 |
 | S4 | 두레이 승인 — 권한 정책·PermissionRequest·ApprovalBroker·권한 모드 UI | ✅ → S5 로 대체 | AC6·AC9 |
 | S5 | (실기 확인 반영) skip 실행 + 위험 동작만 PreToolUse 승인(DangerGate·AlwaysAllowStore), 백그라운드 작업 멘션 소유, 회신 가독성(D12) | ✅ 코드·테스트 · 2차 실기 대기 | AC6·D12 |
+| S6 | (2차 실기 반영) 반응 승인(✅❌👌)·카드 삭제 후 한 줄·사람 말 카드·MCP 분류 단위 항상 승인·Drop 공개 단계만·짧은 답 진행 메시지에 쓰기 | ✅ 코드·테스트 · 3차 실기 대기 | ADR-09 |
 | B3 | 탭이 죽은 채널 재멘션 시 `--resume` 에 도달 못 함(채널 세션 이어받기 불가, 기존 버그) | ✅ | 저장된 세션으로 resume |
 | B1 | 터미널 ⌘클릭 파일·URL 링크 (Claude Code TUI 안에서 툴팁만 뜨고 안 열림) | ✅ 코드 · 실기 미확인 | 마우스 리포팅 TUI 위 ⌘클릭이 열린다 |
 | B2 | 멘션 hook 경로 판정이 형제 폴더(`agent-sibling`)를 채널 `..` 로 잡음 | ✅ | 형제 경로는 null |
 
-검증 (2026-10-13 마지막 실행): `npx vitest run` 271 파일 4,250 통과 · `npm run typecheck` 0 · `tsc -p tsconfig.web.json` 0 · `npm run build` 성공.
+검증 (2026-10-13 마지막 실행): `npx vitest run` 271 파일 4,357 통과 · `npm run typecheck` 0 · `tsc -p tsconfig.web.json` 0 · `npm run build` 성공.
 
 ## 이어서 할 일
 

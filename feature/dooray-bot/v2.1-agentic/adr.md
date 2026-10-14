@@ -49,3 +49,10 @@ status: accepted
 - "항상 승인" 은 Claude Code 설정 파일이 아니라 `AlwaysAllowStore`(채널별 서명)에 기억한다. 판정을 앱이 하므로 권한 모드 변경이 이미 떠 있는 claude 에도 즉시 적용된다.
 - 멘션 턴이 끝나도 사람이 TUI 에 직접 치기 전까지 채널은 "멘션 소유" 로 남는다(`MentionTurnTracker.last`) — 백그라운드 작업의 위험 동작 승인과 뒤늦은 응답이 같은 자리로 간다.
 - 결과: `DEFAULT_MENTION_POLICY`·PermissionRequest hook·acceptEdits 분기 삭제. 예전 빌드가 채널 폴더에 넣은 `permissions.ask` 는 다음 멘션 때 걷어 낸다.
+
+## ADR-v2.1-agentic-09 — 승인 입력은 반응(이모지), 버튼은 쓰지 않는다
+- 계기(2차 실기 2026-10-14): Drop 업로드 1건에 승인 카드 4장·메시지 22개. 사용자가 버튼 승인을 원함.
+- 실측: 버튼 클릭은 웹 클라이언트가 **카드의 `commandId`·`appId`** 로 `POST /messenger/v1/api/commands/{commandId}/action` 을 부른다. 값이 없거나 가짜면 두레이 500(HTML), 실제 앱이면 채널 미등록 시 `INTEGRATION_COMMAND_NOT_REGISTERED_IN_CHANNEL_ERROR`, 등록 시 두레이가 앱 **requestUrl** 로 전달(실패하면 클릭한 사람에게만 오류 토스트). 앱의 Request URL 은 두레이 서버가 health-check 로 직접 호출해 통과해야 저장된다. **어느 경우도 채널·메시지에 흔적이 남지 않는다.**
+- 결정: Clauday 는 설치형으로 각자 PC 가 기준이라 두레이가 닿는 상시 서버(requestUrl)를 둘 수 없다 → 버튼 불가. 메시지 `reactions[{value, memberIds}]` 를 REST 로 읽을 수 있으므로 **카드에 내가 누른 ✅(승인)·❌(거절)·👌(항상 승인)** 를 3초 주기로 확인한다(답장도 유지). 판정 뒤 카드를 지우고 결과 한 줄만 남긴다.
+- 함께: "항상 승인" 은 MCP 쓰기를 서버·분류 단위로 기억(Drop 여러 단계가 한 작업), Drop 은 실제 공개·삭제 단계만 승인, 카드 문구는 기술 값(멱등 키·해시·세션 id) 대신 사람 말, 짧은 답은 진행 메시지에 고쳐 쓴다.
+- 기각: 커맨드 앱 + 공용 중계 서버(설치형·로컬 원칙 위배), Clauday 안에 두레이 웹을 띄워 클릭 요청 가로채기(폰에서 안 됨).

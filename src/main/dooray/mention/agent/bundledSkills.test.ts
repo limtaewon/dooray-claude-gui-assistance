@@ -62,5 +62,21 @@ describe('dooray-reply 스킬 — 좁은 메신저 폭 쓰는 법', () => {
     expect(content).toContain('한 줄에 정보 하나')
     expect(content).toContain('제목 한 줄 + 다음 줄 설명')
   })
+
+  it('"## 짧게" 섹션이 3줄로 있고 "쓰는 법" 뒤, "쓰지 않는 것" 앞에 온다', () => {
+    const idx = (h: string): number => content.indexOf(h)
+    expect(idx('## 짧게')).toBeGreaterThan(idx('## 쓰는 법'))
+    expect(idx('## 짧게')).toBeLessThan(idx('## 쓰지 않는 것'))
+    const section = content.split('## 짧게')[1].split(/\n## /)[0]
+    const bullets = section.split('\n').filter((l) => l.startsWith('- '))
+    expect(bullets).toHaveLength(3)
+  })
+
+  it('짧게 섹션: 화면 한 장, 위험 동작은 Clauday 가 반응으로 받으니 다시 묻지 않기, 이미 답한 조건 재확인 금지', () => {
+    const section = content.split('## 짧게')[1].split(/\n## /)[0]
+    expect(section).toContain('화면 한 장')
+    expect(section).toContain('반응 승인')
+    expect(section).toContain('다시 확인하지 않는다')
+  })
 })
 

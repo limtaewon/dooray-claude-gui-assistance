@@ -10,7 +10,10 @@ export interface DangerMatch {
   category: DangerCategory
   /** 카드 제목에 쓰는 사람 말 */
   label: string
-  /** "항상 승인" 의 기억 단위 — 같은 서명이면 다시 묻지 않는다 */
+  /**
+   * "항상 승인" 의 기억 단위 — 같은 서명이면 다시 묻지 않는다.
+   * Bash 는 명령 단위(git push 를 허용해도 rm -rf 는 다시 묻는다), MCP 쓰기는 서버·분류 단위(여러 단계가 한 작업이라)
+   */
   signature: string
 }
 
@@ -31,14 +34,26 @@ export function classifyDanger(toolName: string, input: Record<string, unknown>)
   }
   const mcp = /^mcp__(.+?)__(.+)$/.exec(toolName)
   if (!mcp) return null
-  const category = classifyMcp(mcp[1].toLowerCase(), mcp[2].toLowerCase())
-  return category ? { category, label: LABELS[category], signature: toolName } : null
+  const server = mcp[1].toLowerCase()
+  const op = mcp[2].toLowerCase()
+  const category = classifyMcp(server, op, input)
+  if (!category) return null
+  // 삭제 계열은 따로 기억한다 — 게시·작성을 "항상 승인" 해도 삭제는 다시 묻는다
+  const destructive = /(^|_)(delete|remove|drop|truncate)(_|$)/.test(op.replace(/^drop_/, ''))
+  return { category, label: LABELS[category], signature: destructive ? `mcp:${server}:${category}:${op}` : `mcp:${server}:${category}` }
 }
 
 function classifyShell(command: string, depth: number): { category: DangerCategory; segment: string } | null {
+  // $(…) · `…` 명령 치환 안의 명령도 실행된다 — 꺼내서 함께 본다
+  if (depth < 3) {
+    for (const m of command.matchAll(/\$\(([^()]*)\)|`([^`]*)`/g)) {
+      const hit = classifyShell(m[1] ?? m[2] ?? '', depth + 1)
+      if (hit) return hit
+    }
+  }
   for (const segment of splitShellSegments(command)) {
     // bash -c "…" / sh -c '…' 는 안쪽 명령으로 다시 판정한다
-    const inner = /^(?:ba|z|k|da)?sh\s+(?:-\w+\s+)*-c\s+(["'])([\s\S]*)\1\s*$/.exec(segment)
+    const inner = /^(?:ba|z|k|da)?sh\s+(?:-\w+\s+)*-\w*c\s+(["'])([\s\S]*)\1\s*$/.exec(segment) ?? /^eval\s+(["'])([\s\S]*)\1\s*$/.exec(segment)
     if (inner && depth < 3) {
       const hit = classifyShell(inner[2], depth + 1)
       if (hit) return hit
@@ -79,7 +94,7 @@ export function splitShellSegments(command: string): string[] {
   return parts.map(normalizeSegment).filter(Boolean)
 }
 
-const WRAPPERS = /^(?:sudo(?:\s+-\S+)*|env(?:\s+-\S+)*|command|exec|nohup|time|nice(?:\s+-n\s*\S+)?)\s+/
+const WRAPPERS = /^(?:sudo(?:\s+-[uUgCh]\s+\S+|\s+-\S+)*|env(?:\s+-\S+)*|command|exec|nohup|time|timeout(?:\s+-\S+)*\s+\S+|nice(?:\s+-n\s*\S+)?)\s+/
 
 function normalizeSegment(raw: string): string {
   let s = raw.trim().replace(/^[({]+\s*/, '').replace(/\s*[)}]+$/, '').trim()
@@ -117,11 +132,19 @@ function classifyShellSegment(seg: string): DangerCategory | null {
 const DOORAY_WRITE_OP = /^(create|modify|update|delete|send|set|upload|move|add|join|leave)_/
 // execute_select·execute_query 같은 조회 실행만 빼고 execute_* 는 쓰기로 본다(execute_ddl 등)
 const DB_WRITE_OP = /^(?:execute_(?!select|query)\w+|(?:insert|update|delete|drop|truncate|alter)(?:_|$))/
-const DROP_WRITE_OP = /^drop_(publish|upload|upload_begin|upload_finish|commit_upload|delete_file|create_project)$/
+// 실제로 공개·삭제가 일어나는 단계만 — 프로젝트 생성(restricted)·업로드 예약(begin)은 아직 아무것도 공개하지 않는다
+const DROP_WRITE_OP = /^drop_(publish|upload|upload_finish|commit_upload|delete_file)$/
 
-function classifyMcp(server: string, op: string): DangerCategory | null {
+const SQL_WRITE = /^\s*(?:with\b[\s\S]*?\)\s*)?(insert|update|delete|replace|merge|drop|truncate|alter|create|rename|grant|revoke)\b/i
+
+function classifyMcp(server: string, op: string, input: Record<string, unknown> = {}): DangerCategory | null {
   if (server.includes('dooray')) return DOORAY_WRITE_OP.test(op) ? 'dooray' : null
   if (server === 'drop' || server.startsWith('drop')) return DROP_WRITE_OP.test(op) ? 'drop' : null
-  if (/mysql|clickhouse|postgres|neon|(^|[-_])db([-_]|$)/.test(server)) return DB_WRITE_OP.test(op) ? 'db' : null
+  if (/mysql|clickhouse|postgres|neon|(^|[-_])db([-_]|$)/.test(server)) {
+    if (DB_WRITE_OP.test(op)) return 'db'
+    // run_sql·run_query 처럼 임의 SQL 을 받는 도구는 본문을 본다
+    const sql = ['query', 'sql', 'statement'].map((k) => input[k]).find((v): v is string => typeof v === 'string')
+    return sql && sql.split(';').some((stmt) => SQL_WRITE.test(stmt)) ? 'db' : null
+  }
   return null
 }
